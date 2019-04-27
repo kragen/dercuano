@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+"""Implement Dercuano.
+
+Next up:
+
+- linking the note from its category pages,
+- linking the category pages from the note page,
+- linking the category pages from the index page.
+
+"""
 from __future__ import print_function
 import cgi
 import errno
@@ -18,6 +27,9 @@ class Bundle:
         self.dirname = dirname
         self._triples = list(load_triples(self.filename('triples')))
         self.output_dir = 'dercuano-' + self.get_version()
+
+    def __repr__(self):
+        return 'Bundle(%r)' % self.dirname
 
     def get_version(self):
         for subj, verb, obj in self.triples():
@@ -41,19 +53,22 @@ class Bundle:
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
 
+    def output_filename(self, *parts):
+        return self.filename(self.output_dir, *parts)
+
     def generate_categories(self):
         for category in self.categories():
             self.generate_category(category)
 
     def category_filename(self, category):
-        return self.filename(self.output_dir,
-                             'categories',
-                             as_filename(category) + '.html')
+        return self.output_filename('categories',
+                                    as_filename(category) + '.html')
 
     def note_filename(self, notename):
-        return self.filename(self.output_dir,
-                             'notes',
-                             as_filename(notename) + '.html')
+        return self.output_filename(self.note_localpart(notename))
+
+    def note_localpart(self, notename):
+        return 'notes/' + as_filename(notename) + '.html'
 
     def note_title(self, notename):
         for subj, verb, obj in self.triples():
@@ -111,8 +126,11 @@ def category_html(bundle, category_name):
                     head_stuff()))
 
 def index_html(bundle):
-    return ley(html(title(bundle.get_title(), ' version ', bundle.get_version()),
-                    head_stuff()))
+    return ley(html(title(bundle.get_title(),
+                          ' version ', bundle.get_version()),
+                    head_stuff(),
+                    ul([li(note.link_ley(level=0))
+                        for note in bundle.notes()])))
 
 def ley(htmlish):
     "HTML generator.  Tiny version of Stan from Nevow."
@@ -156,7 +174,7 @@ def tags(*tagnames):
     for tagname in tagnames:
         yield tag(tagname)
 
-html, title, h1 = tags('html', 'title', 'h1')
+html, title, h1, ul, li, a = tags('html', 'title', 'h1', 'ul', 'li', 'a')
 
 class RawHTML:
     def __init__(self, html):
@@ -171,19 +189,30 @@ class Note:
         self.notename = notename
         self.source_file = source_file
 
+    def __repr__(self):
+        return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
+
+    def link_ley(self, level=1):
+        return a(self.title(), href=("../" * level + self.localpart()))
+
     def render_if_outdated(self, print=lambda *args: None):
         if self.is_outdated():
             print("rerendering", self.notename)
             vomit_html(self.output_filename(), self.render().encode('utf-8'))
 
     def output_filename(self):
-        return self.bundle.note_filename(self.notename)
+        return self.bundle.output_filename(self.localpart())
+
+    def localpart(self):
+        return self.bundle.note_localpart(self.notename)
+
+    def title(self):
+        return self.bundle.note_title(self.notename)
 
     def render(self):
         with open(self.source_file) as f:
             body = markdown.markdown(f.read().decode('utf-8'))
-        note_title = self.bundle.note_title(self.notename)
-        return note_html(self.bundle, note_title, body)
+        return note_html(self.bundle, self.title(), body)
 
     def is_outdated(self):
         source_stat = os.stat(self.source_file)
