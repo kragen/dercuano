@@ -3,9 +3,7 @@
 
 Next up:
 
-- interfile links: replace "`foo-bar`" or “file `foo-bar`” with [title
-  of foo bar](foo-bar).
-- some kind of fucking CSS, Jesus.  Copy Medium or whatever.
+- improve the fucking CSS, Jesus.  Copy Medium or whatever.
 - another eight notes
 - a more convenient way to query the triple store
 - maybe some metadata about word counts and time spans and unfinished
@@ -245,7 +243,7 @@ def index_html(bundle):
     categories = sorted(bundle.categories())
     bundle_title = bundle.get_title()
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
-                    head_stuff(),
+                    head_stuff(level=0),
                     h1(bundle_title, ' notes'),
                     ul([li(note.link_ley(level=0), "\n")
                         for note in bundle.notes()]),
@@ -325,5 +323,8 @@ def replace_links(html, bundle):
 
     return ad_hoc_link_re.sub(repl, html)
 
-def head_stuff():
-    return [tag('meta')(charset="utf-8")]
+def head_stuff(level=1):
+    stylesheet = '../' * level + 'liabilities/style.css'
+    return [tag('meta')(charset="utf-8"),
+            tag('link')(rel='stylesheet', href=stylesheet),
+    ]
