@@ -155,6 +155,58 @@ def load_triples(filename):
                                          for field in line.split())
 
 
+class Note:
+    def __init__(self, bundle, notename, source_file):
+        self.bundle = bundle
+        self.notename = notename
+        self.source_file = source_file
+
+    def __repr__(self):
+        return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
+
+    def link_ley(self, level=1):
+        return a(self.title(), href=("../" * level + self.localpart()))
+
+    def render_if_outdated(self, print=lambda *args: None):
+        if self.is_outdated():
+            print("rerendering", self.notename)
+            vomit_html(self.output_filename(), self.render().encode('utf-8'))
+
+    def output_filename(self):
+        return self.bundle.output_filename(self.localpart())
+
+    def localpart(self):
+        return self.bundle.note_localpart(self.notename)
+
+    def title(self):
+        return self.bundle.note_title(self.notename)
+
+    def render(self):
+        with open(self.source_file) as f:
+            body = markdown.markdown(f.read().decode('utf-8'))
+        categories = sorted(self.categories())
+        return note_html(self.bundle, self.title(), body,
+                         div(h2('Categories'),
+                             ul([li(self.bundle.category_link(category))
+                                 for category in categories]))
+                         if categories else [])
+
+    def categories(self):
+        return set(obj for subj, verb, obj in self.bundle.triples()
+                   if subj == self.notename and verb == 'concerns')
+
+    def is_outdated(self):
+        source_stat = os.stat(self.source_file)
+        try:
+            output_stat = os.stat(self.output_filename())
+        except OSError as err:
+            if err.errno == errno.ENOENT:
+                return True
+            raise
+
+        return output_stat.st_mtime <= source_stat.st_mtime
+
+
 def vomit_html(output_filename, html_contents):
     dirname, _ = os.path.split(output_filename)
     if not os.path.exists(dirname):
@@ -248,58 +300,6 @@ class RawHTML:
 
     def as_html(self):
         return self.html
-
-class Note:
-    def __init__(self, bundle, notename, source_file):
-        self.bundle = bundle
-        self.notename = notename
-        self.source_file = source_file
-
-    def __repr__(self):
-        return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
-
-    def link_ley(self, level=1):
-        return a(self.title(), href=("../" * level + self.localpart()))
-
-    def render_if_outdated(self, print=lambda *args: None):
-        if self.is_outdated():
-            print("rerendering", self.notename)
-            vomit_html(self.output_filename(), self.render().encode('utf-8'))
-
-    def output_filename(self):
-        return self.bundle.output_filename(self.localpart())
-
-    def localpart(self):
-        return self.bundle.note_localpart(self.notename)
-
-    def title(self):
-        return self.bundle.note_title(self.notename)
-
-    def render(self):
-        with open(self.source_file) as f:
-            body = markdown.markdown(f.read().decode('utf-8'))
-        categories = sorted(self.categories())
-        return note_html(self.bundle, self.title(), body,
-                         div(h2('Categories'),
-                             ul([li(self.bundle.category_link(category))
-                                 for category in categories]))
-                         if categories else [])
-
-    def categories(self):
-        return set(obj for subj, verb, obj in self.bundle.triples()
-                   if subj == self.notename and verb == 'concerns')
-
-    def is_outdated(self):
-        source_stat = os.stat(self.source_file)
-        try:
-            output_stat = os.stat(self.output_filename())
-        except OSError as err:
-            if err.errno == errno.ENOENT:
-                return True
-            raise
-
-        return output_stat.st_mtime <= source_stat.st_mtime
-
 
 def note_html(bundle, note_title, body, footers):
     return ley(html(title(note_title, ' ⁑ ', bundle.get_title()),
