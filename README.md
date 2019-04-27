@@ -15,13 +15,17 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this piece of shit for three and a half hours.  I have about
+I’ve been hacking on this piece of shit for four and a half hours.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
-compressed.  So far I have stuck four of them in, totaling 79K.  So I
-am about eight doublings away from finishing the job;
-the last doubling took half an hour.  The
+compressed.  So far I have stuck 11 of them in, totaling 134K and
+52,000 words.  So I
+am about seven doublings away from finishing the job;
+the last doubling (well, near tripling)
+took an hour, and the doubling before that took half an hour.
+Unfortunately at this point it’s taking an entire second or more to rebuild
+the HTML tree from scratch.  The
 notes are currently slightly harder to read in this form than as plain
-text files, due to the lack of CSS anddate/time metadata.
+text files, due to the lack of CSS and date/time metadata.
 
 I may hack together some kind of web UI for adding things to the
 triple store, but so far I’ve been adding them by hand.

@@ -1,0 +1,522 @@
+(See also file `low-power-micros`.)
+
+The energy available from keystrokes on a regular keyboard is almost
+10 milliwatts: plenty to power a portable electronic word processor,
+so you could write a novel on one without an external power source.
+However, so far, energy harvesting keyboards are probably too
+inefficient to make this practical.
+
+[XKCD What if? 102][102] characterizes the energy produced by tapping
+keyboard keys; it cites [Nagurka et al. 1999][1] as providing a
+smallish estimate:
+
+> Using data from a study of rubber-dome keyboards—the most common
+> type these days—… the energy required to press a key is around 1.5
+> millijoules for a letter key and 2.5 for a big key like the enter
+> key or spacebar.
+
+[1]: https://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=786140
+    "Design of a test rig for measurement of stiffness and damping characteristics of computer keyboard keys"
+[102]: http://what-if.xkcd.com/102/ "Keyboard Power"
+
+Summary of results
+------------------
+
+A keystroke adds, usually, a single letter or space to your novel. It
+provides 1300 microjoules of energy, of which 2.25 microjoules are
+needed by an LPC1100-family CPU to run word-processing software, 25
+microjoules are needed by the E-Paper display to display the letter on
+the screen, and 0.5 microjoules are needed to eventually store the
+letter permanently in a Flash memory if you don’t erase it, for a
+total of 27.75 microjoules out of the 1300 available.  This means you
+need at least 2% efficient conversion of the keystroke energy, which
+commercially available pushbutton energy harvesting devices have
+barely achieved (they claim 2–5%.)
+
+However, solar power or pullstring dynamos are probably better
+options.  Typing at 90 wpm provides 10 mW of power, but only while
+you’re typing, and that’s 0.2–0.5 mW after conversion inefficiency; a
+30mm-square solar panel provides 10 mW all the time.
+
+Keystroke energy estimation
+---------------------------
+
+Nagurka et al.'s estimate
+seemed a little high to me: if for each keystroke your 50-gram
+fingers have to travel a 4mm key travel in, say, half a second, and
+then hit the bottom and stop, then the kinetic energy of your finger
+is closer to a microjoule per keystroke than a millijoule:
+
+    user@debian:~/devel/hojas$ units
+    2526 units, 72 prefixes, 56 nonlinear units
+
+    You have: 50 g * (4mm / 0.5 s)^2/2
+    You want: mJ
+            * 0.0016
+            / 625
+
+A [more recent open-access article by the same author][8] explains in
+more detail.  The conclusions of the paper are not very sensitive to
+how fast your fingers move, because the paper has graphs of the
+measurements of the spring force of the rubber-dome keys, which is
+much larger than what is necessary to decelerate your finger and is
+not particularly sensitive to the speed at which the key is pressed:
+for 3mm of the 3.5mm travel of the “K” key in one keyboard he tests,
+for example, the force is between 0.4 newtons and 0.55 newtons
+regardless of whether the key is moving 0.5 mm/s or 80 mm/s, with the
+speed amounting to about 0.1 newtons of difference, i.e. about 25%.
+
+0.45 newtons times 3mm is 1.35 millijoules.
+
+[8]: http://www.eng.mu.edu/nagurka/NagurkaMarklin_Measurement%20of%20Stiffness%20and%20Damping%20Characteristics_JDMSC.pdf
+    "Measurement of Stiffness and Damping Characteristics of Computer Keyboard Keys, Nagurka and Marklin., 2005"
+
+0.45 newtons by itself would decelerate a 50-gram finger at 9 m/s/s,
+which is to say that it’s just about the weight of the finger.  If
+your finger were moving at 60mm/s without you applying continuous
+force to it, it would come to a stop in just under 7ms at 0.45
+newtons.  So the vast majority of the energy transmitted from your
+finger to the key is never part of the kinetic energy of your finger.
+
+(Most of this energy is returned to your finger when the key comes
+back up, so it might be more difficult to type on a keyboard that
+harvests this energy.  Experience with manual typewriters suggests
+that this problem will be minimal.)
+
+Conservatively we might want to disregard the part of the energy
+estimate that’s due to Nagurka and Marklin’s model of how fast your
+fingers move, because he assumes that your keystrokes don’t overlap,
+which they clearly do.  But the difference, as you can see above, is
+small.
+
+Even with this well-substantiated estimate, which is much higher than
+what I’d come up with, Randall goes on to calculate that this isn’t a
+very useful amount of energy for things like running a modern laptop
+or microwaving a burrito.
+
+At 90 words per minute, we have almost 10mW of available power:
+
+    You have: 90*5*1.3mJ/minute
+    You want: mW
+            * 9.75
+            / 0.1025641
+
+Keyboard-powered computers
+--------------------------
+
+The original question, though, was this:
+
+> As a writer, I’m wondering what would be the cumulative energy of
+> the hundreds of thousands of keystrokes required to write a novel.
+> 
+> —Nicolas Dickner
+
+Perhaps Nicolas was actually wondering, in particular, whether you
+could run a computer to write the novel on with the energy from the
+keystrokes, so that he wouldn’t have to worry about losing his battery
+charger or wearing out his battery and being unable to write.
+
+In some sense the answer is clearly yes: people wrote novels on
+mechanical typewriters whose data storage mechanism was ink stamped
+onto paper with a mechanism powered by pressing the keys, although
+they were somewhat more effort to press than modern keyboard keys.
+Intuitively it seems like electronics ought to allow us to do
+*better*.
+
+So how much power do you really need?  Perhaps laptops are an
+energy-inefficient way to write novels, compared to other kinds of
+portable computers.  And in fact it turns out that running an
+electronic word processor on keyboard power is easily feasible,
+although I don’t know of anyone who’s done it.
+
+CPU power consumption
+---------------------
+
+CPU power consumption is not a problem, unless your CPU doesn’t have a
+working sleep mode.  Summary:
+
+    |                   | nJ / instruction | instructions/keystroke |
+    | feasibility limit |              170 |                   7500 |
+    | MSP430            |              0.9 |                1400000 |
+    | PIC24             |               2? |                 600000 |
+    | 1990s StrongARM   |                1 |                1300000 |
+    | LPC1110           |              0.3 |                4300000 |
+    | Pentium           |               10 |                 130000 |
+    | STM32L0           |             0.23 |                5700000 |
+
+### Details ###
+
+You can write a novel using a Commodore 64 or Apple ][, and several
+people did.  They can update text on the screen with relatively
+complex word-processing logic while keeping up with your typing speed,
+even at high typing speeds like 160 words per minute.  These were
+8-bit computers based on the MOSTek 6502 microprocessor and its
+variant the 6510, which typically run about 200 000 instructions per
+second.  Because those instructions only manipulated 8 bits of data at
+a time, you usually need about twice as many of them as on a modern
+32-bit microprocessor to do the same work.  (In some cases you need
+more like 8 times as many, and in other cases you need the same number
+or even less, but those cases are rare.)
+
+(Other 8-bit home computers of the time period, like the Nintendo NES,
+the Altair and all the CP/M computers that followed it, the Atari
+2600, the various TRS-80s, and the Pac-Man arcade machine, were
+similar in speed.  The IBM PC was maybe three to five times faster.)
+
+So if we divide 100 000 32-bit instructions per second by 160 words
+per minute, we get a number of instructions per keystroke that is
+known to be sufficient: about 7500 instructions per keystroke.
+
+So can one keystroke, in the microjoule to millijoule range, produce
+enough energy for 7500 32-bit CPU instructions?  That would require
+power consumption of less than about 170 nanojoules per instruction.
+
+The most common low-power microcontroller family today is the TI
+MSP430.  It’s a 16-bit microcontroller, and TI recently published a
+[white paper on its power consumption][2] which shows two members of
+this family running at a million instructions per second on 300 and
+515 microamps on a 3-volt power supply; 300 microamps times 3 volts
+gives us 900 microwatts, and dividing 900 microwatts / 1MIPS gives us
+0.9 nanojoules per instruction.
+
+[2]: http://www.ti.com/general/docs/lit/getliterature.tsp?baseLiteratureNumber=slay015&fileType=pdf
+
+That is, for the MSP430F2001 described in the white paper, a keystroke
+provides almost 200 times as much power as would be needed to run a
+word processor to handle that keystroke.
+
+Dividing it another way, a 1.3-millijoule keystroke provides enough
+power to run the MSP430 at 1 MIPS (five times as fast as a Commodore
+64) for 1.4 seconds.
+
+The point of the whitepaper is to compare the MSP430 favorably to a
+PIC24 microcontroller from another chip vendor, which (according to
+TI) needs two or three times more power: they estimate that the PIC
+could run off a particular coin cell with a 1% duty cycle for less
+than two years without recharging, while the MSPs could last four to
+six years.
+
+Academic papers report the fabrication of [10pJ/instruction][4] and
+[2.6pJ/instruction][5] microcontrollers, which is another two orders
+of magnitude better than the MSP430’s 900 pJ/insn.  Even as far back
+as the 20th century, [the DEC StrongARM SA1110 used one nanojoule per
+instruction][6], and there were 22-picojoule-per-instruction
+microcontrollers reported and 1-picojoule-per-instruction ones being
+designed.
+
+[4]: http://www-mtl.mit.edu/researchgroups/icsystems/pubs/conferences/2008/ickes_asscc2008_paper.pdf
+    "A 10-pJ/instruction, 4-MIPS Micropower DSP for Sensor Applications, Ickes et al., MIT, 2008"
+[5]: http://web.eecs.umich.edu/~taustin/papers/VLSI06-sublim.pdf
+    "A 2.60pJ/Inst Subthreshold Sensor Processor for Optimal Energy Efficiency, Zhai et. al., poster, 2006"
+[6]: http://www.researchgate.net/profile/Kristofer_Pister/publication/2955370_Smart_Dust_communicating_with_a_cubic-millimeter_computer/file/e0b4951e43fbf4b41b.pdf
+
+Zhai also published
+<https://web.eecs.umich.edu/~taustin/papers/TVLSI09-subliminal.pdf> on
+the 2.6pJ processor.
+
+The most interesting microcontroller to me right now is the 32-bit
+Philips/NXP [LPC1110 family][7], which can apparently run at 48MHz
+(and 48MIPS) at 1.8 volts and just under 8 milliamps.  Dividing,
+that’s 0.3 nanojoules per instruction, three times better than the
+MSP430!  However, the chip suffers about a 6 microamp leakage current
+in deep-sleep mode at room temperature, so each keystroke only
+provides enough energy to keep it in deep sleep mode for about 20
+minutes.  The LPC1110L variant cuts this sleeping energy consumption
+by about a factor of three.
+
+[7]: http://www.nxp.com/documents/data_sheet/LPC111X.pdf
+
+So keystrokes provide about 600 times as much energy as you would need
+to power an LPC1110-family microcontroller running a word processor.
+You could write your word processor in BASIC or some other interpreted
+language and it would still work fine.
+
+More recently (I think 2015),
+STMicroelectronics has released the STM32L011x3/4,
+based on the Cortex-M0+ core, which I think is the same one in the
+LPC1110.  According to their measurements, it can run at 16MHz on
+1.95 mA at anywhere from 1.65 V to 3.6 V, running code from RAM with
+the flash switched off; they claim 0.95 DMIPS/MHz.  If we assume
+1.8 V, this is 230 pJ/instruction, which is about 25% less than the
+LPC1110.  This is according to the datasheet, “DocID027973 Rev 5”.
+
+An interesting feature is that the STM32L011x3/4 has a “low-power run”
+mode which clocks the CPU at 131 kHz at 31–120 μW (10–40 seconds per
+1.3 mJ keystroke), as opposed to its normal 16MHz 3.5 mW run mode (370
+ms per keystroke) and its 0.3–1 μW stop and standby modes (20–60
+minutes per keystroke).  This suggests that maybe you could continue
+doing less-CPU-demanding operations continuously for some time at a
+lower speed, without having to pay for sleep and wakeup.
+Unfortunately, the 7500 instructions guessed at above would amount to
+about 57 milliseconds at this speed, a noticeable lag.
+
+Even non-low-power CPUs are efficient enough that your keystrokes are
+enough to power a word processor: [a New Scientist article from
+2006][3] explains that the Pentium from 1993, Pentium Ms from 2003,
+and Core Duos from 2006 all use 10 to 13 nanojoules per 32-bit
+instruction, which is still about 15 times as efficient as you’d need
+to be able to power a word processor from them.  The problem they have
+is that you can’t put them to sleep and wake them up fast enough, so
+you couldn’t actually use them for this.
+
+[3]: http://www.newscientist.com/blog/technology/2006/08/exploding-batteries-silver-lining.html
+
+Power consumption of other parts of the system
+----------------------------------------------
+
+But a CPU isn’t enough, by itself, to be a word processor.  You also
+need some way to display the text while you’re editing it and to store
+it when the machine runs out of stored energy, two functions fulfilled
+by the ink on the paper of a mechanical typewriter.
+
+You may also want external RAM, since e.g. the LPC1110 family tops out
+at 8 kilobytes of RAM, which isn’t much text, even compared to what
+you could keep in RAM on a Commodore 64.  A small SRAM is probably a
+better bet than power-hungry DRAM, and you need to make sure to save
+it to stable storage before power runs out.
+
+### Display ###
+
+The display is going to use more power than the rest of the system put
+together.
+
+Probably the best current option for low-power text *display* is an
+E-Ink display, like the one used by the Amazon Swindle.  E-Ink can
+maintain the same display for months or years without applied energy
+(as evidenced by broken E-Ink screens).  [A 6" E-Ink display needs
+about 750 mW during screen update][9], which takes 120ms, and that’s
+for 122×91 mm at 167dpi.  Breaking that down, that’s about 190
+nanojoules per pixel update, or 8100 nanojoules per updated square
+millimeter:
+
+    You have: 750 mW * 120ms / (122 mm * 91 mm * (167/inch)^2)
+    You want: nanojoules
+            * 187.53217
+            / 0.0053324185
+    You have: 750 mW * 120ms / (122 mm * 91 mm)
+    You want: nanojoules/mm^2
+            * 8106.6475
+            / 0.00012335556
+
+[9]: http://wiki.mobileread.com/wiki/E_Ink_display
+
+Suppose you want to be able to display eight 20-em lines of 7-point
+text on such a display, similar to a TRS-80 Model 100, since that was
+a portable device that millions of reporters and other writers used on
+a daily basis in its day.  (It sold six million units.)  That’s 7
+points * 8 vertically and 7 points * 20 horizontally: 49mm×20mm,
+similar in size to a cellphone display.  Updating the entire display
+then will require almost 8 millijoules:
+
+    You have: (7 points)^2 * 8 * 20 * 750 mW * 120ms / (122 mm * 91 mm)
+    You want: millijoules
+            * 7.909696
+            / 0.12642711
+
+This means that, although you can do huge quantities of computation
+per keystroke, you can’t afford to update the screen on every
+keystroke; you need about six keystrokes to provide enough power for a
+full screen update.  You’ll have to make do with updating a small part
+of the screen for incremental updates, and save full-screen repaints
+for things like scrolling.
+
+8 20-em lines of text is about 50 words (1 word ≈ 6 ens = 3 ems ≈ 3.2
+ems = 160 ems/50) so 350 words per minute (a normal reading rate)
+works out to 7 screen updates per minute, or just under a milliwatt
+(1 mW).
+
+(Calculating per character: that’s 250 characters in 8 lines, or 31¼
+characters per line, or 1.58 mm per character, or 3.9 mm² per
+character; this ends up being 31.6 μJ per character.)
+
+Alternatively you could just make the keys six times as hard to press
+as on a regular keyboard, plus a tiny bit more to power the rest of
+the system.  This doesn’t sound like a great idea though.
+
+(You can probably use a larger E-Ink display and keep your power
+consumption down by updating only small parts of it.)
+
+You can’t just cut a chunk out of a large E-Ink display; a small E-Ink
+display is [Seeed Studio’s 2.7-inch e-Paper panel][10], which is 70×46
+millimeters and 264x176 pixels for US$26, and can be driven by a US$24
+Arduino shield.  That’s 18 28-em lines of 7-point text, about 200
+words, three times the Model-100-like display I suggested above.
+
+[10]: http://www.seeedstudio.com/depot/27-ePaper-Panel-p-1596.html
+
+Seeed’s site suggests that this hardware needs 3.3 volts, 40mA, and 3
+seconds to refresh the whole screen.  This is unfortunately 50 times
+worse than the figures I got from the other site, totaling 400
+millijoules for a full display redraw:
+
+    You have: 3.3 volts * 40 mA * 3 seconds
+    You want: millijoules
+            * 396
+            / 0.0025252525
+
+You’d think another possible low-power display technology would be
+Pixel Qi “low-power” transflective/reflective LCD developed for the
+OLPC XO laptop.  Their PQ 3Qi-01 is a 235 mm × 143 mm 185 g 1024×600
+display, each pixel containing three transmissive subpixels and three
+grayscale reflective subpixels.  However, its power supply current is
+specified as 135–228 mA at 3.3 V, depending on color (white uses 30%
+more power), even aside for its 1.5 amp initial startup current and
+the 83–525 mA LED backlight current.  Even the lowest power mode, 30
+fps reflective, is specified as 390–480 mW.  So this device is way
+outside of our power budget.  (All this is according to their
+datasheet, “Doc No.: PQ001-2”, Sept 19, 2011.)
+
+But those high-end LCDs aren’t the only possible option.  Old
+cellphones used supertwist nematic (“STN”) LCD displays, which should
+be less power-hungry.  In fact, I think that pixels that are turned
+off on these displays don’t use any power.  The Philips PCF8833
+datasheet says it can refresh a 132×132×3 display at 35.8 Hz to
+227 Hz; it seems to contemplate driving an LCD at 10 V and up to 10 mA
+but more normally 400 μA, but no more than 5 kΩ for each of its 132
+output rows, only one of which is active at a time, which would seem
+to mean 2 mA.  So it’s designed to drive a load of somewhere between
+4 mW and 100 mW but probably something like 20 mW.  The chip itself
+consumes about 1 mA while accessing memory, which works out to be
+something like 3 mW.
+
+So, at a rough guess, a 132×132×3 STN display without a backlight
+might use 7 mW continuously, which is equivalent to the power cost of
+about 37000 E-Ink pixel updates per second (at 190 nJ/pixel as above),
+which means that for motion above 2 fps the STN display is more
+efficient, but for slightly changing text, it’s dramatically less
+efficient.
+
+### Flash or FRAM ###
+
+(Summary: Flash is adequate.)
+
+You also need to be able to store data permanently, so that your novel
+doesn’t get lost when you stop pressing keys for a while.  The most
+reasonable electronic means for that is probably Flash, although MRAM,
+PCRAM, and FeRAM (“FRAM”) and I think ReRAM and CBRAM are currently
+available too and might be reasonable alternatives.
+
+Some random PowerPoint presentation I found on the web says Flash uses
+2μJ per 32-bit write and 150pJ per 32-bit read, while FeRAM uses 1nJ
+for either one.  That means that a single keystroke provides enough
+energy to write 5 megabytes of FeRAM or 2600 bytes of Flash.  Either
+memory technology is clearly sufficient for word processing from this
+point of view, but Flash is much cheaper.
+
+(There are MSP430 microcontrollers that already use FeRAM (“FRAM”)
+instead of Flash, but none of them have more than 128kiB, so none of
+them are big enough to avoid needing off-chip memory for a novel.)
+
+Some other random PowerPoint presentation puts MRAM at 5nJ per “write
+energy”, compared to 0.8nJ for SRAM, but I don’t know if that’s a bit,
+a byte, or a 32-bit word.
+
+[Abarrilado compared FRAM and MRAM chips][11] and found that at 3V
+(?), the FRAM chip needed 5mA to write at 33MHz and 9 μA in standby,
+while the MRAM chip needed 23mA to write at 40MHz and 7 μA in standby.
+I think those bus cycles are mostly being used to write one bit each,
+which would give us 0.45 nJ/bit or 14nJ/32-bit to write the FRAM, or
+1.7nJ/bit or 55 nJ/32-bit to write the MRAM.  However, in both cases,
+he had to pay US$5 for about 32 kilobytes of storage, which means
+enough storage for a novel will be expensive.
+
+[11]: http://deltas.blog.com/2013/04/10/fram-vs-mram/
+
+The reason people are adopting FeRAM for embedded designs is that the
+write latency is lower, which lets the microcontroller go back to
+deep-sleep much sooner, which cuts power consumption.  (Also, it’s
+rad-hard and harder to reverse-engineer, which we don’t care about
+here.)  However, in this application, we’re not under such severe
+constraints of available energy.  We’re worried about milliwatts, not
+microwatts and nanowatts.
+
+Pullstrings
+-----------
+
+Another alternative to keyboard power and solar energy is a dynamo.
+500 mm of pull at 50 N (about 5 kg of weight) should be within the
+capacity of most biological humans, and that’s 25 J; a 50%-efficient
+dynamo would reduce it to 12½ J.  At 10 mW (the power of typing at
+90 wpm, disregarding potential conversion inefficiencies) those 12½ J
+are 21 minutes.  If you need 30 μJ of energy to handle each keystroke
+(3 μJ to run 10000 instructions on a 300 pJ CPU, 25 μJ to update the
+E-Ink display, 0.5 μJ to store it in Flash, rounding up) then this is
+enough energy to handle 420 000 keystrokes.
+
+Related work
+------------
+
+enOcean has a commercial line of energy-harvesting pushbuttons, such
+as their [ECO 200][14], and radio transmitters powered by them, such
+as the PTM 200.  The ECO 200 consumes 2.7 to 3.9 newtons over 1.2
+millimeters and produces 120 to 210 microjoules, which is about 2–5%
+efficiency.
+
+[14]: http://www.enocean.com/en/enocean_modules_928mhz/eco-200-data-sheet-pdf/
+
+Cherry, the well-known keyboard switch company, has a similar product.
+
+Rashi Tiwari under Ephrahim Garcia at Cornell added an
+energy-harvesting device to a regular keyboard’s Enter key and used it
+to flash some LEDs, I think in 2012, although they haven’t published a
+paper on this, just [a YouTube video][13].
+
+[13]: https://www.youtube.com/watch?v=o9fq3OKdPkY
+
+Also, T Wacharasindhu and J W Kwon 2008 J. Micromech. Microeng. 18
+104016 doi:10.1088/0960-1317/18/10/104016 is “A micromachined energy
+harvester from a keyboard using combined electromagnetic and
+piezoelectric conversion.”  They got 42 microwatts out of the setup,
+95% of it from piezoelectric conversion.  42μW/10mW is 0.4%
+efficiency.
+
+<http://responsive.media.mit.edu/wp-content/uploads/sites/5/2013/12/A-Compact-Wireless-Self-Powered-Pushbutton-Controller.pdf>
+got 500 μJ per Scripto “Aim ’n Click” lighter click, but improved
+circuitry could improve this substantially.
+
+Combining sensing with generation
+---------------------------------
+
+Variable-inductance position sensors are well-known in the form of
+e.g. the linear variable differential transformer, which senses the
+differential voltage induced in two counterbalanced secondary windings
+by a pulse or ac current through a primary between them to precisely
+measure the linear position of a high-permeability core.  In this
+case, though, we don’t care about precisely measuring its position;
+it’s adequate to distinguish presence from absence.
+
+If we additionally add a permanent magnet to the mechanism, every
+movement of the core will generate a voltage, even without a current
+through the primary.  We can distinguish that from the
+higher-frequency sensing current because the core will never move
+significantly within 100 ns.  So we can use a capacitive coupling to
+couple the fast pulses from the sense windings through to the sensing
+pins on the microcontroller, while rectifying the much slower ac
+signals with a Schottky diode or four.
+
+(Alternatively, maybe the probe lines should be the ones the power is
+harvested from.)
+
+No separate spring is needed, not even a rubber dome, if the magnet
+itself acts to return the key to the up position.
+
+If we have, for example, a keyboard matrix of six probe lines by six
+sense lines (for 36 total keys), each wire runs through six coils.  I
+think this means that the inductance of the other five coils will
+prevent the current from rising quickly, but not the voltage.
+
+If the key makes a full magnetic circuit when in contact with the
+magnet, it should be easy to sense the initial voltage rise, since the
+circuit reluctance will rise and fall precipitously as the key moves
+through the 100 μm closest to the magnet, with a correspondingly rapid
+change in flux density and thus a correspondingly large voltage.
+
+The probe pulse needs to induce a strong enough current to charge the
+sense pin and other parasitic capacitances.  If we assume that this is
+around 50 pF and we need to charge it to 1.2 volts to be sure of
+detection, this requires 36 pJ of energy; sending such a sense pulse
+256 times per second on each of 6 lines requires 55 nW.  So the power
+to probe the keyboard is minimal.  However, this doesn’t account for
+the fact that the microcontroller needs to wake up in this case!
+Somehow we need to wake up the microcontroller to generate the sense
+pulse.

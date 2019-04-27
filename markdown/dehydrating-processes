@@ -1,0 +1,667 @@
+I was thinking about the problem of displaying graphical user
+interfaces and reacting to clicks and other user events in them, and I
+think I found an interesting unexplored design space, which seems more
+and more promising as I think about it.
+
+To talk about this, I need to talk about a concept that I don’t have a
+good name for.  I guess I’ll call it “interaction models”.  This is not
+exactly about user interface paradigms as conventionally understood — e.g.,
+command-line software, graphical user interfaces, hypertext — although
+it’s not entirely orthogonal to them.  It’s more about the model within
+which programs using those user-interface paradigms interact with not only
+the user, but also each other and the rest of the computing system.
+This document is about a new interaction model which I am exploring.
+
+Background
+----------
+
+Most existing programs fit fairly cleanly into one of several existing
+interaction models: “apps”, “REST”, “batch processing”, “REPL”,
+“notebook”, and “open operating system”, though of course there are gray
+areas.
+
+### Apps ###
+
+The now-conventional (“apps”) model for this is that,
+behind the window, there’s a running program, typically on a multitasking
+operating system in which it runs in a “process” (a virtual
+computer), which has a thread of execution and a stack and a virtual
+memory space and whatnot; and, at times, it responds to user interface
+events, modifying its internal state and possibly its external
+appearance.
+
+This works, and it can be extremely efficient, but it has some
+drawbacks:
+
+- It’s very difficult to return the process
+  to a previous state ("undo"), for
+  example because a user interface action had an effect you didn’t
+  like, or because you wanted to explore some other alternatives.
+- It’s very difficult to update the code of the process, because its
+  internal memory state is entangled with the assignment of addresses
+  to pieces of its code in a way that can be difficult to undo.
+- Data tends to get “siloed” in particular programs, reducing users’
+  control over the data and causing them to spend a substantial
+  fraction of their time figuring out how to get data out of one
+  program and into another.
+- It uses a lot of memory space and, often, CPU time.
+- It can be very difficult to migrate the process from one computer to
+  another, which is a serious problem now that we’re all carrying lots
+  of computers around.
+
+### REST ###
+
+Another approach is REST.  In REST, the “window” is a document sent to
+your user-agent by a server, containing your entire session state and
+including links to other resources that may be relevant.  All
+applications use the same user-agent and the same resource link
+namespace.  REST has a number of advantages over the apps model:
+
+- The uniform link namespace enables a certain degree of
+  interoperability;
+- previous session states can be stored as “bookmarks” and returned to
+  at will, or sent to other people as links;
+- upgrading the code on the server is completely seamless in most
+  cases.
+
+However, because the server is physically far away and because the
+user-agents we are using are unbelievably inefficient, current
+software is shifting away from the REST model and toward the
+apps model.
+
+### Teletypes, typescripts, and the REPL model ###
+
+“Apps” are actually somewhat older than graphical user interfaces — in
+a sense, an “app” is what you get as soon as you load a program onto a
+general-purpose computer and start it running, even if you don’t have
+an operating system.  The machine, in essence, starts to manifest in
+the physical world the behavior of the abstract machine embodied in
+the program — it becomes an avatar of the program, though perhaps
+likening programs to devas or gods is blasphemous.  Traditionally,
+with or without timesharing, once the program starts running, barring
+the invocation of debugging features such as interrupt keys or
+single-step switches, your interaction is with the program, not the
+computer or the operating system — or, at least, that is the desired
+illusion.
+
+In the app model, you launch a program, which puts your user
+interface to the machine into a special mode where it behaves
+differently until it exits — or, if you have a multitasking user
+interface, until you switch tasks.  This is the same way Instagram
+interacts on your cellphone in 2018, the same way Sketchpad worked in
+1962, and the same way Mel Kaye’s Blackjack program worked on the
+LGP-30 in the 1950s.
+
+The LGP-30 was a very simple computer indeed; it contained barely over
+a hundred vacuum tubes, and it ran far too slowly to produce a useful
+display on an oscilloscope screen.  So the user interface on the
+LGP-30 was a Friden Flexowriter, a kind of teletype.
+
+A Teletype™ (or, generically, a teletype) is an electric typewriter
+that could be driven either by the computer or by its operator.  (Or,
+in its original application, by another teletype, perhaps in another
+city.)  This meant that the user interface only needed enough
+electronic or electromechanical memory for the single byte currently
+being input or output, rather than the dozens of bytes required for
+the HP 9100’s calculator display, the kilobyte or more required for
+character-cell terminals, or the many kilobytes to megabytes required
+for framebuffers.  Some form of teletype was the primary form of user
+interface for BASIC, JOSS, and APL in the 1960s, and then Unix in the
+1970s, and it remains with us today in the Unix terminal interface,
+which even today uses the abbreviation “tty”.
+
+On the teletype, many programs could produce their final permanent
+results just by showing them to the user, perhaps without even storing
+them in the very limited memory of the time.  For example, if you had
+a series of calculations you wanted to carry out in LISP, APL, JOSS,
+or BASIC, you could type the formulas into the computer, one after the
+other, and on the paper you would have the formulas, each followed by
+its result, for ease of future reference.  This form of interactivity
+is known today as a REPL, for “read-eval[uate]-print loop”, from its
+name in Lisp, and it remains nearly a sine qua non of new programming
+languages.
+
+The REPL facility meant that you could write useful interactive
+programs in LISP or APL that, paradoxically, contained no code for
+processing user input; they merely provided a vocabulary of procedures
+for the user to invoke from the REPL, leaving the interaction to the
+REPL.
+
+The teletype user interface is very limiting — you can’t even erase a
+character once it’s on the paper, and it was common to use baud rates
+as low as 110 baud, or 11 characters per second, because the mechanics
+couldn’t print any faster anyway.  But it does have some real
+advantages over framebuffers and character-cell terminals: you can get
+a large character repertoire and also boldface and underlining by
+overprinting multiple characters in the same position, and, most
+interestingly, the user is left with a complete and indelible record
+of their interaction, typically on continuous-feed fanfold paper,
+showing both everything they did and everything the computer typed — a
+record they could annotate with pencil or pen.
+
+This made it possible to easily produce not only printed textual
+documents, but also banners, data tables, and data plots.
+
+### Batch processing ###
+
+As an example of app-model glass-teletype interaction, Chapter 6 of
+the TeXbook (originally published in 1984 and documenting the 1983
+version of TeX that supplanted the 1978 version) talks about how to
+start the TeX compiler and then interact with it once it’s started:
+
+> log in; and start \TeX. \ (You may have to ask somebody how to do
+> this on your local computer. Usually the operating system prompts
+> you for a command and you type ‘`tex`’ or ‘`run tex`’ or something
+> like that.)
+> 
+> When you’re successful, \TeX\ will welcome you with a message such as
+> 
+>     This is TeX, Version 3.141 (preloaded format=plain 89.7.15)
+>     **
+> 
+> The ‘`**`’ is \TeX’s way of asking you for an input file name.  
+> % Incidentally, 89.7.15 was Jill’s 50th birthday.
+>
+> …
+> 
+> Now you’re ready for Experiment~2: Get \TeX\ going again.  This time
+> when the machine says ‘`**`’ you should answer ‘`story`’, since that
+> is the name of the file where your input resides. \ (The file could
+> also be called by its full name ‘`story.tex`’, but \TeX\
+> automatically supplies the suffix ‘`.tex`’ if no suffix has been
+> specified.)
+> 
+> …(Previous \TeX\ systems required you to start by typing ‘`\input
+> story`’ instead of ‘`story`’, and you can still do that; but most
+> \TeX\ users prefer to put all of their commands into a file instead
+> of typing them online, so \TeX\ now spares them the nuisance of
+> starting out with `\input` each time.)…
+
+You can see that TeX is interacting in the app model.  However, it
+seems that for TeX users, app-mode interaction was often a nuisance
+that they wanted to minimize.  They preferred to spend their time
+preparing the input file for TeX, then processing it as
+non-interactively as possible.
+
+This leads us to the “batch-processing” interaction model,
+which is almost as old as the app model — or
+perhaps older, if you count running punched paper tape through a
+Teletype.  In batch processing, you start a program, which runs for a
+while, reading input prepared ahead of time and producing output. Then
+the program terminates, without having interacted with you at all
+while it was running.  Batch-processing operating systems predate
+interactive operating systems by a little bit.
+
+Originally, in batch processing, you used a separate, non-computer
+machine to prepare your input, in the form of a deck of punched cards
+punched on a keypunch or of a reel of punched paper tape punched on a
+Teletype.  Perhaps this was an incremental process where you gathered
+punched cards from different places, and even a non-mechanized process
+where you selected and ordered the punched cards by hand.  (The
+equivalent with paper tape involved, as I understand it, knives and
+scotch tape.)
+
+Why would you prefer batch processing to interactive processing?
+
+For many years, a primary reason was economic; computers were very
+expensive compared to employees.  A computing job that required one
+minute of computer time, if done interactively, might require the
+operator to go through ten minutes of machine setup and five minutes
+of teardown, during which time the computer spent all its time waiting
+on the operator, for a total of 16 minutes.  If, instead of *operating*
+the machine manually, you used an *operating system*, you could do it
+in maybe a minute and a half, without requiring any multitasking.
+This approach was still occasionally used into the 2000s on
+supercomputers, because even though they run multitasking operating
+systems, you can sometimes run two jobs faster one after the other
+than if you divide the machine’s resources between them.
+
+The queue lengths were sometimes long, and programmers tell of needing
+to wait a day or more for their (printed) job output after submitting
+their job for processing, back in the 1970s.  So if your one-minute
+job contained five bugs, each of which was hidden by the previous bug,
+it might take you a week and a half to get it to run in the batch
+system, while doing it interactively might have taken you 18 minutes.
+In such cases, the batch system would save computer time — it would
+consume perhaps 4 minutes in this case rather than 18 — at the expense
+of human time.  So it paid off to be extremely cautious about
+correctness, and moreover, using a time-shared (“multitasking”) system
+rather than a batch system could boost your productivity by an order
+of magnitude or more.
+
+Time-shared operating systems got much the same computational
+efficiencies as batch operating systems — while you’re sitting at your
+terminal thinking about what to do next, the computer is running
+someone else’s job — and much the same human efficiencies as
+interactive operation without an operating system.  But they required
+a terminal for each concurrent user, and when implemented with a
+virtual computer per user, they also required much more memory than a
+batch operating system.
+
+However, even in the time-shared environment that Knuth took for
+granted in the above quote, batch processing was part of the
+picture — not just to use less terminals and memory, but also to
+simplify the programming and make the system easier to use.
+
+The wonderful thing about batch processing — ignored for decades in
+favor of mere economic considerations — is its *reproducibility*.  A
+batch program starts up, accesses some input data, produces some
+output data, and exits.  Normally, we have the guarantee that it will
+produce the same output data if given the same input data (a guarantee
+Knuth went to extreme lengths to provide in a cross-platform way in
+TeX, for reasons of preserving access to the scholarly record) and we
+can modify the input data incrementally to see what changes result.
+
+Reproducibility is extremely valuable for testing and debugging, and
+it’s also very useful for *caching*.  A significant fraction of
+programming, perhaps the majority, consists of “optimizing” — not in
+the mathematical sense of finding the minimum of a function, but in
+the sense of making programs do the same thing in less time and/or
+memory.  Caching — storing a previously obtained piece of data so that
+it’s available again when needed — is the most important optimization
+in the world, and perhaps the majority of optimizing and even software
+design consists of tweaking what to cache, when, and how.
+
+Reproducible computations can be cached.  Irreproducible computations
+can’t.  By casting a computation into the batch-processing model,
+we make it reproducible and therefore cacheable.  (Umut Acar’s
+revolutionary “self-adjusting computation” work, as I understand it,
+is a matter of carrying this principle down to a microscopic level.)
+
+The biggest change in mainstream programming practices over the last
+20 years is the near-universal adoption of automated testing, which
+amounts to testing your software in batch mode, so that the test
+results are reproducible, rather than interactively.
+
+Batch processing doesn’t need “undo”, because it just produces output
+data from input data.  If you change the input data, you get new
+output data, but the old output data doesn’t disappear.  By
+incrementally changing input data, we can achieve a sort of “undo and
+redo” without burdening our program code with extra complexity — make
+a change to a part of the input that the program accesses early, and
+it’s like undoing everything the program did after that, making the
+change, and then redoing all the other things in the new context.
+It’s wonderful.
+
+TeX users prefer to keep their interaction with TeX batch-mode because
+it becomes reproducible and thus gains these flexibilities.  And TeX,
+despite unusually extensive interaction facilities for a compiler,
+depends on the batch-processing model — it cannot back up to a
+previous page and change it, for example, or save an editable form of
+a document so you can edit it again later, both of which would be core
+functionality for an app-model word-processing system.  You can
+write a document entirely interactively in TeX — that was the
+Experiment~1 omitted from my TeXbook quote above — but it’s
+impractical.
+
+### The Unix shell, and software tools ###
+
+Shortly after the above quote from the TeXbook, there’s a note about
+command lines:
+
+> \danger Incidentally, many systems allow you to invoke \TeX\ by
+> typing a one-liner like ‘`tex story`’ instead of waiting for the
+> ‘`**`’; similarly, ‘`tex \relax`’ works for Experiment~1, and ‘`tex
+> &plain story`’ loads the plain format before inputting the `story`
+> file.  You might want to try this, to see if it works on your
+> computer, or you might ask somebody if there’s a similar shortcut.
+
+This implies that, on some computers where people ran TeX, the only
+way to specify input files was through the app-model interaction
+described earlier, which meant that reproducing a TeX run required
+a human interaction.
+
+This was an affliction suffered not just by TeX but by many systems of
+that time period, and indeed by many app-model programs nowadays.
+(For predatory companies such as Facebook, the owner of Instagram,
+this is an advantage, not a drawback, although internally they have
+systems for driving the Instagram app in batch mode for testing.)
+
+Unix was a new operating system designed in the 1970s and late 1960s,
+using teletypes, based on a non-app, indeed anti-app, design — though
+Unix itself was unredeemably interactive, most of its programs were
+almost entirely batch-mode.  A Unix user in the 1970s might use dozens
+of programs at different times during a session, but only *interact with* three of them —
+login, the “shell” (an interpreter for an ad-hoc programming language
+optimized for launching other programs) and ed, the editor.
+
+In essence, the Unix shell user interface is a REPL for launching
+batch jobs, and the programs are designed to be composable in useful
+ways.  Unix facilitates this by allowing programs to treat other
+programs’ unfinished outputs as input files, as long as they only
+access them sequentially from beginning to end, a facility known as
+“pipes” — the reader process falls asleep until the writer process
+produces some data, just as with a disk or magnetic tape.  The stream
+of input from the terminal can also be treated as an input file, and
+normally is, providing a certain degree of interactivity to
+normally-batch-mode programs and a certain degree of automatability to
+normally-interactive programs.
+
+The power of the Unix “REPL” must be put in context in its place in
+the 1970s: it ran on a PDP-11, which might typically have a
+quarter-megabyte of RAM, of which each process could access no more
+than 64 KiB at a time.  Nevertheless, in a few seconds, you could
+assemble a command line that strung together four or five processes to
+use the whole quarter-megabyte of RAM to process a file of a megabyte
+or more, fairly efficiently.
+
+Some of the designers of Unix used the metaphor of “software tools” to
+explain the difference between Unix programs and traditional
+app-model programs: rather than climbing into a bulldozer to
+interact with it exclusively for a while, you could pick up a shovel
+in one hand while wrenches and hammers hung from your belt.  The
+software-tools approach became popular with programmers on non-Unix
+systems as well, but without the Unix shell and pipes, it was much
+clumsier.  Too, the heavy costs of launching new programs on non-Unix
+systems made the software-tools approach much less efficient than on
+Unix.
+
+The `make` program added to Unix in the late 1970s provides an
+automatic caching system for such reproducible batch computations, the
+paradigmatic example being recompiling a file of source code and
+relinking an executable when that file has changed.  With `make`, the
+invocations of the compiler are usually automatic.  You can also use
+it to cache a wide variety of staged data processing.
+
+The architecture of the Unix C compiler itself also took advantage of
+the pipe facility to separate a macro preprocessor, the compiler as
+such, and the assembler into separate concurrent processes, making C
+considerably more expressive than other minicomputer programming
+languages of the 1970s.
+
+After a few years, the “C shell” from Berkeley added filename
+completion and command-line editing to the Unix “REPL”, enabling
+incremental cut-and-try construction of command lines.  As an example,
+in my shell history on this laptop, I have the following sequence as I
+incrementally excluded more types of files from my command-line
+listing:
+
+    ls
+    ls | grep -v 'mkv$|vtt$'
+    ls | egrep -v 'mkv$|vtt$'
+    ls | egrep -v 'mkv$|vtt$|webm$'
+    ls | egrep -v 'mkv$|vtt$|webm$|mp4$'
+
+The `ls` and `egrep` programs need not be interactive to support this
+kind of incremental experimentation; they need only take their input
+from the Unix shell command line rather than interactively.
+
+The C shell also added “job control”, which allows a user using a
+teletype-emulating terminal to switch back and forth between one or
+more interactive apps and the shell, just as a GUI windowing system
+does.
+
+The Unix shell, however, suffers some serious weaknesses.  It’s almost
+useless for anything involving graphics, although you can do things
+like this:
+
+    $ gnuplot -e 'set term dumb size 60,15; plot x**2'
+
+      100 **+----------+-----------+------------+---------+**   
+       90 +**          +           +            +         **+   
+       80 +-**                                 x**2 *******-+   
+       70 +-+ **                                       ** +-+   
+       60 +-+  **                                     **  +-+   
+       50 +-+    **                                 **    +-+   
+       40 +-+      **                             **      +-+   
+       30 +-+        **                         **        +-+   
+       20 +-+          ***                   ***          +-+   
+       10 +-+          +  ****     +     ****   +         +-+   
+        0 +-+----------+------***********-------+---------+-+   
+         -10          -5           0            5           10  
+
+Instead of drawing blocky ASCII art, gnuplot can write your plot to a
+file or open it in a window, but in neither case do you get the
+alternating list of queries and answers you normally get in a REPL
+typescript.
+
+The shell is also useless for anything that requires feedback with
+latency under a second, like adjusting spline control points of a
+vector graphic.
+
+Finally, the shell typescript session inevitably contains errors and
+false starts mixed in indiscriminately with the actual useful results,
+limiting the usefulness of the typescript without further editing.  On
+a teletype this was inevitable, but not on a computer screen.
+
+### Notebooks ###
+
+Like most fashionable programmers, I do a lot of my work nowadays in IPython
+notebooks (more recently renamed Jupyter notebooks).  These are
+Python REPL transcripts enhanced with a few major features:
+
+1. As in the Unix shell or the Python REPL, you can edit previous
+   command lines.  Unlike those systems, by default, the edited
+   version replaces the original, and its output also replaces the
+   original output.  If you want both versions in your notebook, you
+   can copy and paste into a new “cell”.
+2. The output from the command lines is not restricted to being text.
+   It can include graphics, TeX markup for equations, and data tables,
+   and often does.  In fact, it can even support further graphical
+   interaction through callbacks.
+3. Because the input and the output are distinguished — although they
+   alternate, as in traditional REPL transcripts — it’s possible to
+   re-execute some or all of the cells with new input data, or to
+   attempt to reproduce the results after an incremental change.  You
+   can think of the contents of each cell as the input to a batch job.
+   Reproducibility is fairly limited, though, for a variety of
+   reasons.  First, the IPython session state is an additional,
+   invisible, constantly-changing input to the “batch job”.  Second,
+   the installed software and filesystem state are also potentially
+   inputs, and they are also invisible and potentially changing.
+
+You can also invoke other programming languages (including the Unix
+shell), include comments in Markdown with LaTeX equations, and a few
+other things, but those are not the most important advantages over the
+bare Unix shell in a terminal.
+
+That is, the notebook is an alternative model for interacting with and
+integrating programs, different from apps, REST, batch processing, and
+teletype REPLs including the Unix shell.
+
+### The open operating system model ###
+
+Before proceeding to talk about the new interaction model I’m exploring,
+I want to point out a few significant systems that don’t fit into the
+above interaction models: Smalltalk, Emacs, Cedar, and Oberon.  In these
+systems, many separately developed “programs” are loaded into the same
+memory space and can interact with one another using function calls, and
+the user can interact with them by invoking functions from any of them
+at any time, and can also load more programs.
+
+In Smalltalk, the system developed at Xerox PARC in the 1970s in which
+object-orientation was invented, not only each window on the screen but
+each letter is an object, which is to say, a tiny virtual computer with
+its own code and state, and each window’s code decides how to display it
+and how to react to events such as clicks.  The difference from the apps
+model is that there’s no separation between the windows — it’s trivial
+to embed one “program” in another, call functions of one “program” from
+another, pass complex data objects from one “program” to another, and so
+on — like Windows OLE, but simple.
+
+Cedar is a system developed at Xerox PARC in the late 1970s and early
+1980s as a sort of improved alternative to Smalltalk and Interlisp, but
+with strong static typing and separate compilation.  Cedar is not as well
+known as Smalltalk, in part because the software was never published,
+but [its successor language][2] Oak is unfortunately extremely popular.
+
+After spending a couple of sabbatical years at Xerox PARC
+working on Cedar and its predecessor Mesa, [Wirth
+went back to Switzerland and, with Gutknecht and others,
+wrote his own version of it from scratch][0], [starting in 1988][1],
+based on his language Modula-3; this system is called Oberon, and it is
+free software.
+
+[0]: https://news.ycombinator.com/item?id=9847955
+[1]: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.90.7173&rep=rep1&type=pdf "Oberon — The Overlooked Jewel"
+[2]: http://lambda-the-ultimate.org/node/1773#comment-21567
+
+XXX Inferno?
+
+Emacs also uses this interaction model.  Emacs Lisp is not
+object-oriented, but it has the notions of “major modes”, “minor modes”,
+“keymaps”, and “buffer-local variables”, which permit different windows
+to respond differently to interaction; and there are a number of popular
+programs written in Emacs Lisp, including Org-mode, Gnus, Magit, Eshell,
+Ediff, and Hyperbole, in addition to the basic IDE functionality Emacs
+was written for.  Although Emacs has been suffering substantially in
+popularity in recent years, some of these programs are, or once were,
+best-in-class applications.
+
+Lampson and Sproull published a 1979 paper in which they called a
+version of this system architecture an “open operating system” or
+“open system”, a term which has been reused for other purposes; they
+emphasized other aspects.
+
+Mummified embedded apps
+-----------------------
+
+With that background out of the way, I’ve been hacking on Yeso, a simple
+framebuffer graphics input-output library, with the purpose of making it
+easy and direct to write graphical programs in any language that run
+pixel-identically on a variety of platforms.  So far I only have X11 and
+Linux framebuffer console backends, but one of the next things I want to
+write for it is Wercam, a display server that uses Yeso itself, rather
+like Xnest, 8½, or Rio — it will allow Yeso apps to connect to it using
+a simple protocol and draw windows on its screen, and route events to
+them as appropriate.
+
+This led me to ask: what kind of window management should it use?
+Should it use overlapping windows, like X, or alternate between giving
+different apps full control of the screen, like Android and IOS normally
+do?
+
+And, of course, I’d been using notebooks for years, and Perry Lorier
+told me about a notebook-style shell he’s writing using curses.  Unlike
+Jupyter/IPython, in which only one cell can be evaluating at a time
+(except that they can respond to callbacks), in his notebook-shell, each
+process gets its own pseudo-terminal, and it can continue running freely
+while you’re interacting with other processes.
+
+So it occurred to me that maybe the window manager should be such a
+notebook-shell.  If you start a program and it merely produces textual
+output and takes textual input, that would appear underneath your
+command, as per normal; but if a program opens a Yeso window, the window
+would be embedded in the notebook there, by default.  Perry’s
+notebook-shell takes a program full-screen when it issues a clear-screen
+escape sequence; perhaps some similar action would be useful.
+
+The Yeso calling interface is in rapid flux, changing about once a day
+for the last three weeks, but putting a colored rectangle on the screen
+can be done in C something like this:
+
+    #include <yeso.h>
+
+    int main()
+    {
+      yeso w = yb_open("hola, mundo!", 64, 64, "");
+      yi_fill(yb_framebuffer(w), 0xcc99cc);
+      yb_flip(w);
+      for (;;) yb_wait(w, 0);
+    }
+
+On the Linux framebuffer console backend, that last line is somewhat
+unnecessary; it just makes the program hang until you kill it.  On the
+X11 backend, it’s kind of mandatory, because otherwise the window closes
+immediately as the program exits; it probably won’t even be on the
+screen long enough for a screen refresh.
+
+But preserving output from programs that are no longer running is sort
+of the sine qua non of REPLs and notebook interfaces.  Maybe if Wercam
+uses a notebook interface for its window management, it should preserve
+the graphical output of the program, just as IPython preserves the
+graphical output of matplotlib plot commands that have plotted data.
+(Unless the user deletes them.)  Wercam could actually do better than
+just save the last frame of output — because Yeso sends a sequence of
+full frames to the display, Wercam could record all the frames (up to
+some limit, by default) and allow you to fast-forward and rewind through
+the impromptu screencast.
+
+#### Horcruxes or continuations ####
+
+Having graphical output there in the notebook without a running process
+behind every scatterplot seems useful.  But what if you want to zoom in
+on one of those plots later?  How can you supply event-handling
+callbacks without a running IPython kernel or other process sitting
+there waiting to answer them?
+
+Well, in the early days of the Web, clicking a link might launch a CGI
+program to generate the response document.  Wercam could do something
+similar.  What if the program left behind at its exit not only an image
+but also a sort of last will and testament, or perhaps a horcrux, giving
+a command to run to handle any new events, and perhaps a set of event
+types to ignore, such as mouse movements?
+
+(Of course, for security reasons, that command should run only with the
+authority of the original program.)
+
+At one point it would have been absurd to spawn a new Unix process for
+each mouse movement — it just took far too long.  But my [forkovh
+test][3] on my laptop takes about 130 μs to fork a child process,
+written in C, which immediately dies, and then reap it.  And
+[httpdito][4] takes about 30–50 μs to accept a connection, fork a child
+process, and then reap it.  (The children handle HTTP requests, but that
+mostly happens on other cores.)  Httpdito is faster probably because
+it’s not linked with the C library, so its memory map is much smaller.
+Linking forkovh with glibc boosts its latency to 670 μs.
+
+Exec is significantly more expensive, although possibly a better
+operating system would help.  Forking, executing, and waiting for a
+hello-world C program takes about 3 ms with glibc on my laptop (whether
+statically or dynamically linked), or 2 ms with dietlibc.  On the Linux
+framebuffer, the Yeso PNG viewer takes 4 ms on small images.  (Pentium
+N3700 1.6GHz at probably 500 MHz, Linux debian 4.4.0-21-generic #37-Ubuntu.)
+
+These latency numbers are not insignificant, but on a 60fps display like
+the one on my laptop, 2 milliseconds out of a 16.7 ms frame is not
+immediately fatal.  I mean, USB mice are normally polled every 10
+milliseconds, and 1 millisecond is the shortest polling interval USB
+supports.
+
+[3]: http://canonical.org/~kragen/sw/dev3/forkovh.c
+[4]: http://canonical.org/~kragen/sw/dev3/httpdito-readme
+
+But suppose respawning the program when there’s an input event, or maybe
+even after a specified timeout, is fast enough at the kernel level.  Now
+the program needs to know the “session state” — if it’s redrawing a
+scatterplot in response to a zoom, for example, it needs to know the
+data points and plot colors.  If it’s an interpreter, it needs the
+parsed program.  If it’s a PDF viewer that renders nearby pages in the
+background to avoid delays, it needs access to the prerendered cache.
+And it needs all of this without having to redo precious milliseconds of
+deserialization every time.
+
+It turns out that arrays of binary integers or floating-point numbers,
+written to files in native byte order, and memory-mapped, works really
+well for this kind of thing.  On my laptop, [mmap() on an already-open
+file takes about 4–6 μs][5].  For more elaborately structured data,
+something like FlatBuffers, CapnProto, or SBE enables you to get
+similarly zippy speeds without having to pay a startup deserialization
+tax.
+
+[5]: http://canonical.org/~kragen/sw/dev3/mmapovh.c
+
+So perhaps the “session state” or “horcrux” in the notebook cell should
+be a filesystem directory with the crucial state saved in files that the
+program knows to open and map into its memory when restarted;
+essentially they are a mummified version of the live program’s
+non-ephemeral memory state, ready for instant rehydration and return to
+life.  This is pretty similar to how Android saves the state of an
+Activity (an app, in Androidese) in a “bundle” in
+[onSaveInstanceState][6] and then passes that bundle to onCreate when it
+restarts the Activity; but Android “flattens” whatever you put into the
+bundle into a “parcel”, which is extra overhead that should probably be
+avoided in this context.
+
+[6]: https://developer.android.com/reference/android/app/Activity.html#onSaveInstanceState(android.os.Bundle)
+
+links to programs
+rehydrating with new versions of code
+declaring which UI events to handle
+delegating to other programs
+file managers
+publishing outputs in formats usable by other programs
+Launching transactions that may fail
+editing text files
+reducers, replay, and distribution
+

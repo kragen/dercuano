@@ -1,0 +1,437 @@
+Low-power microcontrollers for a low-power computer
+===================================================
+
+(See also file `keyboard-powered-computers`.)
+
+E-ink displays are capable of supporting continuous, comfortable
+reading at average power levels under 3 milliwatts.  For this to be
+useful, we need a microcontroller to drive them at comparable power.
+But 5–20 watts might be available sometimes, and we’d like to be able
+to take advantage of it.
+
+To build a computer that provides rapid UI response on very low
+average power (<10mW, >100 seconds per joule) I think you need, among
+other things, multiple processors: a low-speed, low-power “peripheral
+processor”, probably designed as an embedded microcontroller, for
+normal real-time interaction, plus a higher-speed “central processor”
+that powers up occasionally, or when lots of power is available, to
+handle heavier-duty computation.
+
+Computational power needed
+--------------------------
+
+Simply slinging pixel data around is a minimum; at 1 bit per pixel and
+400 pixels per character (due to high-res screens), you need to send
+50 bytes of data to the framebuffer to draw a single letter or space.
+That’s probably about 100 instructions, so 100 instructions/ glyph ×
+350 wpm × 6 glyphs / word = 3500 instructions/second.  But that's like
+a theoretical minimum.
+
+WordStar on a 2MHz (≈0.5MIPS) 8-bit CPU would sometimes fall behind
+your typing a bit.  This suggests that one (8-bit) MIPS is adequate to
+provide real-time word processing.
+
+A nanojoule (1000 pJ) per instruction is a microwatt per MIPS, which
+would be about 0.56 μA/MIPS (the unit microcontroller vendors like to
+use) at 1.8V.  That’s also 1000 giga-ops-per-second per watt.
+Low-power microcontrollers are usually 2–5 times better than this.
+
+Atmel picoPower
+---------------
+
+Atmel ARMs can do 250 pJ per 32-bit instruction and 2μW in standby.
+However, they take forever to wake up, like tens of microseconds (and
+a microsecond is 12 to 48 instructions!).  A full reboot from OFF
+takes 2.2 milliseconds.
+
+At this energy cost, 10W would pay for 40 billion instructions per
+second, but that would require nearly a thousand microcontrollers.
+
+These are Cortex-M0+s with single-cycle hardware (32×32!) multipliers.
+And also a tiny four-cell FPGA called “CCL”, “configurable custom
+logic”.
+
+<http://www.atmel.com/technologies/lowpower/picopower.aspx> makes it
+hard to tell how low power can go.  They say 1.62V.
+
+<http://www.atmel.com/Images/doc8349.pdf> gives an example of how to
+lower power consumption by lowering clock frequency from 8MHz to
+1.8432MHz, transmitting data at 115,200 baud instead of 19,200 baud,
+lowering the brownout voltage from the usual 2.7V to 1.8V, and going
+to sleep, increasing run-time off a capacitor from 6 seconds to 217
+seconds.  However, they never specify the capacitance!
+
+<http://www.atmel.com/products/microcontrollers/arm/sam-l.aspx#saml21>
+says “power consumption down to 35 µA/MHz in active mode and 200nA in
+Sleep mode”.
+<http://www.atmel.com/Images/Atmel-42385-SAM-L21_Datasheet.pdf> says
+48MHz (the Performance Level 2 model) or 12MHz (the PL0 model), 256kB
+flash, 40kB SRAM, 1.62 to 3.63 V, and typically 25 to 100 μA/MHz with
+the regulator in buck mode, lower for PL0 than PL2.  75 μA/MHz at 3.3V
+in the PL0 model seems like the worst-case performance.  Normalizing
+that, we get 250pJ/inst.  Also gives numbers in the 1 to 10 μA for
+STANDBY and BACKUP states, depending on temperature, and a bit lower
+for OFF.
+
+More easily available is the
+<https://www.digikey.com/product-detail/en/ATSAMD10D13A-MUT/ATSAMD10D13A-MUTCT-ND/5226477>
+Atmel ATSAMD10D13A-MUT (US$2.24); datasheet at
+<http://www.atmel.com/Images/Atmel-42242-SAM-D10_Datasheet.pdf>.  8 kB
+flash, 4 kB RAM, 22 GPIOs.  Worst case 75 μA/MHz (+284μA), which
+normalizes to the same 250pJ/inst.  Wakeup time is 4–20μs.
+
+STM32
+-----
+
+See also file `stm32`, but the STM32L low-power ARM microcontroller
+series is supposedly 144 pJ/insn, and can reasonably do duty cycles
+down to 0.02%, while using 2 mA at 1.8 V at 16 MHz, and the STM32F0
+range is 250 pJ/insn.
+
+ATMega328
+---------
+
+The familiar ATMega328 used in the Arduino isn’t the highest-tech or
+lowest-power microcontroller out there, but it’s very well known, and
+it’s simple to get running.  It runs at up to 20MHz, with most
+instructions in a single cycle, but only 8-bit ALU operations.  In
+power-save mode, with a real-time clock enabled, it uses 0.75μA (at
+1.8V, so 1.4 μW); at 8MHz and 5V, it uses up to 12mA, so 60mW, working
+out to 7500 pJ/instruction.  This is about 30 times worse than the
+AT-SAM family and MSP430 family, even before you take into account
+that these are 8-bit operations.
+
+Consequently, at 20MHz, this processor will gobble 150mW.
+
+MSP430
+------
+
+The von Neumann MSP430 family is in the range of 300–500 pJ per
+instruction, 10–25 16-bit MIPS, and 220–4000nW idle, which means
+instruction consumption exceeds idle consumption above about three
+instructions per second or one wakeup per minute.  At a power budget
+of 5mW, an MSP430 could average 12 16-bit MIPS.
+
+These processors are generally the processors of choice for
+very-low-duty-cycle applications.
+
+<http://www.ti.com/lit/wp/slay015/slay015.pdf> TI in 2012 explaining
+why they think MSP430 is better at low-power than Microchip XLP.
+
+<http://www.greenarraychips.com/home/documents/greg/WP003-100617-msp430.pdf>
+says that in 2010 the F18 consumed 7 pJ per instruction or 450 pJ per
+17×17-bit multiply; an MSP430 (at 8MHz) consumed 330 pJ per
+instruction or 2310 pJ per 16×16 multiply.  It also gives a
+sleep/wakeup time of 4 ns for the F18, with an idle power consumption
+of 100 nW, and a sleep/wakeup time of 5μs for the MSP430, with an idle
+(LPM4 sleep state) power consumption of 3600 nW.
+
+<http://johann-glaser.blogspot.com.ar/2012/10/msp430-launchpad-with-debian.html>
+says that an MSP430G2231 has 2kB flash, 128 bytes RAM, and runs at
+16MHz (performing 16-bit operations).  (Also, it gives a nice howto
+for getting a TI Launchpad device working with Debian.)  
+
+<http://www.ti.com/tool/msp430-gcc-opensource> is TI’s deprecated but
+actively maintained port of GCC.
+
+<https://en.wikipedia.org/wiki/TI_MSP430A> says the FRAM series of
+MSP430s has 320 nA RAM retention and 82 μA/MIPS, which is half the
+power consumption of other MSP430s, with up to 2 kB of RAM.  Other
+MSP430s have up to 512kB of ROM or 10kB of RAM.  Normalizing these
+numbers using 3.3V, which ought to be about right, we get 271 pJ/insn
+and 1100 nW.  The MSP430G2xx series has sub-microsecond wakeup, 0.1μA
+RAM retention, and 220μA/MIPS at 2.2V, or 480 pJ/insn and 220nW idle.
+
+Experimental subthreshold processor
+-----------------------------------
+
+<http://www.eit.lth.se/fileadmin/eit/courses/eit095f/Hanson_Variability_J_2008.pfd>
+describes an 8-bit processor that works at 350 mV and uses
+3.5 pJ/instruction, two orders of magnitude less than the MSP430.
+<https://web.eecs.umich.edu/~taustin/papers/VLSI-subliminal.pdf>
+describes it again more briefly.
+<https://web.eecs.umich.edu/~taustin/papers/VLSI06-sublim.pdf>
+describes another one that reaches 2.6 pJ/inst at 833kHz.  None of
+these processors are commercially available.
+
+CoolRisc 81
+-----------
+
+<http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.25.1097&rep=rep1&type=pdf>
+says the CoolRisc 81 uses 22 pJ/inst.  In 2001!
+
+Brains
+------
+
+<http://icri-ci.technion.ac.il/files/2013/07/Karlheinz-Meier_red2.pdf>
+Neurons use about 10 fJ (0.01 pJ) per neural spike (action potential)
+per synapse.  It is not yet feasible to use them to build a portable
+computer.
+
+Energy storage
+--------------
+
+A solar-powered computer could still be somewhat useful at night if it
+can store some energy.  But standard batteries are flaky and break
+after a few years, so fuck them.  And we’re talking about a
+super-low-power device, one that might use under 10mW when in active
+use, so even storing 1 joule of energy is potentially useful (100
+seconds), 10 joules could last you 20 minutes, and 100 joules could
+last you three hours.
+
+But how can you store 100 joules without batteries?  I haven’t found a
+good way.
+
+If you can reduce the power consumption below 1mW, then a smaller
+amount of energy storage would be feasible.
+
+### Solid-state cell energy storage
+
+<http://www.mouser.com/pdfDocs/Cymbet-WP-EnerChips-vs-Supercaps.pdf>
+claims that supercapacitors discharge at 10%–20% per day, while
+EnerChips (theoretically on the market but not in stock at Digi-Key)
+discharge at 1%–2% per *year*.
+
+These solid-state batteries use a thin-film solid with ionic
+conduction as their electrolyte, so they are fully solid-state,
+despite the mobility of ions within them.
+
+<http://www.nature.com/nmat/journal/v14/n10/full/nmat4369.html>
+discusses some new research on solid-state electrolytes for lithium
+batteries in more detail.
+<http://news.mit.edu/2015/solid-state-rechargeable-batteries-safer-longer-lasting-0817>
+is a press release about the paper.
+
+### Capacitor power storage
+
+Solid-state capacitors are the physically stablest medium for storing
+a few joules of energy for short periods of time.  They are low in
+capacity and expensive.  To store 1J, a capacitor needs:
+
+    | E <   | C >      |
+    | 3V    | 0.2 F    |
+    | 10V   | 20000 μF |
+    | 50V   | 800 μF   |
+    | 100V  | 200 μF   |
+    | 300V  | 22 μF    |
+    | 1000V | 2 μF     |
+
+#### Ceramics
+
+Ceramic capacitors generally do not have the necessary energy
+capacity.
+
+<https://www.digikey.com/product-detail/en/C3216X5R0J476M160AC/445-1428-2-ND/569054>
+TDK Corporation C3216X5R0J476M160AC is 47μF, 6.3V, 3.20mm x 1.60mm, US$0.12.
+CV²/2 = 1 mJ.
+
+<https://www.digikey.com/product-detail/en/AMK432BJ477MM-T/587-4368-1-ND/5405565>
+Taiyo Yuden AMK432BJ477MM-T is 470μF, 4V, 4.50mm x 3.20mm, US$5.34.
+CV²/2 = 4 mJ.
+
+<https://www.digikey.com/product-detail/en/JMK325ABJ227MM-T/587-3980-1-ND/4950534>
+Taiyo Yuden JMK325ABJ227MM-T is 220μF, 6.3V, 3.20mm x 2.50mm, US$2.56.
+CV²/2 = 4 mJ.
+
+<https://www.digikey.com/product-detail/en/B58033I5206M001/495-6706-5-ND/5039882>
+EPCOS (TDK) B58033I5206M001 is 20μF, 500V, 33.00mm x 22.00mm, 31g,
+US$89.90.  CV²/2 = 2.5J.  Designed for industrial power inverters.
+
+#### Films
+
+Some film capacitors are designed for high voltages and consequently
+have substantial energy capacity.  You could hook up the output side
+of an ordinary switchmode power supply (the part after the rectifier)
+designed for 240VAC line current to many of these, because in normal
+use a 240VAC-input SMPS’s capacitors will be charged up to 340V.
+<http://www.righto.com/2014/05/a-look-inside-ipad-chargers-pricey.html>
+gives an overview of these power supplies, and points out that you can
+get a crappy one with 5V output for US$3.
+<http://www.onsemi.com/pub_link/Collateral/SMPSRM-D.PDF> explains a
+bit about how you could charge them from a low-voltage source such as
+solar panels.
+
+<https://www.digikey.com/product-detail/en/DS371506-CA/P9669-ND/821966>
+Panasonic Electronic Components DS371506-CA is 50μF, 370V, 50.50mm
+diameter × 112.00mm, US$7.87.  CV²/2 = 3.4 J.  This capacitor is
+designed for shunting a motor.
+<https://media.digikey.com/pdf/Data%20Sheets/Panasonic%20Capacitors%20PDFs/AC%20Film%20Caps.pdf>
+is the datasheet; specifies insulation resistance >1000 MΩ (giving
+τ > 14h), explains it's an “oil wound metallized polypropylene film”
+capacitor.
+
+<https://www.digikey.com/product-detail/en/B32778G1276K/495-3933-ND/1884954>
+EPCOS (TDK) B32778G1276K is 27μF, 1300V, 57.50mm × 35.00mm × 50.00mm,
+US$14.48.  CV²/2 = 23 J.
+<http://en.tdk.eu/inf/20/20/db/fc_2009/MKP_B32774_778.pdf> is the
+datasheet; gives lifetime expectancy of 100k hours (11 years) to 1M
+hours (110 years) at room temperature, but insulation resistance such
+that τ is only 10k seconds (3 hours).
+
+<https://www.digikey.com/product-detail/en/C44AFGP6200ZE0J/399-5955-ND/2704609>
+Kemet C44AFGP6200ZE0J is 200μF, 400V, 76.00mm diameter × 140.00mm,
+US$55.44.  CV²/2 = 16 J.
+
+<https://www.digikey.com/product-detail/en/B25620B1317K322/B25620B1317K322-ND/3489148>
+EPCOS (TDK) B25620B1317K322 is 310μF, 1320V, 116.00mm diameter ×
+103.00mm, US$82.83 (in quantity 16!).  CV²/2 = 270 J.
+
+#### Tantalums
+
+A few tantalum capacitors have reasonable energy capacity.
+
+<https://www.digikey.com/product-detail/en/T491B476K010AT/399-9728-2-ND/3724805>
+Kemet T491B476K010AT is 47 μF, 10V, 3.50mm x 2.80mm, US$0.12.  CV²/2 = 2 mJ.
+
+<https://www.digikey.com/product-detail/en/T491X476K035AT/399-3821-2-ND/818681>
+Kemet T491X476K035AT is 47 μF, 35V, 7.30mm x 4.30mm, US$0.94 (in
+quantity 500!).  CV²/2 = 30mJ.
+
+<https://www.digikey.com/product-detail/en/109D107X9060F2/718-1226-ND/1559882>
+Vishay Sprague 109D107X9060F2 is 100μF, 60V, 7.92mm x 20.22mm,
+US$41.91.  CV²/2 = 180mJ.
+
+<https://www.digikey.com/product-detail/en/TWDE503M006CB0Z0700/478-9404-ND/4990384>
+AVX Corporation TWDE503M006CB0Z0700 is supposedly 50 millifarads, but
+actually mislabeled; it’s 50 microfarads.  6.3V, 9.52mm x 26.97mm,
+US$69.20.  CV²/2 = 1 mJ.  Also “wet tantalum”.
+
+<https://www.digikey.com/product-detail/en/592D228X06R3X8T20H/592D228X06R3X8T20H-ND/2802652>
+Vishay Sprague 592D228X06R3X8T20H is 2200μF, 6.3V, 14.50mm x 7.37mm,
+US$3.69 (in quantity 500!).  CV²/2 = 40mJ.
+
+<https://www.digikey.com/product-detail/en/TWAE228K025CBSZ0000/478-4966-ND/1879539>
+AVX Corporation TWAE228K025CBSZ0000 is 2200 μF, 25V, 9.52mm x 26.97mm,
+US$102.73, wet tantalum.  CV²/2 = 700mJ.
+
+<https://www.digikey.com/product-detail/en/M39006%2F22-0660/1012-1025-MIL/2773731>
+Vishay Sprague [MIL] M39006/22-0660 is 56 μF, 125V, 10.31mm x 28.60mm,
+US$76.61.  CV²/2 = 400mJ.
+
+<https://www.digikey.com/product-detail/en/TWAE157K125SBDZ0000/478-7301-ND/3451926>
+AVX Corporation TWAE157K125SBDZ0000 is 150 μF, 125V, 10.31mm x
+26.97mm, US$87.20.  CV²/2 = 1 J.
+
+#### Supercapacitors
+
+These are newish (like, the last 30 years).  I’m not sure they can be
+trusted to last a long time; the numbers I’m seeing on Digi-Key’s page
+are like “1000 hours at 70°”.
+<http://www.murata.com/~/media/webrenewal/products/capacitor/edlc/techguide/electrical/c2m1cxs-053.ashx>
+talks about the failure modes; it says they degrade little by little
+over time, although even after 5 years their 4.2V 470 mF supercap
+holds 2 J; they claim that their flat packages do a better job of
+keeping moisture out and electrolyte in than cylindrical packages,
+showing a degradation to 80% of capacity after 3000h (4 months).  It
+also mentions that leakage current is around a microamp.  On p.20 it
+shows a dryup lifetime graph, showing that even their DMT products
+will dry up in only 20 years at 70°, while their DMF products will dry
+up in only 5 years at 40°; on p.23 it explains that at 5.5V, their DMF
+will break after only 500 hours at 70° or 6400 hours (9 months) at
+40°, while the DMT will last dramatically longer, like 40,000 hours at
+70°.
+
+<https://www.digikey.com/product-search/en?pv13=1538&FV=fff40002%2Cfff8000c&mnonly=0&newproducts=0&ColumnSort=0&page=1&quantity=0&ptm=0&fid=0&pageSize=500>
+Nichicon JJD0E608MSEH is 6000 farads, 2.5V, 76.20mm × 168.00mm,
+US$326.  CV²/2 = 18750 J.  This sounds like science fiction.
+
+<https://www.digikey.com/product-detail/en/JUWT1105MCD/493-4330-ND/2538684>
+Nichicon JUWT1105MCD is 1F, 2.7V, 6.30mm diameter × 10.50mm, US$0.86.
+CV²/2 = 3.6 J.
+
+<https://www.digikey.com/product-detail/en/DSK-3R3H224U-HL/604-1020-1-ND/970232>
+Elna America DSK-3R3H224U-HL is 0.22F, 3.3V, 6.80mm × 3.00mm, US$2.16.
+CV²/2 = 1 J.
+
+#### Batteries
+
+<https://www.sparkfun.com/products/10319> is a 24.5 mm × 3.0 mm 3.6V
+LIR2450 rechargeable coin cell, rated for 110 mAh, which is 1430 J.
+It costs US$3.
+<https://electronics.stackexchange.com/questions/218655/running-3-3v-mcu-from-lir2032-lithium-ion-button-cell>
+cites a LIR2032 (20 mm × 3.0 mm) cell with 40 mAh at 3–4.2 V, 520 J.
+
+Horowitz & Hill (the 1989 edition with the micropower chapter) says
+that commonplace batteries (9-volt and AA batteries) “give nearly
+their full shelf life at drain currents less than 20μA.”  At 2 V and
+200 pJ/insn (reasonable ballpark figures, though the STM32L does
+better) this works out to an average of 200 000 instructions per
+second.  At 1400mAh for an ordinary 1.5 AA cell, of which you would
+need two (or a boost converter), this is 6 years, which is indeed
+comparable to the battery’s shelf life.  At 1 MIPS, the two-cell
+battery only lasts a year.
+
+I bought a couple of rechargeable NiMH AA batteries the other day for
+some absurd price, like US$10 or something.  They claim 2000 mAh,
+1.2V, which is 8.6 kJ (per cell).  At the full 3.5 mW power of a
+16 MHz STM32L at 1.8V (see file `stm32`), that would run for 28 days.
+
+##### Zamboni piles #####
+
+A cell of the <https://en.wikipedia.org/wiki/Zamboni_pile> yields 0.8
+volts, but only a few nA, and the Clarendon Dry Pile has been ringing
+its bell since 1840.  The cell is perhaps 20mm in diameter, but <1mm
+thick; you could easily stack three of them to get 2.4 volts,
+perfectly adequate to run a microcontroller on without regulation.  In
+particular, the Clarendon Dry Pile produces about 1 nA at 2 kV,
+consuming about 1 μg from each of its cells over the last 144 years,
+according to Croft’s 1984 paper, “The Oxford electric bell.”  He
+doesn’t give dimensions but the dry pile seems to be about 30mm in
+diameter, i.e. 700mm².
+
+However, at least STM32s have a minimal current consumption of a few
+hundred nA (180 nA in standby mode with no RTC, 410 nA in standby mode
+with RTC).  This would require, say, 500 times the cross-sectional
+area of the Clarendon battery: perhaps a 3-meter roll of 120mm-wide
+battery.  If the total thickness were 1mm, the battery would be
+350 mℓ.  This seems like a small price to pay for a battery life
+measured in centuries, as long as the device doesn’t have to be
+portable.
+
+Memory
+------
+
+ISSI’s [IS62C256AL-45ULI-TR][0] is 256 kilobits of parallel 5V 45ns
+SRAM for US$1.43 down to US$1.11 in quantity 500.  [It uses 150
+μW][2], or up to 15 mW in operation.
+
+Microchip’s [23K256-I/SN][1] is 256 kilobits of SRAM in a little bitty
+3.3V 8-pin 20MHz SPI SOIC for US$1.09 down to US$1.05.  [It uses 4 μA
+max][3] for standby, which works out to 13.2 μW.
+
+ISSI’s [IS62/65WVS2568FALL / IS62/65WVS2568FBLL][10] is similar, 256
+kiloBYTES of SRAM in a 3.3V SPI/SDI/SQI SOIC for US$2.20, but only
+available in quantity, running on [4 μA for standby][11].
+
+The [Adesto AT25SF041-SSHD-T][4] is four megabits of 104MHz 2.5–3.6V
+Flash in the same 8-pin SOIC format, and it's much cheaper, US$0.36.
+Being Flash, it uses no power for “standby” but a lot of power to
+erase (10 mA for 500 ms to erase 32 kB ≈ 500 nJ/byte), but [“only” 4
+mA to read][5].  It has quad outputs, so 104 MHz is pretty decent
+speed actually.
+
+ISSI’s [IS62C1024AL-35QLI-TR][6] is a megabit of parallel 5V 35ns SRAM
+for US$2.10 down to US$1.62 in quantity 500.  It [uses 20 μW][7], or
+up to 100 mW in operation.
+
+In PSRAM, ISSI’s [IS66WV51216EBLL-55TLI][8] is 8 megabits of parallel
+55ns 2.5–3.6V DRAM, with all the refresh nonsense hidden inside the
+chip, for US$3.20 down to US$2.31 in quantity 1000.  Because of the
+refresh nonsense, it uses more power, but not as much as you’d
+think — in CMOS standby mode (where presumably it retains the data)
+[it uses 100 μA][9], which works out to 250–360 μW.  That *is* about
+80 times as much as the Microchip part, but it also has about 32 times
+as much memory, so the penalty isn’t that bad.
+
+[0]: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS62C256AL-45ULI-TR/706-1310-1-ND/4733140
+[1]: https://www.digikey.com/product-detail/en/microchip-technology/23K256-I-SN/23K256-I-SN-ND/2001113
+[2]: http://www.issi.com/WW/pdf/62-65C256AL.pdf
+[3]: http://ww1.microchip.com/downloads/en/DeviceDoc/22100F.pdf
+[4]: https://www.digikey.com/product-detail/en/adesto-technologies/AT25SF041-SSHD-T/1265-1131-1-ND/4824165
+[5]: http://www.adestotech.com/wp-content/uploads/DS-AT25SF041_044.pdf
+[6]: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS62C1024AL-35QLI-TR/706-1308-1-ND/4733138
+[7]: http://www.issi.com/WW/pdf/62-65C1024AL.pdf
+[8]: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS66WV51216EBLL-55TLI/706-1427-5-ND/5320130
+[9]: http://www.issi.com/WW/pdf/66WV51216EALL-EBLL.pdf
+[10]: http://www.issi.com/WW/pdf/IS62-65WVS2568FALL-BLL.pdf
+[11]: http://www.issi.com/WW/pdf/IS62-65WVS2568FALL-BLL.pdf

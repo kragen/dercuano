@@ -1,0 +1,770 @@
+Entry-C: a Simula-like backwards-compatible object-oriented C
+=============================================================
+
+Entry-C is a Golang- and SIMULA-67-inspired design for adding
+object-orientation to C in a backwards-compatible fashion, unlike C++,
+while adding only a small amount of extra syntax.  As with C++, it
+doesn’t require garbage collection, it can be used to write
+allocation-free programs to ensure constant space usage, and only the
+language facilities you use will cost you anything at run-time.
+However, it is more flexible and potentially more efficient than C++.
+
+Semantic overloading of existing language features can make it harder
+to report compiler errors usefully, because it increases the space of
+valid programs.
+
+The mysterious `entry` keyword explained
+----------------------------------------
+
+The C language has a set of reserved words that cannot be used for
+identifiers (such as names for variables, fields, or types), such as
+`struct` and `if`, which are generally used as syntactic elements of
+the language.  Among these, we find the curiosity `entry`, which is
+not used for anything; it’s simply illegal in valid C programs, like
+a stray `@` or `` ` ``.
+
+Presumably this was intended for defining functions with multiple
+entry points, which is an easy enough thing to do in assembly.  For
+example, maybe you’d like to make an argument optional:
+
+    printf:  push $stdin
+    fprintf: ...
+
+In general, multiple entry points give you a way to make a tail call
+to another function at a cost of zero instructions in code space and
+zero execution time.  Here’s an example tail call from
+<http://canonical.org/~kragen/sw/netbook-misc-devel/nand.c>:
+
+    int inputs_for_pattern(char *pattern) {
+      char *s;
+
+      for (s = pattern; *s; s++)
+        if ((*s != '0') && (*s != '1') && (*s != 'x')) return 0;
+      return log2_int(s - pattern);
+    }
+
+    int log2_int(int n) {
+      int rv = 0;
+      while (n > 1) {
+        if (n & 1) return 0;        /* lousy error reporting, but whatever */
+        rv++;
+        n >>= 1;
+      }
+      return rv;
+    }
+
+Presumably what the `entry` keyword was contemplated for was being
+able to write the above code more like this:
+
+    int inputs_for_pattern(pattern)
+    char *pattern;
+    {
+      char *s;
+      int n;
+
+      for (s = pattern; *s; s++)
+        if ((*s != '0') && (*s != '1') && (*s != 'x')) return 0;
+      n = s - pattern;
+
+      entry int log2_int(n);
+
+      int rv = 0;
+      while (n > 1) {
+        if (n & 1) return 0;        /* lousy error reporting, but whatever */
+        rv++;
+        n >>= 1;
+      }
+      return rv;
+    }
+
+If you remove the `entry` statement in the middle, this is valid C
+already; but presumably the idea of the `entry` statement is that you
+could, in a sense, enter in the middle of the function; the tail end
+of the function is a function in its own right.
+
+This is a relatively minor micro-optimization in most contexts, and
+error-prone; and making the compiler smart enough that it’s actually a
+win is kind of hard.
+
+Activation-record objects: unifying structs with functions
+----------------------------------------------------------
+
+SIMULA 67's big insight was that, in a way, a function call has a lot
+in common with an object.  It has a set of variables and some code to
+run with access to those variables.  The difference is that a function
+call has very strict sequencing constraints: first the space for the
+variables is allocated (and some of the variables are initialized),
+then the code is executed, and when it returns, the space is
+deallocated.  A C++ object is, in some sense, the union of the
+features of a struct and a function call.
+
+### Nesting constructor code ###
+
+Suppose we simply relax this constraint and blur the distinction
+between structs and functions.  Then, instead of writing this code
+(adapted from
+<http://canonical.org/~kragen/sw/inexorable-misc/simpleproxy.c>):
+
+    struct pipe {
+        struct pipe *next;
+        struct pipe *partner;
+        struct bufferevent *buf;
+        int marked_for_deletion;
+        int fd;
+        char *error;
+    };
+
+    static struct pipe *
+    new_pipe(int fd)
+    {
+        struct pipe *p = malloc(sizeof(*p));
+        if (!p) {
+            log_msg("malloc failed (%s)", strerror(errno));
+            return NULL;
+        }
+
+        p->next = NULL;
+        p->marked_for_deletion = 0;
+        p->fd = fd;
+        p->error = NULL;
+
+        p->buf = bufferevent_new(fd, read_callback, NULL, error_callback, p);
+        if (!p->buf) {
+           p->error = "bufferevent_new failed";
+           return NULL;
+        }
+
+        if (-1 == bufferevent_enable(p->buf, EV_READ | EV_WRITE)) {
+            p->err = "bufferevent_enable failed";
+            bufferevent_free(p->buf);
+            return NULL;
+        }
+
+        return p;
+    }
+
+    static void
+    error_callback(struct bufferevent *bufev, short what, void *arg)
+    {
+        struct pipe *p = arg;
+        log_msg("error %d on conn %d", what, p->fd);
+        mark_for_deletion(p);
+    }
+
+we could write
+
+    struct pipe(int fd)
+    {
+        struct pipe *next = NULL;
+        struct pipe *partner;
+        char *error = NULL;
+        int marked_for_deletion = 0;
+        struct bufferevent *buf = bufferevent_new(fd, read_callback, NULL,
+                                                  error_callback, &fd);
+        if (!buf) {
+            error = "bufferevent_new failed";
+        } else if (-1 == bufferevent_enable(buf, EV_READ | EV_WRITE)) {
+            error = "bufferevent_enable failed";
+            bufferevent_free(buf);
+            buf = NULL;
+        }
+    };
+
+    static void
+    error_callback(struct bufferevent *bufev, short what, void *arg)
+    {
+        struct pipe *p = arg;
+        log_msg("error %d on conn %d", what, p->fd);
+        mark_for_deletion(p);
+    }
+
+    static void
+    mark_for_deletion(struct pipe *p)
+    {
+        /* ... */
+    }
+
+This puts the initialization code for the struct inside the struct
+itself, leaving the allocation or deallocation up to the caller.  It’s
+clearly a win in terms of avoiding code duplication, but it has a few
+drawbacks.
+
+It doesn’t have a convenient way to report initialization errors,
+since it doesn’t have a return value, and it also doesn’t have
+convenient syntax like C++’s `this` to take the address of the object
+it’s initializing, for use in registering the callback
+`error_callback` with libevent.  Instead, it type-puns a pointer to
+the first parameter, which is implicitly stored in the struct, into a
+pointer to the struct as a whole — which will break with no compiler
+warnings if someone inserts a new parameter before `fd`.
+
+### Pointers to nested functions with trampolines ###
+
+GCC implements Pascal-like nested functions, with access to the outer
+function’s stack frame, using a small amount of runtime code
+generation, putting a small trampoline that pushes a pointer to the
+stack frame and then jumps to the function, into the stack frame
+itself.  If we use that feature, we could simplify the above to the
+following:
+
+    struct pipe(int fd) {
+        struct pipe *next = NULL;
+        struct pipe *partner;
+        char *error = NULL;
+        int marked_for_deletion = 0;
+
+        void error_callback(struct bufferevent *bufev, short what, void *arg)
+        {
+            log_msg("error %d on conn %d", what, fd);
+            mark_for_deletion();
+        }
+
+        void mark_for_deletion()
+        {
+            /* ... */
+        }
+
+        struct bufferevent *buf = bufferevent_new(fd, read_callback, NULL,
+                                                  error_callback, NULL);
+        if (!buf) {
+            error = "bufferevent_new failed";
+        } else if (-1 == bufferevent_enable(buf, EV_READ | EV_WRITE)) {
+            error = "bufferevent_enable failed";
+            bufferevent_free(buf);
+            buf = NULL;
+        }
+    };
+
+Now, `error_callback` no longer needs an explicit pointer passed in,
+and indeed if libevent were written to require you to use runtime code
+generation to use basic functionality, `bufferevent_new` could take
+three parameters instead of five.  This expands `struct pipe`’s space
+by the space needed to hold the trampolines.
+
+GCC’s regular nested function support generates functions that are
+only safely callable until the outer function returns, because both
+the outer function variables and the trampoline itself are stored on
+the stack.  This design avoids that restriction, because the
+trampoline can be stored within the struct itself.
+
+### Invoking nested functions without trampolines ###
+
+The only reason for the trampolines, though, is that we’re converting
+nested-function pointers into regular function pointers, and then,
+instead of calling them immediately, we are passing them to a function
+that takes regular function pointers as parameters.  The call to
+`mark_for_deletion` in the above code needs no such trampoline;
+neither does a call such as the following:
+
+    void invoke_error(struct pipe *p) {
+        p->error_callback(NULL, 37, NULL);
+    }
+
+The underlying `error_callback` function takes an extra hidden
+parameter that is a `struct pipe *`, and in this case we’re passing
+that parameter explicitly.
+
+If we adopt a rule that only code lexically within the struct
+declaration is permitted to convert nested-function pointers to
+regular C function pointers, then we can statically compute the set of
+nested functions that need trampolines generated for them, which will
+usually be empty.
+
+### Initializing objects ###
+
+Normally you can initialize a statically-allocated or stack-allocated
+struct with an initializer list (from
+<http://canonical.org/~kragen/sw/netbook-misc-devel/hanoitri.c>:
+
+    typedef struct { int num, denom; } ratio;
+    static const ratio sin_60 = { 56755, 65535 };
+
+It makes sense that you’d repurpose that same syntax to supply
+initializer arguments to struct types like `pipe` above that have
+declared constructor arguments.  Also, as in C++, it seems convenient
+to allow you to just say `= x;` rather than `= { x };` in the case
+where there’s just one argument.
+
+But what about dynamically-allocated objects on the heap, or in an
+array or whatever?
+
+I think the most harmonious approach is to define an additional
+coercion rule from lvalues that are structs with constructors, or
+pointers to structs with constructors, to function pointers.  If you
+invoke such an lvalue as if it were a function, then it decays to a
+pointer to the constructor code, which has a void return value.
+
+Thus, this will initialize element 5 of the array of pipes with the
+`fd` argument `fd0`, and element 6 with `fd1`, and give a compile
+error about a missing constructor argument on element 7:
+
+    struct pipe pipes[10];
+    pipes[5](fd0);
+    struct pipe *p = &pipes[6];
+    p(fd1);
+    pipes[7]();
+
+The following will also give a compile error, because you’re trying to
+invoke a constructor on a `struct pipe` rvalue, which is generally a
+useless thing to do:
+
+    struct pipe pipes[10];
+    struct pipe f() { return pipes[5]; }
+    f()(fd0);
+
+This seems compatible with considering structs and functions merely
+slightly different versions of the same thing.
+
+### Temporary objects ###
+
+In C++, if you have a `Rational` class, you can say
+
+    Rational seven_sixths = Rational(2, 3) + Rational(1, 2);
+
+which (given the existence of the relevant constructors and overloads)
+constructs two or three temporary `Rational` objects and then destroys
+them (you might say “on the stack”, although of course that’s just one
+possible implementation).  This is pretty handy, but the rules about
+the lifetimes of those objects are very tricky, and the syntax creates
+a conflict between the namespace of classes and the namespace of
+functions and variables.  The interaction of this feature in C++ with
+the absence of sequence points between the constructors created a bug
+in most C++ programs where one constructor may be partly complete when
+the other throws an exception.
+
+So, for the moment, I’m not adding temporary objects to Entry-C.
+
+Ad-hoc polymorphism with dynamic dispatch with Golang-like interfaces
+---------------------------------------------------------------------
+
+I’ve been claiming Entry-C was a “backwards-compatible object-oriented
+C”, but so far all I’ve given is a way to avoid writing a separate
+initialization function for your structs and a little syntactic sugar
+to define functions that operates on them more conveniently.
+Object-orientation is usually described as consisting of
+encapsulation, (ad hoc) polymorphism, and inheritance,
+[and something else?] none of which have made an appearance so
+far. Also, I haven’t used the `entry` keyboard I spent so many bytes
+bloviating about at the beginning.
+
+So let’s steal Golang’s approach to polymorphism wholesale.  Golang
+uses these things called interfaces to get polymorphism.  Golang
+interfaces at runtime are basically three-tuples: a pointer to an
+object, a pointer to a vtable, and a pointer to the underlying type of
+the object for the sake of further interface conversions.  Any method
+can be invoked polymorphically, via an interface, or monomorphically,
+via some concrete type; and you can attempt to convert anything to any
+interface type.  Conversions from a concrete type to an interface type
+use a vtable for that interface type computed at compile time, and
+give a compile-time error if that conversion is impossible.
+Conversions from one interface type to another use a vtable generated
+at runtime, and if the new interface type is not simply a subset of
+the old one, they can yield a runtime error.
+
+We can add the same mechanism to C by using the `entry` keyword for a
+totally unintended purpose — declaring an interface type, with a
+syntax exactly analogous to `struct` or `union`:
+
+    entry callback_handler {
+        void error_callback(struct bufferevent *, short, void *);
+        void read_callback(struct bufferevent *, void *);
+    };
+
+Now we can cast a `struct pipe` to an `entry callback_handler`, which
+will use a pointer to a compile-time-generated vtable, as with Golang;
+and we can also attempt to cast an `entry {}` to an `entry
+callback_handler`, which may succeed (constructing a new vtable at
+runtime, or finding a cached one) or may fail.
+
+And that’s polymorphism in Entry-C: both more efficient and more
+flexible than in C++.  It’s more efficient because you only use
+polymorphism where it’s needed; it’s more flexible because the caller,
+not the callee, decides when polymorphism is needed.
+
+Encapsulation
+-------------
+
+Encapsulation might be a good idea, but Entry-C doesn’t have it, or
+even a good way to approximate it.
+
+You can make some of your methods “private” by declaring them
+`static`, which will also keep them from being called polymorphically
+via an `entry`.  But usually the things you would most like to make
+private are variables, and you can’t make variables private by
+declaring them `static`, because static variables are something else.
+
+The best you can do is only a little better than in standard C: you
+can put an `entry` type in your .h file and keep the actual
+implementation type inside your .c file.  Then, because the callers
+can’t allocate space for your implementation type, you probably need
+to provide a function to allocate new instances of it and return
+`entry`s to them, and a function (perhaps in the `entry`) to
+deallocate instances.
+
+This is better than the “pimpl” idiom in standard C or C++ because it
+doesn’t have that disgusting name.
+
+Inheritance
+-----------
+
+Traditional inheritance is a terrible idea:
+
+* Subtyping gives rise to questions of covariance and contravariance,
+  which make your programming language an unnecessarily confusing user
+  interface.  
+* The possibility of inheritance typically makes every variable
+  run-time polymorphic, which makes reading the code more challenging.
+  As a consequence, things that ought to be compile-time errors
+  (e.g. casting from a type that doesn’t define `foo()` to an
+  interface that requires it) become runtime errors (because some
+  subclass might define `foo()`).  Also, things that ought to be
+  trivially easy for the compiler to optimize become difficult.  You
+  can’t inline a callee if you don’t know which callee is going to be
+  called.
+* Classes that are not designed to be subclassed often can’t be
+  subclassed to do what you want, although the language won’t stop you
+  from trying.
+* Classes that *are* designed to be subclassed have no way in the
+  language to define the interface between themselves and their
+  subclasses, and it’s very common for new versions of library classes
+  to break existing subclasses; for example, it’s trivially easy to
+  accidentally get recursion this way, creating the danger of not just
+  infinite recursive loops but also problems with re-entrancy.
+* Everything that you can do with inheritance, you can do better with
+  delegation.
+
+So Entry-C doesn’t have traditional inheritance.
+
+However, as in Plan 9 C and consequently as in Golang, you can import
+the names defined in a nested struct into your own namespace by simply
+not naming the struct:
+
+    struct pipe;
+
+The names in the inner anonymous struct (both inner functions and data
+fields) will be visible wherever your own names would be visible.  If
+you define conflicting names, that’s a compile error.  This enables
+you to share implementations of certain methods across multiple
+classes in a convenient way, without the problems introduced by
+standard inheritance, but it’s purely syntactic sugar for a bunch of
+one-line delegation methods.  The “inherited” methods can’t implicitly
+call methods you define.
+
+At file scope, this allows you to incrementally refactor from global
+data to local data; you can start by collecting the global data into
+an anonymous struct, then move functions into it one or a few at a
+time.
+
+Error reporting
+---------------
+
+There’s a big problem with error reporting in C, and adding
+constructors to structs just makes it worse, because you might want to
+do things in a constructor that could fail, and as in C++, the
+constructor doesn’t really have a way to return that failure value.
+This is, I think, why Golang doesn’t have constructors.
+
+The standard C++ answer is to use exceptions, but exceptions have
+their own problems, especially in the absence of garbage collection
+and in the presence of the kind of things that make code
+non-reentrant.
+
+The Golang answer is to use multiple return values for everything that
+might fail.  Entry-C doesn’t have multiple return values, although
+clearly C should have had them.
+
+The standard C answer is for your initializer function to either take
+the address of the struct as an argument and return an int, or to
+return the address of a newly allocated struct or NULL.  Entry-C
+constructors don’t have return values.
+
+You can do what I did in the example above: define an “error” field in
+the object, indicating whether construction failed.  Alternatively,
+you can move things that could fail out of the constructor, and return
+a success or failure code:
+
+    struct pipe() {
+        struct pipe *next = NULL;
+        struct pipe *partner;
+        struct bufferevent *buf = NULL;
+        int fd;
+        int marked_for_deletion = 0;
+
+        void error_callback(struct bufferevent *bufev, short what, void *arg) {
+            log_msg("error %d on conn %d", what, fd);
+            mark_for_deletion();
+        }
+
+        void mark_for_deletion() {
+            /* ... */
+        }
+
+        char *open(int new_fd) {
+            fd = new_fd;
+            buf = bufferevent_new(fd, read_callback, NULL,
+                                  error_callback, NULL);
+            if (!buf) {
+                return "bufferevent_new failed";
+            }
+            
+            if (-1 == bufferevent_enable(buf, EV_READ | EV_WRITE)) {
+                bufferevent_free(buf);
+                buf = NULL;
+                return "bufferevent_enable failed";
+            }
+            return NULL;
+        }
+    };
+
+However, Entry-C also adds a new kind of error condition: casting one
+entry type to another that isn’t a superset could produce a runtime
+error.  XXX I need a design for how to handle that operation and the
+resulting error.
+
+Function overloading
+--------------------
+
+No.  _Fuck_ no.
+
+Operator overloading
+--------------------
+
+This might be a good idea, especially for arithmetic.  I’m not sure
+how to do it, especially without constructing temporary objects or
+throwing exceptions.
+
+Example: integer DSP pipelines set up at runtime
+------------------------------------------------
+
+Here we have a bunch of DSP filters that can be connected to each
+other at runtime, including a software phase-locked loop, using no
+heap allocation and no casts.  The final paragraph sets up an example.
+
+This code is adapted from
+<http://canonical.org/~kragen/sw/netbook-misc-devel/pll.c>.
+
+A “crad” is a made-up unit of angular measure designed to avoid
+multiplication and division in the main loop of the PLL algorithm.
+(You could argue that it’s at least as bad to do polymorphic method
+dispatch, but probably only if you’re on a computer so big that memory
+references are slower than division.)
+
+    enum { 
+        pi = 0x400,     /* Crads per pi radians. must be a power of 2 for & */
+        iir_shift = 9,  /* >> for low-pass rolloff at 512 samples (16Hz). */
+    };
+
+    /* Every struct defined below can be cast to this type. */
+    entry sink {
+        void consume(int sample);
+    };
+    
+    /* om0 is const base angular frequency, omega, in crads/sample. */
+    struct pll(int om0) {
+        int pha;         /* Current phase in crads. */
+        int err;         /* Accumulated low-pass-filtered phase error. */
+        int amp;         /* Accumulated low-pass-filtered amplitude. */
+
+        /* Compute the actual current angular frequency of a PLL. The bit
+           shift “10”, which determines how much frequency shift we get, was
+           determined by trial and error because I am ignorant of theory. */
+        static int current_om() { return om0 + (err >> 10); }
+
+        /* Update PLL state for a new input sample. */
+        void consume(int cc) {
+            pha += current_om();
+            iir_low_pass(&err, (pha       ) & pi ? cc : -cc);
+            iir_low_pass(&amp, (pha - pi/2) & pi ? cc : -cc);
+        }
+    };
+
+    static void iir_low_pass(int *out, int in) {
+        *out += in - (*out >> iir_shift);
+    }
+
+    struct pll_amp_filter(struct pll *p, entry sink s) {
+        void consume(int cc) {
+            p->consume(cc);
+            s.consume(p.amp);
+        }
+    };
+
+    struct pll_freq_filter(struct pll *p, entry sink s) {
+        void consume(int cc) {
+            p->consume(cc);
+            s.consume(p.current_om());
+        }
+    };
+
+    struct low_pass_filter(int current_value, entry sink s) {
+        void consume(int sample) {
+            iir_low_pass(&current_value, sample);
+            s.consume(current_value);
+        }
+    };
+
+    struct freq_to_squarewave(entry sink s) {
+        int ph = 0;
+        void consume(int omega) {
+            ph += omega;
+            s.consume(ph & pi ? -1 : 1);
+        }
+    };
+
+    struct hold(int val) {
+        void consume(int new_val) {
+            val = new_val;
+        }
+    };
+
+    struct multiplier(entry sink s, struct hold volume) {
+        void consume(int sample) {
+            s.consume(volume.val * sample);
+        }
+    };
+
+    struct putchar_sink {
+        void consume(int sample) {
+            putchar(sample);
+        }
+    };
+
+    struct example {
+        struct pll p = 110 * pi * 2;
+        void consume(int sample) {
+            p.consume(sample);
+        }
+        struct putchar_sink s;
+        struct hold volume = 255;
+        struct multiplier m = { s, volume };
+        struct pll_freq_filter f = { &p, m };
+/// XXX missing square wave generator
+        struct pll_amp_filter a = { &p, volume };
+    };
+
+Example: some of Lisp
+---------------------
+
+This example suffers from the lack of a way to write `this`, and it
+probably needs garbage collection, which will really benefit a great
+deal from being able to write `this`.
+
+    entry value {
+        entry value car();
+        entry value cdr();
+        int is_null();
+        struct symbol *as_symbol();
+        void visit(entry collector gc);
+    };
+
+    entry collector {
+        void recurse(entry value child);
+        void found(void *data);
+    };
+
+    struct pair(entry value car_, entry value cdr_) {
+        entry value car() { return car_; }
+        entry value cdr() { return cdr_; }
+        int is_null() { return 0; }
+        struct symbol *as_symbol() { return NULL; }
+        void visit(entry collector gc) {
+            gc.found(&car_);  /* XXX this means “this” */
+            gc.visit(car_);
+            gc.visit(cdr_);
+        }
+    };
+
+    struct symbol(const char *name, struct symbol *next) {
+        entry value car() { return err("car of a symbol"); }
+        entry value cdr() { return err("cdr of a symbol"); }
+        int is_null() { return 0; }
+
+        struct symbol *as_symbol() {
+            return (symbol*)&name;
+        }
+        void visit(entry collector gc) { gc.found(&name); }
+    } *symbol_table[256] = {0};
+
+    void *allocate(size_t size) {
+        void *rv = malloc(size);
+        if (!rv) abort();
+        return rv;
+    }
+
+    struct symbol *intern(const char *name) {
+        /* This hash function is almost as silly as PHP using strlen */
+        struct symbol *b = &symbol_table[(int)name[0] & 255];
+        struct symbol *s = b;
+        while (s) {
+            if (0 == strcmp(name, s->name)) return s;
+            s = s->next;
+        }
+
+        s = allocate(sizeof(*s));
+        s(name, b);
+        *b = s;
+        return s;
+    }
+
+    struct _nil_type {
+        entry value car() { return err("car of nil"); }
+        entry value cdr() { return err("cdr of nil"); }
+        int is_null() { return 1; }
+        struct symbol *as_symbol() { return NULL; }
+        void visit(entry collector gc) { }
+    } nil;
+    
+    struct pair *cons(entry value car, entry value cdr) {
+        struct pair *rv = allocate(sizeof(*rv));
+        rv(car, cdr);
+        return rv;
+    }
+
+    int length(entry value v) {
+        return v.is_null() ? 0 : 1 + length(v.cdr());
+    }
+
+    entry value assq(entry value alist, symbol *key) {
+        if (alist.is_null()) return nil;
+        entry value item = alist.car();
+        if (item.car().as_symbol() == key) return item;
+        return assq(alist.cdr(), key);
+    }
+
+    entry value reverse(entry value list) {
+        static entry value reverse_with(entry value list, entry value tail) {
+            if (list.is_null()) return tail;
+            return reverse_with(list.cdr(), cons(list.car(), tail));
+        }
+        return reverse_with(list, nil);
+    }
+
+Nothing surprising so far, except maybe that I didn’t make a `typedef`
+for `entry value`.  Now let’s amp up the weird with a lazy mapcar:
+
+    struct mapcar *mapcar(entry value *f(entry value), entry value items) {
+        struct mapcar *rv = allocate(sizeof(*rv));
+        rv(f, items);
+        return rv;
+    }
+
+    struct mapcar(entry value *f(entry value), entry value items) {
+        entry value car() { return f(items.car()); }
+        entry value cdr() { return mapcar(f, items.cdr()); }
+        int is_null() { return items.is_null(); }
+        struct symbol *as_symbol() { return items.as_symbol(); }
+        void visit(entry collector gc) { gc.found(&f); gc.visit(items); }
+    };
+
+Heap-allocation here is necessary because the caller of `cdr()`
+doesn’t know they’re receiving a `struct mapcar`; the declared return
+type of `cdr()` is just `entry value`.  Consequently, they can’t
+allocate space for a `struct mapcar` return value; so, that needs to
+be allocated on the heap.  That’s one reason this needs garbage
+collection, but of course Lisp in general kind of needs it.
+
+This is the kind of situation where “virtual destructors”, which is to
+say a run-time polymorphic method to recursively deallocate child
+resources, are helpful, although in this particular case they aren’t
+enough, because some objects in the object graph may be referenced
+more than once.

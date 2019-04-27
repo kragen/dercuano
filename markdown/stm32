@@ -1,0 +1,716 @@
+I think I am switching from AVRs to STM32s for seven principal reasons.
+
+1. Speed: STM32s are much faster, from almost twice the clock speed to
+   over ten times the clock speed, with registers that are four times
+   as wide, including a single-cycle 32×32→32 multiply — which would
+   be 10 8-bit multiplies and 7 8-bit adds.  And AVRs without an
+   external crystal are limited to 8 MHz, while STM32s can run at full
+   speed on their internal ±1% RC oscillators.
+2. Power: With an STM32, you can run 32 32-bit instructions on the
+   energy the AVR needs to run a single 8-bit instruction.  AVRs,
+   despite their “picoPower” marketing, use about 7500 picojoules per
+   instruction (pJ/insn), and those are 8-bit instructions.  The
+   STM32F0 uses about 1500 pJ/insn, and the STM32L0 uses about
+   230 pJ/insn.
+3. Cost: The STM32 costs more than the AVR, but only slightly, and
+   less per pin or per MIPS.  The 48MHz STM32F031x4, with 39 GPIOs,
+   costs US$1.30 in quantity 1 on Digi-Key.  The cheapest reasonable†
+   AVR is the 20MHz ATtiny13A, which costs US$0.40 and has 6 GPIOs.
+4. Size: The STM32L is *tiny*, 2.133 mm × 2.070 mm in the WLCSP
+   package, with 21 GPIOs (two of which you can run I²C on).  The AVR
+   ATtiny4/5/9/10 is physically the same size, but only has 8 total
+   pins and 4 GPIOs.
+5. Scalability: STM32s have a much higher ceiling; AVRs top out at
+   20 MHz with a limited range of peripherals, while STM32F7s run at
+   216MHz and have all kinds of crazy things.
+6. ADC: STM32s’ ADCs are 12-bit and run at 1Msps and up, while AVRs’
+   ADCs are 10-bit and run up to 15ksps at maximum resolution.
+7. Debugging: AVRs’ DebugWIRE protocol, in a big FUCK YOU to users of
+   free software, is undocumented, while STM32s have a debugging
+   interface called “serial wire debug” which is supported in OpenOCD.
+
+† The ATtiny4/5/9/10 are cheaper at 17¢ but are almost useless.
+
+Introduction
+------------
+
+I think the STM32F031 is going to be my new favorite microcontroller,
+replacing the AVR.  It’s a 32-bit 48MHz Cortex-M0, it costs US$1.30 in
+quantity 1 on Digi-Key, and there is already Arduino support for it,
+which should make it easy to get started.  Like the ATMega328, it has
+32 (or 16) kilobytes of Flash and 4 kilobytes of SRAM.  And, in
+addition to easier-to-handle sizes with shitloads of pins (up to 39
+GPIOs!), it comes in a 2.4-mm-square WLCSP25 form factor.  And it uses
+one fifth the power of the AVR at the same clock speed!
+
+(Hmm, the above mostly refers to the STM32F031x4/6, but I might have
+gotten some details from the STM32F030x4/6/8/C mixed in there.  The
+4/6 is 16 or 32K; 8 and C are 64 and 256 K, and more interestingly, up
+to 32K of SRAM.  These larger chips also come with up to 55 GPIOs.
+There are also STM32F3 and STM32F4 families, which are progressively
+more awesome; the F4 runs at 168MHz and has three 5Msps DACs, and both
+have floating-point.)
+
+On the bad side, it still doesn’t have a radio (unlike the ESP32) and
+it only runs up to 3.6 volts — 5 volts is right out.
+
+[There’s an overview by Satoshi NM][1].
+
+[1]: https://satoshinm.github.io/blog/171212_stm32_blue_pill_arm_development_board_first_look_bare_metal_programming.html
+
+Instruction set
+---------------
+
+ARMv6-M with Thumb-2, ONLY.  RAWK.  Nothing comes close for machine
+code density.  And it has a 1-cycle 32×32 → 32 (☹) multiply, which is
+pretty astounding even if it does discard half the result.
+
+The STM32F0xxx Cortex-M0 Programming Manual (PM0215) doesn’t include
+instruction timings at all except to say that the multiplier takes a
+single cycle, actually.
+
+There’s a separate stack pointer for interrupt handlers if you enable
+it, so that the interrupt handlers (I think there can be up to 7 on
+the stack at once) don’t eat into the worst-case stack space of every
+thread.
+
+Software support
+----------------
+
+OpenOCD even supports the “serial wire debug” interface, which
+apparently allows you to turn the microcontroller into the puppet of
+your workstation using two pins.
+
+GPIOs and 5V
+------------
+
+It does have 5V-*tolerant* I/O pins, though not all of them.  Also,
+its GPIOs *can* be configured as open-drain rather than push-pull,
+which has two huge benefits:
+
+- They can communicate with 5-V systems if there’s an external 5V
+  pullup;
+- Perhaps they can switch somewhat heftier loads?
+
+Supposedly the pins can source or sink 20 mA each, and up to 80 mA
+over the whole chip, which I think is inferior to the AVR’s 200;
+still, if I could hook a 12V 100mA motor directly to four open-drain
+GPIO pins, that would be pretty awesome.  I don’t think I can because
+they get configured as input pins during and after reset, and those
+aren’t supposed to be subjected to more than 4 volts.
+
+Some other STM32s have a special pin for sinking a lot of current from
+an infrared LED.
+
+The GPIO pins can also be configured with internal pullups, pulldowns,
+or neither.
+
+Hmm, wait, it says the 5V-tolerant pins can be subjected to V_{DDIOx}
++ 4.0 volts as long as the pullups and pulldowns are disabled.  What’s
+V_{DDIOx}?  Oh, I guess that’s the 2.0V to 3.6V Vdd.  So 7.6V is
+reasonable.  But anything over 5.5V is outside “general operating
+conditions”.
+
+The smallest and cheapest ones only have 15 GPIOs, which is still
+pretty decent; that’s under 9¢ per GPIO!
+
+The massive number of GPIOs can toggle at up to half the clock speed,
+i.e. 24MHz, supposedly.  I don’t quite understand how this works; do
+you just run a sequence of instructions that loads immediate 16-bit
+values into some CPU register and then writes them to the
+memory-mapped I/O register `GPIOx_ODR`, I guess?  Or is there some way
+to feed the GPIOs with the DMA controller?
+
+Analog
+------
+
+Its ADC is 12-bit rather than the AVR’s 10-bit,
+and it’s supposedly 1μs!  Does
+that really mean 1Msps?  It apparently does... and it has 9 or 10
+external input channels.  And it supports DMA, and there’s a “DMA
+circular mode” (`DMACFG`=1) to just dump stuff into a ring
+buffer — ideal for seeing pre-trigger data!
+
+It doesn’t seem to have an analog comparator input, unfortunately.
+You have to fake it by configuring the ADC to do conversions
+constantly and fire an interrupt when they hit a threshold.
+
+Another drawback compared to the AVR is that the ADC’s full-scale
+reading is always Vdda, which must be at least as high as the power
+supply — at least 2.4 V.  It has a calibrated internal bandgap voltage
+reference to measure against, but it can’t set that as the ADC
+reference voltage directly.  This means that the 4096 counts in the
+output are spaced at least 580 μV apart, and 880 μV at 3.6 V, while
+the AVR’s 1024 counts can be spaced 1.07 mV apart.  Some other STM32
+chips support a separate VREF+ (alluded to in ST AN2834), but the
+STM32F031x4/6 does not.  Only STM32s with 100 or 144 pins do.  ST
+suggests solving the problem with a preamplifier.
+
+The ADC requires at least 2.4 V, although most of the rest of the chip
+will run down to 2.0 V.  And it uses 1 mA at its normal speed.
+
+It’s possible to configure the ADC for lower bit depth (10, 8, or 6
+bits) to speed it up (to 928, 785, or 643 ns, respectively), which
+suggests you could crudely digitize signals up to 780 kHz with one
+STM32.  The sample-and-hold is 1.5 cycles of the 14MHz ADC clock, so
+about 107 ns.  This seems like it is likely to sharply attenuate
+frequency components above about 10MHz even if you can get several
+chips sampling them at once.
+
+The Vdda pin is supposed to draw only about 0.9 mA, so putting it on a
+separate regulator might improve precision.
+
+Like the AVR, it has an inaccurate temperature sensor: ±5°, better
+than the ±10° on the AVR.  (Hmm, at least on the STM32L, the Vsense
+linearity with temperature is at worst ±2°, and at least 1.48 mV/°,
+which you would think would give you 1° accuracy?  Maybe it's just
+`TS_CAL2` that is ±5°?)
+
+In terms of PWM, well, it has 9 timers and 11 (?) PWM channels, which
+can run off 16-bit timers instead of an 8-bit one, which should give a
+lot more dynamic range.  It even has a 32-bit timer!
+
+Some of the timer counters can be run off an external quadrature input
+instead, which should enable quadrature feedback up to fairly high
+pulse rates.
+
+The PWM counters have an adjustable “auto-reload value” and can count
+in either sawtooth, inverted sawtooth, or triangle form.  I think you
+can run them off a 48 MHz clock, which ought to enable you to generate
+phase-correct PWM waves at 24 MHz and factors thereof (24 MHz, 12 MHz,
+8 MHz, 6 MHz, 4800 kHz, 4 MHz, 3428 kHz, etc.)  Or maybe 12 MHz.
+
+They also have a dead-time mode specifically designed for H-bridges.
+
+Buses
+-----
+
+It has I²C (including wakeup from Sleep, 10-bit addressing, multiple
+7-bit slave addresses, and 1 Mbps “Fast Mode Plus”) and an 18Mbps SPI
+interface.  These, like the ADC, support DMA, so you don’t have to
+handle interrupts after every byte like on the Arduino.
+
+Its USART, which also supports DMA, can run at up to 6Mbps, which
+could be handy for RS-485.
+
+The DMA support means that the CPU can sometimes be delayed in its
+access to memory, which seems like it could cause some problems for
+cycle-accurate bitbanging.  The CPU doesn’t seem to have a cache (why
+would you have a cache when all your RAM is zero-wait-state?), but it
+does have a 12-byte instruction prefetch buffer, which could also
+cause unpredictable timing; it can be disabled with `FLASH_ACR`.
+
+The larger STM32F030x4/6/8/C has two I²C interfaces instead of one and
+two SPI interfaces instead of one.  Other STM32 chips have a wide
+variety of peripherals available.
+
+Clocks
+------
+
+In addition to an external crystal, in theory, like the AVR, it has an
+8MHz internal oscillator — with an optional 6× PLL to bring it up to
+48MHz.
+
+A neat thing is that if the external crystal fails, it automatically
+switches to its internal oscillator.  (But then it fires an NMI, and
+your ISR needs to clear the CSSC bit in `RCC_CIR` to escape the NMI
+loop, so it’s not totally transparent.)
+
+Power
+-----
+
+Supposedly it normally uses like 20mA at 3.6 V and 48 MHz or more like
+12mA if all the peripherals are turned off.  This works out to
+something like 1.5 nJ per 32-bit instruction if we figure on 1
+instruction per cycle.  Strangely, the datasheet doesn’t supply
+current consumption figures at 2 V.
+
+This scales linearly down to about 3 mA at 8 MHz, then down to about
+1mA as frequency approaches zero.
+
+It has four modes: Run, Sleep, Stop (3.2–55 μA), and Standby
+(0.7–3 μA), which last is sort of turned off actually, losing all the
+memory contents.  It can run down to 2V.  Stop mode still has a bunch
+of possible interrupt sources as wake sources, though I’m not sure if
+timers are among them.  (I think its RTC may be capable of doing
+this.)  Presumably getting out of Standby involves rebooting, and it
+says the RTC can do this.  Also the watchdog timer can wake it from
+Stop or even Standby.
+
+The RTC has a separate supply and consumes 0.5–2.1 μA when enabled.
+It can continue working down to 1.65 V.
+
+Wakeup from Stop mode takes 2.8 to 9 μs; wakeup from Standby takes
+like 50 or 60.
+
+All of this would seem to imply that it is sensible to use Stop mode
+for duty cycles down to about 0.1% as long as the wakeups are for at
+least, say, 20 μs of execution — 1000 instructions or so.  Which means
+that you can reasonably wake up every 25 ms for 1000 instructions,
+using about 2 μJ while awake and another 1 μJ while asleep, for a
+total of 120 microwatts, 600 times lower than full power consumption
+of 72 mW.
+
+72 milliwatts is about three red indicator LEDs.
+
+(I’m not yet sure how clock speed depends on supply voltage.)
+
+Standby mode might use 5 microwatts, and so makes sense for duty
+cycles down to 0.007%, but requires 100 μs or so (5000 instructions)
+of execution.  I mean, you could do less execution, but then you would
+be spending way more energy on rebooting than on actually getting
+anything done.  At this level you’re waking up no more often than
+every 1.4 seconds or so.  In this mode nearly all the GPIOs are
+tristated.
+
+I think there may be some wrinkles around stabilization time of the
+system clock PLL I may be missing here.  Like, if the PLL is disabled,
+you only get 8 MHz, not 48.  But if the PLL is enabled, it might take
+a while to get sync (up to 200 μs, according to the datasheet).  And
+the PLL automatically gets disabled whenever you enter Stop or
+Standby, though not Sleep, so you always wake up at 8MHz.
+
+Note that erasing the Flash takes 20–40 MILLIseconds, during which
+time presumably the thing is using as much power as normally, or even
+more.
+
+A 3-gram Energizer CR2032 lithium coin cell could power the STM32
+directly, and its 240mAh down to 2 volts works out to 2.2 kJ.  This
+would power the STM32 at full speed for 8 hours (if it can deliver a
+reasonable amount of current; its internal resistance is 20Ω until near
+the end, which in theory means it can deliver 150mA), in Stop mode 99.9% of
+the time waking up 40 times a second for 6 months, or in Standby mode
+waking up every 1.4 seconds for 14 years.  (In either case you can use
+the IWDG independent watchdog or the RTC real-time clock to wake up at
+a scheduled time.)
+
+To power the STM32 at full speed for a full second directly from a
+capacitor would require a 16000 microfarad capacitor.  A 1-farad
+supercapacitor could theoretically run it for a full minute.  If you
+had a buck converter and a boost converter, you could use a
+higher-voltage electrolytic.  For example, the last inkjet printer I
+took apart has a 100μF 50V electrolytic on its main board, which is a
+bit smaller than my last pinky joint; this works out to ⅛J, or 1.74
+seconds at full power.
+
+The larger STM32F030 uses about 10% more power at the same high speeds.
+
+1.5 nJ/insn is slightly higher than the 0.9 nJ/insn of the MSP430
+family, but much higher than the 0.3 of an LPC1110 (see file
+`keyboard-powered-computers`).  Atmel has a line of “picopower” ARM
+microcontrollers that are around 0.25 nJ/insn (see file
+`low-power-micros`).  Much-lower-power microcontrollers exist but are
+not widely used (see `keyboard-powered-computers` and
+`low-power-micros`.)
+
+However, the most relevant comparison is the ATmega328, which (despite
+sharing the “picopower” moniker) gobbles 7.5 nJ/insn (see
+`low-power-micros`).  So the STM32 family uses one fifth the power to
+process four times as many bits!
+
+Relevant comparisons include: that an E-ink display uses about 3 mW
+during continuous reading at a comfortable rate; the ADC also uses 3
+mW while running; and 3 mW from a 12%-efficient solar cell is about ¼
+of a square centimeter.
+
+Memory
+------
+
+It has a bootloader that can reprogram its own flash.  Also it can
+somehow boot from its own SRAM.  Erasing a 1KB page of the flash takes
+20–40 ms, and programming a halfword takes 40–60 μs, which is like two
+or three thousand clock cycles.
+
+Of course ARM is not Harvard, and so not only is C programming
+somewhat simplified, but also, it’s possible to execute code from
+SRAM.  In fact, that’s mandatory if you want to keep executing code
+while erasing or even writing to the Flash, and the SRAM is
+zero-wait-state.
+
+You don’t get the full benefit of the implicit AND operation provided
+by NOR flash — the micro tries to protect you from yourself by
+refusing to program non-erased locations — except that you *can*
+overwrite arbitrary halfwords of the flash with 0x0000 without erasing
+entire pages.  I feel like this could be useful.
+
+Board support
+-------------
+
+The popular [Blue Pill STMDuino is a Chinese design built around a
+STM32F103C8][0], which is a somewhat higher-end STM32: 72 MHz, 64 or
+usually 128 KB of Flash, and 20 KB of RAM.  This is a Cortex-M3 rather
+than M0.  (M4 is the one with the FPU, saturating arithmetic, and
+MAC.).  I think it’s the same size as an Arduino Micro or Nano, I’m
+not sure.  It’s 53.0 mm × 22.5 mm, just slightly larger than an
+Adafruit Feather.
+
+[0]: http://wiki.stm32duino.com/index.php?title=Blue_Pill
+
+The WLCSP25
+-----------
+
+The 2.4mm-square WLCSP25 that the STM32F031x4/6 can come in is
+particularly appealing to me.  It’s just so incredibly tiny; it’s only
+2.458 mm × 2.36 mm × 585 μm at most, and that includes its balls.  It
+should weigh under 10 mg, since it occupies 3.4 μl.  However, a few
+sacrifices are made to get it down to 25 pins, or rather solder balls.
+Port A has pins 0-10, 13, and 14, but is missing pins 11, 12, and 15.
+Port B has pins 0-1, 5-7, and that’s it; port F has just pins 0 and 1,
+which are for the external oscillator.  These 20 GPIOs, plus Vdd, Vss,
+Vdda, BOOT0, and NRST, suck up all the pins.
+
+Port A and PB1 have the analog input channels, so it’s fully supplied
+there.  Port A also has the USART, the SPI interface, and the I²C
+interface, and most of these have alternate pins among those included
+from port B.  PA13 and 14 have the SWD debugging interface.
+
+It’s missing the battery-backup pin for the real-time clock, it’s
+missing the connections for a 32.768kHz watch crystal, and 8 of the
+pins aren’t 5V-tolerant (namely, PA0-7), but it doesn’t actually seem
+to be missing anything essential except moar GPIOs.
+
+So, if you want to max out your GPIOs, you have 20 GPIOs, or if you
+want to preserve debuggability, you have 18 GPIOs and two SWD pins
+(PA13 and PA14).  If you want to use it as a debuggable I²C slave to
+twiddle and maybe process GPIOs, you additionally dedicate either
+PA9-10 or PB6-7 to I²C, and you have 16 GPIOs.  If you need high
+timing precision, you put a crystal on PF0-1.  If you want SPI, you
+can have it (at 3V) on PA4-7, sacrificing three or four analog pins.
+And you have PWM outputs on all the GPIO pins except PF0-1 (the
+oscillator pins) and PA13-14 (the SWD pins), except that I think a
+couple of those pins are actually just used as triggers for the PWM
+waveform (PA0 and PA5 are TIM1_CH1_ETR and TIM2_CH1_ETR, which I don’t
+understand.)
+
+Holy *SHIT*, the STM32L
+-----------------------
+
+I didn’t realize this at first, but since 2015, there’s *another* line
+in the STM32 lineup called the “access line ultra-low-power” STM32L,
+the low-power processors.  And these are even *smaller* and also
+lower-power.  And their ADC is *even faster* at 1.14 Msps, with DMA.
+*And* they have two analog comparators instead of zero.  They still
+have SWD, I²C, and SPI (“only” 16Mbps, and then only above 2.7V; at
+1.71V it can manage 12Mbps, and at 1.65V 8Mbps).  They’re a bit
+slower, though, at 32MHz, but they’re still Cortex-M0+ with a
+single-cycle 32×32→32 multiplier.
+
+The STM32L011x3/4 goes for US$1.50 on Digi-Key, and it has a WLCSP25
+package (STM32L011ExY) that is 2.133 mm × 2.070 mm.  Miraculously, it
+has *more* GPIOs than the larger STM32F0’s WLCSP25: sort of 21 rather
+than 20, because the BOOT0 pin can be configured as PB9, though input
+only.  It has less memory (the 3 has 8K of Flash, the 4 has 16K, both
+have 2K of SRAM) and it can operate down to 1.65 V, or 1.8 V if the
+brownout reset circuit is enabled.
+
+The WLCSP25 pinout is gratuitously different from the STM32F031x4/6
+WLCSP25 pinout, but since it’s a different physical size, you couldn’t
+use it in the same circuit board layout anyway.  Almost the same set
+of pins is mapped: pins 0-10, 13, and 14 on port A, pins 0-1, 5-7, and
+9 on port B, and pins 14 and 15 on port C, rather than 0 and 1 on port
+F, but those are still the external oscillator pins.
+
+The friendliest way to get started with the STM32L might be using the
+LQFP32 package, which is 7 mm square and should be easy to
+hand-solder, since its pins are every 0.8 mm.
+
+The GPIO currents are a bit lower: 16 mA sunk by three-volt pins,
+22 mA sunk by five-volt pins, and 16 mA sourced by either.
+
+### STM32L ADC ###
+
+The 12-bit ADC not only runs at 1.14 Msps down to 1.65V, it only uses
+25μA at 10ksps and 200μA at 1Msps, and it supports up to 256× hardware
+oversampling in order to fake up to 16-bit sampling.  So you could get
+16-bit samples at 4.4 ksps.
+
+### STM32L power ###
+
+The front page of the datasheet claims 0.95 DMIPS/MHz and “down to” 76
+μA/MHz in Run mode.  At 1.8V, if we ignore the “down to” clause, this
+would work out to 0.144 nJ/insn, 144 pJ/insn, dramatically lower than
+the STM32F0; even at its max of 3.6V it’s only twice that,
+290 pJ/insn.  The aforementioned 3-gram Energizer CR2032 lithium coin
+cell with its 240mAh down to 2 volts (2.2 kJ) could thus power it for
+3200 MHz-hours — 100 hours at 32 MHz, 200 hours (8 days) at 16 MHz,
+400 hours (17 days) at 8 MHz, 3200 hours (4 months) at 1 MHz.
+
+Perhaps more interesting still, given a 1-farad 2.7-volt
+supercapacitor, which has 2 J and 0.9 coulombs down to 1.8 V, it could
+run for over 3 MHz-hours; with a 90%-efficient buck-boost regulator
+running the supercap down to 1.3 V (2.8 J), it could run 18 billion
+instructions, 4.9 MHz-hours.  Such a capacitor as the 104μℓ 4Ω 1F
+Nichicon JUWT1105MCD (see file `capacitors`) has a time constant of 4
+seconds, so it can mostly recharge within 4 seconds and 95% charge
+within 12 seconds.
+
+Digging in a bit more, above 16 MHz it needs at least 1.71 V, and
+there are two other “power consumption ranges” up to 16 MHz and
+4.2 MHz, which apparently affect the number of wait states (perhaps to
+Flash only?).  Power consumption is about 1 mA in sleep mode at 16 MHz
+with all peripherals off, and there are seven different low-power
+modes.  In Standby mode, it consumes 180 nA without the RTC enabled or
+410 nA with the RTC.  It has a “low-power run” mode which can run at
+32, 65, or 131 kHz, which, at 25°, runs at 5.7–17μA from RAM or
+18–32μA from Flash, which works out to 210 pJ (1.65 V, 131 kHz, RAM)
+to 400 pJ (3.6 V, 32 kHz, Flash) per instruction; typical consumption
+for normal run mode ranges from 320 μA (4 MHz, running while(1) from
+RAM or with prefetch off) to 5.4 mA (32 MHz Dhrystone from Flash).
+Likely the most efficient is 1.95 mA for 16 MHz from RAM, which is
+further explained as “HSI16 clock source (16 MHz), Range 2, VOS[1:0] =
+10, Vcore = 1.5 V, Flash switched OFF”.  If we figure that this is
+15.2 MIPS and is being powered at 1.8 V, then that’s 3.5 mW,
+230 pJ/insn.
+
+So I can’t figure out where they get the “76 μA/MHz” claim from,
+because the best I can find in their measurements is 122 μA/MHz.  Oh,
+wait, I think I see how to get partway there — the 1.95 mA is “code
+with data processing”, which I think is Dhrystone, and `while(1)` uses
+about 30% less power.  That gets you to 85 μA/MHz but not to 76.
+
+This is still enormously better than, say, the 900pJ MSP430F2001.
+
+A tricky bit here is what kind of suspend mode you can get away with
+using when there isn’t stuff to do.  You have Sleep (1 mA at 16 MHz),
+Stop (with or without RTC, retaining RAM contents), and Standby (with
+or without RTC, losing RAM contents).  Aside from the wakeup time, the
+problem is that in Standby you can only be woken by the brown-out
+reset, power-on reset, RTC “tamper”, something completely undocumented
+called “Auto WakeUp (AWU)”, the independent watchdog, and two of the
+GPIO pins.  By contrast, in Stop mode, you can also be woken up by the
+programmable voltage detector (PVD), the analog comparators, the
+LPTIM, all the GPIOs, the RTC (if it’s running), the USART, the
+low-power UART, and I²C, though not SPI.  And it only takes 5 μs to
+wake up instead of 65 μs.
+
+In exchange for the wakeup limitations, you cut your power; at 1.8 V:
+
+    | mode             |   μA |    μW | time to drain | time to drain  |    duty |
+    |                  |      | 1.8 V | CR2032 2.2 kJ | 1F 2.8J        |   cycle |
+    |                  |      |       | coin cell     | supercapacitor |         |
+    |------------------+------+-------+---------------+----------------+---------|
+    | 16MHz Run        | 1950 |  3500 | 175 hours     | 13 minutes     |         |
+    | 16MHz Sleep      |  450 |   810 | 31 days       | 58 minutes     |     23% |
+    | 131kHz Flash run |   32 |    58 | 14 months     | 14 hours       |   1.66% |
+    | 131kHz RAM run   |   17 |    31 | 27 months     | 25 hours       |   0.87% |
+    | Stop w/RTC       | 0.54 |  0.97 | 72 years      | 33 days        |  0.028% |
+    | Standby w/RTC    | 0.41 |  0.74 | 94 years      | 44 days        |  0.021% |
+    | Stop, no RTC     | 0.29 |  0.52 | 134 years     | 62 days        | 0.0149% |
+    | Standby, no RTC  | 0.18 |  0.32 | 220 years     | 101 days       | 0.0092% |
+
+The “duty cycle” column is the duty cycle at which the power used in
+low-power mode equals the power used in run mode at 16MHz.  At greater
+than this duty cycle, the majority of power used is in run mode, so
+the low-power mode’s power consumption is in the minority; at less
+than this duty cycle, run mode’s power consumption is in the minority.
+
+This makes me think that as long as your duty cycle is above 3% or so,
+you should just use low-power run mode instead of suspending, and
+above 0.1% or so, it isn’t worth worrying about the differences
+between the different suspend modes, so you should just use stop with
+RTC; but below 0.03% or so, the differences between them could
+potentially give you a factor of three improvement in lifetime.
+
+The Sleep mode doesn’t give a huge improvement on power, but it’s very
+cheap and only takes 7–10 clock cycles to wake up from.
+
+The wakeup latency means that, above a certain frequency of wakeups,
+you no longer get the benefit of a low duty cycle.  At the 5 μs wakeup
+time for Stop, for example, you get to the 0.028% duty cycle at 56 Hz,
+even if all you do after the wakeup is just go right back to Stop.
+
+(The wakeup time even from Stop actually depends on the clock speed
+and the voltage regulator configuration and can range from 5.1 μs to
+260 μs (!), and Standby wakeup can range from 65 μs to 3000 μs.)
+
+Such a small device will probably have appreciable power usage in its
+communications with other devices.  In “Range 2”, the I²C interface
+uses 8.2 μA/MHz, GPIOA uses 6.3 μA/MHz, and GPIOB uses 4.1 μA/MHz.  If
+all three are turned on, they total 18.6 μA/MHz, or 300 μA at 16 MHz,
+adding about 15% to run-mode power consumption, but increasing
+stop-mode power consumption by a factor of over 600.  But maybe you
+could enable just I²C while stopped.
+
+If it’s communicating, though, in addition to running its own GPIO
+port, it needs to drive the input impedances of the other chip and the
+lines in between.  Different input pins have different specified input
+leakage currents: ±50 nA, 200 nA, 500 nA, and they’re specified as
+having a typical input capacitance of 5 pF, which means that charging
+them up to 1.8 V will cost you 9.0 picocoulombs, the same as you spend
+on the leakage current in 180 μs, 45 μs, or 18 μs, according to which
+leakage current you figure with.
+
+9.0 picocoulombs on half the bits you transmit (the ones that differ
+from the previous bit) at 1.8 V gives you a cost of 8.1 pJ per bit,
+which triples to 24 pJ for separately-clocked serial protocols like
+I²C and SPI.
+
+8 or 24 pJ per bit is relatively significant compared to 230 pJ/insn,
+since instructions generally produce 32 bits, which means 7.2 pJ per
+output bit.  But it’s far from the overwhelming cost I was fearing.
+
+Local availability
+------------------
+
+I can get an STM32F103C8T6 here in Buenos Aires for AR$154 (US$5.39)
+or some kind of STM32F030 from /*while1*/ in Liniers for AR$99
+(US$3.46).  Arduinos based on the STM32F103C8T6 are even more common
+and cost from AR$200 to AR$300 (US$7–10.50).  Large volumes would
+therefore seem to depend on importation.
+
+The 103 has a Cortex-M3, USB, 72MHz, CAN, two 1Msps 12-bit ADCs, 20K
+of SRAM, 64K of Flash, three 16-bit timers, two I²C interfaces, JTAG,
+and 1.25 DMIPS/MHz.  It runs down to 2.0V.  It seems to come in
+LQFP100, LQFP64, and LQFP48 packages.  The “C” in the part number
+means these are 48 pins, which means 37 GPIOs.
+
+In particular [“Arduino Arm Stm32 Cortex-m3 Stm32f103c8t6
+Mona”](https://articulo.mercadolibre.com.ar/MLA-627363964-arduino-arm-stm32-cortex-m3-stm32f103c8t6-mona-_JM)
+is Monarca Electronica in Flores for $220, with male headers.  Monday
+to Friday 10:00–13:00, 14:00–19:00.  Gavilán 58, C1406AWA Buenos
+Aires, 011 4634-2407, info@monarcaelectronica.com, according to Gooble
+and [Mercadoshops](http://monarca.mercadoshops.com.ar/closed).  Also
+WSAP 1162241486.  I could go there TOMORROW.
+
+Fun projects
+------------
+
+You should totally be able to bitbang NTSC or PAL color from this bad
+mofo, or for that matter AM radio.  You should even be able to do AM
+radio with their PWM outputs, since that’s the 540 kHz to 1610 kHz
+range.  The PWM waves unfortunately have relatively few power levels
+available, but the slightly lower frequencies actually within the AM
+radio spectrum have more; 545.5 kHz is subharmonic 44, so you should
+have 22 meaningfully different power levels available.
+
+Given the 24MHz max GPIO toggle rate, a TV typewriter could in theory
+manage 400 kilopixels per 60Hz NTSC field, or 800 kilopixels on the
+screen.  But NTSC is actually limited to about 6MHz of bandwidth, so
+it’s more like 100 kilopixels per field or 200 kilopixels per
+frame — about 400 × 500.  This is enough for 60 lines of 80 columns.
+
+Rebraining a calculator with one of these bastards should give you
+access to virtually unlimited computational power.
+
+The 8MHz HSI RC oscillator has an 8-bit HSITRIM register which adjusts
+its frequency up or down in steps of about 40kHz, about 0.5%.  If
+scaled up into the FM radio range, these are steps of about
+0.5 MHz — too big to get usable FM radio out of.  But maybe there’s
+another way to bend the HSI frequency by adjusting the voltage,
+current, or temperature of the chip.  You’re lacking about a factor of
+4 in speed to do direct digital synthesis of FM radio waveforms
+without an analog front end, but maybe you could generate, say, a
+14 MHz square wave and filter out its 7th harmonic.  This would be
+about 3.4 CPU clock cycles per full oscillation, so it would be kind
+of tricky, but maybe you could do it.
+
+All the trimming and calibration and precision in the ADC and clocks,
+plus the various push-pull/open-drain/pullup/pulldown optionson the
+GPIOs, should enable a much better version of the M328, especially if
+you use a crystal.  And 3.6V or 2.4V should be a lot safer for the DUT
+than 5V.  (Does the M328 run at 5V?)
+
+The AVR could only sample from its ADC at very low sampling rates.
+Even the cheapest STM32 can do 1 Msps
+and so you should be able to digitize 500 kHz
+waveforms.  This gives you about 2.5% of a decent oscilloscope, which
+ought to be enough to debug slow circuits.
+
+If you could gang up several STM32s, you could perhaps make 35% of a
+decent oscilloscope, or even a bit more.  14 STM32s adequate to the
+job should cost under US$10.
+
+Alternatively, it ought to be feasible to build an SDR for broadcast
+AM or FM radio using that megasample of capture bandwidth.
+
+Audio communication and touch detection should be easy.
+
+The Magic Kazoo should definitely be built around one of these bad
+boys.  So should lots of other musical instruments.
+
+The 25-to-55-kΩ pullups and pulldowns should source or sink a few
+hundred μA.  In theory you could use this to very dimly light an LED,
+or charge a capacitor or reverse-biased diode by a very small amount
+to measure light, heat, radioactivity, or vibration.  Into 10 pF of
+capacitance you should get a few tens of mV/ns (MV/s), or a bit under
+a volt per 48 MHz cycle.  According to the datasheet, a Vishay 1N4001
+is about 15 pF and has a reverse leakage current that rises
+exponentially with temperature, from 0.2 μA at 50V at 25° up to 5 μA
+at 100° and 180 μA at 150°.  Fortunately or unfortunately, it’s also
+near exponential with voltage, being something like 0.03, 1.5, and
+20 μA respectively at the 7% of peak reverse that 3.6 V represents.
+Unfortunately the input leakage current is given as up to ±0.2 μA in
+analog mode, which would overwhelm the smaller numbers in this
+list. 1.5 μA at 15 pF is 100 kV/s or 100 mV per 1μs ADC sample time.
+(The STM32 pins themselves weigh in at 5 pF.)  A lower-voltage diode
+might be a better choice as a temperature sensor.
+
+You should be able to use the hi-Z input state for detecting
+electrical fields, given this 0.2 μA number.  Maybe a capacitive
+divider would be useful. 
+
+It should be feasible to do a pretty fast 16-bit-wide logic analyzer
+using one of the 16-bit GPIO ports.  I don’t know how often you can
+read them but it seems like it should be at least 10 million times a
+second, producing 20 megabytes per second.  Probably you could stream
+such data out to an SPI peripheral at the much slower 18 megabits per
+second the SPI interface supports.
+
+For parallel computing, it should be feasible to implement the PAPERS
+Beowulf barrier synchronization primitive on a cluster of these guys
+using their open-drain/pullup configuration.  As each microcontroller
+reaches the barrier, it writes a 1 to its pin, but continues to read a
+0 from it until the last open-drain output on the bus gets set to 1.
+Given the 20 mA sink current capability and the 25 kilohm minimal
+pullup resistance, it should be possible to synchronize over 100
+microcontrollers within microseconds this way.  If only a small number
+of microcontrollers enable their pullups, it should be feasible to
+scale to thousands.  This approach is actually used in the Gestalt
+FABNET bus.
+
+It should also be possible to compute a crude majority rule function
+in this way, by using the pullups and pulldowns to “vote”.
+
+Parallel computing is especially appealing given the STM32L0’s six
+times lower cost per instruction, with the limitation to 16MHz.  You
+could plausibly build a 3×3×3×3 81-processor hypercube with 162
+kilobytes of RAM and 1.30 megabytes of Flash, capable of 1.2 billion
+instructions per second, that weighed 100 milligrams and ran (for
+embarrassingly parallel problems) on 1.8 V, 160 mA, 280 mW, for a BOM
+cost of under US$100.  It might measure 7 mm × 7 mm × 7 mm if the
+circuit boards and capacitors don’t take up too much space.  Without
+any external switches, it could scale its power usage down to 26
+microwatts by moving all the processors to Standby; with one, it could
+power the unused processors off entirely, leaving a power of 0.32 μW
+for the one left in Standby.
+
+It should be straightforward to do the DSP necessary for short-range
+ultrasonic communication even at hundreds of kHz, if you can find
+adequate transducers.
+
+I think the key to inventing ubiquitous computation, if found in a
+literary genre, is going to be fantasy, not science fiction.  Sterile
+tropes of human-like computers with voice interfaces do not help us to
+imagine how we might actually interact with these devices.  If we can
+give the objects in our environment new rules — whatever new rules we
+want — what rules would we like to give them?  If you can enchant the
+objects in your environment to act however you want, what would you
+have them do?
+
+Perhaps you would have your possessions follow you around, put
+themselves away when you got home, and scream or fight back when they
+were being stolen.  Your bullets and arrows would never miss, and your
+clothes would become hard as rock when the bullets of others were
+about to hit them.  Your utensils would change color or cry out in
+pain if they recognized a poison in your food.  Your clothes would
+always keep you dry and at a comfortable temperature, despite being
+thin and light, and would never rip or stain.  You would know
+everything about whoever you met before they told you, and you would
+know whenever you were in danger.  You could reach the top of the
+highest tree or through the narrowest keyhole, and hear a whisper
+across the city if it had your name in it.  You could climb walls like
+Spider-Man, fly through the air like a bird, or run faster than a
+horse; you could send objects flying to wherever you wished.  You
+could call down lightning and fire to destroy your enemies, or turn
+them to stone, mud, or pillars of salt.  Your house would clean
+itself, and it would change its appearance as you wished.

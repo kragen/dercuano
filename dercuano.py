@@ -3,9 +3,16 @@
 
 Next up:
 
-- some kind of fucking CSS, Jesus.
-- another note or two
+- use H1 tags if you’ve got ’em
+- interfile links: replace "`foo-bar`" or “file `foo-bar`” with [title
+  of foo bar](foo-bar).
+- some kind of fucking CSS, Jesus.  Copy Medium or whatever.
+- another eight notes
 - a more convenient way to query the triple store
+- maybe some metadata about word counts and time spans and unfinished
+  status?
+- maybe don’t link to categories that contain only one note?
+- maybe list categories on the link to the note?
 
 """
 from __future__ import print_function
@@ -78,13 +85,13 @@ class Bundle:
         for subj, verb, obj in self.triples():
             if subj == notename and verb == 'titled':
                 return obj
-        return notename.replace('-', ' ').title()
+        return notename.replace('-', ' ').capitalize()
 
     def category_title(self, category_name):
         for subj, verb, obj in self.triples():
             if subj == category_name and verb == 'category-titled':
                 return obj
-        return category_name.replace('-', ' ').title()
+        return category_name.replace('-', ' ').capitalize()
 
     def category_link(self, category_name, level=1):
         return a(self.category_title(category_name),
@@ -149,7 +156,7 @@ def category_html(bundle, category_name):
     category_title = bundle.category_title(category_name)
     return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
                     head_stuff(),
-                    h1('Notes in category: ', category_title),
+                    h1('Notes in category “', category_title, '”'),
                     ul([li(note.link_ley())
                         for note in bundle.notes()
                         if category_name in note.categories()])))
