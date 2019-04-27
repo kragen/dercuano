@@ -186,9 +186,10 @@ def category_html(bundle, category_name):
 
 def index_html(bundle):
     categories = sorted(bundle.categories())
-    return ley(html(title(bundle.get_title(),
-                          ' version ', bundle.get_version()),
+    bundle_title = bundle.get_title()
+    return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(),
+                    h1(bundle_title, ' notes'),
                     ul([li(note.link_ley(level=0))
                         for note in bundle.notes()]),
                     div(h2('Categories'),
