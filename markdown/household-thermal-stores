@@ -1,0 +1,442 @@
+Today is 2018-11-16.  My house here in Buenos Aires has another power
+outage, an event which happens regularly during the summer months.
+They think power will be restored in some four hours, but this is
+uncertain.  On one occasion a few years ago, I had a three-week power
+outage.
+
+(Note: in fact, as I wrote this, the power came back and stayed on.)
+
+The first thing I did was to check the refrigerator and put ice into
+it.  So I was thinking about the sizes of the thermal stores that
+would be needed for the various temperature-control applications of
+electrical energy that I had been suddenly denied.
+
+Refrigerators
+-------------
+
+In preparation for such events, I have some soft-drink bottles filled
+with water and frozen in the freezer, to absorb heat through their
+enthalpy of fusion, and more soft-drink bottles filled with water and
+chilled in the refrigerator, to provide thermal mass.  When there’s a
+power outage, I move ice bottles from the freezer into the fridge.
+
+Unfortunately, my refrigerator is not a super-efficient model like the
+Sun Frost line; it’s a rather normal refrigerator with a compressor, a
+magnetic-strip gasket, and a few centimeters of foam between the
+inside and outside walls.  I’ve scoured it in vain for information
+about its energy-efficiency, except that it claims its nominal power
+is 230 watts, and it uses 180 watts to defrost the freezer and 15
+watts for the light.  Let’s assume that 230 watts is the maximum
+power, but that it doesn’t run the compressor and the defroster at the
+same time, so the compressor uses 215 watts.  And, although I haven’t
+measured this, the compressor needs to run somewhere around half the
+time.  (This is normal.  If your compressor needs to run 80% of the
+time or more to keep the fridge cold at normal ambient temperatures,
+you’re in danger of going over the temperature setpoint and spoiling
+your food if it warms up a bit outside, say from 20° to 24°, and so
+compressors are sized to prevent this.  But if your compressor only
+needs to run 20% of the time, you could have used a compressor half
+the size, and the fridge would be a lot cheaper.)
+
+So let’s say the compressor averages 110 watts at normal ambient
+temperatures, and let’s suppose it has a coefficient of performance of
+2, which is a normal kind of coefficient of performance for
+refrigeration systems.  That means it draws off 200 watts of heat from
+the food within, on average, to compensate for the heat leakage
+through the walls and the seals and the losses when the door is opened
+and all the cold air falls out.  (The bottles in the fridge also serve
+a bit to reduce the air losses.)  And that means that those leakages
+are about 220 watts.
+
+The enthalpy of fusion of ice is about [333 kJ/kg][6], so 220 W is
+about 660 mg/s of melting ice, which works out to 57 kg/day
+(19 MJ/day).  I don’t have 57 kg of ice in there.  I have the
+following bottles:
+
+    | N |     ℓ |  total |
+    |---+-------+--------|
+    | 1 |  2.25 |   2.25 |
+    | 3 |  1.25 |   3.75 |
+    | 2 |   0.6 |    1.2 |
+    | 8 |   0.5 |     4. |
+    | 1 |  .375 |  0.375 |
+    |   | total | 11.575 |
+    #+TBLFM: $3=$1*$2::@7$3=vsum(@2$3..@6$3)
+
+So I have about 11.6 kg of ice in there, which works out to about 4.9
+hours.  Whew, that’s not much!  And I guess that’s why old-fashioned
+iceboxes worked on a basis of daily door-to-door ice delivery.
+
+Wrapping the refrigerator in a blanket might help the situation.  But
+another possible solution would be a coolth reservoir where I actually
+could store 50 kg or more of ice, frozen when there’s power and used
+for cooling when there’s not.  It could be relatively small, and
+indeed to keep the power costs acceptable it would need to be
+relatively small and relatively well insulated.
+
+[6]: https://en.wikipedia.org/wiki/Enthalpy_of_fusion
+
+Dehydrators
+-----------
+
+At Burning Man, where you need to either burn or haul away any garbage
+you generate, down to the smallest fern leaf, we dehydrated our
+garbage by hanging it out in the dry wind in a net bag; this prevented
+it from rotting while we were there, improved its qualities as fire
+fuel, and reduced its weight enormously for the trip back.  Though
+this is rarely done in the US, the same procedure is commonly used to
+dry clothes after washing them, though usually without the bag.  And
+of course this is a common way to preserve sliced produce as well.
+
+Putting air in contact with moist things causes the humidity in some
+surface layer of air to reach 100% (in the case of pure water) or
+whatever the equilibrium relative humidity of the solution is (when it
+has solutes such as salts).  Water can diffuse across this layer into
+other air, or you can blow the surface layer away and replace it with
+new air, and in either case you remove water from the vicinity of the
+moist thing and increase the drying rate.
+
+The amount of moisture required to reach 100% humidity rises
+exponentially with air temperature, doubling about every 10½°, so by
+raising the temperature of the air a few degrees, you can get very
+substantial increases in the drying rate.  This is complicated by the
+fact that the evaporation itself cools down the air and the moist
+thing, and so your surface temperature is always a bit lower than the
+incoming air temperature; after a short while, the heat thus absorbed
+is necessarily replaced by the heat in the incoming air.
+
+The principal difficulty with dehydrators is that they have to work
+relatively fast to be useful, and this requires the air to be both
+hot, which requires a lot of energy, and fast-moving, which requires a
+bit of energy but mostly careful airflow design.  There’s the
+additional difficulty that, if you’re heating things up with fire or
+electricity, you need a thermostat, and ideally one that turns the
+heat off if it fails, rather than unexpectedly setting fire to things
+and melting things.
+
+The [enthalpy of vaporization of water is 2.26 MJ/kg][e], an enormous
+number, and it swamps the specific heat of air or vapor, so nearly all
+of the energy that goes into the dehydator is used to evaporate water.
+
+[e]: https://en.wikipedia.org/wiki/Enthalpy_of_vaporization
+
+Here, I’ve been using my electric oven to dehydrate garbage.  The oven
+has a thermostat that goes down to 50°, and also a fan and a shutoff
+timer.  So far, the thermostat has been dependable, but I’m not sure
+that it’s designed to fail safe; the shutoff timer fails when there’s
+a power outage (as I said before, a frequent event), and in those
+cases the oven turns back on when power is restored.  This is
+unacceptable and so I cannot depend on the shutoff timer.
+
+(Ideally a dehydrator would be driven by a humidistat and would shut
+off when the desired humidity was reached.)
+
+Depending on what you’re dehydrating, different temperatures may be
+acceptable, and clothes dryers are designed with a relatively
+sensitive thermostat for precisely this reason — the high heat that
+most quickly dries cotton clothes would be disastrous for delicate
+synthetics.  35° is a fairly safe temperature for anything other than
+certain exotic materials you probably shouldn’t be playing with
+anyway.  Raw-foodists require their food not to be heated above 42°
+for somewhat debatable nutritional reasons.  75° is generally
+considered adequate for sterilizing food; although there are a few
+exotic thermophile microbes that can survive higher temperatures, they
+are not active at 37° (the temperature they are at after you eat them)
+and so they are generally not pathogenic.  Some common plastics,
+especially PET — the polyester used for both cloth and Coke
+bottles — soften and change shape above 90°, and in my oven I’ve
+observed dried egg whites browning somewhere in the 70°–90° range.
+Water, of course, boils at 100°.  Wood starts to brown around that
+temperature, too, though the autoignition temperature of paper is 233°
+according to Bradbury.
+
+Using the psychrometic exponential rule of thumb, even at 35°, you
+evaporate water almost 3× as fast as at 20°, and at 75° you evaporate
+it 38× as fast.  Furthermore, the same air heated to 75° has 38× lower
+relative humidity, so if the relative humidity is 70% outside, it’s 2%
+in the dehydrator.  This means not only that you can dry things
+faster, but also that you can dry things that wouldn’t dry at all in
+room-temperature air, because they have enough salt or other
+hygroscopic substance in them that they’re already in equilibrium.
+
+Predicting the exact drying rate is very complicated, because it
+depends not only on the rather complicated diffusion and advection
+processes I mentioned above, but also on airflow patterns, specimen
+thickness, humidity diffusion rate through the specimen, salinity, and
+the presence of other hygroscopic substances.  But usually, in my oven
+at its nominal uncalibrated 75°, my tens-of-millimeters-thick food
+garbage dries out satisfactorily in an hour or two.
+
+How much energy does this require?  100 g of food garbage (orange
+peels, chicken bones, outer onion layers, food particles washed off
+dishes, and whatnot) might be a meal’s worth, assuming you don’t let
+food rot.  Say that’s 75% water, so 75 g of water.  That’s 170 kJ at
+2.26 MJ/kg.  Air’s fairly low specific heat of 1.01 kJ/kg/K means that
+putting 170 kJ into heating air from 20° to 75° means you need to heat
+about 3 kg of air to deliver that energy; at 1.2 kg/m³, that’s 2.5 m³
+of air you need to pass over the meal’s worth of food, or 510 kJ or
+7.5 m³ per person per day, 5.9 W.  You might need to double that if
+some food goes bad.  It’s still a factor of 20 to 40 smaller than the
+reservoir you need for the refrigerator.
+
+In a situation of a prolonged outage of municipal services,
+dehydration is probably also a reasonable weapon to have in your
+arsenal against food decay, corpse decay, and feces, although if
+you’re going to be dehydrating feces with hot air you probably want to
+use a separate dehydrator from the food dehydrator, and you might also
+want to use some kind of scrubber on the output air to keep the smell
+down.  (This in turn suggests you might want to use a closed-loop
+system like the one modern condensing clothes dryers use.)  Dehydrated
+feces can be burned, stored, or more easily composted than fresh
+feces, especially diarrhea, and if you can sterilize them in the
+process, all the better.
+
+Cooking
+-------
+
+My stove is, unfortunately, electric.  Cooking a meal involves,
+minimally, heating the food to the right temperature and holding it at
+that temperature until it’s cooked.  The temperature is invariably
+between 40° and 100°.  Some meats can be cooked _sous vide_ at
+temperatures as low as 60°, at least once they’re sterilized, but many
+vegetables require 90°.  Kidney beans in particular are dangerously
+poisonous if cooked below about 95°.XXX
+
+The traditional means for holding the food at the right temperature is
+to continuously apply heat to it, while it’s losing heat to the
+environment by another route, so that the thermal equilibrium is
+around the desired cooking temperature, but other approaches are
+possible; for example, you can use a thermos or hooikist to maintain
+the temperature passively, or a thermostat together with some
+insulation to maintain it more actively, as crockpots, _sous vide_
+cookers, and my oven do.
+
+Typically a meal’s worth of food for a person is about 500 g, and it’s
+largely water, with a specific heat in the neighborhood of water’s.
+Heating it from 20° to 80° thus requires 20 kilocalories, 84 kJ, which
+is 2 minutes in a 700-watt microwave oven at full power.  Thermal
+losses might push the energy required higher, perhaps to 150 kJ.
+Three meals a day then require 450 kJ per person per day, or 5.2 W,
+very close to the 510 kJ required to dehydrate the food garbage.
+
+Indoor climate control
+----------------------
+
+Due to deplorable construction techniques, a refrigerative air
+conditioner of 2000 watts or more is necessary in many Buenos Aires
+apartments to maintain the temperature at bearable levels.  2000 watts
+of input produces about 4000 watts of heat removal (CoP ≈ 2), but
+typical duty cycles are about ⅓ on a 24-hour basis, meaning that you
+only need to remove 1300 watts on average (115 MJ/day).  Typical set
+points are in the 18°–26° range; 24° is about the most I can take.
+
+Ice vests
+---------
+
+Workers in very hot environments, such as some parts of power plants,
+often use ice vests, which either have ice packets in the vest or
+coolant tubes in the vest running to an ice backpack containing some
+phase-change material at or below 20°, typically water ice at 0°.
+This allows you to shunt the 100 W or so of heat that your body
+produces into the ice rather than finding a way to reject that heat
+into a hostile environment.  If you are adequately insulated, that 100
+W, or up to 2000 W if you’re exercising hard enough, is all the ice
+vest needs to absorb.
+
+Usually ice vests are used for short stints, like an hour or two, but
+an ice vest that could last 8–12 hours would be very useful in the
+Buenos Aires summer.  An hour at 100 W is 360 kJ, or a bit over 1 kg
+of ice, so a 12-hour ice vest would require about 13 kg of ice, which
+would be an uncomfortably heavy backpack.
+
+As an alternative to indoor climate control, an ice vest with easily
+interchangeable ice packs, or even that you could leave plugged into a
+flexible coolant line as you move around your apartment, could be
+lightweight, and it would require less energy than air conditioning,
+since it would only need to absorb the heat produced by your body, not
+the sunlight flooding in through the windows or the hot air seeping in
+under the door.
+
+Showering
+---------
+
+The building has a central electric hot-water system with a huge
+stainless steel tank, so my hot water didn’t actually go out during
+this power cut, but it would during a longer cut.  My shower delivers
+about 250 mℓ/s of water at typically about 40°, but needs to be able
+to reach 45°; further temperature range is undesirable, as water above
+45° can scald you before you can react.  I typically shower for about
+half an hour a day, which is perhaps longer than most people, and
+works out to about 450 ℓ of fresh water that would have otherwise
+flowed unmolested past Buenos Aires into the Atlantic, where it turns
+brackish in the estuary of the Rio de La Plata.
+
+450 ℓ of water at ΔT = 25 K is 47 MJ per person per day, or about
+540 W.
+
+Summary of thermal energy needs
+-------------------------------
+
+So here are the controlled heat flows per person, with a per-day
+average.  This is not the electrical energy, but the thermal energy.
+
+    | Use              | W (avg) | MJ/day | target |         |
+    | Air conditioning |    1300 |    115 | 20°    | cooling |
+    | Refrigerator     |     220 |     19 | 4°     | cooling |
+    | Ice vests        |     100 |    8.6 | 20°    | cooling |
+    | Showering        |     540 |     47 | 45°    | heating |
+    | Cooking          |     5.2 |   0.45 | 100°   | heating |
+    | Dehydration      |     5.9 |   0.51 | 75°    | heating |
+    | total            |  2171.1 | 190.56 |        |         |
+    #+TBLFM: @8$2..@8$3=vsum(@2..@7)
+
+So the first thing to notice is that air conditioning actually
+accounts for 60% of the total, and the problem gets substantially
+easier if we can eliminate it, for example with ice vests or better
+building envelope design.  The second thing to notice is that the
+high-temperature heat applications are very low-volume, while the
+high-volume heat application, showering, is very low-temperature.
+
+Possible reservoirs
+-------------------
+
+What combination of thermal reservoir designs could we use to satisfy
+these needs?  We can use thermal mass or phase-change materials, and
+we can recharge the reservoirs from different sources of heat and
+cold.
+
+We can consider the hot reservoirs and cold reservoirs separately,
+because they are 
+
+### Cool reservoirs ###
+
+Although ice vests could in theory use a higher-temperature
+phase-change material, you pretty much need water ice in even larger
+volumes for food refrigeration, and probably any other phase-change
+material would be both more massive and more expensive.  So it’s
+probably best to just use ice for the phase-change cool reservoir.
+28 MJ of ice is 84 kg of ice per day, of which 8.6 MJ or 26 kg is for
+your ice vest; a week’s store of ice would be 590 kg, almost a cubic
+meter.  This is a substantial-sized home appliance, especially with
+the extra volume needed for cooling extra people.
+
+The difficulty with water ice is that you need something below 0° to
+get it, unless perhaps you make clathrates or something at a slightly
+higher temperature.  Although some very dry places do reach such
+temperatures during the night — and you might be able to do a bit
+better still with reflective optics and some evaporative
+cooling — here in Buenos Aires, this pretty much requires active
+refrigeration, either with a compressor or some other form of
+refrigeration, like a vortex tube or an ammonia-absorption
+refrigerator.
+
+(An ammonia-absorption refrigerator powered by solar thermal energy is
+quite a reasonable possibility.)
+
+But it’s quite common for the temperatures to reach cool and even
+chilly levels during the night; as I write this, for example, it’s 18°
+outside.  If you could accumulate a large mass of 18° material during
+the night, for example by passing night air through it, you could use
+that for indoor climate control during the day, even if not directly
+for food refrigeration.  But how much mass would you need?
+
+Supposing that it’s in the form of water bottles at 18°, which you
+then allow to warm up to 23° as you pass air over them in order to
+sink the undesired daytime heat.  To compare apples to apples, we’ll
+suppose we’re using this to cool your no-longer-ice vest rather than
+to air-condition your house, so we only need 8.6 MJ.  But 8.6 MJ /
+((23 - 18) calorie / g) = 410 kg instead of the 26 kg for the
+corresponding ice.  (The other 58 kg were for cooling food down to 4°,
+for which the 18° water would be counterproductive.)  Cooling the
+410 kg of water back down at night involves passing at least 8.6 MJ /
+(5 K · 1.01 kJ/kg/K) = 1700 kg = 1400 m³ of 18° air over them.  That’s
+66 ℓ/s or 139 cfm if you do it in the 6 coolest hours, which is a
+quite feasible airflow rate, but one that will require forced air in
+any reasonably-sized system.
+
+If you have a phase-change material that changes phase at a
+temperature between 18° and 23°, you could use that instead, and maybe
+you could get it down to 50 kg or something.  Unfortunately, the only
+things I’m aware of that fits the bill is certain expensive grades of
+paraffin and some outrageously expensive metals.
+
+The potential advantage of using a second cool reservoir at a more
+moderate temperature is that you can replenish it in relatively simple
+ways, like with a box fan running at night, rather than a compressor
+or vortex tube or something.  But it’s probably not worthwhile, since
+you need the larger, colder cool reservoir for food preservation
+anyway.
+
+### Hot reservoirs ###
+
+On the other hand, the system should almost certainly use separate
+reservoirs for heat: one for the ≈1 MJ daily of cooking and
+dehydration heat at 100°, and another one for the ≈50 MJ daily of hot
+water at 45°.  Both of these temperatures can be easily obtained from
+solar thermal energy; the equilibrium radiation temperature of “one
+sun” is 94°, which is to say that thin things on Earth’s surface only
+fail to reach 94° when they’re at right angles to sunlight because
+they have air blowing around to cool them off, and “two suns” — the
+intensity of sunlight you get from direct sun plus a flat
+mirror — gets you to 163°.  Anything up to “ten suns”, which would get
+you to 379°, is considered a “low solar concentration ratio” and is
+easily achieved.
+
+#### Small high-temperature reservoir ####
+
+If we have to gather the 11.1 W of cooking and dehydration heat during
+6 hours of sun exposure — a reasonably pessimistic figure — then we
+need 44 W during that time, which is 0.044 m², a 210-mm-square area.
+In order to be able to cook and dehydrate at other times of day, we
+need to transfer the heat from the absorber (which is of a size
+somewhere less than 0.04 m² to achieve the required temperature, and
+somewhere larger than 0.004 m² so that the optics aren’t too
+complicated) to some kind of reservoir.  Bricks, for example, or sand.
+The easiest way to move this heat around is with some kind of coolant,
+and the easiest one that has no trouble with temperatures from 20° to
+a bit over 100° is air.
+
+If we add a bit of pad, let’s suppose that the reservoir itself is at
+120° when full and stores 3 MJ of heat that are released when it cools
+down to 100°, at which point we consider it “exhausted”.  Storing 3 MJ
+in 20 K of ΔT in a material with, say, 1 J/g/K, means that it needs
+about 150 kg of active mass, say about 1500 ceramic tiles of 100 g
+each, which will occupy on the order of 0.15 m³ of volume including
+air spaces between them.  This will have on the order of 1.5 m² of
+surface area around it through which it can lose heat to the
+environment with its ΔT of about 90 K above ambient.  We’d like it to
+lose no more than, say, 1 MJ during 18 hours when it’s not warming up,
+which is a rather demanding 15 W or so, 9 W/m², or 0.1 W/m²/K.  It’s
+probably not safe to use organic insulators like polyisocyanurate,
+styrofoam (33 mW/m/K; see file `deep-freeze`), or straw (90 mW/m/K) at
+these temperatures, but fiberglass should be fine.  I don’t have
+fiberglass’s insulance handy, but let’s say it’s 50 mW/m/K.  Then you
+need 500 mm of fiberglass around your thermal reservoir to reach such
+a demanding specification.  This is somewhat unreasonable.
+
+So let’s add a lot more pad.  Let’s let our reservoir be at 200° when
+full and store 20 MJ of heat by cooling down to 100°.  Now it needs to
+be 200 kg, which would be a cube 58 cm on a side at 1 g/cc, with a
+surface area of 2.1 m².  Say we can afford to lose 16 MJ (leaving
+4 MJ) during 18 hours, which is 250 W (better not keep it indoors in
+the summer) at a ΔT of 130 K, which works out to 120 W/m² and
+0.9 W/m²/K.  (50 mW/m/K) / (250 W / 130 K / 2.1 m²) = 55 mm of
+fiberglass insulation, which is eminently feasible, comparable to what
+my refrigerator uses.
+
+You can’t, of course, support 200 kg of tile or whatever on 580×580 mm
+of fiberglass and maintain the fiberglass’s insulance.  But you can
+suspend the mass in a frame in the middle of the fiberglass, hanging
+it by metal wires.  1mm-diameter music wire would in theory be enough,
+but probably more like 8 such wires would be advisable to keep the
+suspended frame from shifting around and opening gaps in the
+fiberglass.
+
+If you can use a phase-change material with a transition temperature
+between 100° and 200°, you might be able to simultaneously reduce the
+mass, and the volume, the working temperature of the reservoir, the
+variability of the temperature, and the surface area through which
+heat is lost.  Alkali nitrates and typemetal occur to me as
+possibilities.
+
+The absorber that heats up the air to heat the reservoir 

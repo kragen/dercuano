@@ -1,0 +1,504 @@
+Scriptable windowing for Wercam
+===============================
+
+One of the designs I’m thinking of for window systems for BubbleOS
+(see file `bubbleos`) is sort of based on MGR, the Blit, and Plan 9,
+with some ideas from NeWS ([as filtered through the UNIX-HATERS
+Handbook][1]), [Bitcoin][2], [eBPF][3], and [Dan Luu’s studies of user
+interface latency][0].  It’s also partly inspired by thinking about
+might-have-beens about the VT100, the H19, and the Datapoint 2200 from
+the 1970s.
+
+[0]: https://danluu.com/input-lag/
+[1]: http://www.art.net/~hopkins/Don/unix-haters/x-windows/disaster.html
+[2]: https://en.bitcoin.it/wiki/Script
+[3]: https://lwn.net/Articles/740157/
+
+However, see also file `wercam-nonscriptable-windows`.
+
+Basically, the issue is that user interface latency is a really big
+deal when it comes to the “feel” of an interactive system, and modern
+computer software design is making our user interface latency suck
+shit, to the point that most modern computers are dramatically less
+responsive than an Apple //e.  The Apple //e takes 30 ms to get a
+keystroke on the screen, while a typical modern machine takes
+100–160 ms, and a tuned modern machine takes 60 ms.  And this gets
+worse rather than better when we try to operate our systems over
+long-latency links, which are, despite all predictions, increasingly
+common in today’s world, despite the concurrent proliferation of
+low-latency links.
+
+One approach to the link latency problem is the Lotus Notes strategy:
+partially replicate the application state on different nodes,
+including some as close to the user as possible, and reconcile the
+occasional conflicting update after the fact.  This is more or less
+the modern AJAX strategy, but it doesn’t help much with user-interface
+latency as such.
+
+A different approach, which is sort of the original use case for JS,
+is to put a small amount of application-specific code as close as
+possible to the client to react quickly to input events, while
+delegating more complex processing to the client application.  As [Don
+Hopkins explains][1]:
+
+> At the mere mention of network window systems, certain propeller
+> gheads who confuse technology with economics will start foaming at
+> the mouth about their client/server models and how in the future
+> palmtops will just run the X server and let the other half of the
+> program run on some Cray down the street. They’ve become unwitting
+> pawns in the hardware manufacturers’ conspiracy to sell newer
+> systems each year. After all, what better way is there to force
+> users to upgrade their hardware than to give them X, where a single
+> application can bog down the client, the server, and the network
+> between them, simultaneously!
+>
+> The database client/server model (the server machine stores all the
+> data, and the clients beseech it for data) makes sense. The
+> computation client/server model (where the server is a very
+> expensive or experimental supercomputer, and the client is a desktop
+> workstation or portable computer) makes sense. But a graphical
+> client/server model that slices the interface down some arbitrary
+> middle is like Solomon following through with his child-sharing
+> strategy. The legs, heart, and left eye end up on the server, the
+> arms and lungs go to the client, the head is left rolling around on
+> the floor, and blood spurts everywhere.
+>
+> The fundamental problem with X’s notion of client/server is that the
+> proper division of labor between the client and the server can only
+> be decided on an application-by-application basis. Some applications
+> (like a flight simulator) require that all mouse movement be sent to
+> the application. Others need only mouse clicks. Still others need a
+> sophisticated combination of the two, depending on the program’s
+> state or the region of the screen where the mouse happens to
+> be. Some programs need to update meters or widgets on the screen
+> every second. Other programs just want to display clocks; the server
+> could just as well do the updating, provided that there was some way
+> to tell it to do so.
+> 
+> The right graphical client/server model is to have an extensible
+> server. Application programs on remote machines can download their
+> own special extension on demand and share libraries in the
+> server. Downloaded code can draw windows, track input eents, provide
+> fast interactive feedback, and minimize network traffic by
+> communicating with the application using a dynamic, high-level
+> protocol.
+> 
+> As an example, imagine a CAD application built on top of such an
+> extensible server. The application could download a program to draw
+> an IC and associate it with a name. From then on, the client could
+> draw the IC anywhere on the screen simply by sending the name and a
+> pair of coordinates. Better yet, the client an download programs and
+> data structures to draw the whole schematic, which are called
+> automatically to refresh and scroll the window, without bothering
+> the client. The user can drag an IC around smoothly, without any
+> network traffic or context switching, and the server sends a single
+> message to the client when the interaction is complete. This makes
+> it possible to run interactive clients over low-speed (that is,
+> slow-bandwidth) communication lines.
+
+From a security point of view, the idea of uploading arbitrary
+application code to the window server is somewhat alarming.  What if
+it hangs the window server, or makes it run slowly or unresponsively?
+What if one application uploads a malicious version of a widget used
+by another application?
+
+Putting a small amount of application code into the input event
+handling path is also the approach taken by [BPF][4] for packet
+filtering: tcpdump uploads a tiny bytecode program into the BSD kernel
+to discard uninteresting packets *in interrupt context*, forwarding
+the interesting packets to the user-level program.  This avoids
+context-switching to the tcpdump process for every network packet,
+which was seriously important in 1992 when BPF was designed, and even
+more important in 1980 when its stack-machine predecessor, CSPF, was
+designed.
+
+[4]: http://www.tcpdump.org/papers/bpf-usenix93.pdf
+
+BPF’s instruction set has 22 instructions and two registers, but only
+supports forward jumps, so it cannot express loops.  [eBPF][3], which
+includes things like functions and user-accessible data structures, is
+now used by Linux not only for packet filtering, but also for
+sandboxing processes (a purpose for which MacOS uses a tiny Scheme),
+inserting debugging and performance probes into the kernel,
+
+Uses of scriptability in Wercam
+-------------------------------
+
+Suppose that application programs can upload event-handler scripts for
+a similar virtual machine into the Wercam window server, which then
+compiles and runs them.  Then maybe those scripts can provide quicker
+responsiveness than the applications themselves, because they’re
+running in the process that directly draws into the framebuffer.
+Indeed, maybe at some point we can move that process out of the
+time-sharing operating system the applications are running on, into a
+real-time executive like the one in RTLinux, or even onto dedicated
+display-handling hardware.  Then we can get the latency of user
+interface responsiveness down into the submillisecond range where the
+delay really is undetectable by humans.
+
+But to guarantee this kind of responsiveness, especially without
+rewriting major parts of your application in this strange virtual
+machine, we must limit the amount of context available to the
+event-handler script; and it might not produce the ultimately correct
+display immediately.  In a lot of cases, this is probably okay.  Mosh
+does something similar with typing: when you type a printable
+character, it immediately adds it to your screen, and then it
+reconciles the screen image with the remote host, so if the character
+didn’t get echoed by the application there, it disappears.
+
+What kinds of things might you reasonably add?
+
+### Input event selection ###
+
+Well, one simple example is that you can specify which events you
+would like the window server to send to the client.  Don’s example of
+how some applications would like all mouse movement, while others just
+want clicks, is the simplest example.  You can implement it easily if
+your event-handler script is in charge of sending the events back to
+the client; it can simply return without doing anything when the
+mouse-button state hasn’t changed since the last event.  This
+mechanism is more complicated than the X11 mechanism:
+
+      /* Apparently StructureNotifyMask is what you use to get MapNotify
+       * events? */
+      XSelectInput(w->display, w->window, KeyPressMask
+                   | KeyReleaseMask
+                   | ButtonPressMask
+                   | ButtonReleaseMask
+                   | PointerMotionMask
+                   | StructureNotifyMask
+      );
+
+But it’s probably a lot easier to debug!
+
+### Bit gravity ###
+
+X11 has a “bit gravity” feature which modifies window resize handling.
+If the bit gravity of a window is set to, for example,
+`NorthEastGravity`, then when a window is resized, the previous window
+contents are in the upper right corner of the screen (“northeast” in
+the conventional mapping of compass directions to maps).  This matters
+because there is a span of time between the window resize on the
+server and when the application may be able to respond by redrawing
+the window.  Indeed, when X was designed in the 1980s, window redraws
+often took several video frames, even when there were no issues of
+system load.
+
+### Input event translation ###
+
+A more interesting example — and this is where we get into MGR and
+Blit territory — is that if the client’s event-handler script is
+responsible for sending the events to the client, maybe it can also
+determine the form of those events.  Like, maybe you could add a
+mouse-compatibility layer in front of some program written for a
+character-cell terminal, just by defining a few event handlers.
+
+### Application-to-display stream parsing? ###
+
+Of course, that suggests that the event-handler script could *also* be
+in charge of the handling of data *from the client*.  And then maybe
+you could, as the Blit does, start out in a glass-tty mode with some
+default event handlers that provide glass tty behavior, and then
+upload new event handlers with escape sequences.
+
+That’s probably not actually ideal, for a couple of reasons.  First,
+graphical applications can easily involve sufficiently massive data
+volumes that we want to minimize the number of copies of that data.
+(I’m typing this on a 1920×1080 32bpp 60Hz screen, which multiplies
+out to 497,664,000 bytes of pixel data per second.  mpv can actually
+reliably get that data on the screen, using OpenGL.  We probably don’t
+want that data flowing through an unaligned FIFO, and we probably
+don’t want client bytecode to be in charge of parsing it, because
+despite the potential advantages of 
+
+It’s probably better to maintain the application-to-display protocol
+fixed, but include in it the ability for the application to directly
+invoke previously-uploaded event handlers, including event handlers
+that won’t fire on any window-system-generated events.
+
+### Vertical sync for tear-free redrawing ###
+
+Another interesting example is the unfortunately-named† XSYNC
+extension, intended to provide tearing-free and flicker-free
+double-buffering for X11, as well as audio/video synchronization.  It
+was [proposed in 1991][5] but [the Linux implementation still lacks
+access to the vsync signal][6] needed to make it work, despite [some
+work on this in 2003][7].  [XSYNC works by corking up the
+pipeline][11] of drawing requests from a given client until some
+condition becomes true, such as a given timestamp passing, a counter
+incrementing, or [the monitor going into vsync][9].  Then the pipeline
+gets uncorked and updates the screen during the vertical blanking
+interval (VBI) or renders the next animation frame or whatever.
+
+† “Unfortunately named” because an almost, but not completely,
+unrelated core X11 function is called `XSync()`.
+[5]: https://www.x.org/releases/X11R7.7/doc/libXext/synclib.html
+[6]: https://www.x.org/wiki/Development/Documentation/Obsolescence/#xsync
+[7]: https://www.freedesktop.org/wiki/FreedesktopProjects/#synchronization
+[9]: https://lwn.net/Articles/354596/
+[11]: https://www.x.org/wiki/guide/extensions/#index5h2
+
+Aside from the clumsy special-casing in the `XSyncWaitCondition`
+struct (which you can read about in the docs if you’re interested),
+implementing vertical synchronization just by uncorking a drawing
+request pipeline excludes many optimizations we would like to do.
+Consider [what Massalin said about terminal emulation in
+Synthesis][8]:
+
+> The numbers in Table 7.5 can be used to predict the elapsed time for
+> the “cat /etc/termcap” measurement done in Section 7.2.2.
+> Performing the calculation, we get 3.4 seconds if we ignore the
+> invocation overhead and use only the per-character costs. Notice
+> that this exceeds the elapsed time actually observed (Table 7.2).
+> This unexpected result happens because Synthesis kernel [sic] can
+> optimize the data flow, resulting in fewer calls and less actual
+> work than a straight concatenation of the three quajects would
+> indicate.  For example, in a fast window system, many characters may
+> be scrolled off the screen between the consecutive vertical scans of
+> the monitor.  Since these characters would never be seen by a user,
+> they need not be drawn.  The Synthesis window manager bypasses the
+> drawing of those characters by using fine-grained scheduling.  It
+> samples the content of the virtual VT100 screen 60 times a second,
+> synchronized to the vertical retrace of the monitor, and draws the
+> parts of the screen that have changed since the last time.  This is
+> a good example of how fine-grain scheduling can streamline
+> processing, bypassing I/O that does not affect the visible result.
+> The data is not lost, however.  All the data is available for review
+> using the window’s scrollbars.
+
+[8]: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.29.4871&rep=rep1&type=pdf#page=132
+
+This kind of optimization — which, incidentally, improves
+predictability and reduces user-interface latency — can’t be done
+simply by uncorking a drawing pipeline at a predetermined time.  You
+have to avoid sticking useless drawing operations into the drawing
+pipeline in the first place.
+
+It would, on the other hand, be easy to implement this drawing
+approach as an event-handler script, although not without some kind of
+looping capabilities.  Note that in this case the loop indexes over
+the terminal screen contents, which is a finite-size data object, and
+so it’s amenable to worst-case execution-time guarantee calculation —
+just not in such a straightforward way as BPF’s loop-free
+virtual-machine instruction set.  (And you could limit execution time
+by, for example, inserting an Ethereum-style gas check before each
+backward jump or potentially-recursive function call, although a
+static check seems perhaps more desirable, since it moves the error
+reporting to a client request instead of a failed window redraw.)
+
+(Despite the complaining in the links above, it’s actually reported to
+be possible to get tear-free redraws under X11; [GLX is reported to be
+adequate][10] [when used properly][12], but I think I do see tearing
+in mpv using an OpenGL visual.)
+
+[10]: https://stackoverflow.com/questions/30277659/how-to-wait-for-vsync-in-xlib-app
+[12]: https://www.reddit.com/r/linux/comments/5f4ul3/does_wayland_actually_eliminate_tearing/daig3ey/
+
+Terminal emulators may be a somewhat unusual case, though.  The
+“source” contents of a terminal window is small (typically a few
+kilobytes) and bounded, so it’s safe for a window server to traverse
+it during the VBI; and it’s much smaller (typically 200× smaller,
+though this varies by font size and pixel depth) than the pixel data
+in the window, updating the “source” is inherently much cheaper than
+updating the pixel data; and the source may suffer massive quantities
+of updates while it’s not visible.  Other kinds of applications
+(hypertext browsers, movie players, PDF viewers) might not have all
+these properties.
+
+So it may not be ideal to design Wercam around what’s best for
+terminal emulators.
+
+However, tear-free vertically-synced redrawing is desirable for many
+applications.
+
+### Window-server-side text editing ###
+
+However, modern GUI programs are full of text fields, and each text
+field is a full-fledged text editor.  Much of the time, the app
+doesn’t care about the intermediate values of the text field, only its
+eventual value.  Rather than simply doing local echo of keystrokes,
+ideally the vast majority of keystrokes and mouse clicks could be
+handled by the window server without any interaction with the
+application process at all, until it wants the contents of the text
+field, or the user sends some keystroke that the text field doesn’t
+handle.
+
+This requires the window location and shape, font metrics, font
+glyphs, and buffer contents to be all maintained in the window server,
+where they’re accessible to the client-sent event handlers.  The font
+glyphs in particular are a potential problem, given the rendering time
+and total size of full Unicode fonts, so probably some kind of
+glyph-rendering-on-demand is needed, with some kind of placeholder
+displayed for not-yet-loaded glyphs.
+
+With Unicode, combining characters and bidirectional text rendering
+are another big ball of hassle that is probably best not uploaded in
+tiny event handlers.
+
+But even handling the most basic actions with low latency — cursor
+positioning with the mouse or arrow keys, inserting characters,
+deleting characters with backspace — would go a long way to reducing
+the latency of user interaction with text fields.
+
+### Keyahead and mouseahead for menus ###
+
+One of the benefits of Don Hopkins’s implementation of [pie menus in
+the window server in NeWS was “mouseahead”][13]: since mouse movements
+that followed the click that brought up the pie menu weren’t processed
+until the pie menu was already active, there’s no window of time
+during which a too-fast click or release will be lost.  This is
+analogous to how you can “key ahead” or “type ahead” in
+keyboard-driven menu or data-entry systems; you don’t need to wait for
+the application to display a menu before selecting from it, or to move
+the cursor to the next field before typing into it.  The same sequence
+of actions will always have the same result regardless of details of
+timing or how fast the application manages to respond, which makes the
+system feel better, allowing the user to control it quickly with
+open-loop control.
+
+[13]: https://medium.com/@donhopkins/pie-menu-fud-and-misconceptions-be8afc49d870
+
+A very simple event-handler script is adequate to track the user’s
+position in a menu tree and navigate it by mouse movements.
+
+> “Keyahead” is a rather old term, appearing for example in [the TRS-80
+> Model II DOS manual][14]:
+> 
+> > #### Keyaheads ####
+> >
+> > TRSDOS allows keyaheads of up to 80 characters.  This means that you
+> > can type in the next command while previous ones are being executed.
+> >
+> > **Note:** A keyahead will not be displayed until TRSDOS or the
+> > application program is ready to interpret it.
+> 
+> Unfortunately I don’t know of a modern term for the phenomenon.
+
+[14]: https://electrickery.hosting.philpem.me.uk/comp/trs80m2/doc/TandyModel2DiskOperatingSystemReferenceManual.pdf
+
+MATE, the desktop environment I’m using at the moment, has a serious
+failure of both keyahead and mouseahead.  It has a
+Microsoft-Windows-95-style “Start” menu, which can be activated either
+by clicking the menu button or by pressing the Microsoft Windows key
+on the keyboard.  When it hasn’t been used for a while, though, it
+gets slow (presumably relevant stuff needs to be read from disk) and
+subsequent keys or mouse actions are captured by whatever the
+foreground application window is, rather than being routed to the
+menu.  This means that, even when the menu opens quickly, you have to
+wait for it to appear before starting to select things from it.
+
+### Animation, compositing, and filtering ###
+
+It’s beneficial for filtering (for e.g. text drop shadows) to run in
+the display server rather than the app.
+
+Other protocol considerations
+-----------------------------
+
+Applicaiton embedding (e.g. a Flash player or movie player in a web
+browser) will really benefit a lot if there’s a way to avoid copying
+all the pixel data first from one application to the other, then to
+the server.
+
+Tentative protocol design
+-------------------------
+
+The primitive unit of drawing is a 32×32-pixel tile in premultiplied
+32-bit RGBA format with the bytes in that order.  This representation
+is chosen for a few reasons:
+
+- It’s 4096 bytes, the usual memory page size on i386 and amd64
+  systems.  That means that in theory you should be able to transfer
+  tile buffers between clients and servers on the same machine without
+  copying them, just by remapping memory, at least if they’re properly
+  aligned.  It may have undesirable cache effects for operations on
+  corresponding pixels in multiple tiles, but typically these are done
+  on only three or four tiles at a time, and all modern L1D caches are
+  at least four-way set-associative.
+- A single scan line of it is 32 pixels, which is 128 bytes.  This is
+  larger than, and divisible by, the cache line size on currently
+  popular desktop CPUs, which is 64 bytes.  It’s also larger than any
+  of the SIMD registers in current popular CPUs, which max out at 512
+  bits (64 bytes).  A single color plane of it would be only 32 bytes,
+  which would be smaller than a 512-bit AVX512 register, but would fit
+  in the more commonly used 256-bit SIMD registers.
+- It’s smaller than typical L1D cache sizes (≈64 KiB), so you can fit
+  several tiles in the L1 cache at once.
+- It’s large enough that most pixels (87.9%) are interior pixels, not
+  border pixels.
+- It’s large enough that unaligned blitting from one tile to another
+  will still only run into tile boundaries every 16 pixels on average.
+- It’s small enough to keep wasted space in tiles that run off the
+  edge of a window to a tolerable level.  To take a random window size
+  that would fit on this display, a 949×1067 window is 30×34 tiles, or
+  31×35 tiles if none of its edges are aligned on tile boundaries.
+  That’s a total of 1,111,040 pixels, while the window as such
+  contains 1,012,583 pixels, so you have 9% waste.  Windows I actually
+  have open on this display have sizes like 800×482, 656×362, and of
+  course 1920×1080.  Many of these are divisible by 16; some are even
+  divisible by 32.
+- It’s the pixel format this video system uses.  Most video systems,
+  in fact.  And it’s easy to work with.  And it has alpha.  It has the
+  great disadvantage that it’s twice as big as the 16-bit and 15-bit
+  formats common in mobile phone displays and video formats.
+
+Tiled images can efficiently support filtering and rescaling
+operations, which, like alpha-compositing, are fundamental to
+currently fashionable GUIs.
+
+There are two ways to draw things: either send a tile from the
+application to the display server, sticking it into a tile-aligned
+position on some pixmap, or blit some pixels from one pixmap to
+another.  Blitting uses the premultiplied version of the Porter–Duff
+“over” operator to modify the destination pixmap with the source
+pixmap, as in Plan9’s 8½ or the usual use of the XRENDER extension.
+
+Blitting coordinates can exceed the boundaries of the source pixmap,
+which is not an error; instead, the pixmap wraps.  Destination pixmap
+coordinates are clipped as you would expect.
+
+Note that this leaves out the “hold out of” and “add” Porter–Duff
+operations, as well as the possibility of using an alpha channel from
+another source, which are present in the XRENDER Composite request.
+
+When the application creates a thing, such as a pixmap, a data buffer,
+or an event handler, it specifies the identifier it will use in the
+future to identify that thing.  This eliminates the round trips that
+would be needed if the display server were to be responsible for
+allocating these identifiers, as in X11 and 8½.  The application must
+first request resource allocations to be used by these later
+creations; the resource allocation may be denied, but if it is
+granted, the creations are guaranteed to succeed precisely when they
+do not exceed the allocated quantity.
+
+Duplicate tiles are not coalesced in the memory of the display server,
+as they are in XRENDER.  This is because, in any case, this could not
+be visible to applications, for security reasons.  Reducing the charge
+against the application’s pixel quota would make applications unstable
+in a difficult-to-debug way; they would fail to allocate sufficient
+pixels only when certain other applications were running.  Pixmaps are
+writable, and Wercam is designed to provide guaranteed real-time
+responsivity, which means that even copy-on-write tile sharing is
+probably a bad idea, because it means that writing a pixel might vary
+in speed by orders of magnitude depending on whether that tile was
+shared.  (And this is a side-channel information leak if the timing is
+observable to the application, which it surely would be.)
+
+Another desirable property of the system is that you should be able to
+capture and replay a protocol stream, as you can with ttyrec, and in
+particular that it should be possible to generate a “checkpoint”
+containing just the protocol messages necessary to get the window into
+the current state, so that a checkpointed application can be
+reconnected to a fresh window server, if desired.
+
+Event types:
+
+- VSync
+- Timer expiration
+- Mouse events
+- Keyboard events
+- Touch events (start, end, move)
+- Screen resize
+- Error
+- Window close
+

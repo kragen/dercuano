@@ -1,0 +1,468 @@
+Fencepost cognitive interface errors in text editing
+====================================================
+
+A substantial part of the work of editing natural-language text
+amounts to rearranging small pieces of it, and these pieces most
+frequently correspond to natural units, such as words, clauses,
+prepositional phrases, sentences, and paragraphs.  Existing text
+editors fall far short of the optimum in this.
+
+Emacs has commands for moving by and deleting characters, words,
+sentences, lines, S-expressions, paragraphs, and in some cases, pages.
+You would think that this would make it easy to do sequences like “go
+back five words, delete two words, and then insert them at the end
+(suitably defined) of the sentence.”  But if you attempt to apply that
+sentence to the end of itself, this is what you get:
+
+> “go back five words, delete two words, and then insert them at the
+> end () of the sentence.”suitably defined
+
+Rather than, as you might hope:
+
+> “go back five words, delete two words, and then insert them at the
+> end of the sentence (suitably defined).”
+
+Similarly, you might hope that backward-word (M-b in Emacs parlance)
+would take you to the same position as backward-word backward-word
+forward-word (M-b M-b M-f), at least if there was a second word to
+move backwards over.  But, as far as I know, it never does; the first
+sequence leaves you at the end of a word separator, while the second
+sequence leaves you at its beginning.  Consequently, after the second
+sequence, you can use kill-word (M-d) to delete one or more words
+including any leading separators, which you can then insert again
+coherently at a position before another word separator.  For example,
+starting from
+
+> can |then insert again coherently at
+
+you can use M-f M-d M-d M-f C-y to get to this desirable state:
+
+> can then coherently insert again| at
+
+You could make the same edit from this different starting position:
+
+> can then insert again coherently| at
+
+by using C-f M-DEL M-b M-b C-y:
+
+> can then coherently |insert again at
+
+M-DEL is backward-kill-word, which, unlike M-d, includes any
+*following* separators; thus the necessity for the initial C-f to
+avoid this mess:
+
+> can then coherently|insert again  at
+
+This requires slightly nontrivial cleanup, and the situation is worse
+in programming languages.  Transient-mark mode, M-@, M-h, and C-M-SPC
+can help significantly, but they don’t really solve the problem.
+
+The underlying difficulty here is that in Emacs, a sentence is not a
+sequence of words; it is a sequence of alternating words and word
+separators, which contains nearly twice as many elements as words.
+Since it would take twice as long to get anywhere if the movement
+commands moved by such elements, they move past the large elements,
+and you can use character-movement commands to fine-tune.
+Unfortunately, this leads to a lot of fine-tuning, user errors when
+you get the fine-tuning wrong, and unnecessary round trips to make
+sure the fine-tuning is right.
+
+The same difficulty attends Emacs’s commands for sentences and
+S-expressions, though typically not lines and paragraphs.
+
+lowriter
+--------
+
+LibreOffice Writer clones Microsoft Word’s text editing command set,
+which in its turn is copied from early Macintosh, and thence from
+Bravo and Smalltalk.  Its word movement commands (Ctrl-← and Ctrl-→)
+take you to the beginnings of words or the beginnings of non-space
+strings between words, and they are the same positions in both
+directions.  Its word deletion command, Ctrl-Backspace, deletes back
+to these same positions, except that it also has stopping positions at
+the beginnings of paragraphs, even empty ones.  (Also, lowriter
+considers embedded apostrophes, though not trailing apostrophes, to be
+parts of words; similarly, embedded commas are parts of words if they
+have digits on both sides of them, though periods are not.)  It
+doesn’t seem to have commands to move by sentences, although it does
+have movement by paragraphs (Ctrl-↑ and Ctrl-↓).  This works better
+than Emacs’s word-movement approach in most cases, but not all.  The
+first example above, commanded as as Ctrl-← Ctrl-← Ctrl-← Ctrl-Shift-←
+Ctrl-Shift-← Ctrl-Shift-← Ctrl-Shift-← Ctrl-x Ctrl-→ Ctrl-→ Ctrl-→
+Ctrl-v, yields this:
+
+> “go back five words, delete two words, and then insert them at the
+> end of the sentence(suitably defined) .”
+
+But the second example:
+
+commanded as Ctrl-→ Ctrl-Shift-→ Ctrl-Shift-→ Ctrl-x Ctrl-→ Ctrl-v,
+comes out fine, though slightly different from Emacs:
+
+> can then coherently insert again |at
+
+And the third example, which logically should have the same problem as
+Emacs, when commanded as Ctrl-Shift-← Ctrl-x Ctrl-← Ctrl-← Ctrl-v:
+
+> can then insert again coherently| at
+
+instead also comes out fine; the space to the left of “coherently” was
+deleted immediately after the word itself, and upon being inserted at
+the beginning of “insert”, a space is appended to preserve the
+pre-cut-and-paste word boundaries:
+
+> can then coherently |insert again at
+
+If you paste into the middle of a word, spaces are inserted both
+before and after; if you paste into the middle of whitespace, spaces
+are inserted neither before or after.  If you paste between a
+sentence-ending word and the sentence-ending punctuation, space is
+inserted before the pasted word, but not after; no corresponding
+cleanup seems to exist for pasting to the beginning of a sentence.
+However, if the string you deleted was “coherently ”, with the
+trailing space, as it would be if you used the word movement commands
+to find both ends of the selection, or if it was “coherentl”, not
+touching the final word boundary, none of this magic DWIM whitespace
+behavior happens.
+
+I suspect that the reason for the DWIM behavior is that, in lowriter,
+if you select words by double-clicking with the mouse, instead of
+using Ctrl-Shift-← and Ctrl-Shift-→, the space after the word is not
+included in your selection!
+
+Also, in lowriter, triple-click selects by sentences, but doesn’t
+include whitespace surrounding the sentence; this means that if you
+rearrange a sequence of sentences by triple-click and drag-and-drop,
+you have to clean up whitespace afterward, in a way exactly analogous
+to the Emacs word-separator problem described above.  Quadruple-click
+(!!) selects paragraphs, but only single paragraphs; dragging outside
+the paragraph reverts to selecting by characters.
+
+Vim
+---
+
+Vim’s word movement commands (w and b, not e and ge) seem to be
+entirely consistent with lowriter, except that they treat apostrophes
+and commas like any other punctuation; and deleting, cutting, and
+pasting is consistent with movement, though of course without DWIM.
+
+When programming in Emacs, I’ve often been frustrated by its
+word-movement commands skipping over long sequences of punctuation and
+whitespace as if they weren’t even there.  Vim’s command structure is
+significantly better in this regard.
+
+Eclipse
+-------
+
+Eclipse’s word movement commands have the same problem as Emacs’s.
+
+New editor design thoughts
+--------------------------
+
+What should the command set for a new editor look like?
+
+### Established movement-command convention ###
+
+Assuming that MacOS and Microsoft Word are consistent with lowriter,
+violating their word movement and deletion command convention is
+costly; Vim’s behavior is also consistent with it, and the behavior
+seems to be both more predictable and more frequently what is desired
+without DWIM magic.  But the fact that lowriter does resort to DWIM
+magic behavior under fairly normal circumstances suggests that perhaps
+a better alternative is possible.
+
+### Selection-verb versus Emacs or Vim commands ###
+
+The Smalltalk and Bravo selection-verb convention, imitated in
+Macintosh and in nearly all subsequent GUIs, of first selecting a
+region of text visibly and then applying subsequent commands to that
+region of text, is substantially more predictable than the Emacs and
+Vim approach of applying commands to regions computed after the
+command starts.  Both the selection-verb convention and the Vim
+approach enjoy substantially better orthogonality than the Emacs
+command set, although by the same token the Emacs commands are often
+shorter:
+
+    |           | forward  | backward | mark                 | delete/kill    | backward delete/kill    |
+    | char      | C-f      | C-b      |                      | C-d            | DEL                     |
+    | word      | M-f      | M-b      | M-@                  | M-d            | M-DEL, C-backspace      |
+    | sentence  | M-e      | M-a      | mark-end-of-sentence | M-k            | C-x DEL                 |
+    | line      | C-p      | C-n      |                      | C-k (XXX),     |                         |
+    |           |          |          |                      | C-S-backspace  |                         |
+    | paragraph | M-}, C-↓ | M-{, C-↑ | M-h                  | kill-paragraph | backward-kill-paragraph |
+    | sexp      | C-M-f    | C-M-b    | C-M-SPC              | C-M-k          | ESC C-backspace         |
+
+Of these 27 different keystroke commands, I think only 16 are in my
+own subconscious repertoire, and that’s after 30 years of this body
+using one or another Emacs.  Some of those work in readline, or GTK
+(by default), while others don’t, adding to the difficulty.
+
+### Ctrl-backspace ###
+
+Ctrl-backspace is extremely valuable, more valuable even than
+backspace, because it eliminates not only keystrokes but also feedback
+round trips.  (I mistyped that “trips” as “tirps”, for example, and
+then used Ctrl-backspace to delete it and type the correct word.)
+Replacing Ctrl-backspace with a selection-verb sequence like
+Ctrl-Shift-← Ctrl-x (which does work in lowriter, for example) would
+be intolerable, unless both the selection and the verb were a single
+keystroke, could be released in an indeterminate order, and supported
+repeating without fiddly key alternation.
+
+### Multilevel cut and paste ###
+
+Emacs’s killing and C-y and M-y behavior is also extremely valuable:
+it means you don’t have to decide ahead of time which deleted text you
+are going to want to paste later, and you don’t have to worry about
+losing text on the clipboard by cutting something else.  Every
+mainstream UI has supported multilevel undo for over 20 years,
+eliminating the danger of losing your undo information with a
+following command (the famous modal UI “edit” problem, in which “e”
+selected “everything”, “d” deleted it, “i” went into insert mode, and
+“t” was inserted, losing the undo info.)  It’s long since time they
+supported multilevel cut and paste!
+
+### The Back button ###
+
+Emacs’s C-u C-SPC command, which pops the mark stack, is extremely
+useful for returning to editing what you were just editing before your
+last search; it’s like a WWW browser “back” button, but inside a
+single editor buffer.  It really needs a more convenient keybinding,
+one that can be repeated without key alternation.  Browsers bind it to
+Alt-← and, historically, Backspace, although that’s going away, but
+something you can type without taking your fingers off the home row
+would be superb.
+
+### Text movement ###
+
+Eclipse’s Alt-↑ and Alt-↓ keybindings for moving a block of lines
+(either the current line, or the selected block, expanded to full
+lines) are one of the few code-editing features in Eclipse that I miss
+in Emacs and Vim.  They don’t work as well for text in paragraphs,
+since it tends to have logical boundaries that don’t coincide with
+line boundaries, but you could imagine a similar command set that did
+work well; lowriter, for example, permits drag-and-drop rearrangement
+of text fragments with the mouse, although it doesn’t provide ongoing
+feedback about the final result.
+
+Emacs has a set of “transpose” commands which can in theory be used
+for this, but they are awkward to use: they only move single units (of
+whatever size: lines, sentences, sexps, words, chars — but not blocks
+of two lines or words or whatever), only forward, and only two of them
+have default keybindings that can be repeated without alternating keys
+(C-x C-t is transpose-lines, which doesn’t take advantage of the
+transient map feature in recent versions of Emacs that, for example,
+allows C-x e e e to run the last keyboard macro three times.)
+
+### Movement via incremental search ###
+
+Incremental-search, which originated in Emacs in the 1970s is
+extremely valuable, both for the usual search purposes and for cursor
+movement, as Jef Raskin showed in his work (on the Canon Cat,
+SwyftWare, The Humane Environment, and Archy).  It’s an even faster
+means of cursor movement than using the mouse.  Unfortunately, Emacs’s
+implementation of incremental-search is crippled for cursor movement
+in a few different ways:
+
+1. When searching *forward*, Emacs incremental-search leaves the
+   cursor at the *end* of the search string, not its beginning.  That
+   means that if you want to move the cursor from “extremely” above to
+   the start of “beginning” in this paragraph, you can’t simply search
+   for “beginning”; you’ll end up somewhere in the middle of the word
+   or at its end.  Instead you must search for “its “, and the search
+   is no longer effectively incremental — even though “it” is
+   sufficient to uniquely identify the string you’re searching for,
+   you have to keep typing to get to the place you want.
+   Alternatively, you can search for “beginning” and then issue an
+   extra command to get from the middle to the beginning of
+   “beginning”; this requires typing only up to “be”.
+
+2. Emacs’s incremental-search is modal, requiring an extra keystroke
+   to terminate it.  This can result in mode errors, where later
+   keystrokes are erroneously used as part of the search key, but the
+   larger problem is that it is a significant amount of overhead.  The
+   Canon Cat, for example, used its quasimodal “LEAP” to move by
+   paragraphs by searching for paragraph breaks, or by “sentences” by
+   searching for periods; releasing “LEAP” ended the search.  Thus
+   “search for the next newline” was “LEAP-Return”, releasing “LEAP”
+   after “Return”, the same number of keystrokes as Emacs’s M-a or
+   C-e; it’s a sequence of three events.  Using C-s . RET in Emacs is,
+   by contrast, a sequence of six events: Ctrl down, S down, release
+   all, period down, RET down, release all.  A benefit of being modal
+   in this way is that the same C-s and C-r keystrokes can repeat the
+   search in different directions.
+
+3. As an additional problem, the particular keystroke Emacs chose to
+   terminate incremental-search is RET or Enter.  This makes it
+   unintuitive and inconvenient to search for newlines (you can do it
+   by typing Ctrl-J, although I don’t know if I knew that until I
+   tried it just now).
+
+Vim’s incremental search avoids problem #1, but still has problems #2
+and #3, and actually problem #3 is even worse: /^V^J RET in Vim
+searches for NUL rather than LF.  Searching for an actual linefeed in
+Vim requires /\n RET.
+
+A separate tweak to text incremental search is to display further
+search hits in context in a separate pane once they’re infrequent
+enough, allowing a smooth transition from in-context navigation to
+menu navigation.
+
+### Multiple cursors ####
+
+The proprietary Sublime Text editor’s multiple-cursor feature seems
+like a better alternative to keyboard macros under most circumstances,
+because it allows you to see the effects of all the “iterations” of
+your “macro” incrementally as you are composing it.  But I’m getting
+off on a tangent.
+
+### Selection command design ###
+
+Most of that is preamble to say that I think the selection-verb model
+is generally better, but you need sufficiently powerful selection
+commands to keep that model from being too clumsy.  For rearranging
+text by word, sentence, or paragraph, perhaps you could use a command
+like Emacs’s M-@, which extends the selection to the end of the next
+word, thus allowing you to select multiple words by repeating the
+command — but with semantics more like Emacs’s M-h, which also extends
+the beginning of the selection to the previous paragraph boundary, if
+it isn’t already there (except that it does the wrong thing if there’s
+already a selection which wasn’t created by M-h).  So, in Emacs, M-h
+selects one paragraph, M-h M-h selects two paragraphs, and so on; a
+new editor could have keybindings that operate similarly.
+
+Three such keybindings — select-word, select-sentence, and
+select-paragraph — would allow you to quickly select the span of text
+you want to operate on, if it’s less than, say, four logical units
+long.  Making longer selections would be faster with the mouse or
+using incremental search, requiring the user to strategize as to how
+to make the selection, and potentially causing long decision times
+around the break-even point due to the problem of Buridan’s Ass; to
+the extent that we can avoid imposing the need to strategize on the
+user, we can shorten the path to the user’s desire.  (The kfitzat
+haderech is the ultimate user interface!)
+
+S-expression selection is somewhat trickier because there are at least
+two potential directions the user might want to expand their
+selection: forward to the following expression, and up the
+S-expression tree.  So a single keybinding for marking sexps will not
+suffice.  Thus Emacs provides forward-sexp (C-M-f), backward-sexp
+(C-M-b), mark-sexp (C-M-SPC, which extends the region forward),
+down-list (C-M-d), backward-up-list (C-M-u), up-list, kill-sexp
+(C-M-k), backward-kill-sexp (ESC C-backspace), and
+kill-backward-up-list.  Maybe the right solution is to repurpose the
+select-word and select-sentence keybindings in programming-language
+modes.
+
+Perhaps mouse selection can give an indication of the desired
+granularity of selection by its speed: if the mouse is moving too fast
+for the user to have intended to select at the granularity of a single
+character or even a single word, perhaps sentence or even paragraph
+granularity was intended.  If the mouse selection starts out with the
+incorrect granularity, the user can correct it by moving the mouse
+faster or slower as they drag out the rest of the selection.  This
+mechanism could smoothly incorporate probabilities from stochastic
+models of natural language to permit sub-sentence selections,
+including things like dependent clauses and prepositional phrases.
+
+### Delimiter behavior ###
+
+But you still have the problem of the fenceposts or delimiters: when
+are they included in the selection and when are they excluded?
+
+If there’s an improved model of text that permits a better user
+interface for rearranging bits of it, I suspect it looks something
+like, “Paragraphs are sequences of sentences.  Sentences are sequences
+of words.”  This avoids the fencepost problems described earlier,
+where you move by words, cut by words, and then paste, and yet you end
+up merging words or creating extra spaces.  This is not too far from
+the model implicit in the Vim command set, where w and b take you to
+the beginnings of words or punctuation strings.
+
+The sequence-of-words model does potentially have the problem
+lowriter’s DWIM is trying to patch up: a sequence of words in a
+different context might need different word separators around them.
+For example, if I were to replace “around them” in the previous
+sentence by moving “in a different context” to the end of the
+sentence, including a space after that phrase would be inappropriate.
+
+A possible solution to this problem might be something like the
+following data model:
+
+0. Words are nonempty sequences of alphanumeric characters, with
+   possible exceptions for things like apostrophes and commas in
+   numbers.
+1. Words are always terminated by word terminators, which are inserted
+   automatically if not present, as Vim does with trailing newlines in
+   a text file.  All word terminators terminate nonempty words.
+2. Word terminators followed by words are displayed (and, in plain
+   text, serialized) as spaces.
+3. Word terminators followed by punctuation or paragraph breaks are
+   not displayed (or serialized in plain text).
+4. Spaces following other spaces or punctuation — anything that isn’t
+   a word — represent real spaces, not word terminators.
+5. Paragraph breaks are always preceded by a word terminator or real
+   space, which is not displayed (or serialized in plain text).
+
+This provides a bijective mapping between displayed character
+sequences and internal character sequences.  In one direction, spaces
+following alphanumerics and preceding either spaces or alphanumerics
+are converted to word terminators, and word terminators are inserted
+before punctuation that follows alphanumerics; in the other direction,
+word terminators are converted to spaces unless they precede
+punctuation.
+
+In terms of commands:
+
+1. Word movement commands move to points which include the beginnings
+   of words, beginnings of paragraphs, and beginnings of punctuation
+   strings.
+2. Mouse selection of words selects between the same points word
+   movement commands move to, and thus includes the fucking word
+   terminators.
+3. Movement by sentences moves to the beginnings of sentences.  The
+   sentence terminator pattern 
+4. Selection by sentences includes the sentence-ending punctuation,
+   any following punctuation before space, and any following spaces,
+   including the invisible space preceding a paragraph break, but not
+   the space that often precedes the beginning of the sentence; that
+   space belongs to the previous sentence.  It also includes any
+   punctuation at the beginning of the sentence following spaces that
+   belonged to a previous sentence, such as an open parenthesis or
+   open quote.
+
+Like lowriter’s approach, this provides the right behavior for cutting
+and pasting sequences of words from the ends of sentences to the
+middles and from the middles to the ends; however, it does so in a way
+that is predictable because it is consistent with its data model,
+rather than being a DWIM special case.  Unlike lowriter’s approach, it
+also provides the right behavior for cutting and pasting sentences
+from anywhere in a paragraph to any other sentence boundary in a
+paragraph.  Like lowriter’s approach, it still requires manual cleanup
+for cutting and pasting sequences of words to or from the beginnings
+of sentences.  It differs from lowriter's approach when you select a
+word (or several words) with the mouse and either copy or move it to
+the interior or end of another word: in that case, it will paste with
+a space after it but not before, as lowriter does when you make the
+same selection using keyboard selection commands.
+
+How well will these rules apply to programming languages, should you
+be editing a program in natural-language mode?  Since the mapping
+between the internal representation and the serialized one is
+bijective, it shouldn’t pose any particularly serious problems.
+
+### Scoring ###
+
+I think the editor should use game mechanics to teach you to use its
+command set in the way we have Tayloristically determined to be the
+most effective.
+
+### Autosuggest ###
+
+The editor should use a neural network pretrained on a corpus of
+existing open-source projects and natural-language text, then later
+trained on the things you actually write in it, to order and possibly
+even add autocompletion suggestions.  It can also adjust the frequency
+of autosuggest suggestions to the circumstances: if the human
+frequently accepts a suggestion or peruses the options, it should
+offer suggestions more frequently.

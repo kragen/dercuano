@@ -15,20 +15,24 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this piece of shit for six hours.  I have about
+I’ve been hacking on this piece of shit for seven and a half hours.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
-compressed.  So far I have stuck 11 of them in, totaling 134K and
-52,000 words.  So I
-am about seven doublings away from finishing the job;
-the last doubling (well, near tripling)
+compressed.  So far I have stuck 22 of them in, totaling 244K and
+95,000 words.  So I
+am about six doublings away from finishing the job;
+the last doubling, adding 11 documents, took three hours;
+the doubling (well, near tripling) before that
 took an hour, and the doubling before that took half an hour.
-Unfortunately at this point it’s taking an entire second or more to rebuild
+Unfortunately at this point it’s taking two entire seconds to rebuild
 the HTML tree from scratch.  The
 notes are currently only a bit easier to read in this form than as plain
 text files, due to the lack of CSS and date/time metadata.
 
 I may hack together some kind of web UI for adding things to the
-triple store, but so far I’ve been adding them by hand.
+triple store, but so far I’ve been adding them by hand.  But now it
+seems like the time is starting to be linear in the number of
+documents I add, largely having to do with manual categorization more
+than writing code.
 
 Dependencies
 ------------
@@ -39,5 +43,5 @@ Manfred Stienstra, and Python 2.  I’m using 2.7.12.
 Time log
 --------
 
-2019-04-26 21:41 to 02:25 initial version (11 notes, tables of contents, HTML generation)  
+2019-04-26 21:41 to 02:25 (4½ hours) initial version (11 notes, tables of contents, HTML generation)  
 2019-04-27 10:38 to ??? (get titles from Markdown, add links between notes, add CSS)

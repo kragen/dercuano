@@ -1,0 +1,545 @@
+After reflecting on my solar dehumidifier idea (from August 2016 or
+maybe earlier) and the current air-conditioner-less state of my new
+bedroom, I did some calculations on making a desiccant-based air
+conditioner powered by the sun.
+
+The basic idea is that you cool air by evaporating water, like a swamp
+cooler.  But because swamp coolers work poorly or not at all when the
+air is already humid, you dehumidify the air before cooling it.  And
+because the high-humidity output is undesirable in climates that
+aren’t dry, you transfer the cool through a recuperative heat
+exchanger without transferring the humidity; this is known as
+“indirect evaporative cooling”.
+
+Standard swamp coolers use a recirculating pump to dribble water over
+wood wool (“excelsior”) pads to evaporate it, but a mister might work
+just as well, and might reduce the available habitat for bacteria.  WP
+says a high-pressure pump and 5-micron mist orifices are effective.
+
+To dehumidify the air, you pass it over a desiccant, a hygroscopic
+substance which absorbs some of the moisture from the
+air — potentially nearly all of it, depending on the desiccant and how
+dry it is.  The desiccant will eventually be saturated with moisture
+and stop absorbing it from the air; at this point it needs to be
+regenerated, normally by heating, normally by running hot air through
+it, then dumping the hot, moist air into the environment.
+
+This design uses a large quantity of a cheap, inefficient desiccant,
+such as wood wool, rather than a more reasonable quantity of a more
+mainstream desiccant, such as calcium chloride.  As a result, most of
+the heat from the regeneration air is deposited as sensible heat in
+the desiccant; only a fraction is used to drive out the water.  In
+order to prevent this heat from leaking into the intake air to be
+desiccated, two more air circuits are needed: a closed circuit of dry
+air to remove the heat from the desiccant, and an open circuit of hot
+dry air to remove the heat from the closed circuit.
+
+So there are five separate, isolated air circuits: a cool wet circuit
+running through the desiccant, the evaporator, and a heat exchanger; a
+cool dry circuit running through that heat exchanger; a hot wet
+circuit running through a solar heater and used to regenerate the
+desiccant; a closed dry circuit (half hot, half cold) to cool the
+desiccant; and a hot dry circuit to cool the air in the closed dry
+circuit down to ambient, transferring the heat to the outside air.
+Only the cool dry circuit connects to the indoor air.
+
+Swamp coolers typically achieve 70% to 90% relative humidity on their
+output side; I think it should be possible for relatively simple
+desiccants (wood wool itself, for example) to get the relative
+humidity of the air going into the evaporator below 20%
+see calculations below), but I haven’t
+performed experiments to show this yet.
+As long as it’s below 20%, we have a
+minimum swing of 50% relative humidity, which achieves half of the
+total theoretically achievable temperature swing.  WP says, “Most
+efficient systems can lower the dry air temperature to 95% of the
+wet-bulb temperature, the least efficient systems only achieve 50%.”
+
+I am estimating that my new bedroom might receive 4 kilowatts of solar
+heat during the day (3400 frigories per hour, a bit over a “ton”) that
+it might be necessary to extract.  Converting this sensible heat
+adiabatically into latent heat by evaporating water consumes 1 g of
+water per 2260 J, which is to say (4000/2260) g/s of water: 1.8 g of
+water per second, or 6.4 kg (= 6.4 ℓ) per hour.  And let’s suppose
+that the desiccant can be recycled every 30 minutes.
+
+Output airflow rates
+--------------------
+
+Let’s suppose that it is adequate to reduce the temperature of the
+humid air in the evaporation stage to 15° — indeed, the cool air
+output will probably need to be mixed with enough warm air to avoid
+being uncomfortably cold.  At 15°, [the vapor pressure of water is
+about 1.7 kPa or about .017 atm][6]; at about a 18:28 molar mass ratio
+of air to water vapor, that works out to .0109 g of water per g of air;
+[air’s density of 1.2 g/ℓ][7] means that our 1.8 g/s of water will
+need 165 g/s of air occupying 138 ℓ/s to carry it along.
+
+But wait, how much cooling can we get out of .0109 g of water per g of
+air?  Will it cool it enough?  Air holds 1.005 kJ/kg/K of sensible
+heat.  2260 J/g * .0109 g/g / (1.005 kJ/kg/K) is about 24.5 kelvins of
+ΔT, so we should be fine as long as the incoming air is below 15° +
+24.5K ≈ 40°.  Checking the [psychrometric chart][5], that seems about
+right; the 15° diagonal wet-bulb line hits the horizontal 0% RH line
+at a dry-bulb temperature of 41°.  40° or 41° is fine.  It never gets
+that hot here.
+
+[5]: https://en.wikipedia.org/wiki/Psychrometrics#/media/File:PsychrometricChart.SeaLevel.SI.svg
+[6]: http://www.kayelaby.npl.co.uk/chemistry/3_4/3_4_2.html
+
+Taking into account the finite efficiencies of evaporative coolers
+mentioned earlier, a 60%-efficient evaporative cooler (justified
+below) would only lower the air temperature by 14.7°, which gets us to
+15° for temperatures of 29.7° and below, and even at 38° still gets us
+to a quite tolerable 23.3°.
+
+Wood wool as a desiccant
+------------------------
+
+Common high-capacity desiccants include Glauber’s salt (sodium
+sulfate, mirabilite), plaster of Paris, silica gel, calcium chloride,
+and sodium bentonite.  But many other hygroscopic substances could
+potentially be used, including Play-Doh, pot shards, coffee beans,
+cocoa husks, shredded PET bottles, wood wool, straw, or palo borracho
+fibers.  But let’s consider wood wool, since it’s probably pretty
+typical of many of these substances, and relatively cheap.
+
+Let’s suppose that by heating wood wool or a similar cheap hygroscopic
+substance after saturation with outdoor air we can easily drive out 5%
+of its mass in water.
+
+5% is a conservative estimate for wood, because dry wood normally has
+about [12% moisture content, says WP][0], compared to its mass after
+being oven-dried at 103° for 24 hours.  The fiber saturation point,
+which wood in a 99% relative-humidity atmosphere, is typically 25% or
+30% moisture content; [equilibrium moisture content][1] ranges from 0%
+at 0% relative humidity through that 25% or 30%, hitting about 7%
+moisture content at 40% relative humidity and 12% moisture content at
+60% relative humidity.  (Buenos Aires summer usually ranges from 30%
+to 60% relative humidity.)  [Wood outdoors in Miami ends up with 13%
+to 15% moisture][2]; in Phoenix, it’s more like 5% to 10%.
+
+[0]: https://en.wikipedia.org/wiki/Wood_drying
+[1]: https://en.wikipedia.org/wiki/Equilibrium_moisture_content
+[2]: http://www.conradlumberco.com/pdfs/ch12_Drying_Control_of_Moisture.pdf
+
+Wood drying is normally a very slow process, taking days for hardwoods
+at tens of millimeters of thickness, roughly proportional to the
+1.52th power of the wood thickness, according to the
+Simpson-Tschernitz wood drying model.  At 500 microns (a typical
+thickness for wood wool), this should be several hundred times faster,
+needing only 15 to 30 minutes to come near equilibrium, or less for
+softwoods.
+
+To me, the above implies that exposing air to a sufficiently large
+quantity of wood with, say, 7% moisture content, will result in
+reducing its relative humidity to 40%, like Phoenix, and if the
+incoming air has 60% relative humidity, the wood will stop removing
+water from it once the wood reaches 12% moisture content.  So I think
+5% moisture content swing is a reasonable estimate for wood.  But can
+we do better?  Like 10%?
+
+Wood [starts to char above about 200°][4], and sugar starts to
+caramelize at 170°.  Let’s say we heat our desiccant up to just 150°
+to give a good margin of safety.  What will the air’s relative
+humidity be?  And what will it leave in the wood?
+
+[4]: https://en.wikipedia.org/wiki/Pyrolysis
+
+If we take some incoming air at 35° (a worst case scenario in Buenos
+Aires!) and 65% relative humidity, the psychrometric chart shows
+that it contains .022 g of water per g of air, I guess because water’s
+vapor pressure at 35° is 5.63 kPa = .0556 atmospheres, 65% of that is
+.0361 atmospheres, and water vapor is only about 18/28 of nitrogen’s
+density, which gives a fraction of .0232 grams per gram — close
+enough.  If we then use a solar oven to heat it up to 150°, [water’s
+vapor pressure goes from 5.63 kPa to 476 kPa][6], so the relative
+humidity falls by the same factor of 84.5, to 0.77%.  This should
+leave the wood’s equilibrium moisture content at about 0.1%; the EMC
+chart in the WP page I linked above has wood at 120° reaching 5% EMC
+at 60% RH, a ratio of about .08 between the two percentages.
+
+That is to say, heating wood up to 150° should be sufficient to remove
+over 99% of its moisture content from ordinary levels of air humidity
+once it reaches equilibrium, a process whose speed depends on the
+thickness of the wood but should only take a few minutes for the
+thicknesses I’m talking about here.
+
+This means that we probably *can* get 10% of the wood’s weight in
+water, and perhaps more importantly, we can use it to reduce the
+relative humidity of the air being desiccated down below 20% or so, at
+the expense of a lower moisture load in the wood.  Indeed, using
+countercurrent regenerator principles — where the air being desiccated
+runs through progressively dryer and dryer wood — perhaps we can
+reduce its relative humidity down below 5% or even 1% in this way.
+
+Wood has a specific heat typically between 2 and 3 kJ/kg/K, with white
+pine being in the middle at about 2.5.  The energy used to heat up the
+wood to the drying temperature is essentially wasted, so it would be
+nice to minimize it; going from 20° to 150°, it’s about 390 kJ/kg of
+wood, or about 3900 kJ per kg of moisture absorbed in the wood.
+Additionally, we need energy to evaporate the water, which is the same
+2260 J/g or 2260 kJ/kg of moisture, for a total of about 6200 kJ/kg of
+moisture removed by the dehumidifier.
+
+You could consider this a fairly appallingly terrible level of
+efficiency, but solar thermal energy has been very cheap for the last
+several billion years, and will probably remain so until at least
+2030.  So we can afford to “waste” an enormous amount of such
+low-grade thermal energy.
+
+The air output from the desiccant, at 20% humidity or less, then gets
+humidified by the evaporator to 80% or more, so we can get at least
+60% of the theoretical 24.5K temperature reduction, as long as the
+output is at or above 15°.
+
+Sizing the desiccant and the hot wet circuit
+--------------------------------------------
+
+Above I’ve talked about a 30-minute cycle time, 65% input humidity (at
+up to 35°, thus involving up to .022 g/g of moisture), 20% output
+humidity from the desiccant, and 138 ℓ/s of airflow for the cool, wet
+air circuit.  The amount of water absorbed in the desiccant should be
+somewhat less than the 1.8 g/s evaporated in the evaporator, because
+the input humidity is lower than the evaporator’s output
+humidity. 0.022 g/g of water vapor in air of 1.2 g/ℓ is .0183 g/ℓ of
+water vapor, which, at 138 ℓ/s, works out to 2.5 g/s.  XXX this is
+clearly wrong.  Over 30 minutes, 2.5 g/s works out to 4.5 kg of
+moisture; our equilibrium moisture content is only 10%, since we’re
+using an inefficient cheap desiccant, so that works out to 45 kg of
+desiccant.
+
+This is clearly a manageable quantity of stuff to put on the roof of
+your bedroom — it’s not 4500 kg or something clearly impractical like
+that — but at Lowe’s they sell “excelsior blankets” for landscaping at
+[US$183 for 65 pounds, US$6.20/kg], so we’re talking about almost
+US$300 of material.
+
+[7]: https://www.lowes.com/pd/Hanes-Geo-Components-101-25-ft-x-96-in-Excelsior-Biodegradable-Single-Net-Blanket/3318272
+
+2.5 g/s by 6200 kJ/kg gives us an estimate of how much thermal power
+we need: about 15.5 kW, which is about, say, 20 m² of sunlight, and
+about 4× the amount of thermal power we’re trying to reject.
+
+15.5 kW of thermal power at 150° with a ΔT of 130 K in air carrying
+1.005 kJ/kg/K is 119 g/s of hot wet air, or 99 ℓ/s, a bit lower
+than the other circuits.
+
+Output airflow
+--------------
+
+The 138 ℓ/s of cool wet air can be used to cool a somewhat larger
+quantity of cool dry air to, perhaps, a somewhat higher temperature.
+If the cool dry air temperature is to be 20°, you could perhaps have
+200 ℓ/s or more of cool dry air.
+
+If we compromise at, say, 160 ℓ/s, we still need to figure out how we
+move this air around, ideally somewhat quietly.  If the ducting is a
+generous 400mm in diameter, this works out to about 1.3 m/s of air
+velocity, which is going to be somewhat noisy, but tolerable and
+easily achievable.
+
+Desiccant cooling
+-----------------
+
+The 3900 kJ/kg deposited as sensible heat to raise the desiccant from
+20° to 150° must be removed somehow; otherwise it will heat the intake
+air rather than desiccating it.  My friend Mina suggests perhaps
+separating the desiccant from the outside air with only a very thin
+moisture barrier, such as aluminum flashing, so that it can absorb the
+ambient temperature in a rest period after being regenerated; if this
+is workable, it is clearly simpler than what I propose here, which I
+am certain is workable.
+
+The desiccant passes through three stages: desiccation, regeneration,
+and cooling.  The cooling stage passes cooling air in a closed circuit
+through it, heating the air; that air then passes through a
+recuperative heat exchanger to cool it so that it can return to cool
+the desiccant further.
+
+This air is at, I think, an average temperature of 85°, thus
+transferring 65 K of ΔT, and holding 65 K · 1.005 kJ/kg/K = 65 kJ/kg
+of air.  The sensible heat involved is 2.5 g/s · 3900 kJ/kg = 9.7 kW.
+Consequently this circuit must circulate 149 g/s of air, 124 ℓ/s; I
+think a similar quantity is needed on the hot dry circuit, although
+maybe it’s twice as much air due to a lower ΔT.
+
+Fans
+----
+
+160 ℓ/s is 340 cubic feet per minute.  For comparison, [a US$24 6"
+(152 mm) duct fan pumps 240 cfm][10] on 37 watts and supposedly makes
+68 dB of noise.  This works out to US$0.21 and 330 mW per ℓ/s; the
+five air circuits of 138, 160, 99, 124, and 248 ℓ/s add up to 770 ℓ/s,
+US$160, and 250 W.  This is less than 2% of the power needed to
+regenerate the desiccant.  It could be reduced further by using wider
+ducts like the 400mm ducts I suggested above; perhaps it could be
+provided by solar heat as well, rather than by electricity,
+particularly since Buenos Aires is prone to power outages at the
+hottest times.  At 1 m/s, 250 W is 250 N, the weight of about 25 kg,
+which gives some idea of how much work this device requires.
+
+Some kind of wacked-out dude has made a [solar Stirling engine][11] of
+“probably about 100 to 150 W” or “an estimated 70–100 watts” at about
+400 mm diameter, “from the ‘Andy Ross Stirling’ design,” with the two
+cylinders at right angles (“V-position”).  At a typical 25% Carnot
+efficiency and 800 W/m² insolation, 250 W would require a solar
+concentrator of some 1.25 m².  It looks like the nutbag is using a
+Fresnel lens of about 1 m² for his somewhat smaller engine.
+
+[10]: https://www.amazon.com/VenTech-VT-DF-6-DF6-Duct/dp/B005KMTYFK/ref=sr_1_2?ie=UTF8&qid=1482369846&sr=8-2&keywords=fan+cfm
+[11]: https://www.youtube.com/watch?v=5pdqDQwehlk
+
+Freezing stuff by multistage water evaporation
+----------------------------------------------
+
+At a minimum, even with a perfect system, to get to 0° with
+evaporative cooling, you need to start with dry air at 9°; to get to
+9° with evaporative cooling, you need to start with dry air at 27°;
+but to get to 27° with evaporative cooling, you can start with dry air
+at any livable temperature whatsoever.  So a cascade of two or three
+such desiccant-based coolers could cool food or whatever down below
+freezing.
+
+Water consumption
+-----------------
+
+6.4 ℓ/h is probably 30 ℓ/day, which is probably an acceptable cost.
+I can’t think of a way to condense either the water from the desiccant
+or from the evaporator.
+
+Feedback
+--------
+
+There are a few process parameters that need to be controlled to keep
+the system working properly.
+
+If the cool wet air circuit runs too fast, the desiccant could be
+overloaded, leading to air still moist as it enters the evaporator,
+and thus output air not as cool as it should be.
+
+If the cool wet air circuit runs too slow, it may not be able to
+evaporate enough water — it will be the right temperature, but there
+won’t be as much cool air as there should be.
+
+If the evaporator water runs too slowly, output air will not be as cool as
+it should be.
+
+If the evaporator water runs too quickly, it could accumulate.  Swamp
+coolers normally use a float valve to prevent this.
+
+If the hot wet air circuit runs too fast, it might not be as hot as it
+should be, and so the desiccant might be less regenerated than
+intended, leading to diminished cooling capacity; however, unless this
+is super extreme, the diminution should be minimal, because the drying
+process is an exponential decay already close to its asymptote at this
+point.
+
+If the hot wet air circuit runs too slowly, it might be too hot, which
+could set fire to the desiccant or melt other parts of the machinery,
+maybe including the solar heater itself.  This would be disastrous.
+Some kind of thermostatic control on the solar heater seems essential.
+
+If the cool dry air circuit runs too fast, it won’t be as cool as it
+could be, while if it runs too slow, some of the cool will escape up
+the chimney with cool wet air.
+
+If the desiccant rotates too slowly, it will become saturated with
+moisture in the cool wet air circuit, diminishing cooling performance;
+if the regeneration air is properly temperature-controlled, there
+should be no further risk, but if the regeneration air is too hot,
+then the desiccant rotating quickly enough be the only thing
+preventing it from overheating.
+
+If the desiccant rotates too quickly, assuming a countercurrent
+configuration, I think the only bad thing that will happen is that it
+will leak more heat from the hot wet circuit into the cool dry
+circuit, mildly degrading performance.
+
+XXX what about the desiccant cooling circuits?
+
+With electronics, of course, it’s very simple to monitor and
+compensate for all of these problems.  But one of the appealing
+benefits of this design is that, at least in theory, you should be
+able to construct and repair it with Stone Age materials and tools.
+
+So it should be possible to make it work reliably under varying
+conditions with the following feedback and safety mechanisms:
+
+- A float-valve mechanism to control the moisture in the evaporator
+  (and maybe a recirculating pump);
+- making the desiccant rotate considerably more quickly than the
+  minimum necessary;
+- ???
+
+Perhaps of use is the fact that [most species of flat grain wood will
+change size 1% for every 4% change in moisture content][22], but only
+crosswise, so you can make humidistats out of wood.
+
+[22]: http://www.thisiscarpentry.com/2010/09/03/moisture-content-wood-movement/
+
+Desiccant rotation systems
+--------------------------
+
+The desiccant could be either in the form of a single, slowly rotating
+wheel, physically rotating through the three phases it needs, or it
+could be three or more separate pebble beds, controlled using valves.
+
+A 1% prototype
+--------------
+
+Suppose we just want to see if the idea can work.  It should be
+possible to scale it down:
+
+- 40 W thermal cooling output;
+- 1.4 ℓ/s of input and 15° cool wet air output;
+- 1.6 ℓ/s of 20° cool dry air output;
+- 990 mℓ/s of hot wet air output;
+- 18 mg/s or 64 mℓ/h of water consumed and evaporated;
+- 25 mg/s of water removed from input air and transferred to hot wet air output;
+- 450 g of desiccant, costing US$3.
+- 30-minute cycle time on the desiccant;
+- 150 mm diameter air pipes.
+
+wait, how much thermal input?
+
+Alternative fuels
+-----------------
+
+Any kind of fire, including a propane or wood fire, should serve to
+heat the air to regenerate the desiccant.  With a coke or charcoal
+fire, you could pass the combustion exhaust directly through the
+desiccant, but other common kinds of fires probably produce too much
+water and other contaminants which could damage the desiccant in
+several ways: directly hydrating it, clogging pores in it, coating its
+surface with waterproof coatings, catalyzing pyrolysis at lower
+temperatures, and supporting fire.  So this involves using another
+heat exchanger in place of the solar heater.
+
+Alternative coolants
+--------------------
+
+Air has some significant advantages as a coolant: it can withstand
+temperatures from cryogenic to red-hot, it isn’t combustible, it’s
+readily available anywhere in the world, it has low viscosity, and
+it’s compatible with a wide variety of materials (at least at ordinary
+temperatures).  But it also has very low density, which means that
+transferring significant heat flows with it requires very large pipes
+and large heat exchangers.
+
+In this case, I don’t think there is a reasonable alternative to air
+for any of the five circuits.  The cold wet circuit and the hot wet
+circuit need water to evaporate into them, so they need to be air;
+
+Alternative desiccants
+----------------------
+
+Wood scraps, paper scraps, and such things may be a cheaper
+alternative to such freshly manufactured materials.  In some places,
+soil containing a substantial amount of clay, or maybe organic matter,
+might be cheaper and work adequately.  [Watts, Bilanski, and
+Menzies][8] show adsorption “isotherms” for various bentonite clays
+showing about 100–200 mg adsorbed water per gram of dried clay at 0.6
+“relative vapour pressure”, which I think means 60% relative humidity.
+(They never explain the terms in the paper.)  [US patent 4,254,565][9]
+from 1981 says that bentonite left out to dry in the sun for a few
+weeks to months typically ends up with 10% to 18% moisture content.
+
+[8]: http://www.csbe-scgab.ca/docs/journal/30/30_2_237_ocr.pdf
+[9]: https://www.google.com/patents/US4254565
+
+So a porous soil mixture that’s half sodium bentonite and half, say,
+sand, might perform similarly to wood as a desiccant.  It would also
+have has the safety advantage that it’s not combustible.
+
+Perhaps the second cheapest alternative, following dirt itself, is
+agricultural crop residues like straw or bagasse.  It turns out there
+are a number of studies of equilibrium moisture content of straw,
+because moisture absorption is crucial for, among other things,
+straw-bale construction.
+
+[Kymäläinen and Pasila published an experiment in 2000][12] on flax
+and hemp fiber “moisture regain”, typically 12% in flax or hemp at 21°
+and 65% RH, but only 7% in cotton, because most of the sorption is not
+from cellulose.  They found curves quite similar to wood — 5% EMC at
+15% RH, 10–15% EMC at 76% RH, and 25 or 30% EMC at 97% RH, depending
+on harvest time, all dry basis.  They also say, “Pectins and
+hemicellulose absorb more moisture from the air than does cellulose,”
+which sounds intriguing.
+
+[12]: https://www.researchgate.net/publication/229022825_Equilibrium_moisture_content_of_flaxlinseed_and_fibre_hemp_straw_fractions
+
+[Farmers discussing online say][13] you normally bale straw at 15%
+moisture content, though sometimes you can get away with 20% (at which
+point hay will rot, posing a fire risk, but straw may not), and if you
+leave it out long enough it gets down to 8–10%.  Farmers won’t buy hay
+with over 16% moisture.  [For construction, anything below 20% is
+OK][14].
+
+[13]: https://thefarmingforum.co.uk/index.php?threads/hay-and-straw-moisture-content.7043/
+[14]: https://www.strawbale.com/how-to-choose-the-right-straw-bales/
+
+[Some anonymous Canadians at CMHC in maybe 1996 measured straw bale
+equilibrium moisture content][15] and found a similar curve to that of
+wood: 5% EMC at 20% RH, 10% EMC around 50% RH, and 15% EMC around 80%
+RH, all dry basis.
+
+[15]: https://www.cmhc-schl.gc.ca/publications/en/rh-pr/tech/96-206.pdf
+
+[Duggal and Muir measured EMC of wheat straw in 1981][16] and found
+7–9% EMC at 35% RH, 7–12% EMC at 55% RH, and about 10%–14% EMC at 70%
+RH, all wet basis, all depending on temperature.
+
+[16]: http://www.sciencedirect.com/science/article/pii/0021863481900731
+
+[Taha Ashour et al. in 2010 measured EMC of some plasters][17] used
+for straw-bale buildings, finding EMCs mostly in the 2%–4% range, even
+when the plasters were 75% reinforcing fibers made of wood or straw
+and 25% made of soil (which was 31% clay).  The article doesn’t
+mention the fact that these EMCs are like five times lower than the
+EMCs of the incorporated fibers, so I don’t know if the author has any
+idea why this large discrepancy exists, or even if they know there is
+a discrepancy.
+
+[17]: https://www.researchgate.net/publication/251667489_An_experimental_investigation_on_equilibrium_moisture_content_of_earth_plaster_with_natural_reinforcement_fibres_for_straw_bale_buildings
+
+[Heath and Walker in 2009 measured EMC of straw bale walls][18] and
+found a fairly straight line from 2% EMC at 4% RH up to 13% EMC at 70%
+RH, followed by a sharp upward turn to 50% EMC (!!) at 93% RH, all dry
+basis.
+
+[18]: http://opus.bath.ac.uk/17487/1/Monitoring_of_straw_bale_walls.pdf
+
+[Alfalfa hay bales currently cost AR$35 per 25-kg bale][19], which
+would reduce the desiccant cost from US$300 to AR$70, which is about
+US$5.  (Actually there are some shipping costs which almost double the
+cost, but whatever.)  [Wheat straw bales cost AR$70][20].
+
+[19]: http://articulo.mercadolibre.com.ar/MLA-622523358-vendo-fardos-de-alfalfa-de-excelente-calidad-_JM
+[20]: http://articulo.mercadolibre.com.ar/MLA-611896060-fardos-de-paja-de-trigo-_JM
+
+Hay can spontaneously combust due to thermophilic bacteria if wet.
+[At 200°F (93°) farmers are advised, “Most likely, a fire will
+occur.”][21], but even as low as 160°F (71°) it can happen.  So it's
+possible that straw, being in many ways similar to hay, might not
+withstand temperatures as high as 150° without catching fire.
+
+[21]: http://articles.extension.org/pages/66577/preventing-fires-in-baled-hay-and-straw
+
+Advantages over standard indirect evaporative cooling
+-----------------------------------------------------
+
+You might reasonably ask why not simply use a normal cooling tower to
+cool some water (or oil or propylene glycol or whatever), then run
+that water through a heat exchanger in your house.  That is a much
+simpler approach, and it also avoids raising the humidity in the
+house.  However, more or less by definition, it can only cool the air
+down to the wet-bulb temperature of the outside air, and usually it
+can’t quite make it that far.  On an unpleasant summer day in Buenos
+Aires, when the temperature reaches 35° and the relative humidity 60%,
+the wet-bulb temperature is 27° — still unbearable.  Worse, on simply
+cooling that air to 27° without dehumidifying it, you would raise its
+relative humidity to 90%, which is very unpleasant indeed.  (Air
+conditioners generally reduce this problem by dehumidifying air by
+cooling it even further, then allowing it to mix.  XXX maybe I should
+tackle that by a different approach)

@@ -1,0 +1,499 @@
+Current-source grid
+===================
+
+Your wall socket is 50Hz or 60Hz, 120 or 240 volts rms ac, but most
+importantly it is a voltage source.  That is, the voltage remains
+constant at, say, 235 volts, regardless of whether you’re drawing 0
+amps or 20 amps from it.  Actually, this is a little bit of a lie; the
+voltage does reduce somewhat as you draw current from it.  Maybe the
+resistance of the wire in the wall is 1Ω, so if you’re drawing 20
+amps, the voltage falls to 215 volts.  And as your house draws more
+current, the voltage on the whole circuit to your house from the
+transformer falls a bit, though probably not as much as the voltage
+drop from the wires in your wall.  But the voltage is *relatively*
+constant.
+
+This configuration gives rise to a number of phenomena we’re familiar
+with, not all agreeable:
+
+- All of our unswitched outlets are wired in parallel.  Switches are
+  wired in series with the devices they control.
+- If we touch the prongs of an electric plug as we plug it in or
+  unplug it, we get a nasty shock — potentially a deadly one.
+- Negative-resistance devices like fluorescent tubes and neon
+  lights — as well as fixed-voltage devices like LEDs — require
+  auxiliary electronics to operate at all without exploding.
+- If an electrical appliance has its insulation fail inside, even if
+  it’s a low-power appliance like a VCR or LED lamp, its carcass can
+  become electrified — resulting in either a circuit breaker tripping
+  (if the ground wire is properly wired) or a deadly shock hazard.
+- We can step voltage up for transmission and distribution using
+  transformers, but the transformers are heavy and bulky, made from
+  laminated electrical steel.
+- Even an electrical outlet that is providing no energy to anything is
+  potentially hazardous if a toddler sticks hairpins into it.
+- 50Hz or 60Hz interference is picked up by everything; under some
+  circumstances, many harmonics also appear.  These are audible and
+  frequently cause trouble with audio electronics.
+- As little as 100 mA of this current can be fatal, and it’s easy for
+  human skin to have the <2.4kΩ resistance necessary for this to
+  happen.
+- The insulation thickness and separation between the conductors is
+  sized for the voltage that is always present, with a healthy safety
+  factor.  But the thickness of the copper conductor itself is sized
+  for a worst-case current that may never be present, again with a
+  healthy safety factor.
+- As at least one teenager has learned, throwing eggs into an
+  electrical substation can cause a dangerous explosion.
+- The temperature a heating element reaches depends on its length.  If
+  we reduce a heating element to half its length, we double the power
+  it dissipates, quadrupling the power density.  In addition to making
+  calculations somewhat trickier, this means that sticking a knife in
+  the toaster will likely melt the heating element, ruining the
+  toaster.
+- Every standard electrical cable carries this deadly voltage
+  difference, and if cut, can easily melt the cutting tool and cause
+  an electrical fire.
+- Powering a low-voltage device (like any transistor-based
+  electronics) requires either one of those heavy transformers
+  mentioned above or a much more complex (and noisy and potentially
+  unreliable) switching power supply.
+- Fixed-speed single-direction electrical motors (up to 50Hz or 60Hz,
+  i.e. 3000 or 3600 rpm) are very simple and extremely reliable, but
+  on single-phase power, require either an inefficient shaded-pole
+  arrangement or a large and failure-prone starter capacitor to
+  guarantee a particular direction of rotation.
+- Many switching power supplies have very large inrush currents when
+  first plugged in, which frequently results in flying sparks from the
+  prongs of the electrical plug.
+- We protect our houses and appliances by wiring circuit breakers or
+  fuses in series with them.  When the current exceeds the rating of
+  the safety device, it disconnects, creating an open-circuit
+  condition and its attendant inductive voltage spikes, but cutting
+  the current to zero.  However, this generally only cuts the hot side
+  of the supply; the problematic appliance remains connected to the
+  neutral side, which can still carry a hazardous voltage.
+- Short circuits are a bad thing which can result in electrical fires
+  and even plasma explosions.  Open circuits are innocent and totally
+  normal, occurring whenever we unplug something or turn it off.
+- If you start to receive a significant electrical shock, you lose
+  control of your muscles, which may cause you to firmly grasp the
+  source of the shock, increasing the danger.
+- It’s basically impossible to shield the extremely-low-frequency
+  emissions and prevent them from escaping a building or penetrating a
+  sensitive measuring instrument.
+
+None of these are inherent to electricity in general.  If we used an
+RF current source rather than a extremely-low-frequency voltage source, all
+of the above items change.
+
+What is a current source?
+-------------------------
+
+First, what is a voltage source?
+
+A voltage source is an energy source with a constant voltage across
+the load, regardless of the current.  Its output impedance is zero.
+The voltage of your wall socket is a close approximation of a voltage
+source; its impedance is on the order of 1Ω.  It has a limit to how
+much current it can supply — even leaving aside the fuses and circuit
+breakers, to draw 240 amps from your 1Ω 240V source, you would need a
+short-circuit load, which means that none of the power actually
+reaches the load, and also you cannot reduce the impedance any further
+in order to draw more current.
+
+A current source, by contrast, is an energy source with a constant
+current, regardless of the voltage.  Its output impedance is infinite.
+A photovoltaic cell in constant light at a voltage well below its
+maximum output voltage is a close approximation of a current source,
+because each photon it converts generates an electron-hole pair
+regardless of the voltage; I think its impedance is on the order of
+1MΩ.  Any current source has a limit to how much voltage it can
+supply — if you open-circuit the photovoltaic cell, its voltage will
+rise to about 0.7 volts and stay there.  At that point you cannot
+reduce the conductance any further in order to get higher voltages.
+
+This is one of many applications of a certain duality in electronics
+in which we interchange serial and parallel, voltage and current,
+resistance and conductance, and I think capacitance and inductance,
+and maybe frequency and period, and everything comes out the same.
+
+The study of electrical currents began with batteries, which are
+pretty close approximations to voltage sources.  Current sources, on
+the other hand, are generally thought of as artificial or theoretical
+constructs.  But in today’s world of power electronics, our voltage
+sources are usually complicated circuits, and we can build current
+sources just as easily.  Stick-welding machines
+and TIG welding machines are commonly designed
+as high-power current sources, under the name “constant-current
+source”, or “CC”, for example.
+
+Why are RF current sources an interesting alternative?
+------------------------------------------------------
+
+It turns out that if you use a current source rather than a voltage
+source for your mains power, and run it at a higher frequency, there
+are a number of interesting results.  In particular, all of the bullet
+points in the first section above become false, and there are a number
+of potential safety, cost, and complexity benefits — although of
+course we won’t know if these work out in practice until we have real
+experience with them.  Current sources defy the expectations we have
+built up over centuries of working with voltage sources — among other
+things, about what is safe and what is dangerous.  To take the
+simplest example, short-circuiting a high-power current source is
+totally safe and actually the right way to turn off whatever it’s
+powering.  Open-circuiting it, by contrast, can produce a hazardous
+voltage.
+
+The extremely low frequencies we’re accustomed to using date from the
+late 19th century, when they derived from the frequencies of rotation
+of the steam-driven generators used to produce the power.  This
+approach is still used today, with generators’ rotation synchronized
+to the grid frequency before putting them online.  But supplying power
+at higher frequencies has a number of substantial advantages in
+safety, electronic noise, and equipment size, cost, and complexity.
+
+In addition to potential uses in houses and industry, this system
+should also be useful in spacecraft, where wiring harnesses commonly
+contribute an alarming amount both of very expensive mass and of very
+expensive power consumption.
+
+Basics
+------
+
+Consider a system supplying one ampere at 32768 Hz, the frequency of a
+watch crystal, to every wall outlet, with current-source compliance up
+to 1000 VAC.
+
+The outlets on a circuit are wired up in series — the current flows
+first through one appliance, then another, then another.  When no
+appliance is plugged in, a short-circuit shunt is mechanically imposed
+across the two terminals of the outlet, so current flows through the
+outlet with no significant voltage drop.  When all the outlets on a
+circuit are short-circuited, the total resistance of the circuit might
+be 1Ω, so the 1A will produce 1V of voltage drop and 1W of power
+consumption.
+
+If a 10W appliance is plugged in, once its contacts have made contact
+with those of the outlet, its plug mechanically removes the
+short-circuit shunt, introducing the appliance into the circuit.  The
+appliance’s impedance of 10Ω produces a voltage drop of 10V across the
+plug (once the current source’s output voltage rises to match),
+delivering 10W to the appliance.
+
+A switched outlet or appliance has the switch in parallel to it.  When
+the switch is closed, there is no voltage across the appliance, and
+consequently no current through it, or a tiny residual current due to
+the tiny voltage drop across the closed switch.  Opening the switch
+forces the current to flow through the appliance instead.
+
+A short circuit between an outlet and the neutral wire removes power
+from the appliances downstream from it, but causes no other problems.
+An open circuit, however, could cause a hazardous voltage, and
+therefore safety measures must be taken to shunt current past the open
+circuit, just as fuses or circuit breakers must create an open circuit
+in a voltage-source system to interrupt hazardous currents.
+
+All the normal wires are the same tiny size, 24 AWG, 510 μm in
+diameter, which is enough to carry 1A without getting warm, but not so
+thick as to waste any significant copper due to the 400-micron skin
+depth in copper at 32768 Hz.  Higher-current internal ac wires in some
+appliances need to be made of copper tape of less than 1 mm thick.
+The thickness of the wire does not depend on the length of the run,
+because the voltage drop is inconsequential; the current source will
+automatically raise the voltage to compensate, so that the load will
+receive the full 1A anyway, as long as the run isn’t so long as to
+approach the current source’s compliance limit (1000 V, thus 1000 Ω at
+1 A.)
+
+Physically, the outlets are strange.  The two prongs are each 20 mm
+long, with their first 15 mm insulated, as in France; they are
+positioned a rather large 40 mm apart, with a ground prong in the
+middle.  Behind the outlet, the attachments for the tiny wires are on
+strange stalks that curl back around.  All of this is for high-voltage
+safety in the unlikely case that a single outlet is called upon to
+supply the full 1000 V limit of a circuit; it needs the creepage
+allowance not to form a conductive, but high-resistance, path between
+the electrodes.
+
+Despite the possibility of using a single wire from one outlet to the
+next, in fact the return wire runs alongside the hot wire as a lightly
+twisted pair for the whole circuit in order to reduce EMI.  It isn’t
+connected to anything until the last outlet in the string.
+
+Each circuit is fed from a separate transformer, a bit smaller than
+the usual circuit breaker, on a higher-voltage-compliance
+constant-current “bus”, which is wired in series, not in parallel as
+usual.  The transformers are center-tapped, and the center tap is
+grounded, so the net voltage surrounding the twisted pair of wires is
+zero, and of course their net current is also zero.  This reduces EMI
+and keeps the voltage from any point to ground to a minimum.  Each
+transformer also has a safety shunt attached to it.
+
+Safety
+------
+
+First, in at least a couple of ways, the system I’m describing here is
+potentially *more* dangerous than the traditional system.  240V is
+often not enough to kill you, depending on how dry your skin is.  120V
+almost never is.  But one ampere through your arms is traditionally
+considered very likely to kill you, and the current source will
+happily apply 1000 volts to you if you are suddenly the only path
+through its circuit and that is what is needed to drive an ampere
+through you.  1000 watts applied to your body is also very likely to
+kill you.
+
+Also, kilovolts can do surprising things that the more usual voltages
+do not do, jumping through air and burning tracks through dust on
+surfaces and whatnot.
+
+However, there are a variety of ways this system is inherently safer,
+as well as a number of safety features that can be added.
+
+First, the vast majority of circuits will not have hazardous voltages
+present on them at all, because they will not have hundreds of watts
+of load, so they won’t need hundreds of ohms of impedance.  And even
+those circuits that do have hazardous voltages will generally not have
+hazardous voltage differences within a single appliance.
+
+??? I’m conflicted about whether grounding the center taps is a good
+idea.  Without that current path to ground, there would never be any
+hazardous voltages relative to ground in the system, only potentially
+hazardous voltage differences within the circuit.  But without it,
+grounding an enclosure will not produce a detectable ground fault if a
+hot wire comes in contact with the enclosure.
+
+As explained above, short circuits are not hazardous in a
+current-source system — the current source will only supply its usual
+current to them, rather than an unbounded current, and they will
+dissipate no energy.  Open circuits produce a hazardous voltage but no
+immediate fire.  The real danger is near-open circuits of a few kΩ,
+which could potentially dissipate a few kW.
+
+I think one amp is not enough to sustain an arc in air (???), which
+would eliminate the usual risk of arcing, despite the high voltages.
+
+Using RF is a safety advantage because currents at these frequencies
+cannot (???) penetrate deeply into the human body, instead staying on
+the skin, and so they cannot cause muscular contractions (???) or
+cardiac fibrillation.  They can still cause burns, and RF electrical
+burns are notorious, but that requires a lot more energy.
+Unfortunately, this system is capable of supplying that energy.
+
+While it’s harmless and probably useful to include traditional series
+overcurrent fuses in the system — if the current deviates
+significantly above 1 A, you have a bad problem in your current source
+and it would be a good idea to disconnect from it — they won’t detect
+hazardous voltage soars or open circuits, which are the kinds of
+problems that could arise from electrical faults inside your house.
+
+Grounding the cases of appliances provides a more effective safety
+measure against hot cases than in the traditional voltage-source
+system.  In the standard system, a hot wire contacting the grounded
+case produces a ground fault, which fires the circuit breaker.  In
+this system, by contrast, it shorts out half of the transformer and
+the upstream appliances, effectively dividing the circuit into two
+circuits of 500 mA each, joined at a shared ground point.  The
+enclosure remains grounded and thus safe to touch; there are no sparks
+and no danger of electrical fire.  However, nothing on the circuit
+will work properly until the faulty appliance is removed, because it
+will be getting a quarter of its usual power.
+
+The simplest safety shunt against open circuits is just a buzzer-type
+SPST relay; its normally-closed contacts in series with a
+normally-closed pushbutton short the load, and its winding in series
+with the load holds those contacts open.  If at some point the load
+goes open-circuit, the current through the load and the coil will
+cease, the contacts will spring closed, and the load will remain
+shunted out of the circuit until someone pushes the pushbutton†.  This
+fails safe in case of coil failure and in case of power failure; it
+may be inconvenient to have to reset all your circuits after a power
+failure, but it’s better than having to replace all your appliances.
+It may be possible to tune this circuit to reliably detect the
+ground-fault half-current case, too.
+
+The other problem the above circuit has is that it doesn’t actually
+limit the voltage; it just responds to the source’s inability to
+sustain its current in the face of overwhelming resistance.  In the
+case where the source is actually capable of hitting 10kV, it might
+fail to activate because the deadly overvoltage has burned a track
+across the outlet and is efficiently heating it to incandescence.
+
+A simple truly-overvoltage-driven alternative would be a large gas
+tube.  A fluorescent lamp tube would sort of work, but its discharge
+maintenance voltage is high enough (in the range of 100V)
+that it would probably cause
+major damage to the faulty load.
+
+A fully-solid-state alternative might be a diac in series with a small
+inductor and a NC pushbutton, driven from a bridge rectifier in
+parallel with the load.  If the diac goes into conduction due to
+overvoltage, it should crowbar the circuit rather effectively until
+someone presses the button; the inductor keeps it in conduction as the
+voltage crosses through zero 65536 times per second.  This should give
+you under 10V across the circuit.  (e.g. [the Littelfuse K1400GURP
+SIDAC][1] can handle an amp steady-state and will crowbar down to 1.2
+volts, with a breakover voltage of 130–146V; you could use 7 of them
+in series, giving you a breakover of 910–1022 volts, and a voltage of
+8.4 volts, plus the bridge and inductor voltages.  It costs 37¢ in
+bulk.)
+
+[1]: https://www.digikey.com/product-detail/en/littelfuse-inc/K1400GURP/F6684CT-ND/5180608
+
+An alternative relay circuit would use a latching relay activated by
+current through, say, a calibrated spark gap, MOV, diac, or gas tube.
+It could latch either mechanically or, by virtue of energizing its own
+coil, electromechanically.  This last has the dubious advantage of
+resetting automatically after power failures, including after being
+shunted out of the circuit by an upstream shunt.
+
+† At which point the circuit potentially goes really open-circuit if
+the load still isn’t repaired, thus causing further safeties to trip
+further upstream, so maybe this design is inadequate.  Or maybe you
+just need two of them, maybe controlled with a make-before-break
+pushbutton that opens one circuit after closing the other.
+
+Appliance design
+----------------
+
+Everything is topsy-turvy in the current-source world, but it’s
+overall simpler.  It’s fine for things to short out when they fail;
+it’s problematic and possibly dangerous for them to create open
+circuits, for example by breaking the filament of an incandescent
+lightbulb.  If your lightbulb filament breaks, it will trip the safety
+shunt, and you will probably want to turn off all the lightbulbs on
+the circuit, reset the safety, and then turn them on one at a time
+until you figure out which one is tripping the safety.
+
+Resistive heating is simple.  1Ω is 1W.  To get a given temperature
+under given cooling conditions, you use a given filament; you get the
+same temperature no matter how much of it you use, but more filament
+gives you more power.  You should probably mount it on some kind of
+conductive backing with light insulation in between so that it becomes
+a short circuit if it melts, not an open circuit.
+
+More resistance gives you more power; this is precisely backwards from
+the situation with voltage sources, where load resistance and power
+are inversely proportional.
+
+3V 1.5W LEDs can be driven directly from the regulated 1A with no
+resistor.  Smaller LEDs will burn out; larger LEDs will only shine
+1.5W.  Large fluorescent tubes of about 100W can, too, with no ballast
+or starter, as long as they can cold-cathode start at a low enough
+voltage, and fast enough to keep the safety shunt from tripping.  50W
+tubes should work if half-wave rectified — with one diode in series
+and another opposite diode shunting the combination.  But most LEDs
+and fluorescent lights will require some kind of power supply.
+
+Voltage-step-up transformers can be used to step down the current for
+some of these devices, such as small LEDs.  Voltage-step-down
+transformers are probably useful to step up the current for larger
+resistive elements, so that they can use thicker wire.
+
+Low-voltage low-power power supplies are really easy; a tiny 1A
+47-microhenry inductor has an impedance of ωL = 4.8Ω and thus a
+voltage across it of 4.8V (ac rms), which is 6.8V peak.  Stick a
+silicon bridge rectifier across that, dropping 1.4V, and you can
+charge a capacitor to 5.4V dc at any current up to 100mA average or so
+(at which point the inductor voltage starts to drop because you’re
+stealing its current).  For 10% ripple at 100mA, the capacitor itself
+only needs to bear the 100mA for 15.3 microseconds without dropping
+more than 0.5V, which means 3 μF is adequate; an LC filter would allow
+you to use a smaller capacitor and also get better stability.  If you
+want a regulated voltage, you might want to use a slightly larger
+inductor to get more like 9V peak, then drive a 7805 off it.  Then it
+would be okay to steal more current from the inductor.
+
+In any case, you won’t have any 50Hz or 60Hz ripple.  You’ll have
+32768Hz ripple, plus some harmonics like 65536Hz and 98304Hz, which
+are a lot easier to filter out.
+
+Combining the two above, you can quite reasonably use a
+voltage-step-down transformer to feed a 22μH inductor 5A, then
+rectify, filter, and regulate, to get a 60% efficient 1A 5V regulated
+USB power supply in five components.
+
+In the simplest case, of course, you can get a voltage by using a
+resistor rather than an inductor, but it will dissipate power.  Or you
+could use an unpolarized capacitor of a few μF.
+
+Inrush currents from hooking up capacitors to line voltage no longer
+exist.  Instead you have inductive voltage spikes when you switch an
+inductor into the 1A circuit.  You may want a snubber network to tame
+this, but that may be unnecessary — you aren’t going to design in an
+inductor with more than 1kΩ of reactance, which means more than 10mH.
+½LI² = 5 mJ, which may not be enough energy to cause any real
+problems.
+
+Switching power supplies are still a thing, despite the greatly
+increased convenience of old-style transformer power supplies, and
+they need no inductors.  If you were using dc instead of ac, a
+switching power supply amounts to switching between a dead short and a
+capacitor-diode series.  You run your voltage-regulated circuit off
+the capacitor, and the diode keeps the capacitor from discharging
+during the time that the power is turned off with a short.  You can do
+this with ac if you use a bridge rectifier or just a
+reverse-protection diode.  For lower-power supplies, you could just
+use a rectifier diode to generate a voltage dissipatively and switch
+that voltage onto a capacitor at times.
+
+Squirrel-cage induction motors should be barely feasible: 800 poles
+around the stator should give you 164 revolutions per second, which is
+9840 RPM.  The “squirrel cage” should probably be a millimeter-thick
+copper or aluminum sheet.  I don’t think you can use laminated
+electrical steel in the rotor at these frequencies.  On the plus side,
+the starter capacitor can be quite small.
+
+Universal motors are not feasible at all without rectification.
+
+Wire diameter, resistance, and cost
+-----------------------------------
+
+The higher peak voltages allowed by a current-source system, as well
+as the automatic compensation for wiring losses, allow us to use much
+lower maximum currents and therefore thinner wire than in the
+traditional system.  Instead of building the copper for the worst case
+and the insulation for the average case, it allows us to build the
+copper for the average case and the insulation for the worst case.
+Insulation is much cheaper than copper.
+
+[24AWG copper wire is 510μm in diameter and 84Ω/km][0], and it’s
+recommended for currents up to 3.5 A.  84Ω/km means 84mΩ/m and
+thus, at 1A, 84 mW/m, which is not totally insignificant in terms of heating,
+but not really dangerous either.  It means you can go over 5 km round
+trip with this wire before you hit the source’s 1000 V compliance
+limit.
+
+[0]: http://www.powerstream.com/Wire_Size.htm
+
+A bigger issue at these frequencies is likely to be stray inductance.
+1Ω is only 9.7 μH.  The twisted pairs should reduce this problem, but
+they won’t eliminate it.
+
+Copper’s density of 9.0 g/cc means this works out to 1.8 grams per
+meter of wire, or 3.6 g if you run the neutral wire next to the hot
+one.  But that doesn’t count the insulation, which needs to be safe at
+1000 V.
+
+100 turns of this wire on an inductor work out to a coil, say, 5.1 mm
+long and 5.1 mm thick, for maybe 15 mm of diameter on the whole
+inductor.  Transformers might be a little larger.  None of that takes
+into account the insulation, though, so probably the reality will be
+several times that.
+
+1000 V probably needs over 16 mm clearance between exposed conductors
+and 64 mm creepage distance, although I should look up the standards.
+
+As explained in the “appliance design” section, the higher frequencies
+allow the use of much smaller capacitors, inductors, and transformers,
+which dramatically reduces cost and weight.  The current-mode design
+allows us to get whatever voltage we want by adjusting a reactance;
+the use of rf ac allows us to get whatever current we want with a
+tiny transformer.
+
+Etc.
+----
+
+ are too high for humans to hear, so
+they cause less problems with audio equipment; and they
+

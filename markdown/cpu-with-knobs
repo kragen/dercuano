@@ -1,0 +1,548 @@
+A two-operand calculator supporting programming by demonstration
+================================================================
+
+Historical programmable calculators have mostly either used
+BASIC-style infix expressions and jumps, or FORTH-style stack
+operations.  When I’m programming, I find FORTH code more bug-prone
+than register-to-register code.  Could you design a usable
+programmable calculator using a non-stack-machine machine code?  I
+think so, and in fact, I think you could make it more usable than
+traditional calculators by taking advantage of programming by
+demonstration.
+
+Or, to put it another way, how easy could you make programming in raw
+machine code, so that you don’t wish for an assembler?
+
+Physical description
+--------------------
+
+In front of you is a box with an unusual keyboard and two knobs, one
+above the other, each with a 16-digit numeric LCD display next to it.
+Each knob has 16 positions around it labeled with the letters J
+through Y.  A third knob with a third display is located below the
+keypad; it also turns indefinitely in either direction, with a larger
+number of detents.  The top knob and display are labeled Γ; the bottom
+knob and display are labeled Δ.  Turning a knob to one of its 16
+positions selects the number displayed on its display; there are 16
+different such numbers.  Both knobs access the same set of numbers;
+when they are turned to the same position, they display the same
+number.
+
+There is also a peripherals box connected to it with a cable which
+will be described later.
+
+The keypad looks like this:
+
+<!--
+    |----+----+----+----+---+---+---|
+    | 0↓ | 1↓ | 2↓ | 3↓ | ± | B | C |
+    |----+----+----+----+---+---+---|
+    |  7 |  8 |  9 | +  | ~ | > | ← |
+    |----+----+----+----+---+---+---|
+    |  4 |  5 |  6 | -  | ^ | : | ↓ |
+    |----+----+----+----+---+---+---|
+    |  1 |  2 |  3 | ×  | & | ; | ⇐ |
+    |----+----+----+----+---+---+---|
+    |  0 |  @ |  ! | /% | | | { | } |
+    |----+----+----+----+---+---+---|
+-->
+
+<table class="keypad">
+    <tr><td>0↓<td>1↓<td>2↓<td>3↓<td    >±<td   >B<td>C
+    <tr><td >7<td >8<td >9<td >+<td    >~<td>&gt;<td>←
+    <tr><td >4<td >5<td >6<td >-<td    >^<td   >:<td>↓
+    <tr><td >1<td >2<td >3<td >×<td>&amp;<td   >;<td>⇐
+    <tr><td >0<td >@<td >!<td>/%<td    >|<td   >{<td>}
+</table>
+
+
+<style>
+.keypad td, .key {
+        padding: 0.4em;
+        border-radius: 0.4em;
+        background-color: bisque;
+        border-color: bisque;
+        border-style: outset;
+        border-width: 0.1em;
+        text-align: center;
+}
+.key { display: inline-block; }
+.keypad {
+        border-spacing: 0.2em;
+}
+</style>
+
+XXX missing: `>>`, `<<`, some way to swap stacks
+
+Calculation
+-----------
+
+The numeric keys enter a number into the upper display, Γ. If a number
+was there previously, it is replaced, unless the last thing you did
+was also a numeric or backspace key, in which case it is appended to
+the number there.  The backspace key (<span class="key">⇐</span>) removes the last digit from
+the number.  If you turn the Γ knob away from that position, the
+displayed number will change, but when you turn it back to that
+position, the number you entered is still there.  If the Δ knob is in
+the same position, the same number shows on both displays, and they
+update together.
+
+This is because the machine contains 16 registers, named P, Q, R, S,
+T, U, V, W, X, Y, J, K, L, M, N, and O, and the knobs select which of
+the registers is displayed on each display at each moment.
+
+The arithmetic keys
+<span class="key">+</span><span class="key">-</span><span class="key">×</span>
+alter the number on the Δ display by
+respectively adding to it, subtracting from it, or multiplying by it
+the number on the Γ display.  The Γ number remains unchanged, unless
+both knobs are in the same position, in which case it shows the same
+number as Δ.
+
+The arithmetic key <span class="key">/%</span>
+alters Δ by dividing it by Γ, leaving the
+quotient in Δ, but does not leave Γ unchanged; rather, it leaves the
+remainder in Γ.  The quotient is rounded toward zero, and the remainder
+is consequently sometimes negative.
+
+XXX maybe use 32.32 fixed-point?  × differs only by a right shift but
+<span class="key">/%</span> differs radically.
+
+The <span class="key">±</span> key changes the sign of the number in Γ.
+
+So far, this allows simple use of the machine as an integer (XXX?)
+calculator.  You select some register with both Γ and Δ, type a
+starting number into it, and then select a different register with Γ
+and type more numbers into it and apply operations to update your Δ
+accumulator.
+
+The keys
+<span class="key">^</span><span class="key">~</span><span class="key">&amp;</span><span class="key">|</span>
+are similar to the arithmetic keys, but perform bitwise
+operations on the numbers: XOR, NOT, AND, and OR, respectively.  <span class="key">~</span>
+applies only to Γ, not to Δ, on the theory that much of the time that
+you invert the bits in a number, it’s because you’re about to use it
+to clear some bits in something else.  You can pull out either knob to
+set the corresponding display to hexadecimal, or push it back in to go
+to decimal.
+
+Memory
+------
+
+The <span class="key">@</span> and <span class="key">!</span>
+keys use Γ as an address into a larger “main memory”
+of 65536 numbers; <span class="key">@</span>
+reads main memory at the address Γ and copies it into
+Δ, while <span class="key">!</span>
+copies Δ to main memory at the address Γ.  The display below
+the keypad displays one of the numbers in this memory, and the knob
+moves backwards and forwards in this memory.  It has a narrow stem in
+the middle to allow spinning it quickly, and this implements something
+like mouse acceleration so that you can scroll rapidly through memory.
+Main memory is nonvolatile, retaining its contents even when the
+device is unplugged.
+
+Programmability
+---------------
+
+The other keys are somewhat more difficult to explain, because they
+pertain to the device’s programmability.
+
+### Defining subroutines ###
+
+Whenever you are typing, the
+program counter displayed in the display below the keypad advances,
+recording your instructions in the memory so that you can replay them
+later; numeric entry is not recorded until it is complete, so
+backspace does not create a program instructions, nor does typing a
+number followed by
+<span class="key">:</span> or a few other things.  The
+<span class="key">:</span> key marks a
+label, which can be used as the beginning of a subroutine or loop.
+This is implemented by storing the current program counter at address
+Γ and magically restoring Γ to its previous value.  The
+<span class="key">;</span> key marks
+a return address; it has no effect on the Γ and Δ registers, so its
+only immediate effect is to store an instruction in memory.
+
+This means that you can define a subroutine by doing a calculation,
+typing <span class="key">;</span>,
+then using the third knob below the keypad to scroll back
+in memory to the beginning of the calculation, entering a subroutine
+number, and pressing <span class="key">:</span>.
+Or you can enter the subroutine number and
+<span class="key">:</span>, then do the calculation.  This third knob’s somewhat larger
+display shows a main memory address and its contents in two formats:
+as a decimal number and in a strange alphabetic hexadecimal format,
+the same one used to label the register knobs.
+
+Only numbers in [0, 511] are valid labels due to the instruction
+encoding.
+
+There is the potential to accidentally overwrite things by recording
+an interactive computation in this way, so you may want to use the
+third knob to jump backwards from time to time when you aren’t recording
+things on purpose.
+
+### Interactive mode and execution mode ###
+
+Once a subroutine is defined, you can invoke it with the
+<span class="key">↓</span> key,
+which calls the subroutine whose label number is displayed in Γ by pushing the
+program counter on a stack and fetching from memory at the number displayed in Γ into the
+program counter.  An extra bit in the program counter tracks whether
+the machine is in interactive mode or execution mode, so upon
+returning from the subroutine from an interactive call, the machine
+reverts to interactive use.  The
+<span class="key">B</span>, and
+<span class="key">C</span> keys interact with this
+bit:
+<span class="key">B</span> in execution mode sets the machine to interactive mode
+(pausing whatever program is running) and
+<span class="key">C</span> sets it to execution
+mode, resuming the paused subroutine.
+<span class="key">B</span> in interactive mode is used
+for single-stepping; in most cases, it simply interactively executes
+the instruction at the program counter without leaving interactive
+mode, but if that instruction is a ↓ or `;`, its effect is slightly
+modified — the interactive bit remains set after the context switch,
+so you can single-step through the subroutine as well.  (Or you can
+continue until its exit with <span class="key">C</span>.)
+
+This fact of having an interactive bit saved on the stack with the
+return address allows you a lot of debugging flexibility.  You can
+interrupt the program at any point with
+<span class="key">B</span> to see what it’s doing,
+then
+<span class="key">C</span>
+to continue, even if you’re nested inside some other similar
+debugging session higher up the stack.  You can update the contents of
+the registers by typing numbers followed by
+<span class="key">B</span> to step to the next
+instruction.
+
+XXX exactly when entered numbers get stored into the instruction
+stream needs some clarification.  What if you turn the Γ knob to
+modify multiple registers before typing <span class="key">B</span>?
+
+### Shortcut keys ###
+
+The <span class="key">0↓</span>,
+<span class="key">1↓</span>,
+<span class="key">2↓</span>, and
+<span class="key">3↓</span> keys are shortcut keys to call the
+subroutines whose addresses are stored at addresses 0, 1, 2, and 3.
+This allows you to implement simple applications just by vectoring
+those functions to subroutines of your choice and, perhaps, placing
+stickers on the keys.
+
+### Local variables ###
+
+Registers P through W are saved and restored on the stack in memory
+along with the program counter by the `↓` call
+and `;` return instructions, making
+them local variables in each subroutine.  However, because they are
+copied to the stack during the call instruction, their value in the
+caller is available in the callee; so you can use them to pass
+parameters, and the callee’s changes to those parameters will be
+automatically discarded upon return.  So if the callee wants to return
+values to the caller, it should put them into one of the other
+registers, such as X and Y.
+
+### Conditionals ###
+
+The <span class="key">{</span>
+key adds a conditional jump instruction to the program and
+stores the address of that jump instruction on a special small stack
+not stored in main memory; the
+<span class="key">}</span> key then backpatches that
+conditional jump to point to the current program counter.  The
+conditional jump jumps if Δ is zero.  In order to preserve the
+programming-by-demonstration feel of the machine, all 16 data
+registers are also stored on that stack and restored when you type
+<span class="key">}</span>.
+
+The <span class="key">&gt;</span>
+key sets Δ to 0 if it was negative.  This means that the
+sequence `->{…}` executes the `…` only if Δ was greater than Γ
+originally.
+
+### Unconditional jumps and loops ###
+
+The <span class="key">←</span>
+key fetches an address from the address Γ points to and adds a
+jump to that address to the current program.  This is basically
+intended for loops: you type, say,
+<span class="key">8</span><span class="key">:</span>
+at the beginning of the loop,
+and then <span class="key">8</span><span class="key">←</span>
+at the end of the loop; but it can also be used for
+subroutine tail calls.  I’m not sure what it should do in interactive
+mode.
+
+Generally you will want to use <span class="key">{</span> and <span
+class="key">}</span> inside the loop in order to make it not infinite.
+In particular, <span class="key">{</span><span
+class="key">;</span><span class="key">}</span> conditionally
+terminates the subroutine the loop is within.
+
+### Wide program counter ###
+
+Because memory words are fairly large (64 bits?) several instructions
+can normally fit into one; the opcode field is 4 bits and the source
+and destination register fields are 4 bits each, for a slightly
+awkward total of 12 bits.  This makes the program counter three bits
+wider than the usual 16-bit memory addresses, plus the interactive
+bit, which allows single-stepping at sub-instruction-word granularity,
+as well as returns, calls, and jumps into the middle of instruction
+words.
+
+Interrupts
+----------
+
+No.
+
+Peripherals
+-----------
+
+In addition to the three numeric displays already mentioned, there are
+some other peripherals on the calculator, mostly in the peripherals box.
+
+When the value of the last register, register O, changes, there is an
+audible click whose volume increases with the magnitude of the change.
+This is because register 15 is connected to a digital-to-analog
+converter which is connected to a speaker.
+
+The peripherals box has eight smoothly turning dials on it.  The
+current positions of these dials are mapped into main memory at
+positions 0x7f00 (WOPP) through 0x7f08 (WOPX).
+
+The current time is always available in memory at address 0x7f09
+(WOPY).
+
+There is a 320×240 touchscreen LCD display on the peripheral box with
+16-bit color and an integrated framebuffer.  The current touches are
+available in addresses 0x7f10 (WOQP) through 0x7f14 (WOQT);
+each one contains X and
+Y coordinates and an active bit to indicate whether it’s active or
+not.  Its current vertical scan position is in 0x7f15 (WOQU).
+By placing 80
+64-bit words in the addresses starting at 0x7f20 (WORP) and writing a scan
+line number to 0x7f70 (WOWP), you can update a scan line on the display.
+
+There is a switch on the peripherals box attached to an LED that
+illuminates a sign saying “RECORDING” and a microphone.  When the
+switch is turned on, the LED flashes, and the current microphone sound
+pressure level is available at 0x7f30 (WOSP).
+
+When in execution mode rather than interactive mode, the current
+34-bit state of the keyboard (except for the
+<span class="key">B</span> key, which returns to
+interactive mode) is available at 0x7f40 (WOTP).
+
+Machine code encoding
+---------------------
+
+This is especially important on this machine because if you’re writing
+the machine code without an assembler, you’re probably also reading it
+without a disassembler, and indeed the third knob and display are
+designed for this.
+
+Each instruction except for immediate constants is 12 bits, 3 nibbles.
+A memory word is 64 bits, 16 nibbles; this allows space for five
+instructions in 60 bits, plus an extra one-nibble tag field which is
+used for literals.  Normally it is 1111 (f/O) but when it is 0000
+(0/P) the word is a literal word with 56 bits of immediate data, here
+nibbles labeled nd through n0.
+             
+<!--
+    | 1111 | op0 | A0 | B0 | op1 | A1 | B1 | op2 | A2 | B2 | op3 | A3 | B3 | op4 | A4 | B4 |
+    | 0000 | reg | nd | nc | nb  | na | n9 | n8  | n7 | n6 | n5  | n4 | n3 | n2  | n1 | n0 |
+-->
+
+<table class="encoding">
+    <tr><th>nibble<th>f <th>e <th>d <th>c <th>b <th>a <th>9 <th>8 <th>7 <th>6 <th>5 <th>4 <th>3 <th>2 <th>1 <th>0
+    <tr><th>normal<td>1111 <td>op0 <td>A0 <td>B0 <td>op1 <td>A1 <td>B1 <td>op2 <td>A2 <td>B2 <td>op3 <td>A3 <td>B3 <td>op4 <td>A4 <td>B4
+    <tr><th>literal<td>0000 <td>reg <td>nd <td>nc <td>nb  <td>na <td>n9 <td>n8  <td>n7 <td>n6 <td>n5  <td>n4 <td>n3 <td>n2  <td>n1 <td>n0
+</table>
+
+<style>
+.encoding { border-spacing: 0; border-width: 0 0 1px 1px }
+.encoding td, .encoding th { border-width: 1px 1px 0 0; padding: .3em; text-align: center }
+.encoding, .encoding td, .encoding th { border-style: solid; border-color: black }
+</style>
+
+The fields labeled An and Bn vary in interpretation according to the
+instruction format; for two-operand instructions, they are generally
+the source and destination registers; for one-operand instructions, An
+specifies the instruction and Bn specifies the operand register; and
+for zero-operand instructions, all three fields specify the
+instruction.
+
+### Two-operand instructions ###
+
+Optimizing for 12 bits and hexadecimal legibility, the two-operand
+opcode format is as follows:
+
+<!--
+    | opcode | Γ    | Δ    |
+    |--------+------+------|
+    | xxxx   | xxxx | xxxx |
+-->
+
+<table class="encoding">
+   <tr><th>opcode<th>Γ<th>Δ
+   <tr><td>xxxx<td>xxxx<td>xxxx
+</table>
+
+The Γ source and Δ dest fields each identify one of the 16 registers
+(with the low 4 bits of the register’s letter), and the opcode fields
+identify one of the two-operand operations:
+
+<!--
+Outdated table:
+
+    | conventional hex | 0 | 1 | 2 | 3  | 4 | 5 | 6 | 7 | 8 | 9 | a | b | c | d | e | f |
+    |                  | + | - | × | /% |   | ^ | & | | | ! | @ |   |   |   |   |   |   |
+    | ASCII alphahex   | P | Q | R | S  | T | U | V | W | X | Y | J | K | L | M | N | O |
+-->
+
+<table class="encoding">
+   <tr><th>conventional hex<td>0<td>1<td>2<td>3 <td>4<td>5<td>6<td>7<td>8<td>9<td>a<td>b<td>c<td>d<td>e<td>f
+   <tr><th>operation       <td>+<td>-<td>×<td>/%<td>{<td>^<td>&<td>|<td>!<td>@<td> <td>one-operand<br/>(see below)<td colspan="4">(control flow)<br/>(see below)
+   <tr><th>ASCII alphahex  <td>P<td>Q<td>R<td>S <td>T<td>U<td>V<td>W<td>X<td>Y<td>J<td>K<td>L<td>M<td>N<td>O
+</table>
+
+This means, for example, that the three-nibble sequence PTJ means “J = T + J”.
+
+For most of these operations, as explained earlier in the section
+about the user interface, the source operand Γ is left unchanged and
+the destination operand Δ gets the result.  There are two exceptions:
+/%, which like the <span class="key">/%</span> key, leaves the
+remainder from the division in the source operand; and `{`.
+
+`{` tests the source operand Γ to see if it’s 0, and if so, executes a
+forward jump.  The destination operand field Δ is not treated as a
+register reference at all.  Rather, its value from 0 to 15 indicates a
+number of instruction *words* to skip over, starting from the
+instruction word following the word containing the `{` instruction.
+That means that when the Δ field is 0, the conditional jump goes to
+the beginning of the next instruction word, skipping up to four
+instructions; when the Δ field is 1, the conditional jump goes to the
+beginning of the instruction word after that, skipping 5, 6, 7, 8, or
+9 operations (or possibly only 1 to 5 if the next instruction word was
+a literal word); and so on up to 15, which skips 15 entire instruction
+words, plus the remainder of the word containing `{`.  If the register
+indicated by Γ was nonzero, however, instruction continues as if
+nothing had happened.
+
+This means that the `}` key may need to insert nop operations to fill
+out the current instruction word, so that it has a word-aligned
+address to backpatch the `{` instruction with.  This is an annoying
+amount of complexity to attach to a key, but the alternative would be
+to only enable `{` to skip over up to 16 *instructions*, rather than
+up to 84, which would be a painfully anemic conditional.  (But hey, HP
+calculators’ conditional only skipped a single instruction.)  Still,
+the complexity involved here is small compared to the complexity of
+division or procedure calls.
+
+### One-operand instructions ###
+
+There’s a different format for one-operand operations:
+
+<!--
+    | opcode     | xop  | reg  |
+    | 1011 (b/K) | xxxx | xxxx |
+-->
+
+<table class="encoding">
+    <tr><th>opcode<th>xop<th>reg
+    <tr><td>1011 (b/K)<td>xxxx<td>xxxx
+</table>
+
+The one-operand operations are encoded with the following xop values:
+
+<!--
+Outdated table:
+
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7     | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+    | 0 | 1 | 2 | ~ | ± | { | > | ;/nop |   |   |    |    |    |    | -2 | -1 |
+    | P | Q | R | S | T | U | V | W     | X | Y |  J |  K |  L |  M |  N |  O |
+-->
+
+<table class="encoding">
+   <tr><th>conventional hex<td>0<td>1<td>2<td>3<td>4<td>5<td>6<td>7    <td>8<td>9<td>a<td>b<td>c<td>d<td>e<td>f
+   <tr><th>operation       <td>0<td>1<td>2<td>~<td>±<td> <td>><td>;/nop<td> <td> <td>  <td>  <td>  <td>  <td>-2<td>-1
+   <tr><th>ASCII alphahex  <td>P<td>Q<td>R<td>S<td>T<td>U<td>V<td>W    <td>X<td>Y<td> J<td> K<td> L<td> M<td> N<td> O
+</table>
+
+The operations named with numbers set the register to that constant.
+
+### Zero-operand instructions ###
+
+`;` and nop need no operands, so we distinguish between them by the
+register field: 0 for nop, 1 for `;`.
+
+### Instructions taking labels ###
+
+Looking at what’s left of the keyboard, <span class="key">:</span> just defines a label; it
+doesn’t add anything to the instruction stream.  <span class="key">B</span> break, <span class="key">C</span>
+continue, and
+<span class="key">⇐</span>
+backspace similarly are purely interactive
+operations.  However, both ← and ↓ require a label number, which is
+not actually taken from Γ (that’s just the interactive user
+interface!) but encoded in the instruction.  These are encoded with a
+9-bit label number field:
+
+<!--
+    | opcode | label       | (meaning) |
+    |    110 | x xxxx xxxx | ←, goto   |
+    |    111 | x xxxx xxxx | ↓, call   |
+-->
+
+<table class="encoding">
+    <tr><th>opcode<th>label<th>(meaning)
+    <tr><td>110   <td>x xxxx xxxx<td>←, goto
+    <tr><td>111   <td>x xxxx xxxx<td>↓, call
+</table>
+
+### Literals (immediate data) ###
+
+As mentioned above, literals larger than ±2 are encoded using an
+entire instruction word by putting tag 0000 in the first nibble of an
+instruction word, followed by a destination register and 56 bits of
+literal data.  The literal data is sign-extended to put it into the
+specified register.  In particular, this means that a memory word
+containing a positive number less than 2⁵⁶ can be interpreted as an
+instruction to load that number into register 0 (P), which is a
+technique that you can use to improve the legibility of your program.
+
+### Examples ###
+
+So an instruction word written in alphahex as O PTJ PUT KTU KWP consists
+of two addition instructions (J += T; T += U), a negation instruction
+(U = -U), and a nop.
+
+XXX reshuffle opcodes for ASCIIhex legibility.  P for + is good, maybe
+M or L for -, T or M for ×, O or Q or R for /%, N for ~, X for ^, S
+for !, L for @, which leaves the less important & and | to get less
+desirable letters.  But we need groups of two letters for ← and ↓,
+chosen from PQ, RS, TU, VW, XY, JK, LM, or NO.  JK suggests “jump” and
+TU suggests “to” (maybe shuffle × off to M), but nothing in particular
+suggests “call” or “invoke”.
+
+XXX maybe use BCD?
+
+XXX maybe merge &, ^, and ~ into a NAND operation, given their
+relative rarity?  Maybe add a MOV operation?
+
+Thanks
+------
+
+This document draws on discussions with Sean Palmer and John Cowan.
+
+<link rel="stylesheet" href="http://canonical.org/~kragen/style.css" />
+
+<script src="http://canonical.org/~kragen/sw/addtoc.js">
+</script>

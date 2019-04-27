@@ -4,7 +4,7 @@
 Next up:
 
 - improve the fucking CSS, Jesus.  Copy Medium or whatever.
-- another eight notes
+- more notes: wercam-nonscriptable-windows, circuit-notation, stack-stack, deep-freeze
 - a more convenient way to query the triple store
 - maybe some metadata about word counts and time spans and unfinished
   status?
@@ -53,7 +53,7 @@ class Bundle:
 
     def notes(self):
         dirname = self.filename('markdown')
-        for notename in os.listdir(dirname):
+        for notename in sorted(os.listdir(dirname)):
             if notename.endswith('~') or notename.startswith('.'):
                 continue
             yield self.note(notename)
@@ -169,6 +169,12 @@ class Note:
     def link_ley(self, level=1):
         return a(self.title(), href=("../" * level + self.localpart()))
 
+    def flavor(self):
+        for subj, verb, obj in self.bundle.triples():
+            if subj == self.notename and verb == 'flavor':
+                return markup_flavors[obj]
+        return markdown_replacing_links(self.bundle)
+
     def render_if_outdated(self, print=lambda *args: None):
         if self.is_outdated():
             print("rerendering", self.notename)
@@ -185,10 +191,10 @@ class Note:
 
     def render(self):
         with open(self.source_file) as f:
-            body = markdown.markdown(f.read().decode('utf-8'))
-        body = replace_links(body, self.bundle)
+            body = f.read()
+
         categories = sorted(self.categories())
-        return note_html(self.bundle, self.title(), body,
+        return note_html(self.bundle, self.title(), self.flavor()(body),
                          div(h2('Categories'),
                              ul([li(self.bundle.category_link(category), "\n")
                                  for category in categories]))
@@ -209,6 +215,15 @@ class Note:
 
         return output_stat.st_mtime <= source_stat.st_mtime
 
+
+def markdown_replacing_links(bundle):
+    def replace(s):
+        return replace_links(markdown.markdown(s.decode('utf-8')), bundle)
+    return replace
+
+markup_flavors = {
+    '<pre>': lambda s: ley(tag('pre')(s)),
+}
 
 def vomit_html(output_filename, html_contents):
     dirname, _ = os.path.split(output_filename)
@@ -307,7 +322,7 @@ class RawHTML:
 def note_html(bundle, note_title, body, footers):
     return ley(html(title(note_title, ' ⁑ ', bundle.get_title()),
                     head_stuff(),
-                    h1(note_title),
+                    '' if '<h1>' in body else h1(note_title),
                     RawHTML(body),
                     script(src="../liabilities/addtoc.js"),
                     footers))
