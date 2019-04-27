@@ -3,8 +3,11 @@
 
 Next up:
 
+- maybe reify categories as a class?
+- add author name to pages
+- add an introductory paragraph to the index page
 - improve the fucking CSS, Jesus.  Copy Medium or whatever.
-- more notes: wercam-nonscriptable-windows, circuit-notation, stack-stack, deep-freeze
+- 22 more notes: wercam-nonscriptable-windows, circuit-notation, stack-stack, deep-freeze, bubbleos, etc.
 - a more convenient way to query the triple store
 - maybe some metadata about word counts and time spans and unfinished
   status?
@@ -73,7 +76,8 @@ class Bundle:
 
     def generate_categories(self):
         for category in self.categories():
-            self.generate_category(category)
+            if len(self.notes_in_category(category)) > 1:
+                self.generate_category(category)
 
     def category_filename(self, category):
         return self.output_filename(self.category_localpart(category))
@@ -130,6 +134,10 @@ class Bundle:
         return set(obj for subj, verb, obj in self.triples()
                    if verb == 'concerns')
 
+    def notes_in_category(self, category_name):
+        return [note for note in self.notes()
+                if category_name in note.categories()]
+
     def generate_index(self):
         vomit_html(self.filename(self.output_dir, 'index.html'),
                    index_html(self))
@@ -153,8 +161,10 @@ def load_triples(filename):
         for line in f:
             if not line.strip():
                 continue
-            yield tuple(urlparse.unquote(field.replace('+', '%20'))
-                                         for field in line.split())
+            fields = tuple(urlparse.unquote(field.replace('+', '%20'))
+                           for field in line.split())
+            for fn in fields[2:]:
+                yield (fields[0], fields[1], fn)
 
 
 class Note:
@@ -197,6 +207,8 @@ class Note:
         return note_html(self.bundle, self.title(), self.flavor()(body),
                          div(h2('Categories'),
                              ul([li(self.bundle.category_link(category), "\n")
+                                 if len(self.bundle.notes_in_category(category)) > 1
+                                 else li(self.bundle.category_title(category))
                                  for category in categories]))
                          if categories else [])
 
@@ -251,8 +263,7 @@ def category_html(bundle, category_name):
                     head_stuff(),
                     h1('Notes in category “', category_title, '”'),
                     ul([li(note.link_ley(), "\n")
-                        for note in bundle.notes()
-                        if category_name in note.categories()])))
+                        for note in bundle.notes_in_category(category_name)])))
 
 def index_html(bundle):
     categories = sorted(bundle.categories())
@@ -264,7 +275,8 @@ def index_html(bundle):
                         for note in bundle.notes()]),
                     div(h2('Categories'),
                         ul([li(bundle.category_link(category, level=0), "\n")
-                            for category in categories]))
+                            for category in categories
+                            if len(bundle.notes_in_category(category)) > 1]))
                     if categories else []))
 
 def ley(htmlish):
