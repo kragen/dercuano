@@ -111,6 +111,8 @@ class Bundle:
 def load_triples(filename):
     with open(filename) as f:
         for line in f:
+            if not line.strip():
+                continue
             yield tuple(urlparse.unquote(field.replace('+', '%20'))
                                          for field in line.split())
 
@@ -139,7 +141,7 @@ def category_html(bundle, category_name):
     category_title = bundle.category_title(category_name)
     return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
                     head_stuff(),
-                    h1(category_title),
+                    h1('Notes in category: ', category_title),
                     ul([li(note.link_ley())
                         for note in bundle.notes()
                         if category_name in note.categories()])))

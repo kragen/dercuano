@@ -1,0 +1,1131 @@
+I’m reading Wirth’s _Project Oberon_, feeling it might be useful for
+BubbleOS.
+
+Certainly I am not going to take the severe approach he claims was
+essential (p. 8):
+
+> Concentrate on essential functions and omit embellishments that
+> merely cater to established conventions and passing tastes.
+
+To a great extent, whimsy is the entire raison d’être of BubbleOS,
+thus Tetris (216 lines of C), Toki (some 130, not counting the data
+tables), and Cuerdas Caóticas; does that doom it?  Certainly many
+embellishments will be omitted, but by no means all.  My feeling is
+that the embellishments are as essential as the functions.
+
+As one simple example, Oberon presents the keyboard as an input stream
+of characters (p. 11).  Perhaps it’s an “embellishment” to deliver
+keyup events as well, but without it, Tetris is substantially less
+enjoyable.  (On p. 19 we find that the Lilith keyboard was connected
+via RS-232, aka V24 as we find on p. 209, so perhaps it sent ASCII
+characters rather than multibyte key-event sequences, thus rendering
+keyup events impossible at the hardware level.  Indeed, this is
+confirmed for the Ceres keyboards on p. 205.  On p. 208 we find it
+used an appalling 300 bps baud rate, implying a horrifying minimum of
+33 ms of keyboard latency.)
+
+It’s interesting to note that Oberon uses the “viewers” terminology
+from Cedar — as well as, at least initially, the non-overlapping,
+column-oriented layout of Cedar.
+
+It’s amusing that even in 1992 Wirth felt it necessary to explain what
+the “so-called mouse” was and how it worked (p. 12), though it had
+been 24 years since Engelbart’s Fall Joint Computer Conference
+demo — and, moreover, 8 years since the mass-market introduction of
+the Macintosh.  This naïveté perhaps explains the catastrophic
+“interclick” interaction design in Oberon (p. 96, p. 375, especially
+p. 386), despite the attention given to usability in, for example, the
+rejection of modes and hidden state (pp. 13–14) and memorization of
+abbreviations (p. 15).
+
+I had forgotten that command texts could have textual parameters
+textually following them (p. 13), parsed when you middle-clicked on
+the command name.
+
+The mention of traps and leaving global variables in an inconsistent
+state (p. 13) makes me somewhat queasy.  Surely rolling back a
+transaction is a better response?
+
+The note about how much simpler it is to have an event-loop system
+rather than preemptive multitasking (p. 14), while correct, seems
+rather overoptimistic to me; the ostensible consequent elimination of
+background computations seems like a very heavy price to pay — though
+at least they made the concession to practicality of an “abort
+character” to halt runaway infinite loops
+(“cntl-shift-delete” — p. 208), and p. 18 explains that background
+tasks such as the garbage collector do indeed exist.
+
+The paean to the versatility of text on p. 15 seems a bit dated; it
+would be nice to have _hyper_text output, and with reasonable layout
+and styling at that, so that you can not only copy and paste filenames
+from a directory listing into a command line somewhere, but also click
+on the filename to mark it for a mass action or to pop up a menu of
+available operations.
+
+I’m wary of inheritance, which was not present in Cedar and which
+Wirth endorses fervently at the bottom of p. 15.  I’ve used
+inheritance extensively in C++, Python, JS, Java, and Ruby, and I’ve
+come to the conclusion that inheritance was a mistake.
+
+The explanation on p. 16 of the benefits of dynamic linking — that
+each module is present only once in the “store”, by which he means
+RAM — makes me think that perhaps dynamic linking’s time has come and
+gone.  I’m typing this on a machine with 4 GiB of RAM.  If I have both
+libjpeg 8.0.1 and libjpeg 8.0.2 loaded, that wastes 360 kB of RAM, one
+eleven-thousandth of the total.  Perhaps some benefits accrue to this
+flexibility that make it worth the cost?  For example, perhaps I would
+like to test a new version of libjpeg and automatically compare its
+output to the old version, or perhaps I would like to port my
+JPEG-using programs to the new version of libjpeg one by one instead
+of all at once?
+
+Perhaps more urgently, what if I want to load a copy of libjpeg linked
+with special testing functions for accessing the filesystem, rather
+than the real functions?  This is very important functionality that
+can easily be provided by dynamic linking, but it would be
+catastrophic for other arbitrary things that wanted to call libjpeg to
+inadvertently call the copy of libjpeg under test.
+
+The total size of the core system (p. 18) is very impressive indeed:
+12,277 lines of Oberon code (186 pp.) for the kernel, filesystem,
+windowing system, graphics editor, device drivers, text editor,
+compiler, and networking stack, plus some undetermined amount of
+assembly code (4664 bytes, so presumably about 1200 instructions for
+the NS32k), all compiled together to 131,800 bytes of executable code.
+Of this, 4000 lines is the compiler.  The graphics system in
+particular (Fonts, Viewers, and Display) total 5324 bytes,
+substantially less than the 9597 bytes of text in yeso-xlib.a at the
+moment, much of which has to do with interfacing to Xlib and
+graphics-file libraries.
+
+The description of viewers on p. 22 makes me think that perhaps Unix
+processes might simplify some things after all — the `ViewerDesc` type
+requires a `Handler` procedure for each window to be invoked with
+events, while in Yeso no such thing is needed, because each window
+normally has an entirely separate Unix process, and in any case its
+events can be read by the client as it pleases.  (But perhaps cisco’s
+travails getting sshd working on IOS are a better argument.)
+
+On p. 23 the note about inheritance of message types is very
+interesting — the idea of adding new derived message types as
+subclasses of existing message types is simultaneously fascinating and
+horrifying.
+
+It’s interesting to read about a stackless “task” on p. 24.
+
+The examples of inheritance on pp. 23–24 are basically closures — they
+exist in order to allow a task or viewer handler proc (like a WndProc)
+to maintain per-instance data.
+
+The “system management tool” on p. 32 is interesting; it’s more or
+less a form with clickable buttons, with the nice feature that it’s
+just a piece of text, typable by the user and WYSIWYG anywhere.  (The
+↑ glyph for what was described as “A reference-character ‘^’” on the
+previous page is interesting — it’s from ASCII-1963, obsolete in
+ASCII-1968, but still in use in Smalltalk until the 1990s or even
+2000s — Wirth’s sabbatical at PARC, Smalltalk’s birthplace, may be
+relevant here.)
+
+A thought-provoking question is how far you could go with building an
+editable user interface that consisted of such templates and
+replacements — a popup menu replacing a menubutton and vice versa.
+Perhaps when you click on one command button (or press a control key
+bound in the context), it replaces the whole form it’s embedded in
+with a query result, simply by textual replacement.  Some of this
+could even be done with a simple text template language.  And maybe a
+“reveal codes” toggle would be helpful for hiding the necessary markup
+at times.
+
+(Similar things existed [in Gypsy at PARC][Tesler] at the time; the
+menu at the top of the screen had a section labeled “*Scan* for {}”
+and another labeled “*Substitute* {} for {}”, where the words “Scan”
+and “Substitute” were italicized to indicate that they were clickable,
+and the curly braces enclosed their arguments, which were of variable
+length.)
+
+No introduction to the syntax of the language has been given before
+p. 34 as far as I can tell, so the reader is left to guess that `#`
+means `≠` and the semantics of the procedure-call mechanism (although
+it seems to be the same as Pascal’s.)
+
+The long sequences of statements on a single line, such as “c := b; b
+:= a; a := (c MOD 509 + 1) * 127 + ORD(s[i])” are not in keeping with
+my aesthetic sensibilities, but those sensibilities may be a product
+of C and its assembly-language roots; certainly I wrote a lot of code
+in such a style in the 1980s myself (in BASIC), and Knuth’s “TeX: The
+Program” (1984) is full of lines like `else begin back_input; cur_tok
+← par_token; back_input; token_type ← inserted;`, though somewhat
+better typeset than the Oberon code.
+
+(This may go some distance to explaining how the Oberon compiler is
+only 4000 lines of code.)
+
+The password-hashing setup on p. 34 is cringe-inducingly naïve.  Also,
+though, I infer from the code that Oberon’s INTEGER type was 16 bits,
+either at times or always, since all of its variables would fit easily
+in 32 bits (19 bits I think).  See p. 258 for how it’s set on the
+server and p. 260 for why.
+
+The setup of Oberon.User (also p. 34) as ARRAY 8 OF CHAR seems
+strangely primitive, given that Wirth conceived the system after heavy
+use of Cedar, from which it gets its tracks and viewers.  Why didn’t
+he use ropes?  Ropes don’t appear at all in Oberon.  (Perhaps Wirth
+was skeptical about immutability in general, or at least when it comes
+to strings; see the bletcherous inline strtok() code in Call on
+p. 38.)
+
+I’m suspecting that the “flip” in the names of FlipArrow and FlipStar
+on p. 35 means “XOR”, which I suspect is the meaning of the fifth
+parameter of Display.CopyPattern, given here as “2”; this could be
+more explicit.  It’s somewhat horrifying to see the cursor bitmap
+sizes hardcoded into the bounding code like this; it suggests that the
+arrow and the star were the only two sprites in Oberon, so Gutknecht
+(or Wirth) didn’t feel that factoring out a generic sprite-bounding
+system was worthwhile.  (The DrawCursor function immediately afterward
+may be the one that’s actually used, though; perhaps the Flip variants
+were obsolete?)  (Perhaps not; on p. 40 they’re assigned to the Fade
+and Draw methods of the Arrow and Star markets, reinforcing the XOR
+hypothesis.)  (Further explanation of cursor management is given on
+p. 59, and on p. 60 we have, “markers are usually painted
+non-destructively in inverse-video mode.”, which I think means using
+the XOR hack; p. 61 defines Display.invert, explained as the “mode” “s
+XOR d”, as “2”, and indeed the fifth parameter of CopyPattern is
+“mode”.  Whew.)
+
+On p. 36 we see HandleFiller, which handles events in parts of the
+screen containing no windows (“viewers”).  The IF M IS InputMsg THEN
+WITH M: InputMsg DO stuff is a bit tiresome by contrast with ML.  (I’m
+increasingly of the opinion that garbage-collected languages should be
+almost purely functional.  Imperative code’s advantages, such as they
+are, are vitiated by GC — maybe there’s a local optimum near Golang.)
+The Display.FrameMsg argument is explained on p. 48.
+
+On pp. 36–37 we see some clearly duplicated code, suggesting that the
+“dead code” hypothesis for FlipArrow and FlipStar is plausible:
+OpenDisplay should call OpenTrack twice, but instead duplicates its
+contents.  Perhaps at some point in the past OpenTrack did something
+that was undesirable in OpenDisplay.
+
+On p. 38 we see some examples of code with added reading complexity
+due to having no early exits; here Install wants to avoid adding a
+task to the task list if it’s already there:
+
+    t := PrevTask;
+    WHILE (t.next # PrevTask) & (t.next # T) DO t := t.next END;
+    IF t.next = PrevTask THEN T.next := PrevTask; t.next := T END
+
+This translates to C as:
+
+    t = PrevTask;
+    while (t->next != prev_task && t->next != T) t = t->next;
+    if (t->next == prev_task) {
+        T->next = prev_task;
+        t->next = T;
+    }
+
+But I think it would be more natural to write it with an early exit,
+avoiding the redundant test:
+
+    TaskDesc *t = prev_task;
+    for (t = prev_task; t->next != prev_task; t = t->next) {
+        if (t->next == T) return;
+    }
+    T->next = prev_task;
+    t->next = T;
+
+(I wouldn’t call my variables `t` and `T`, though.)
+
+We also see what the authors were talking about when they said that
+GetSelection was implemented by broadcasting a message to all viewers
+on p. 38.  After the Viewers.Broadcast call, GetSelection fishes the
+information about the selection out of the fields of the
+SelectionMsg — presumably one or more of the viewers mutated it,
+perhaps conditionally based on the timestamp (which would explain the
+otherwise strange comments on p. 29 about the definition of the
+current selection, and indeed the existence of the timestamp field, as
+well as its initialization here to -1.)
+
+On p. 39 we have some hints about the character encoding, as the main
+loop has some random code wedged into it to compensate for the
+difference between the keyboard’s character encoding and that used
+elsewhere in the system.  Assuming this PDF is faithful, both
+encodings are unknown to me; one has € at 0x81 and the other has it at
+0x80.
+
+On p. 40 we have the initial construction of the circular linked list
+of tasks, starting with just the garbage collector.  A separate list
+header structure would have almost required a special case in the task
+list mutations (the Install and Remove procedures on p. 38 and the
+task-unlinking case in the main loop near the top of p. 40) because
+(if Oberon is like Pascal) you can’t take a pointer to a struct
+field — although you can pass it as a VAR parameter, and maybe that
+would have been adequate.
+
+It’s somewhat jarring to find Min (for INTEGERs) in module Oberon on
+p. 34 and Max (for LONGINTs) in module System on p. 40.
+
+On p. 41 we find the System.SetUser command, which it turns out
+separates the username from the password with a “/”: “WHILE (ch #
+"/")”.  (This was actually suggested by the instruction “{ type
+user/password }” on p. 31.)  Interestingly, this constant uses the
+same doublequotes used for strings, suggesting that in Oberon (as in
+Python, but very much not as in C or Pascal) a character is a string
+of length 1.  Also we find that the username’s length limit is
+actually 7 characters, not 8, because of the terminating 0X.
+
+We also see the implementation of the rules for input parsing
+explained on p. 31: System.SetFont (also on p. 41) has a special case
+for “^”, as do SetColor, SetOffset, etc., all implemented with
+separate calls to Oberon.GetSelection.  But they’re missing the “@”
+cases (although perhaps they wouldn’t apply.)  At least they’re all
+using the same Texts.OpenScanner call to tokenize the parameter text.
+
+A thing conspicuously missing in these user commands is error
+handling.  If the specified font name doesn’t exist or isn’t supplied,
+there is apparently no feedback to the user at all that a command was
+invoked but merely failed, much less why it failed and how to proceed.
+Omitting error handling is indeed a very effective way to reduce the
+amount of code in your system, but it may not be a good tradeoff.
+
+On p. 42 we see the bitfield datetime system in its full glory.  I’m
+glad I don’t have to do date arithmetic on Oberon.
+
+On p. 44 we have the save-unders problem that accounts for so much of
+the complexity of both X11 and the Blit: “Any efficient management of
+overlapping viewers must rely on a subordinate management of
+(arbitrary) sub-rectangles and on sophisticated clipping
+operations. This is so because partially overlapped viewers must be
+partially restored under control of the viewer manager. For example,
+in Figure 4.1(b), rectangles a, b, and c of viewer A ought to be
+restored individually after closing of viewer B,” although A and B are
+reversed from the diagram, in which A is on top of B.  The Blit did
+indeed do this; Microsoft Windows opted instead to dispatch paint
+messages to the exposed viewer.
+
+The scrollbars on p. 44 would seem to owe a lot to MacOS, although
+perhaps I’m mistaken and PARC had nearly identical-looking scrollbars.
+The sans-serif code font on p. 44 and vertical italic email font on
+p. 45 (perhaps they are in fact the same font?) look like they come
+from Smalltalk.
+
+The custom one-click shortcuts to print on particular printers or set
+particular fonts in the editor on p. 44 are particularly appealing.
+
+On p. 48, the Oberon variant of MVC is most amusing: any time any
+document changes, all viewers are notified so that they can update if
+necessary, thus avoiding the necessity to register and deregister
+views of a model.  This is a step toward the usual ImGui approach of
+repainting all viewers on every screen frame.  (But see p. 79 for
+where this falls down, p. 98 for the unification, and p. 385 for a
+redundant re-explanation.)
+
+We also see that Oberon has an X11-like hierarchy of windows, though
+it calls them “frames”.  Oberon windows are pretty lightweight,
+though; they contain seven words (presumably 28 bytes on the NS32032
+they were designing for), so you can have tens of thousands of them if
+you like.  However, the main purpose of this hierarchy in practice
+seems to be the pairing of inverse-video menu texts with contents
+panes as a single object, since the other use (vertical tracks of
+viewers) doesn’t seem to really need handlers or really anything other
+than a global list of widths.
+
+On p. 49 we see an email from “Griesemer” on “30.10.91”.  Could that
+be the Golang Griesemer?  Yes, Golang Griesemer got his Ph.D. at ETHZ
+under Wirth and Mössenböck in 1993 on a vector version of Oberon for
+the Cray Y-MP, called Oberon-V.
+
+On p. 50 we are introduced to the “logical display area”.  I wonder
+how decoupled from displays it ended up being in practice; the XOR
+hack mentioned earlier suggests not much.
+
+On p. 51 we are faced with yet another definition of OpenTrack, or the
+declaration of one at any rate, this time in module Viewers.  What
+happened to the one on p. 37?
+
+On pp. 54–55 we have a small contradiction: “according to the
+principle of information hiding an internal data structure is fully
+private to the containing module and accessible through the module’s
+procedural interface only,” yet, “Although there is no language
+facility to enforce it, the variable _state_ is to be treated as
+read-only by every module other than _Viewers_.”  I guess once you get
+a pointer into the internal data structure you can navigate it as you
+please!
+
+On p. 56 we have an interesting viewpoint on object-orientation:
+
+> Message handlers in Oberon are implemented in the form of “procedure
+> variables” that obviously must be initialized properly at object
+> creation time. In other words, some concrete behavior must
+> explicitly be bound to each object, where different instances of the
+> same object type could potentially have a different behavior and/ or
+> the same instance could change its behavior during its lifetime. Our
+> object model is therefore *instance-centered*.
+
+The procedure variables themselves, though, at least in the cases
+we’ve seen so far, handle all the messages directed to a given viewer
+or other frame, not just one.  So they aren’t the equivalent of a C++
+virtual method, but rather of a C++ vtable.  This is explained in
+more detail on pp. 379–81.
+
+(This is in addition to the parallel mechanism for identifying record
+subtypes at runtime.)
+
+Pascal procedure variables could only be passed down the stack, not
+stored in records, with the consequence that this style of programming
+was impossible in Pascal.  The reason was that Pascal had nested
+procedures with block scope, but no garbage collection.  The same
+reason explains why Pascal var parameters — which are pointers that
+may point inside of stack frames or records, unlike Pascal’s heap
+pointers — can only be passed down the stack, rather than stored in
+data structures.  This restriction would seem to be unnecessary in
+Oberon.
+
+I’m not a big fan of the four-deep nested IFs at the bottom of p. 56.
+
+On p. 57 we see an observation which is in a sense very trivial from
+the point of view of the Actors model, but quite a mind-bomb for the
+Pascal crowd:
+
+> The essential point here is the use of new *outgoing* messages in
+> order to process a given *incoming* message. We can regard message
+> processing as a transformation that maps incoming messages into a
+> set of outgoing messages, with possible side-effects.
+
+(That’s all there is to the Actors model, really, except to view all
+of computation in that way.)
+
+On p. 59 we see why XOR-drawn cursors flicker when something else is
+being drawn without double-buffering.
+
+On p. 61 the drawing API is explained.  It lacks the ability to copy a
+block of pixel data to or from an offscreen buffer; cursors (and
+fonts, p. 62) are drawn using CopyPattern, which takes a
+foreground-color parameter and a one-bit-deep (p. 62) Pattern.
+
+On p. 62 we collide with the Oberon language’s lack of slices and
+consequent weakness in dealing with variable-size bitmap data.
+
+On p. 63 we seem to be considering double-buffered
+Xinerama-style-unified displays of varying color depths;
+double-buffering is somewhat surprising for the 1984–8 timeframe when
+they were building the Oberon system — the Macintosh, the CGA, and the
+EGA didn’t have enough RAM to double-buffer in popular modes, and
+X-Windows (1984, X11 in 1985) isn’t double-buffered — it hurt
+responsiveness.  Working multi-depth Xinerama is surprising even
+today.
+
+For now I’m going to skip over the complete implementation on
+pp. 67–77.
+
+On p. 78, where they’re starting to talk about texts, they explicitly
+call out Cedar’s influence:
+
+> Motivated by our positive experience with integrated text in the
+> _Cedar_ system [Teitelman] we decided to provide a central text
+> management in Oberon at a sufficiently low system level.
+
+On p. 79, they say, “It is important not to confuse this type with the
+far less powerful type *string* as it is often supported by advanced
+programming languages.”  Of course we’ve already seen a fair bit of
+NUL-terminated string handling in the previous chapters; and Oberon’s
+Text type is mutable, preventing it from being used for many of the
+things Cedar used ropes for.  Oberon texts have fonts, colors, and
+“vertical offsets” (which seems to mean superscript or subscript; see
+p. 102 for an illustration), making them essentially quite graphical
+objects.  They have no implicit line breaks, so they are intrinsically
+formatted for a particular line width.  However, texts to be displayed
+in standard text viewers cannot have multiple font sizes!  See
+pp. 100–101 for this disheartening development.
+
+On p. 79 we also see the weakness of their minimalist MVC
+implementation explained on p. 48: there’s an additional observer
+interface to be notified of changes to Texts — though in this case
+it’s so broken it only supports notifying a single observer.  (But see
+p. 98.)
+
+On p. 80, we see that their text handling is plagued by the same kind
+of unnecessary multiplication of interfaces as their pixel
+handling — instead of having a single string type, they have three or
+more — ARRAYs OF CHAR, Texts (which may have properties or “looks”),
+and now Buffers.
+
+On pp. 80–81 we are introduced to the Reader type, which, like an
+Emacs marker, points to a place in a Text without being merely a
+number.  However, I suspect that Reader doesn’t have the virtue of
+Emacs markers: that it moves with the buffer contents when something
+is inserted earlier in the buffer.  We shall see.  Certainly there
+seems to be no possibility of passing Readers instead of integers as
+positions to procedures that take text-position arguments.  (On p. 87
+we see that Readers contain a reference into the piece-chain data
+structure of Texts that would enable them to survive mutations in
+other pieces undisturbed.)
+
+I am distinctly unimpressed with the bug-prone Scanner sum type, with
+its 5 different value fields and a sixth tag field to tell which is
+active.
+
+On p. 82 we have this absolutely fascinating note:
+
+> Typically, readers and scanners are… of a *transient* nature, … This
+> fact manifests itself by the absence of any possibility to reference
+> readers and scanners by pointers.
+
+This is a very surprising note!  It implies that in Oberon you can’t
+declare a POINTER TO Scanner type whenever you please; perhaps only
+their own module is permitted to declare such a type.  Presumably,
+though, you can embed them in other records, and reference those other
+records with pointers, if you want to, so I am at a loss as to what
+the benefit of this limitation might be.
+
+Lower on p. 82 we have Oberon’s text formatting capabilities, such as
+they are; they’re similar to TeX or Smalltalk in that the favored
+approach to produce an output of ten tokens (strings, integers, and
+decimal fractions, say) is to invoke a sequence of ten procedures,
+passing the same argument.
+
+On p. 83 we find that they have chosen to represent Texts with
+Bravo-style piece chains.
+
+On p. 90 we have the curious feature that does impedance-matching
+between the piece-chain structure and keyboard input:
+
+> And finally, typed characters that are supposed to be inserted into
+> a text need to be stored on a continuously growing file, the
+> so-called *keyboard file*.
+
+This doesn’t really cover text generated as command output, but I
+suppose we could have output files for all commands, too.
+
+The keyboard file could be useful for other purposes, too; for
+example, you might want to look at it, or even have the end of it
+continuously displayed for a screencast.
+
+We also see the usual conceit of totalizing systems like Microsoft
+Word: plain ASCII text files are accepted, as input files, but only
+“for compatibility reasons”.  Ugh.
+
+The discussion of file page immutability on p. 90 is also
+interesting — the piece-chain data structure they’re using shares with
+ropes the feature of being able to include arbitrary amounts of file
+data without reading it from disk until needed, so for it to be
+completely safe, it is necessary for that file data not to be modified
+in the meantime.  (Perhaps a change notification scheme would work
+under some circumstances, but Oberon seems to have no such scheme.)
+This is expressed on p. 91 as follows:
+
+> Once a file page is allocated it must not be reused (until system
+> restart).
+
+But it’s not talking just about reuse *for another file*, but also
+about reuse for a different version of the same file.
+
+This is an interesting desideratum for filesystems: the ability to
+retain immutable on-disk snapshots of particular files.  The “system
+restart” backdoor might be thought clearly unacceptable nowadays,
+requiring as it does regular reboots to prevent the filesystem from
+getting full.  (This is elaborated on p. 163, where file pages are
+called “sectors”.)
+
+It’s also interesting in that, although Oberon’s Text isn’t immutable
+as Cedar’s ROPE is, its implementation depends on immutability — but
+of disk files.  (But note that disk files aren’t immutable; see
+p. 164!  So this can fail.)  In a way, this seems perverse — it’s
+depending on a more expensive kind of immutability, but doesn’t fully
+deliver the decoupling benefits of Cedar’s ROPE, in that you can’t
+just hand out Text references willy-nilly — you’ll get aliasing bugs
+where something you handed it to goes and mutates it later.  But it
+seems like making a copy of a Text might often be a sufficiently cheap
+operation as to make this forgivable, since only a small number of
+Pieces need to be copied.  (The association of “looks” with Piece
+objects will multiply the number for fancy documents.)
+
+On p. 98 we have the link between the Text change notification
+mechanism (p. 79) and the Viewer change notification mechanism
+(p. 48): changing a Text being displayed in a Viewer invokes
+Viewers.Broadcast with an UpdateMsg (with the typically painful and
+repetitive Pascal/Oberon record initialization syntax.)  I suppose
+this means that you can’t share a Text between a text frame and
+another kind of non-viewer user that wants to be notified if it
+changes, but sharing it between multiple text frames is no problem.
+
+On p. 99 we see concern about flickering, but manifested by using
+bitblt for scrolling, rather than double-buffering a screen update.
+This is an example of extra complexity introduced by optimizations
+that were necessary in 1988 on a 1-MIPS machine that are no longer
+relevant.
+
+On p. 100 we see the rather dismaying pronouncements:
+
+> 1.) For a given text frame the distance between lines is constant.  
+> 2.) There are no implicit line breaks.
+
+This means that there is no way to get a title in a larger font to
+take up more vertical space.  This is justified by the desire to
+display text in a single pass, but is that really worth damaging the
+formatting quality of the text so severely?
+
+My propfont.c spike does paragraph filling (implicit line breaks) with
+a proportional font, though not variable line spacing, in grayscale at
+22 megabytes of text per second on one core of my 1.6GHz laptop.
+Assuming 1.5 instructions per cycle, this is about 109 instructions
+per letter.  On a 1-MIPS workstation, in a 15-millisecond screen
+frame, this could manage to format about 15 kilobytes of text.
+
+On p. 101 we find that we can’t even get a title in a larger font at
+all:
+
+> line spacing is fixed for every text frame. Therefore, different
+> styles of a base font are possible within a given text frame while
+> different sizes are not.
+
+Watching [Larry Tesler’s 2017 demo of Gypsy from 1981][Tesler] I see
+that Gypsy and Bravo didn’t have different sizes or different
+typefaces either, at least a couple of years earlier, except for
+italic and bold (and underlined and inverse-video) variants of the
+same base font.
+
+[Tesler]: https://youtu.be/2Z43y94Dfzk
+
+On p. 102 we see, for the first time I’ve noticed, that Oberon’s
+Y-coordinates increase upward rather than downward.  Also, its font
+system purports to support hinted outline fonts, but on p. 104 we see
+that this is not the case; it only supports raster fonts.
+
+We also see another of the lamentable COBOL-style arbitrary
+limitations on string sizes: font names are 32 characters long.
+
+On p. 104 we see that in the “ultimately stable” font file format, we
+have a single-byte enumerated value for the font family (“*Times
+Roman*, *Syntax*, etc.”)  This seems like a choice that is almost
+guaranteed to produce incompatibility; since more than 256 font
+families exist in the world, someone must maintain a registry of font
+family identifying bytes, which will need new families added to it
+from time to time, both producing the chance of incompatibility (if
+two different installations of Oberon start using the same identifier
+for different fonts) and inflexibility (since you cannot simply add a
+new font file to your Oberon installation, but must also add the
+family to the family registry.)
+
+(Of course, the continuous and implicit conflation of “ASCII” with
+“text” seems quaint in 2019.)
+
+The font file format has a couple of other drawbacks:
+
+1. It supports raster fonts only, and apparently monochrome ones
+   without antialiasing at that.
+2. There is no provision made for output device resolution: the units
+   of “height” are unspecified.  (On p. 63 we saw that Oberon output
+   devices supposedly do know their physical height.)  This presumably
+   means that they are pixels, so you might use a height-10 font on a
+   standard 75-dpi screen and a height-30 font on a 300-dpi printer;
+   this precludes the kind of adaptation normally needed to preserve
+   readability at small sizes.
+
+The printing graphics model on p. 105 seems rather impoverished
+compared to PostScript, and presumably the PARC language JaM it
+derived from; like X11, for example, it provides only unrotated text,
+and seemingly no facilities for clipping or even color — its
+primitives completely lack composability!  It’s also rather depressing
+that (like X11 but unlike GDI and Quartz) they chose a completely
+different imaging model for printing and onscreen drawing.
+
+I am skipping for the time being past pp. 105–143, which contain
+several source-code modules.
+
+On p. 144 we have the Oberon philosophy on dynamic linking, namely,
+that you should make your linker fast enough that you are not tempted
+to link things statically.  This philosophy does more or less prevail
+in modern Unix and Microsoft Windows, but it does have a certain
+amount of cost in the Unix context, where the loading of a compiled
+program is conflated with the initiation of a process.  `ldd
+/usr/bin/mate-terminal` on my laptop, which merely runs the dynamic
+linker to link the 58 dynamic libraries into mate-terminal and prints
+the results, takes about 30 milliseconds, which is a human-detectable
+period of time; that’s on a CPU core that runs about 2.4 billion
+instructions per second.  Valgrind reports that it takes about
+7 million instructions in the last-spawned child process.  So on a
+1-MIPS workstation this would take about 7 seconds, or about 72
+seconds if you believe the 2.4-billion number.
+
+Probably, though, you can use jumps through program linkage tables
+(called “link tables” here on p. 144) to reduce this cost if it
+becomes significant; the cost of linking then diminishes to merely a
+merge of the tables of subroutines in all the libraries; as explained
+on p. 145, this is the approach Oberon uses.  PC-relative addressing
+on modern processors eliminates the need to use these tables (or a
+separate library-base-pointer register) for intra-module references.
+(On p. 147 we see that apparently the NS32k’s BSR instruction is
+PC-relative.)
+
+Indirection through such a table does impose an extra cost on each
+static inter-module subroutine call (though not necessarily dynamic
+calls through function pointers.)
+
+On p. 145 we are faced with the question of numbering procedures.  How
+does the linker avoid trying to load module A compiled against version
+1 of module B, attempting to link it to version 2 of module B with a
+different procedure numbering?  Because the page says, “Procedure
+names are not needed, as they have been transformed by the compiler
+into numbers unique for each module.”
+
+On p. 146 we see that Oberon uses two separate registers for
+intra-library relocation, rather than ELF’s single register (which is
+%ebx on i386 IIRC).
+
+We also encounter something claimed to be microcode; I’m not clear on
+whether this is the actual microcode for the NS32032 CXP and RXP
+instructions (it seems to be; the instruction opcodes
+are given on p. 355), or some kind of Oberon-specific
+portable assembly.
+
+On p. 156 we encounter the notion of a “rider”, which is to say, a
+file cursor; Michael Franz gives this as one of the great advances in
+Oberon over other systems, but I don’t understand what the difference
+between a Rider and a Unix file descriptor is, except that in Oberon
+you need to first call Old (or New) to open the file and then Set to
+place a Rider, rather than just calling open().
+
+On p. 157 we encounter the presumption of filenames:
+
+> A file system must not only provide the concept of a sequence with
+> its accessing mechanism, but also a registry. This implies that
+> files be identified, that they can be given a name by which they are
+> registered and retrieved. The registry or collection of registered
+> names is called the file system’s *directory*.
+
+What do we get if we question this?  We’ve already seen that Oberon
+does question it somewhat — previously written file pages can continue
+to be referenced by Texts even when they are obsolete — but what if
+our files were anonymous?  Perhaps we could include references to them
+in other files (in a way that is explicit to the filesystem), then run
+a garbage collector.
+
+It seems that all Oberon files are open read-write; even all riders
+are read-write.
+
+On p. 159 we encounter the horrifying suspicion that perhaps Oberon
+files require a function call and return for every byte read — and an
+inter-module call and return, at that.  But p. 157 allays our
+suspicion — there is a ReadBytes call that takes an (unsafe)
+variable-length array.  This is elaborated on p. 163, which gives the
+measured speedup on the Ceres-3 as 18× (though still only 2.5
+megabytes per second — to RAM! — which seems painfully slow.  It’s
+about 7000 times slower than my current laptop’s in-cache RAM access
+of 17 gigabytes per second, according to lmbench’s bcopy benchmark.)
+
+On p. 163 we encounter the first clue that Oberon in fact used memory
+protection after all, though perhaps not virtual memory:
+
+> In this table, every sector is represented by a single bit
+> indicating whether or not the sector is allocated. Although
+> conceptually belonging to the file system, this table resides within
+> module Kernel, because for safety reasons it is write-protected in
+> user mode.
+
+(But see on p. 194 that Ceres-3 had no MMU; p. 197 goes into the
+details of the memory mapping.)
+
+Also we find that the Oberon startup routine involves scanning the
+entire filesystem for free blocks, like jffs, to build the in-RAM
+sector reservation table; this seems that it would not scale well to
+modern disks with billions of sectors, but perhaps it depends on the
+locality of the file directory.  However, as in Unix, the block
+pointers (“sector table”) and indirect pointers (“extension table”) in
+Oberon are stored in the inode (“file header”), so the locality can’t
+be very good.  On p. 190 we are told, “[T]he initialization of the
+sector reservation table clearly dominates the start-up time of the
+computer.  For a file system with 10'000 files it takes [on] the order
+of 15s to record all files.”
+
+(The whole sector GC thing seems rather bletcherous to me, even for
+1984.)
+
+On p. 164 there is a clue as to why Franz thought riders were so
+awesome: in Oberon, disk buffers are associated with a particular
+file, rather than with the disk as in typical Unix systems.  Clearly
+associating buffers with a particular file descriptor would lead to
+inconsistencies (failure to Read Your Writes, among others).
+
+The description of the buffer semantics here make it clear that the
+immutability property required by Texts on p. 90 is not in fact
+provided; you can change the contents of a Text by rewriting parts of
+its underlying disk file, though not by writing an entire new version
+of the file and then invoking Register to update it.
+
+On p. 174 we see that Oberon’s Register includes an fsync() (Unbuffer)
+to avoid losing data.  My recent experiences with recalcitrant USB
+drives make me wonder if some kind of limit to dirty in-memory data is
+needed to guarantee responsiveness in cases like this — Oberon’s four
+buffers (4KB) per file, for example, ensures that this Unbuffer call
+won’t take that long.
+
+Also on p. 174 we see that they didn’t know about weak pointers, so
+they hacked the garbage collector’s root set to compensate:
+
+> there exists a pitfall that is easily overlooked: all opened files
+> would permanently remain accessible via root, and the garbage
+> collector could never remove a file descriptor nor its associated
+> buffers. This would be unacceptable. We have found no better
+> solution to this problem than to design the garbage collector such
+> that it excludes this list from its mark phase.
+
+On pp. 174–175 we see that they use a 24-way B-tree to map file
+pathnames (capped at 32 characters) to sector addresses, where their
+inodes are stored, though it’s defined naïvely without hysteresis and
+can thus thrash splitting and unsplitting the root when oscillating
+about a crucial number of entries.  This choice is justified on
+simplicity and efficiency grounds on p. 189 and contrasted with Unix’s
+hierarchical filesystem, but the simplicity grounds make me suspect
+that the authors never read the Unix filesystem code, which used a
+linear search through an unordered directory at the time, and indeed
+in many later implementations.
+
+It’s unfortunate that the B-tree code wasn’t generalized and exported
+to provide a general-purpose ISAM facility.
+
+On p. 176 we see that FileDir.Enumerate is in the “non-public” API of
+FilesDir (the reason being given on p. 183); also, I note that it
+takes a callback but no userdata.  Does Oberon support nested
+procedures with lexical scope, as Pascal did?  The notes about BSR on
+p. 147 didn’t suggest that the regular procedure-call sequence
+involves passing a context pointer, as nested procedures normally
+require (except when circumvented with GCC’s stack-trampoline hack).
+
+On p. 192 we find an RT-11-style/VMS-style command-line switch
+“/date”!  For the Directory command.
+
+On p. 194 we find some explanation for the earlier ambiguity about
+memory protection: the Ceres-3 has no MMU!
+
+On p. 195 the memory maps confused me by having 0 at the top and
+addresses increasing downwards; it led me to wonder whether the
+Ceres-[123] all had stacks that grew *upwards*, which they don’t, as
+we can see from the “microcode” on pp. 146–7.
+
+On p. 198 we find deep skepticism about the usefulness of MMUs: “a
+dispensible [sic] overkill for single-user workstations.”  Yeah, maybe
+if all your software is written in OCaml.  Although I suppose the
+Macintosh was pretty useful without an MMU from 1984 until MacOS X
+(1999?).
+
+On p. 199 we are introduced to the garbage collector; surprisingly,
+they mention reference counting (though giving the algorithm
+incorrectly) and the mark-and-sweep scheme they use, but not copying
+collectors.  Oberon uses a non-incremental stop-the-world
+mark-and-sweep collector using pointer reversal.
+
+On p. 202 we are introduced to the heap object format, which has a
+4-byte header (ick).  Maybe it was hard to do better than that in
+1984, although BIBOP kind of did.  BIBOP may be easier if you have an
+MMU, but I don’t think it really needs one.
+
+On p. 207 we have the entirely unnecessary SetMouseLimits interface,
+which has no equivalent in PS/2, USB, or evdev mouse protocols, but
+the Oberon mouse driver reports absolute rather than relative X and Y.
+Even if you wanted to limit the memory needed to buffer mouse events,
+you could buffer a ΔX and ΔY!  This unconventional choice of border
+behavior also implies a lack of awareness of the Fitts’s-Law-driven
+design of 1984 Macintosh menus:
+
+> The position “wraps around” in both the horizontal and vertical
+> directions.
+
+To be fair, though, nobody had written about this outside of Apple at
+the time.
+
+On p. 209 we have “the module’s initialization sequence”, which I
+suppose is the block of code at the end of the module; I hadn’t
+realized this was run when the module was loaded, but of course such a
+thing is urgently necessary in a Pascal-family language that doesn’t
+permit you to initialize values in their declaration.  In this case,
+it’s also being used to install interrupt handlers.
+
+We also see the module V24, for accessing the serial port; its
+interface is entirely incompatible with those of file access, of
+handling keyboard events, and of access to Text objects.
+
+On p. 210 I finally realized that “0FFFFC000H” is a LONGINT while
+“30X” is a CHAR.  (This is explained in the scanner on p. 307.)
+
+The serial-port driver on p. 210 is quite compact for a device driver.
+Its use of a CPU delay loop in Break (p. 211) despite being a driver
+for a chip with a sufficiently accurate real-time timer on it seems
+suboptimal.  This goes unremarked here, but a similar (but more
+justifiable) delay loop on p. 216 merits the comment, “This is rather
+unfortunate.”
+
+On p. 211 we have a description of an RS-485 network.  They claim to
+have gotten 230 kbps, close to contemporary Arcnet’s 300-kbps
+performance.  It’s strange that they claim that clock accuracy limits
+packet length, though, since they’re using SDLC bitstuffing (and in
+fact the whole SDLC protocol, including its 256-station addressing
+limit) to ensure adequate transition frequencies to maintain CDR.  (On
+p. 222 we find that the length limit is 512 bytes.)
+
+On p. 216 we have the account of SDLC’s alternative to CSMA/CD, whose
+code is near the top of SendPacket on p. 214:
+
+> Before sending a packet, it must be verified that the line is free
+> by testing the so-called hunt bit. If the line is busy, the line is
+> polled again after a delay. The delay is influenced by the station's
+> address, causing all stations to have a slightly different
+> delay. Actual collisions can only be detected by the receiver
+> through the CRC-check at the end of the packet.
+
+What’s not mentioned is that this whole procedure, including the retry
+delay, blocks the entire machine; presumably this will always happen
+if the line is faulted in a certain way.  There is no retry limit.
+
+During the packet transmission the driver disables interrupts in order
+to be able to meet the SDLC chip’s timing constraints, like the old
+Linux PIO disk driver.  This seems like it could detectably interfere
+with interactive responsiveness: 512 bytes is 4096 bits, which is
+almost 18 ms at 230 kbps, and it’s possible that we might have to wait
+for several packets from other senders to finish passing before we can
+send our own.
+
+I haven’t read the SCSI driver on pp. 218–220, but I’m pleasantly
+impressed that it’s only two pages of code.
+
+On p. 222 we find the description of the TFTP-like file transfer
+protocol; its lack of windowing might slow down file transfer (since
+the ACK packet will be delayed until whatever user interface task has
+the receiving processor busy is done) but I’m not sure that the SCC
+driver described on pp. 211–216 can buffer multiple packets anyway.
+
+The lack of cryptography in the user authentication p. 222 is entirely
+unremarkable in the 1984–92 context; although it is of course
+unacceptable nowadays, some web hosts still use unencrypted FTP.
+
+It’s amusing that the file transfer protocol includes an instant
+message protocol (though no group chat).  This becomes less amusing
+when we reach the end of Chapter 10 on p. 230 and realize that the
+file transfer protocol is the only application protocol supported by
+their network!  (Well, the dedicated server software in Chapter 11
+also includes an email protocol and a printing protocol, which the
+workstations have the client code for.)  This is somewhat
+disappointing in the 1984–88 context they were designing the code in,
+which also saw network-transparent windowing in W and X, telephony
+over Ethernet, and the birth of Novell, and was 16 years after
+Engelbart’s 1968 demo in which he demonstrated screen-sharing of a
+windowed environment over a long-distance network.
+
+They describe ARP on pp. 222–3, but they’re ARPing for a person’s
+initials rather than an IP address.
+
+On p. 231 we begin the description of the dedicated server, and it’s
+astonishing to realize that they don’t have a fileserver in the normal
+sense — a networked facility that appears as a filesystem, just like
+local disk filesystems, but perhaps supports locking or something,
+which was the primary service provided in Novell and NFS/NIS networks
+in the 1980s and 1990s.  Wirth had experience with such a
+system — Cedar’s FS was done that way, and its designers report that
+they only allowed local disks reluctantly as a concession to user
+demands.  Perhaps he didn’t think it was a good idea?
+
+They say their server is a Ceres-1 with two megs of RAM (half being
+the printer’s framebuffer) and a 1-MIPS processor on p. 259.
+
+It’s amusing that the primary interface between servers is a message
+queue, though one substantially simpler than AMQP.
+
+On p. 237 we are explained that an Oberon mailbox (for email, not some
+kind of message queue thing) is structurally restricted to 64
+kibibytes and 30 messages; the format is a sort of compound-file-like
+filesystem-within-a-file with its own block-based free map and
+directory.  I have to say that I think the Berkeley mbox format is
+both simpler and less limited (though surely less efficient; providing
+a mailbox directory requires reading the entire file).  (Sendmail was
+a nightmare of complexity compared to the simpler mail server
+presented here.)  Maybe they should have fixed their filesystem so it
+didn’t allocate an entire kilobyte to every file, so they could have
+just used a file per message.  It appears also that it’s possible for
+the mailbox file to be so fragmented that a new message won’t fit.
+(Confirmed on p. 245.)
+
+You could imagine justifying such a complex mailbox file format if it
+were generalized to support arbitrary tables.  For some reason,
+mailbox formats seem to be an attractive nuisance for ingenious people
+to overcomplicate, Mork being perhaps the most notorious example but
+far from the only one.
+
+“Franz” (presumably Michael) appears on p. 238 in an example mail
+message, as do “Templ” and “Mueller”.
+
+On p. 238, we see that for no particularly good reason the mail access
+protocol seems to be binary: 10H for ACK, 25H for NAK, 26H for NPR,
+24H for NRQ, and so on.  These are the values of the field
+SCC.Header.typ.
+
+On p. 252 we see the use of a temporary file (one not registered in
+the filesystem directory) as a buffer for data:
+
+> it is almost the same as that for handling requests to receive a
+> file. But instead of registering the received file, the file is
+> inserted into _Core.PrintQueue_.
+
+This is the same mechanism I’m planning to use to deliver buffers of
+pixel data to the Wercam server on Linux.
+
+On p. 253 we see the printer rasterizing operations.  (Before
+PostScript, all raster printers were WinPrinters.)  The midpoint
+circle algorithm makes an appearance (as it does again on
+pp. 423–424), though unfortunately the ellipse procedure is omitted.
+
+On p. 258 we see that the cringe-inducing password hash from p. 34 is
+actually password-equivalent; it has a cringe-inducing justification
+on p. 260, which also explains that in order to protect the user
+database from unauthorized access, it’s stored outside the filesystem,
+since the filesystem has no protection.  Yet on p. 265, we read, “the
+impossibility of activating users’ programs on the server station
+significantly reduces the possibilities for inflicting damage from the
+exterior.”  But presumably the server stores its software modules in
+the filesystem for use during boot?
+
+On p. 287 we have RT-11-style command-line switches again (as on
+p. 192), and specifically they are to disable index and type checks,
+suggesting that these were major performance bottlenecks at one time.
+We also see the Algol-68-like expression “the mode of the object”,
+meaning its type.
+
+On p. 288 we see Figure 12.6, the call graph of the Oberon recursive-
+descent parser, which doubles as a summary of the Oberon grammar.
+
+On p. 289 we finally discover the meaning of the suffixed asterisk on
+many procedure names at their definition: it indicates that they are
+to be compiled in such a way that they can be called from another
+module, so they return with an RXP instruction rather than RET.  This
+implies that even intramodule calls of these procedures must use the
+slower CXPD; a trampoline function could have been used to avoid this.
+
+In the scanner or tokenizer (module OCS) on p. 307 we have yet another
+of the tiresome lists of numbered constants, this time in the form of
+a table of token types: number, NIL, string, ident, `;`, and so forth.
+In Lisp or Cedar you would use atoms (symbols) for this, in modern C
+you could use an enum, and in ML you would use a sum type.  A comment
+seems like a distinctly poorer form for this information, but I
+suppose it has the advantage that, being a comment, it doesn’t count
+against the compiler’s 4000-line footprint.
+
+The code for OCS is on pp. 307–312.
+
+The hash function described on p. 307 (embedded in the Identifier
+procedure on p. 308) is very poor, particularly considering that it
+requires a division by 43 after every identifier character.
+
+On p. 308 we see another peculiar feature of Oberon’s grammar: logical
+AND is written as `&`, while logical OR is written as `OR`, and _binds
+more tightly than AND_, unless there’s an error in the code to scan to
+the end of the identifier.
+
+It’s interesting that Texts has a Read procedure that produces a CHAR
+rather than a CHAR-with-looks.
+
+Given the simplicity of the compiler as a whole, it seems inescapable
+that its chief bottleneck must have been this scanner (though the book
+does not, as far as I can tell, mention a profiler, and even the
+debugger on p. 368 seems very limited).  On that basis it may seem
+quite surprising that they chose to make a full intermodule function
+call for every input character; there are 41 callsites for Texts.Read
+in OCS by my count.  An intra-module function call might have been a
+bit better — both intramodule and intramodule calls had hardware
+instructions, but I don’t know what their timings might have
+been — but really you’d like to use a piece of code like the following:
+
+    IF bufPtr = bufLen THEN refillBuffer END;
+    ...buf[bufPtr]...; bufPtr := bufPtr + 1
+
+However, you really don’t want to put that in the source code itself
+in 41 places, and Oberon doesn’t have a C-like preprocessor, a
+Lisp-like macro system, or a compiler capable of inlining even an
+intramodule function call, much less an intermodule function call.
+
+On the gripping hand, the dedicated server in Chapter 11 (p. 231 et
+seq.) was of their first Ceres-1 generation of workstations and had
+two megabytes of RAM.  The largest module in the system was OCE at 972
+lines of code (see p. 18; OCS is listed there as 314 lines, matching
+well with its 6-page length here).  Perhaps 972 lines of code might
+involve another 972 lines of comments, averaging 60 characters per
+line, for a total of 117 kilobytes.  Reading such a source module
+entirely into RAM before beginning the scanning process would have
+used only 6% of the workstation’s memory, and would have avoided the
+problem of file access during tokenization entirely.  (Although
+`*bufp++` is considerably wordier in Oberon than in C.)
+
+On p. 312 we see the initialization of the keyword hash table:
+
+    BEGIN i := KW;
+        WHILE i > 0 DO
+            DEC(i); keyTab[i].symb := 0; keyTab[i].alt := 0
+        END ;
+
+One is forced to wonder how much code could have been eliminated from
+Oberon by zeroizing module variables, as C does, or all uninitialized
+variables, as Java and Golang do.
+
+On p. 325 we have the following extremely dubious statement:
+
+> It is the goal of a good compiler to make use of all addressing
+> modes offered by the computer, thereby avoiding the emission of
+> unnecessary instructions for address computation.
+
+Presumably the intent of avoiding unnecessary instructions is either to
+make the code run faster, to reduce code size, or nowadays to use less
+energy, but using more addressing modes is not guaranteed to move you
+toward any of these goals — not in 1984 with microcoded CISCs, not in
+1988 with nascent RISC, and certainly not in 2019 with superscalar
+micro-op-based CPUs.
+
+On p. 330 we see that the author is not American; a procedure is named
+AssReal.
+
+On p. 345 we find the amusing detail that the NS32k memory block move
+instruction is called MOVSB, just like the 8088 (though there it’s not
+really a block move without the REP prefix: REP MOVSB).
+
+On p. 355 we see the full Nominal Semidestructor Thirty Two Million
+CISC instruction set.  Sometimes the failure of this chip in the
+market has been attributed to poor compiler quality: on paper it was
+just as good as a 68000, but in practice it performed about 25% worse
+with the vendor’s C compiler.  It seems to have had a couple of
+special-purpose base registers (FP and SB), 8 general-purpose
+registers (like the 8088), and an indirect addressing mode.  Unlike
+the 8088, its instructions are (generally) two-address instructions.
+
+I'm somewhat alarmed by the remark on p. 356, “This solution strictly
+limits the size of modules” — how small do they have to be?  None of
+the ones listed on p. 18 was more than about 12 kilobytes.
+
+The code generator itself occupies pp. 357–367, more or less.  56
+lines of code seem to fit on a page, but, as commented before, the
+lines are uncomfortably long.
+
+On p. 368 we are introduced to the very primitive debugger.
+
+Reading p. 369 it occurs to me that perhaps the debug information the
+debugger reads should be the same information the compiler uses to
+tell itself where things are stored.
+
+On p. 374 Wirth tells the story of how he saw Chuck Thacker’s SIL
+written in BCPL on an Alto at PARC in 1976 and went to write his own
+in Modula-2 on a PDP-11, which grew gradually into the Oberon graphics
+editor.
+
+On p. 385 we have the viewer-broadcast update mechanism from p. 48
+explained again.
+
+On p. 388 we have the 1980s view of object-orientation: its virtue is
+that it allows you to dynamically load machine code you don’t have the
+source code to, as long as it implements a calling interface you do, by
+means of “the extensible record type and the procedure variable”.  Yuck.
+
+On p. 407 we find that they encountered the object-graph serialization
+problem (“pickle”) in the graphics editor, solving it with an object
+table.  Later on pp. 435–436 we see that in the ensuing years they
+generalized this approach to arbitrary object graphs, using it for the
+repertoire of objects in a text as well.
+
+There is a screenshot from 1995-09-21 on p. 440, showing the state of
+the Oberon system at that time, with desktop icons, overlapping
+windows, over 1000 messages in a mailbox, and still regrettable
+non-antialiased pixel fonts.
