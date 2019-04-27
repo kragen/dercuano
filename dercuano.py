@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
+import cgi
+import errno
 import os
 import urllib
 import urlparse
 import subprocess
+
+import markdown
 
 
 def ok(a, b):
@@ -22,8 +27,9 @@ class Bundle:
         return 'prerelease'
 
     def notes(self):
-        for notename in os.listdir(self.filename('markdown')):
-            yield Note(self, notename)
+        dirname = self.filename('markdown')
+        for notename in os.listdir(dirname):
+            yield Note(self, notename, os.path.join(dirname, notename))
 
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
@@ -32,10 +38,24 @@ class Bundle:
         for category in self.categories():
             self.generate_category(category)
 
+    def category_filename(self, category):
+        return self.filename(self.output_dir,
+                             'categories',
+                             as_filename(category) + '.html')
+
+    def note_filename(self, notename):
+        return self.filename(self.output_dir,
+                             'notes',
+                             as_filename(notename) + '.html')
+
+    def note_title(self, notename):
+        for subj, verb, obj in self.triples():
+            if subj == notename and verb == 'titled':
+                return obj
+        return notename.replace('-', ' ').title()
+
     def generate_category(self, category):
-        vomit_html(self.filename(self.output_dir,
-                                 'categories',
-                                 as_filename(category) + '.html'),
+        vomit_html(self.category_filename(category),
                    category_html(self, category))
 
     def categories(self):
@@ -79,12 +99,99 @@ ok(as_filename('a/bad file\\name: this\0'),
    'a%2Fbad+file%5Cname%3A+this%00')
 
 def category_html(bundle, category_name):
-    return '<html><title>Category ' + category_name
+    return ley(html(title('Category ', category_name),
+                    head_stuff()))
 
 def index_html(bundle):
-    return '<html><title>Dercuano version ' + bundle.get_version()
+    return ley(html(title('Dercuano version ', bundle.get_version()),
+                    head_stuff()))
+
+def ley(htmlish):
+    "HTML generator.  Tiny version of Stan from Nevow."
+    try:
+        as_html = htmlish.as_html
+    except AttributeError:
+        if isinstance(htmlish, str):
+            return cgi.escape(htmlish)
+        if isinstance(htmlish, list):
+            return ''.join(ley(item) for item in htmlish)
+        raise
+    else:
+        return as_html()
+
+class Element:
+    def __init__(self, tagname, attrs, content):
+        self.tagname = tagname
+        self.attrs = attrs
+        self.content = content
+
+    def as_html(self):
+        return '<%s%s%s>%s</%s>' % (
+            self.tagname,
+            ' ' if self.attrs else '',
+            self.render_attrs(),
+            ley(self.content),
+            self.tagname)
+
+    def render_attrs(self):
+        return ' '.join('%s="%s"' % (k, cgi.escape(v, True))
+                        for k, v in self.attrs.items())
+
+def tag(tagname):
+    def render(*args, **kwargs):
+        return Element(tagname=tagname, attrs=kwargs, content=list(args))
+    return render
+
+def tags(*tagnames):
+    for tagname in tagnames:
+        yield tag(tagname)
+
+html, title, h1 = tags('html', 'title', 'h1')
+
+class RawHTML:
+    def __init__(self, html):
+        self.html = html
+
+    def as_html(self):
+        return self.html
 
 class Note:
-    def __init__(self, bundle, notename):
+    def __init__(self, bundle, notename, source_file):
         self.bundle = bundle
         self.notename = notename
+        self.source_file = source_file
+
+    def render_if_outdated(self, print=lambda *args: None):
+        if self.is_outdated():
+            print("rerendering", self.notename)
+            vomit_html(self.output_filename(), self.render().encode('utf-8'))
+
+    def output_filename(self):
+        return self.bundle.note_filename(self.notename)
+
+    def render(self):
+        with open(self.source_file) as f:
+            body = markdown.markdown(f.read().decode('utf-8'))
+        note_title = self.bundle.note_title(self.notename)
+        return note_html(self.bundle, note_title, body)
+
+    def is_outdated(self):
+        source_stat = os.stat(self.source_file)
+        try:
+            output_stat = os.stat(self.output_filename())
+        except OSError as err:
+            if err.errno == errno.ENOENT:
+                return True
+            raise
+
+        return output_stat.st_mtime <= source_stat.st_mtime
+
+
+def note_html(bundle, note_title, body):
+    return ley(html(title(note_title),
+                    head_stuff(),
+                    h1(note_title),
+                    RawHTML(body)))
+
+def head_stuff():
+    return [tag('meta')(charset="utf-8")]

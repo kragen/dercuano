@@ -11,3 +11,9 @@ copy can unpack and read, without requiring any online resources.
 I wrote it in Python 2, even though it’s 2019, for reasons of
 expediency.  I still have a wider selection of Python 2 modules
 installed on this machine.
+
+Dependencies
+------------
+
+Dercuano depends on the Python Markdown module, the one started by
+Manfred Stienstra, and Python 2.  I’m using 2.7.12.
