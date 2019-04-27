@@ -26,6 +26,13 @@ class Bundle:
 
         return 'prerelease'
 
+    def get_title(self):
+        for subj, verb, obj in self.triples():
+            if subj == 'dercuano' and verb == 'bundle':
+                return obj
+
+        return 'Dercuano'
+
     def notes(self):
         dirname = self.filename('markdown')
         for notename in os.listdir(dirname):
@@ -78,7 +85,8 @@ class Bundle:
 def load_triples(filename):
     with open(filename) as f:
         for line in f:
-            yield tuple(urlparse.unquote(field) for field in line.split())
+            yield tuple(urlparse.unquote(field.replace('+', '%20'))
+                                         for field in line.split())
 
 
 def vomit_html(output_filename, html_contents):
@@ -103,7 +111,7 @@ def category_html(bundle, category_name):
                     head_stuff()))
 
 def index_html(bundle):
-    return ley(html(title('Dercuano version ', bundle.get_version()),
+    return ley(html(title(bundle.get_title(), ' version ', bundle.get_version()),
                     head_stuff()))
 
 def ley(htmlish):
@@ -111,10 +119,12 @@ def ley(htmlish):
     try:
         as_html = htmlish.as_html
     except AttributeError:
-        if isinstance(htmlish, str):
+        if isinstance(htmlish, unicode):
             return cgi.escape(htmlish)
+        if isinstance(htmlish, str):
+            return ley(htmlish.decode('utf-8'))
         if isinstance(htmlish, list):
-            return ''.join(ley(item) for item in htmlish)
+            return u''.join(ley(item) for item in htmlish)
         raise
     else:
         return as_html()
@@ -188,7 +198,7 @@ class Note:
 
 
 def note_html(bundle, note_title, body):
-    return ley(html(title(note_title),
+    return ley(html(title(note_title + ' ⁑ ' + bundle.get_title()),
                     head_stuff(),
                     h1(note_title),
                     RawHTML(body)))
