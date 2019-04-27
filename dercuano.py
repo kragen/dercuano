@@ -18,6 +18,7 @@ from __future__ import print_function
 import cgi
 import errno
 import os
+import re
 import urllib
 import urlparse
 import subprocess
@@ -61,7 +62,10 @@ class Bundle:
 
     def note(self, notename):
         dirname = self.filename('markdown')
-        return Note(self, notename, os.path.join(dirname, notename))
+        source_file = os.path.join(dirname, notename)
+        if not os.path.exists(source_file):
+            raise KeyError(notename)
+        return Note(self, notename, source_file)
 
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
@@ -184,10 +188,11 @@ class Note:
     def render(self):
         with open(self.source_file) as f:
             body = markdown.markdown(f.read().decode('utf-8'))
+        body = replace_links(body, self.bundle)
         categories = sorted(self.categories())
         return note_html(self.bundle, self.title(), body,
                          div(h2('Categories'),
-                             ul([li(self.bundle.category_link(category))
+                             ul([li(self.bundle.category_link(category), "\n")
                                  for category in categories]))
                          if categories else [])
 
@@ -232,7 +237,7 @@ def category_html(bundle, category_name):
     return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
                     head_stuff(),
                     h1('Notes in category “', category_title, '”'),
-                    ul([li(note.link_ley())
+                    ul([li(note.link_ley(), "\n")
                         for note in bundle.notes()
                         if category_name in note.categories()])))
 
@@ -242,10 +247,10 @@ def index_html(bundle):
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(),
                     h1(bundle_title, ' notes'),
-                    ul([li(note.link_ley(level=0))
+                    ul([li(note.link_ley(level=0), "\n")
                         for note in bundle.notes()]),
                     div(h2('Categories'),
-                        ul([li(bundle.category_link(category, level=0))
+                        ul([li(bundle.category_link(category, level=0), "\n")
                             for category in categories]))
                     if categories else []))
 
@@ -271,7 +276,7 @@ class Element:
         self.content = content
 
     def as_html(self):
-        return '<%s%s%s>%s</%s>' % (
+        return u'<%s%s%s>%s</%s>' % (
             self.tagname,
             ' ' if self.attrs else '',
             self.render_attrs(),
@@ -308,6 +313,17 @@ def note_html(bundle, note_title, body, footers):
                     RawHTML(body),
                     script(src="../liabilities/addtoc.js"),
                     footers))
+
+ad_hoc_link_re = re.compile(r'(?:file\s+)?<code>(.*?)</code>')
+def replace_links(html, bundle):
+    def repl(mo):
+        try:
+            note = bundle.note(mo.group(1))
+        except KeyError:
+            return mo.group(0)
+        return ley(note.link_ley())
+
+    return ad_hoc_link_re.sub(repl, html)
 
 def head_stuff():
     return [tag('meta')(charset="utf-8")]
