@@ -13,6 +13,7 @@ def go(dirname):
         note.render_if_outdated(print=print)
     bundle.generate_categories()
     bundle.generate_index()
+    bundle.install_liabilities()
     bundle.generate_archive()
 
 

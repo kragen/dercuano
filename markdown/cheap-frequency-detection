@@ -1,0 +1,1128 @@
+Most audio and radio signals are passed through some unknown linear
+time-invariant system, such as linear circuits or multipath fading,
+before we get them.  So it’s often to our advantage to try to detect
+features of these signals that survive such mangling.  Those features
+are sinusoids, or, more generally, complex exponentials.
+
+If you want to detect sinusoidal components in a signal, the standard
+approach is to use the Fourier transform.  This has a couple of
+disadvantages:
+
+1. It requires a substantial amount of computation per sample,
+   specifically (for the radix-2 FFT) 2 lg N real multiplications
+   where N is the window size and lg is the base-2 logarithm;
+2. When a signal is only present during part of the window, its energy
+   is smeared across the whole window, which may remove aspects of
+   interest (you may want to know when it happened)
+   and may push it below the noise floor;
+3. It more or less requires floating-point computation, which
+   increases the number of bit operations substantially.
+
+There are a number of other approaches which can be used in cases
+where the Fourier transform’s disadvantages are fatal, but I haven’t
+found a good overview of them.  Here I’m going to talk about counting
+zero crossings, SPLLs, CIC decimation, the
+Minsky circle algorithm, the Goertzel algorithm,
+Karplus-Strong delay line filtering,
+linear predictive coding,
+and uh
+this thing I just came up with in the shower,
+and finally an extended zero-crossing approach.
+
+Counting zero crossings
+-----------------------
+
+A very simple and commonly used nonlinear filtering or demodulation
+approach is to count the number of times the signal crosses the
+X-axis.
+
+If the majority of your signal power is in a single frequency (perhaps
+because you’ve already filtered it) the count of zero
+crossings is a reasonable approximation of the frequency.  A step
+up from this is to measure the time interval of the last N zero
+crossings, maybe the last 16 crossings or the last 64 crossings,
+in order to get an estimate whose
+precision is limited by your sampling rate rather than by both your
+sampling rate and your time window.
+
+The simplest approach is just this, assuming 8-bit samples being
+returned from `getchar()` (unsigned, as is `getchar()`’s wont):
+
+    volatile int crossings = 0;
+    ...
+    for (;;) {
+        while (getchar() < 128);
+        crossings++;
+        while (getchar() >= 128);
+        crossings++;
+    }
+
+However, this allows any arbitrarily small amount of noise near a slow
+zero crossing to add extra zero crossings.  Normally in circuits we
+deal with this by adding a Schmitt trigger, as described in Otto
+Schmitt’s 1937 paper, “A Thermionic Trigger”; as Schmitt says, “in
+another application, [the thermionic trigger circuit] acts as a
+frequency meter more linear than one of the thyratron type, and one
+immune to locking,” whatever that means.
+The Schmitt trigger adds a little bit
+of hysteresis through positive feedback, and indeed roughly any kind
+of positive feedback on digital inputs nowadays is called a “Schmitt
+trigger”.
+
+In code, adding this hysteresis is even simpler:
+
+    volatile int crossings = 0;
+    ...
+    for (;;) {
+        while (getchar() < 128+16);
+        crossings++;
+        while (getchar() >= 128-16);
+        crossings++;
+    }
+
+This requires the noise to move the needle by at least 32 counts
+before it qualifies as a “crossing”, which you would think is 18 dB
+below full-scale, but of course it’s not an average over the whole
+signal, but an increment at that point.  Impulsive noise can overcome
+this while totaling well below -18 dB by being at -∞ dB in between
+impulses.
+
+The other problem is that unless the actual signal is substantially
+higher than those -18 dB, this will miss crossings, maybe all of them.
+You can adjust the hysteresis to compensate with, for example, a peak
+detector (note I haven’t tried this):
+
+    volatile int crossings = 0;
+    ...
+    int threshold = 0, x;
+    for (;;) {
+        int peak = 0;
+        while ((x = getchar()) < 128 + threshold) {
+            if (128 - x > peak) peak = 128 - x;
+        }
+        crossings++;
+        threshold = peak >> 3;
+
+        peak = 0;
+        while ((x = getchar()) > 128 - threshold) {
+            if (x - 128 > peak) peak = x - 128;
+        }
+        crossings++;
+        threshold = peak >> 3;
+    }
+
+This may count a few extra crossings at the beginning of the process
+until it warms up; from then on, it notes the peak of each half-cycle
+to use to adjust the hysteresis threshold for the next crossing.  If
+the signal you’re detecting drops suddenly (by a factor of 8, as
+specified by `>> 3`) within a single cycle, it could suddenly stop
+counting cycles; similarly, if there is a noise spike that exceeds the
+signal by a factor of 8, it could suddenly stop being able to detect
+the signal.
+
+Per sample, this requires two subtractions, two comparisons, a
+conditional assignment, and a conditional jump, plus a couple more
+operations after each zero crossing.
+
+A more robust version of this algorithm would use perhaps the median
+peak, the median, or some percentile over the last several cycles,
+rather than simply the peak, and would decay the threshold toward 0
+over time in order to recover from the kinds of situations described
+above.  This requires a few more operations.
+
+For frequency detection of a signal, the zero-crossing approach may be
+superior to the linear FFT-based approaches discussed below.  For
+example, if you want to control a synthesizer using your voice, you
+need to be able to discriminate at least between musical notes.  If
+you want to distinguish between 110 Hz (A) and 106 Hz (closer to G#)
+with an FFT you need your frequency bins to be 4 Hz apart, which means
+you need to be running the FFT over a 250 ms window.  But at 48 ksps,
+the zero crossings of a 110-Hz square wave are 436 samples apart,
+while the zero crossings on a 106-Hz square wave are more like
+453 samples apart, and it seems like you could probably use the median
+of the last 4–8 intervals between zero crossings.  8 half-waves at
+106 Hz would be 38 ms.
+
+However, I suspect that all of these variants are strictly inferior to
+using a phase-locked loop, which is almost exactly the same amount of
+computation but has truly impressive noise immunity, and can
+additionally tell you the power of the frequency it’s detecting (at a
+little extra computational expense.)
+
+Software phase-locked loops
+---------------------------
+
+A phase-locked loop is a nonlinear filter that measures the frequency,
+phase, and possibly power of a signal with constant or slowly changing
+frequency.  You use a phase detector to set the frequency of a local
+oscillator to match the frequency of the signal, and the phase
+detector uses that local oscillator as its reference.  The simplest
+phase detector is just a chopper and a low-pass filter; here’s a
+software implementation in one line of C, suitable for tone frequency
+tracking:
+
+    /* A PLL in one line of C. arecord | ./tinypll | aplay */
+    main(a,b){for(;;)putchar(b+=16+(a+=(b&256?1:-1)*getchar()-a/512)/1024);}
+
+This is potentially quite efficient,
+taking almost exactly the same amount of computation as counting zero crossings;
+at its base, it involves four
+additions or subtractions per sample, plus a bit test, a conditional,
+and a couple of bitshifts.
+
+This takes a signal (by default at 8 ksps) from the ALSA audio driver
+with one sample on `getchar()`; `b` is the current phase of a local
+oscillator with period of 512 counts, whose free-running frequency is
+one cycle per 512/16 = 32 samples, so 250 Hz.  The phase detector
+accumulates its error signal in `a`.  The input sample is chopped by
+the ≈250Hz square wave from `b`, then either added to or subtracted
+from `a`, which has an exponential low-pass filter applied to it by
+way of subtracting a 512th of itself, yielding a time constant (I
+think?) of 512 samples or 64 ms.  The range of `a` extends up to where
+a == a+255-a/512, which is to say when a == 512*255 == 130560; the
+lower limit is analogously -130560.  So `a` is scaled down by dividing
+by 1024 to get `b`’s free-running increment, which means that in
+theory it could cause `b` to run backwards or at up to 130+16 = 146
+counts per sample, thus about 3.5 samples per cycle or 2280 Hz.
+(Actually, not even that much, because half the time you have to be
+feeding it zeroes, so its maximum stable magnitude oscillates around
+130560/2.)
+
+(In practice I’ve never managed to get the above code
+even up into the kHz range.)
+
+`putchar()` then outputs the low 8 bits of `b`, forming a sawtooth
+wave from it with twice the chopper frequency, around 500 Hz.
+
+More conventionally formatted and without the uninitialized-read
+undefined behavior, the above code reads as follows:
+
+    int main()
+    {
+        int a = 0, b = 0;
+        for (;;) {
+            a += (b & 256 ? getchar() : -getchar());
+            a -= a/512;
+            b += 16;
+            b += a/1024;
+            putchar(b);
+        }
+    }
+
+This kind of phase detector tries hard to keep the chopper in
+quadrature with the detected signal.  If you want to know the power of
+the detected signal, you can chop the input signal with a second
+chopper in quadrature with the first and sum its (squared)
+output.
+
+Note that this kind of phase detector is optimized for detecting
+square waves, and thus can lock onto odd harmonics of the signal it
+thinks it’s detecting.  This may be an advantage or a disadvantage in
+a particular application.
+
+The 1/512 in the above code, which is a low-pass filter on the phase detector
+output (and oscillator frequency input), directly limits how fast the
+PLL can track a changing frequency; less apparent is that it also
+limits how much noise immunity the PLL has, and how far the PLL’s
+frequency can jump to achieve lock (the “capture range”).  The
+proportionality factor by which the phase output adjusts the local
+oscillator frequency (the 1/1024) limits how far the PLL can track
+before losing lock (the “lock range”).  A couple of hacks to improve
+these tradeoffs are to sweep the natural frequency of the LO when it
+hasn’t yet achieved lock, to use several concurrent PLLs with
+different natural frequencies, and to tighten the low-pass filter once
+lock is achieved.
+
+With a different kind of phase detector, a PLL is also useful for
+things like beat detection and beat matching, which is in a sense its
+primary use in hardware — generating clock signals with a
+predetermined relationship to existing clock signals, including clock
+and data recovery for asynchronous data transmission.
+
+The one-line program is about the same length in machine code as in C.  An
+amd64 (but LP64) assembly listing for the 63 bytes of this loop is as
+follows, keeping `b`, the local oscillator state, in %ebp, and `a`,
+the phase detector, in %ebx.  GCC -Os did not optimize the
+multiplication and divisions into a conditional and bitshifts as you
+might expect:
+
+      40              	.L3:
+      43 0011 89E8     		movl	%ebp, %eax
+      44 0013 25000100 		andl	$256, %eax
+      44      00
+      45 0018 83F801   		cmpl	$1, %eax
+      46 001b 4519ED   		sbbl	%r13d, %r13d
+      47 001e 31C0     		xorl	%eax, %eax
+      48 0020 4183CD01 		orl	$1, %r13d
+      49 0024 E8000000 		call	getchar
+      49      00
+      51 0029 4489E9   		movl	%r13d, %ecx
+      52 002c 0FAFC8   		imull	%eax, %ecx
+      53 002f 89D8     		movl	%ebx, %eax
+      54 0031 99       		cltd
+      55 0032 41F7FC   		idivl	%r12d
+      56 0035 29C1     		subl	%eax, %ecx
+      57 0037 01CB     		addl	%ecx, %ebx
+      59 0039 B9000400 		movl	$1024, %ecx
+      59      00
+      60 003e 89D8     		movl	%ebx, %eax
+      61 0040 99       		cltd
+      62 0041 F7F9     		idivl	%ecx
+      63 0043 8D6C0510 		leal	16(%rbp,%rax), %ebp
+      65 0047 89EF     		movl	%ebp, %edi
+      66 0049 E8000000 		call	putchar
+      66      00
+      69 004e EBC1     		jmp	.L3
+
+There are many ways to improve this simplified PLL.
+
+A simple one is to use a simple-moving-average filter instead of an
+exponential filter to smooth the phase detector; this gives you better
+tracking of frequency changes for the same noise immunity, or better
+noise immunity for the same tracking of frequency changes.
+
+Different phase detectors are best for different kinds of signals.
+For sinusoidal signals with no significant harmonics, like a person
+whistling or an FM radio signal, you can get a better phase detector
+by weighting samples toward the middle of the sample interval more
+highly than samples toward its edges; multiplying by even a triangle
+wave (a square wave convolved with a simple moving average) gets you
+most of the way there.  For signals where only, say, leading edges are
+significant, you can use a phase detector that only considers the few
+samples near that leading edge.
+
+The shower algorithm
+--------------------
+
+Let’s suppose you want to detect some fixed frequency f and you’ve
+already resampled your signal to a sampling rate of 4f.  Two
+orthogonal sinusoids at frequency f then are [-1, -1, 1, 1] and [-1,
+-1, 1, 1]; two others are [0, 1, 0, -1] and [1, 0, -1, 0].  If you can
+find the dot product of your signal with a pair of these sinusoids,
+then you can use their Pythagorean sum to precisely compute the energy
+in that frequency component of the signal.
+
+If you’re dumping the decimated samples into a four-sample circular
+buffer x[0], x[1], x[2], x[3], with some incrementing pointer xp:
+
+    x[xp++ & 3] = new_sample;
+
+Then you could imagine using x[xp], x[xp-1], x[xp-2], and x[xp-3] with
+the appropriate modulo math.  However, this is totally not necessary,
+because you actually don’t care how these sinusoids are aligned with
+the signal; you only care that they are orthogonal.  It’s totally
+valid to compute one phase component as x[0] - x[2] and the other as
+x[1] - x[3] and then compute their Pythagorean sum:
+
+    return pythsum(x[0] - x[2], x[1] - x[3]);
+
+So far, though, we’ve gotten away without requiring the potentially
+large number of bit operations required to even square a number.  For
+low-precision data types, like 8 bits, it would be totally valid to
+use a lookup table of squares, then binary-search it to find the
+square root.  However, there are more approximate alternatives that
+may be good enough in many cases.
+
+Specifically, max(|a|, |b|) and |a| + |b| are both approximations of the
+Pythagorean sum that are never wrong by more than a factor of √2 and
+can be computed in a small linear number of bit operations.  Both are
+precisely accurate when a or b is 0 and have their worst case when |a|
+== |b|; max(|a|, |b|) is low by a factor of √2 then, and |a|+|b| is
+high by a factor of √2.  Both have level sets that are square, but
+rotated 45°.  If we sum them, the resulting octagonal level sets have
+a worst-case error of a bit under 12%, just under 1 dB.
+
+This Pythagorean-sum-approximation algorithm looks like this:
+
+    if (a < 0) a = -a;
+    if (b < 0) b = -b;
+    return ((a < b ? b : a) + a + b >> 1);
+
+YMMV.  On something like an AVR ATMega, the necessary three
+comparisons, three conditional branches, pair of additions, and right
+shift are probably slower than just computing the Pythagorean sum with
+the two-cycle multiplier.  In the other direction, the 3 dB worst-case
+error of max(|a|, |b|) or |a| + |b| is insignificant in many
+frequency-detection contexts, where you’re trying to determine whether
+a signal is more like -15dB or more like your -50dB noise floor.
+
+In many cases you might want to be integrating the wave over a
+significant period of time.  In a case like that, there are a few
+different cheap approaches you can take.  A circular buffer of four
+simple-moving-average filters provides optimal noise immunity for a
+given step response; you can do the same thing with the accumulators
+for single-pole exponential filters; and a chain of two or three
+moving-average filters inexpensively gives you something approaching a
+Gaussian window.  Finally, you could simply use a buffer of four
+accumulators to sum the corresponding samples across some rectangular
+window, without attempting any kind of nonuniform weighting.
+
+### The problem of frequency response in rectangular windows ###
+
+The disadvantage of rectangular windows in general (whether simple
+moving average filters or fixed windows of a few hundred samples or
+whatever) is that their Fourier transform is sinc.  Implicitly
+multiplying your signal by the rectangular function in this way
+effectively convolves its frequency spectrum with sinc, which dies off
+relatively slowly (1/n) as you get far away from its center.  Even a
+simple triangular window, which can be achieved by convolving two
+identical rectangular functions together (and thus squaring their
+frequency response), dies off at a much more reasonable pace (1/n²).
+And, in a sense, this is the basis for CIC decimation.
+
+CIC decimation
+--------------
+
+CIC decimation does not itself detect signals; it just (linearly, with
+linear phase, essentially with a convolution of simple moving
+averages) low-pass filters them and reduces the sampling rate.
+However, an Nth-order CIC decimation filter involves only N integer
+additions (using N accumulators) per input sample plus N subtractions
+per output sample (using N previous output samples).  As explained
+above, though, there are very efficient ways to detect signals in such
+decimated data.
+
+Here’s a second-order CIC decimation filter (untested) that reduces
+the sample rate by a factor of 73.  It uses unsigned math because in C
+unsigned overflow is well-defined and guarantees the property that
+(a+b) - b == a, regardless of overflow, and the CIC algorithm needs that.
+
+    enum { decimation_factor = 73 };
+    unsigned s1 = 0, s2 = 0, d1 = 0, d2 = 0, i = decimation_factor;
+    for (;;) {
+        s1 += getchar();  // integrator 1
+        s2 += s1;         // integrator 2
+        if (0 == --i) {
+            i = decimation_factor;
+            unsigned dx = s2 - d1; // differentiator (“comb”) 1
+            d1 = s2;
+            unsigned dx2 = dx - d2; // differentiator 2
+            d2 = dx;
+            putchar(dx2 / (decimation_factor * decimation_factor));
+        }
+    }
+
+For each input sample, this involves two additions, a decrement (or
+increment), and a jump conditional on zero.  Each output sample
+additionally requires two subtractions; in this case, I’ve also
+rescaled the output by dividing by a compile-time constant (which
+usually costs a multiply), so that it will be in (I think precisely)
+the same range as the original samples; however, this loses precision
+and dynamic range, and in many cases, no such rescaling is needed.
+
+A 440 Hz signal (A above middle C in A440 standard pitch) sampled at
+8 ksps is 18.1̄8̄ samples per cycle.  The factor of 73 above resamples
+an 8 ksps signal such that a signal of roughly 438.4 Hz, about 6 cents
+flat, will occupy 4 output samples, as recommended above for the
+shower algorithm.  How well an actual precise 440 Hz signal will be
+detected depends on how long you integrate the results over.
+
+The second-order nature of the above filter effectively windows each
+sample with a triangular window.
+
+Here’s an (n-1)th-order version (untested):
+
+    enum { decimation_factor = 73, n = 4 };
+    unsigned s[n] = {0}, d[n-1] = {0}, i = decimation_factor;
+    for (;;) {
+        s[0] = getchar();
+        for (int j = 1; j < n; j++) s[j] += s[j-1];
+        if (0 == --i) {
+            i = decimation_factor;
+
+            unsigned dj = s[n-1];
+            for (int j = 0; j < n-1; j++) {
+                unsigned djprime = dj - d[j];
+                d[j] = dj;
+                dj = djprime;
+            }
+
+            printf("%d\n", dj);
+        }
+    }
+
+There’s a quasi-inverse of CIC decimation, which is CIC interpolation;
+in essence, this amounts to using the Method of Finite Differences
+that Babbage used to tabulate polynomials on the Difference Engine.  I
+say it’s a quasi-inverse because it doesn’t undo the low-pass
+filtering that CIC decimation does, I think not even the part that’s
+below the Nyquist frequency of the decimated signal.
+
+I think it’s feasible to control the CIC decimation rate using a phase
+detector, like a PLL, and it may be possible to dither the decimation
+rate with something like the Bresenham algorithm; however, since the
+signal out of the comb filter is amplified by a linear factor of the
+decimation rate, this may be somewhat tricky, as oscillations of the
+decimation rate turn into oscillations of the output signal amplitude,
+which needs to be controlled for.
+
+If you are resampling to several different frequencies, the initial
+per-sample integration steps, and even the counter increment, can be
+shared between them.
+
+The Minsky Circle Algorithm
+---------------------------
+
+In HAKMEM (MIT AI Lab memo 239), item 149 (p. 73) describes an
+algorithm attributed to Minsky for drawing circles — or, more
+precisely, very slightly eccentric ellipses:
+
+    NEW X = OLD X - ε * OLD Y
+    NEW Y = OLD Y + ε * NEW(!) X
+
+Rendered into C:
+
+    int x = 255, y = 0, n = 1000;
+    while (--n) {
+        x -= y * epsilon;
+        y += x * epsilon;
+        pset(x0 + x, y0 + y);
+    }
+
+As Minsky comments, “If ε is a power of 2, then we don’t even need
+multiplication, let alone square roots, sines, and cosines!”
+
+Here’s a version that outputs a sine wave in minimized C:
+
+    main(x,y){for(y=100;1+putchar(x+128);x-=y/4,y+=x/4);}
+
+Of course, division by 4 can be implemented by an arithmetic shift
+right by 2 bits.
+
+HAKMEM items 150–152 go into some more detailed analysis.
+
+We can think of the epsilons as rotating the (x, y) phasor by some
+angle (specifically, cos⁻¹ (1-½ε²), according to item 151;
+note that Baker’s transcription contains an erroneous omitted superscript 2).
+If we add input samples to x (or y) then it will sum whatever
+frequency component is in sync with the rotation:
+
+    for (;;) {
+        x -= epsilon * y;
+        y += epsilon * x + getchar();
+        putchar(x * scale);
+    }
+
+Frequency components that are not in sync with the rotation will
+average out to zero.  Frequency components that are in sync will grow
+without limit.
+
+You can use two different ε factors for the two multiplications, which
+gives a more elliptical “circle” and a denser range of frequencies.
+In particular, one of them can be 1, which means you can generate a
+tone of arbitrary frequency with only a single scaling operation per
+cycle, plus the addition and subtraction:
+
+    main(x,y){for(y=100;1+putchar(x+128);y+=x-=y/8);}
+
+In somewhat more standard formatting, although with a still somewhat
+eccentric use of `for`:
+
+    /* Output an audio sinusoid with Minsky’s ellipse algorithm */
+    #include <stdio.h>
+
+    int main()
+    {
+      for (int x=0, y=100; EOF != putchar(x+128); x -= y >> 3, y += x)
+        ;
+      return 0;
+    }
+
+The loop here compiles to this amd64 machine code:
+
+      400450:	89 e8                	mov    %ebp,%eax
+      400452:	c1 f8 03             	sar    $0x3,%eax
+      400455:	29 c3                	sub    %eax,%ebx
+      400457:	01 dd                	add    %ebx,%ebp
+      400459:	48 8b 35 e0 04 20 00 	mov    0x2004e0(%rip),%rsi # 600940 <__bss_start>
+      400460:	8d bb 80 00 00 00    	lea    0x80(%rbx),%edi
+      400466:	e8 b5 ff ff ff       	callq  400420 <_IO_putc@plt>
+      40046b:	83 f8 ff             	cmp    $0xffffffff,%eax
+      40046e:	75 e0                	jne    400450 <main+0x10>
+
+Unfortunately, this version spends almost all of its time calling and
+returning from `_IO_putc`.  A version that writes into a 512-byte
+buffer instead, achieving 850 megasamples per second on my laptop, is
+as follows:
+
+    #include <stdio.h>
+
+    int main()
+    {
+      char buf[512];
+      int x=0, y=100;
+      for (;;) {
+        for (int i = 0; i != sizeof(buf)/sizeof(buf[0]); i++) {
+          x -= y >> 3;
+          y += x;
+          buf[i] = 128 + x;
+        }
+        if (fwrite(buf, sizeof(buf), 1, stdout) != 1) return -1;
+      }
+    }
+
+Its inner loop compiles to the following nine instructions (again, on
+amd64):
+
+      400460:	89 ea                	mov    %ebp,%edx
+      400462:	c1 fa 03             	sar    $0x3,%edx
+      400465:	29 d3                	sub    %edx,%ebx
+      400467:	48 63 d0             	movslq %eax,%rdx
+      40046a:	83 c0 01             	add    $0x1,%eax
+      40046d:	8d 4b 80             	lea    -0x80(%rbx),%ecx
+      400470:	01 dd                	add    %ebx,%ebp
+      400472:	3d 00 02 00 00       	cmp    $0x200,%eax
+      400477:	88 0c 14             	mov    %cl,(%rsp,%rdx,1)
+      40047a:	75 e4                	jne    400460 <main+0x20>
+
+The book “[Minskys and Trinskys][0],” by Corey Ziegler Hunts, Julian
+Ziegler Hunts, R.W. Gosper and Jack Holloway, explores the variations
+of this algorithm in more detail; I don’t have the book, but according
+to [Nick Bickford’s 2011 post on the subject][1], they prove that,
+using δ for the ε factor that multiplies Y:
+
+    Xₙ = X₀ cos(n ω)+(X₀/2-Y₀/ε) sin(n ω)/d
+    Yₙ = Y₀ cos(n ω)+(X₀/δ-Y₀/2) sin(n ω)/d
+
+where
+
+    d = √(1/(δ ε)-¼)
+    ω = 2 sin⁻¹(½√(δ ε))
+
+If this is correct, Gosper’s earlier result in HAKMEM that ω =
+cos⁻¹ (1-½ε²) should be a special case of it (where ε = δ); it isn’t
+immediately obvious to me why this is so, but these do seem to be
+consistent for a couple of trial values:
+
+    cos  ω = 1 - ½ δ ε
+    sin ½ω = ½ √(δ ε)
+
+[0]: http://au.blurb.com/b/2172660-minskys-trinskys-3rd-edition
+[1]: https://nbickford.wordpress.com/2011/04/03/the-minsky-circle-algorithm/
+
+I hypothesize, but haven’t proven either experimentally or rigorously,
+that if you start with 0 and add each new input sample to x, you will
+accumulate a phasor in x and (possibly, depending on the algorithmic
+variant, scaled) y of all of the samples encountered so far, rotated
+by the appropriate angle.  This will give you the total you’ve
+encountered so far of a given Fourier component.
+
+The Goertzel Algorithm
+----------------------
+
+The Goertzel algorithm (sometimes more specifically
+“the second-order Goertzel algorithm”)
+is an optimized version of Minsky’s algorithm,
+requiring only one multiply or quasi-multiply per input sample.  It’s
+actually older than Minsky’s formulation, dating from 1958.  At its
+heart is the oscillator s[n] = (2 cos ω) s[n-1] - s[n-2], which
+oscillates with an angular frequency of ω per sample; to look at it
+another way, it’s the state transition function (s, t) ← ((2 cos ω) s
+- t, s).  To this you just add each input samples x: (s, t) ← (x + (2
+cos ω) s - t, s); in this way, the energy in the desired frequency
+accumulates in s and t, and at the end of the accumulation process,
+you can measure it.
+
+Since 2 cos ω is constant, this is just a constant multiplication
+— and some values are inexpensive to multiply by.  For example, you
+can multiply a value a by 1-2⁻⁴ as follows:
+
+    a -= a >> 4;
+
+This is what I mean by “quasi-multiply”.
+
+cos⁻¹(1-2⁻⁴) ≈ 0.3554, and consequently this works out to an
+oscillation period of 2π/0.3554 ≈ 17.68 samples.  Here’s a C version
+that emits a sine wave that repeats precisely, due to roundoff error,
+every 53 samples, for a period of 17.66̄ samples, 452.8 Hz (lamentably
+about halfway between A and A# above middle C) in linear unsigned
+8-bit samples at 8 ksps:
+
+    /* Generate a 452.8 Hz sine wave. ./goertzel | aplay */
+    #include <stdio.h>
+
+    int main()
+    {
+      int s = 0, t = 32;
+      for (; EOF != putchar(s + 128);) {
+        int tmp = s;
+        s += s;
+        s -= s >> 4;
+        s -= t;
+        t = tmp;
+      }
+    }
+
+Not counting the output bias addition, this requires an addition, two
+subtractions, and a bit shift per sample.  Here’s a one-line version:
+
+    main(s,t,u){for(t=32;u=s,1+putchar(128+(s-=t-s+s/8));t=u);}
+
+(For the special case where ω = ⅓π, cos ω = ½, so 2 cos ω = 1; we can
+thus get a 6-sample cycle with only a subtraction per sample; in that
+case (s, t) ← (s-t, s).  At 8 ksps this is 1333.3̄ Hz, 19 cents sharp
+of E6.)
+
+In a sense, this oscillator works by obtaining the derivative
+information — stored as an explicit second variable in Minsky’s
+algorithm — from the difference between s[n-1] and s[n-2].  We can
+rewrite the recurrence relation as follows:
+
+    s[n] = (2 cos ω) s[n-1] - s[n-2]
+
+Let’s suppose:
+
+    s[n-2] = k cos θ₀
+    s[n-1] = k cos (θ₀ + ω)
+
+Presumably in this case s[n] should be identically k cos (θ₀ + 2ω).
+Is it?
+
+    s[n] = 2 cos ω s[n-1] - s[n-2]
+         = 2 cos ω k cos (θ₀ + ω) - k cos θ₀
+         = k (2 cos ω cos (θ₀ + ω) - cos θ₀)
+
+As you would remember from high-school trigonometry if you were
+smarter than I am,
+
+    cos (t + h) = cos t cos h - sin t sin h
+    sin (t + h) = sin t cos h + cos t sin h
+    cos 2ω = cos² ω - sin² ω
+    sin 2ω = 2 sin ω cos ω
+
+So
+
+    cos (θ₀ + 2ω) = cos θ₀ cos (2ω) - sin θ₀ sin (2ω)
+                  = cos θ₀ cos² ω - cos θ₀ sin² ω - 2 sin θ₀ sin ω cos ω
+    cos (θ₀ + ω) = cos θ₀ cos ω - sin θ₀ sin ω
+    k cos (θ₀ + 2ω) = k (cos θ₀ cos² ω - cos θ₀ sin² ω - 2 sin θ₀ sin ω cos ω)
+    s[n] = 2 cos ω s[n-1] - s[n-2]
+    if
+    s[n-2] = k cos θ₀
+    s[n-1] = k cos (θ₀ + ω)
+    then
+    s[n] = 2 cos ω k cos (θ₀ + ω) - k cos θ₀
+         = k (2 cos ω cos (θ₀ + ω) - cos θ₀)
+         = k (2 cos θ₀ cos² ω - cos θ₀        - 2 sin θ₀ sin ω cos ω)
+         = k (cos θ₀ (2 cos² ω - 1)           - 2 sin θ₀ sin ω cos ω)
+         = k (cos θ₀ (cos² ω + cos² ω - 1)    - 2 sin θ₀ sin ω cos ω)
+         = k (cos θ₀ (cos² ω - (1 - cos² ω))  - 2 sin θ₀ sin ω cos ω)
+         = k (cos θ₀ (cos² ω - sin² ω)        - 2 sin θ₀ sin ω cos ω)
+         = k (cos θ₀ cos² ω - cos θ₀ sin² ω   - 2 sin θ₀ sin ω cos ω)
+         = k cos (θ₀ + 2ω)
+    ∴ cos (θ₀ + 2ω) = (2 cos ω) cos (θ₀ + ω) - cos θ₀ QED
+
+This shows that given two points on a sinusoid of the right angular
+frequency and any amplitude or phase, the Goertzel algorithm will
+continue extrapolating further points on it indefinitely.
+
+Measuring the energy is inexpensive (requiring two real multiplies, a
+subtraction, a couple of squares, and an addition) but not entirely
+obvious if we only keep around the last two samples of s.  The
+standard presentation is that we transform them into a complex number
+encoding the magnitude and phase of the signal:
+
+    y[n] = s[n] - exp(-i ω) s[n-1]
+
+Which is to say:
+
+    y[n] = (s[n] - (cos ω) s[n-1]) + i (sin ω) s[n-1]
+
+Note that that, if ω is small, the exponential gives a value close to
+1, so this is very nearly the difference between the two last values
+of s.
+
+The idea is that the basic recurrence relation given above for s will
+rotate this resultant phasor around by an angle of ω without altering
+its magnitude.  Does it?
+
+In the case of an arbitrary multiplier, the Goertzel algorithm beats
+Minsky’s circle algorithm by almost a factor of 2, since Goertzel
+requires only a single multiply per sample, while Minsky requires two
+multiplies per sample.  But in a case where the multiplication can be
+achieved by a bit shift and is basically free, Minsky requires just
+
+    s += t >> n;
+    t -= s >> n;
+
+while Goertzel requires
+
+    u = s;
+    s += s - t - (s >> n);
+    t = u;
+
+So you have three additions or subtractions instead of two, and maybe
+a bit of shunting as well, but one less bit shift.
+
+Another factor to consider is that, for a given multiplier precision,
+the Minsky algorithm covers the frequency spectrum much more densely;
+for a multiplier ε (2⁻ⁿ in the example above) the Minsky frequency is
+cos⁻¹ (1-½ε²), while the Goertzel frequency is cos⁻¹ (1-½ε).  So, for
+example, if we are multiplying x, y, and 2·s[n-1] by 1/256 to get the
+value we subtract, Minsky gives us a 3.9-milliradian rotation and a
+1608-sample period, while Goertzel gives us a 63-milliradian rotation
+and a 100.5-sample period.  This is somewhat intuitive, in that the
+Minsky algorithm applies the multiplier twice per iteration.
+
+The single-scaling version of Minsky’s algorithm is presumably similar
+to Goertzel in its angular resolution, but with two additions or
+subtractions per sample instead of three; the results I mentioned
+above for that algorithm should be sufficient to show whether that is
+true.
+
+You can think of the Goertzel algorithm (or the Minsky algorithm) as
+integrating the complex phasor y at a particular frequency over the
+input signal — that is, y is a sum table (or prefix sum or cumulative
+sum) of the input signal at that frequency.  This suggests that if you
+want to know the amount (and phase) of signal at that frequency
+between two points in time, you can subtract the corresponding points
+in y, just as with a first-order CIC filter, and thus inexpensively
+apply a moving average filter to it.  (You will need to rotate the two
+phasors into phase with a rotation appropriate to the window size,
+costing two multiplies.)
+
+### Goertzel and Minsky as complex integrators ###
+
+This of course suffers from the rectangular-window problem I mentioned
+in the shower-algorithm section.  You can apply the CIC approach,
+making a second-order or third-order sum table and then infrequently
+taking differences at some window width, giving you the amplitude and
+phase of the chosen frequency windowed by a triangular or
+near-Gaussian function.  However, I think computing these sum tables
+will require accumulating them as complex numbers and doing the
+rotation by the appropriate phase before adding each new
+sample — which, in the general case, requires a complex multiplication
+(four real multiplications).
+
+However, in the case where we can do the multiplication inexpensively,
+as in the examples above with a bit shift and a subtraction or
+addition, this may be a reasonable approach.  (See also the section
+below about avoiding multiplications.)
+
+Karplus-Strong delay line filtering
+-----------------------------------
+
+The Karplus-Strong string synthesis algorithm consists of nothing more
+than a recursive unity-gain comb filter with a little bit of low-pass
+filtering.  Originally, the delay line was initialized with random
+noise, but it’s the resonances of the filter that provide the envelope
+and most of the frequency response.  Here’s a one-line C
+implementation initialized with just an impulse:
+
+    s[72]={512};main(i){for(;;i%=72)s[i]+=s[(i+1)%72],putchar(s[i++]/=2);}
+
+This version does two indexed fetches, two indexed stores, three
+divisions, an addition, and a couple of increments per sample, but the
+divisions can be replaced by equality tests and conditional stores,
+except for one which is a bit shift.  So you need an indexed fetch, an
+addition, an indexed store, a index increment, a bit shift of 1, and
+the compare-to-threshold-and-reset operation on the index to implement
+the circular buffer.
+
+Here’s the same algorithm written in a more reasonable way, with a
+time limit:
+
+    #include <stdio.h>
+
+    enum { delay = 72 };
+
+    int s[delay] = { 512 };
+
+    int main()
+    {
+      int i = 0, i2 = 0;
+      for (int n = 8000; n--; i = i2) {
+        i2 = i + 1;
+        if (i2 == delay) i2 = 0;
+
+        s[i] += s[i2];
+        s[i] >>= 1;
+
+        putchar(s[i]);
+      }
+
+      return 0;
+    }
+
+As a recurrence relation, this is computing
+
+    s[n] = ½s[n-71] + ½s[n-72]
+
+Of course, you can start with an empty buffer and add input signal to it,
+which will be convolved with the infinite impulse response of
+the recurrent filter — which response is precisely the sound you hear
+when running it with no input starting from the above buffer with just
+an impulse in it.  That impulse response has every frequency that fits
+an integer number of times into the input buffer — the fundamental of
+72 samples (111.1̄ Hz), but also 36 samples (222.2̄ Hz), 24 samples
+(333.3̄ Hz), and so on.  The averaging of adjacent samples attenuates
+higher frequencies.
+
+If you negate the recurrence, it will instead allow signals with an
+odd number of half-cycles to resonate.  For example:
+
+    s[n] = -½s[n-71] - ½s[n-72]
+
+This will preserve signals with a period of 144 samples, 48 samples,
+28.8 samples, 20.57 samples, 16 samples, and so forth.  This allows
+you to shorten the buffer by half and eliminates all the even
+harmonics, which may be a drawback or an advantage, depending on the
+signal you’re trying to detect.
+
+Autoregressive filtering
+------------------------
+
+CIC’s integration and comb filters, the Karplus-Strong comb filter,
+and the Goertzel s recurrence are all special cases of autoregressive
+filtering, as used in linear predictive coding for
+speech — they “predict” each new sample as a linear combination of the
+previous samples.  There exist efficient algorithms
+for finding the optimal autoregressive filter to minimize the
+(squared?) residual, such as the Yule–Walker equations.
+The coefficients of this filter are the
+coefficients of a polynomial in the z-domain whose zeroes are the
+formants of, say, a speech signal.
+
+Avoiding multiplication with single-addition and dual-addition multipliers
+--------------------------------------------------------------------------
+
+Several times in the above, we’ve referred to cases where it’s
+possible to use just a bit shift instead of a constant multiplication,
+or merely to subtract or add a shifted number.  This is interesting
+because bit shifts are, in hardware and occasionally in software,
+free — they require zero gates, zero bit operations, and zero time.
+An interesting question, then, is what set of multipliers we can
+achieve with a single addition (or subtraction, which requires the
+same number of bit operations):
+
+    >>> numpy.array(sorted(set(x for a in range(8)
+                                 for b in range(8)
+                                 for x in [(1 << a) + (1 << b),
+                                           (1 << a) - (1 << b)])))
+    array([-127, -126, -124, -120, -112,  -96,  -64,  -63,  -62,  -60,  -56,
+            -48,  -32,  -31,  -30,  -28,  -24,  -16,  -15,  -14,  -12,   -8,
+             -7,   -6,   -4,   -3,   -2,   -1,    0,    1,    2,    3,    4,
+              5,    6,    7,    8,    9,   10,   12,   14,   15,   16,   17,
+             18,   20,   24,   28,   30,   31,   32,   33,   34,   36,   40,
+             48,   56,   60,   62,   63,   64,   65,   66,   68,   72,   80,
+             96,  112,  120,  124,  126,  127,  128,  129,  130,  132,  136,
+            144,  160,  192,  256])
+
+So, for example, in the neighborhood of 127, we can compute
+multiplications by 120, 124, 126, 127, 128, 129, 130, 132, and 136
+with a single addition or subtraction plus some bit shifts.
+
+Suppose we can manage two additions or subtractions, not just one.
+Then we can, for example, multiply by 27 with two additions:
+
+    x += x << 1;  // multiply by 3
+    x += x << 3;  // multiply by 9
+
+Multiplying by 27 in the usual way would have required three
+additions: x + (x << 1) + (x << 4) + (x << 5).
+
+This approach gives us 1052 separate multipliers with bit shifts of up to 8:
+
+    >>> singles = set(x for a in range(8)
+                        for b in range(8)
+                        for x in [(1 << a) + (1 << b),
+                                  (1 << a) - (1 << b)])
+    >>> len(numpy.array(sorted(set(a*b for a in singles for b in singles))))
+    1052
+
+Additionally, though, we can add or subtract the original number,
+possibly with a shift.  So, for example, to multiply by 59, although
+its Hamming weight is 5, we can calculate (x << 6) - (x << 2) - x.
+Combining this approach with the previous one gives us 1366
+multipliers with bit shifts of up to 8:
+
+    >>> len(sorted(set(x for a in singles
+                         for b in singles
+                         for x in [a*b, a+b, a-b])))
+    1366
+
+Allowing larger bit shifts actually extends our range further; with
+shifts of up to 16, we can multiply by any constant integer factor in
+(-256, 256) with two shifted additions or subtractions except for the
+following handful:
+
+    >>> singles = set(x for a in range(16)
+                        for b in range(16)
+                        for x in [(1 << a) + (1 << b),
+                                  (1 << a) - (1 << b)])
+    >>> doubles = set(x for a in singles
+                        for b in singles
+                        for x in [a*b, a+b, a-b])
+    >>> numpy.array([x for x in range(-255, 256) if x not in doubles])
+    array([-213, -211, -205, -203, -181, -179, -173, -171, -170, -169, -165,
+           -149,  -85,  171,  173,  179,  181,  203,  205,  211,  213])
+
+This implies that, given an appropriate constant scale factor, we can
+always do an approximate multiplication with two shifted additions and
+subtractions while introducing an error of one part in 2·171 = 342 or
+less.  In fact, more than three-quarters of the multipliers in (-1024,
+1024) are reachable:
+
+    >>> len([x for x in range(-1023, 1024) if x not in doubles])
+    499
+    >>> len(doubles)
+    24418
+
+This is especially beneficial for higher-precision operands — for
+example, 16-bit or 32-bit operands, for which the O(N²) bit operations
+of a full-precision multiply could be prohibitive.
+
+In cases like the Minsky algorithm and the Goertzel algorithm where
+constant multiplication is being used to rotate a phasor progressively
+over time by a constant angle, it may be reasonable to “dither” the angle
+by alternating between two different inexpensive rotations; this
+introduces phase noise or jitter, but when it amounts to a small
+fraction of a cycle, it shouldn’t make much difference.
+
+The extended zero-crossing approach
+-----------------------------------
+
+A problem shared by the Minsky algorithm, the Goertzel algorithm, and
+the shower algorithm is that they are all ways to calculate or
+approximate a component of the Fourier transform or the short-time
+Fourier transform (which I think is the best any linear algorithm can
+do), and as a result they are fundamentally limited by the same
+uncertainty principle: to distinguish between, in my example, 110 Hz
+and 106 Hz, they need at least 250 ms of data, regardless of the
+sampling rate.
+
+I think, however, that phase-locked loops and zero-crossing detection
+can do better.  In the absence of noise, or with relatively low noise,
+they can provide a very accurate measurement of frequency with very
+little data; in the extreme, by measuring the time of a single
+half-cycle.
+
+However, even that is poor performance; in theory, in the absence of
+noise, we need only three sequential samples of the sine wave!  Any
+three samples, as long as they’re much less than half a wavelength
+apart!  Their first differences give us two slopes, and their second
+difference gives us the second derivative; the ratio between this
+second derivative and the central value gives us the negated squared
+angular frequency.  (Roughly; hmm, I should work out what it is for
+real, because especially for high frequencies this is only
+approximate.)
+
+The problem is that the phase-locked loop with the square-wave
+edge-detector that I showed is only getting information from the
+samples immediately next to the zero crossing — as is the
+zero-crossing detector.  But usually there is lots of useful
+information further away from the zero crossing, too.  We should be
+able to take advantage of that information to more precisely estimate
+the phase of the wave at each point in time.
+
+The phase of a pure sine wave of unity amplitude and angular frequency
+is just atan2(x, dx/dt); for angular frequency ω and an arbitrary
+amplitude, it is atan2(x, dx/dt/ω), as the amplitude is a common
+factor of both arguments and thus cancels.
+
+We don’t really need to know the precise derivative to uniquely
+identify a part of the cycle, though.  We only need to know the value
+at that sample and whether the derivative is positive or negative.
+(Alternatively, we don’t really need to know the precise value; we
+only need the derivative and whether the sample is positive or
+negative.)
+
+If we count the time interval since we last passed the current phase
+angle, this should give us some kind of guess at the period of the
+wave — potentially a new guess on every sample!  If we accumulate
+these guesses over some period of time, we can take the median of the
+accumulated guesses (rather than, say, the mean) as the period of our
+wave.
+
+This is like zero-crossing time measurement, but instead of measuring
+time between crossings of just the X-axis, we’re counting the time
+between the crossings of every single phase.  Some degree of
+hysteresis is appropriate, but now the hysteresis threshold can be
+more or less an angle rather than an amplitude.
+
+If we’re concerned about computation time, though, we probably don’t
+actually want to calculate the arctangent precisely, even if that were
+possible for an unknown-frequency signal.  Instead we would like to
+lump each sample into some kind of angle bin based on something that’s
+cheap to compute about that sample.
+
+For example, we could draw a square around the origin, with the sides
+meeting where x[n] == x[n] - x[n-1] and where x[n] == x[n-1] - x[n].
+On the right side of the origin, crossing the real axis, we have a
+side where x[n] > 0; on the left side of the origin, crossing the real
+axis, we have a side where x[n] < 0; on the top side, crossing the
+imaginary axis, we have a side where x[n] - x[n-1] > 0; on the bottom
+side, crossing the imaginary axis, we have a side where x[n] - x[n-1]
+< 0.  Which side we put a given sample on depends on which of these is
+greatest, subject to a somewhat arbitrary scaling decision that will
+double performance for frequencies around some optimal frequency.  So
+if we’re on the right side, that means that x[n] is higher than all of
+0, x[n] - x[n-1], and x[n-1] - x[n]; if we’re on the left side, it
+means it’s lower than all three; if we’re on the top side, x[n] -
+x[n-1] is higher than 0 and higher than either x[n] or -x[n]; if
+we’re on the bottom side, it’s lower than all three.
+
+More on phase detection and frequency suppression
+-------------------------------------------------
+
+Frequecy detection is sort of intimately interwoven with frequency
+suppression.  Consider the following example.
+
+You want to suppress a 50Hz interfering signal introduced into
+electrical measurements by a nearby 50Hz fluorescent tube.  The
+waveform is periodic at 50Hz, and indeed symmetric, but very far from
+sinusoidal.
+
+The simplest approach is simply to apply a feedforward comb filter: by
+adding the signal to itself as it appeared 10ms ago, you will
+completely suppress the noise from the fluorescent tube, because that
+comb filter has nulls at 50Hz, 150Hz, 250Hz, etc.  But it does some
+violence to the remaining signal, since each impulse in the signal now
+appears twice, 10ms apart, thus smearing things out in the time domain
+and adding 6dB to components of 0Hz, 100Hz, 200Hz, etc.  And, of
+course, if the lamp turns on or off suddenly, you’ll have half a cycle
+of bleedthrough at the end, which is attenuated but not suppressed if
+the turnoff is gradual.
+
+Within the linear-filtering paradigm, you can trade some of these
+undesirable characteristics against one another by using more than one
+previous sample.  For example, instead of merely adding the signal
+10ms ago, you can add half the signal 10ms ago and subtract half the
+signal 20ms ago.  This results in further temporal smearing of
+whatever gets through, but the echo signals are now 6dB quieter.  If
+we carry this further and use the average of ten samples (the
+corresponding points in the last ten half-cycles, half negated), the
+added echo is now 20dB down.
+
+However, I think we can do better with some nonlinearity.  For
+example, if we use median filtering rather than mean filtering over
+the corresponding points in the last ten half-cycles, random impulses
+will not be echoed at all.  Or you can use a hybrid: instead of purely
+the median, use the mean of the six medial values, discarding the two
+highest and two lowest values as outliers; or use a weighted mean with
+weights not restricted to 0 and 1.  And we could extrapolate an
+expected amplitude for the waveform to suppress, allowing us to
+completely suppress sufficiently gradual turn-ons and turn-offs.
+
+Human-voice sounds are periodic, entirely asymmetric, and also very
+far from sinusoidal due to their laryngetic origin as impulse trains.
+It’s common for the second harmonic to be even stronger than the
+fundamental!  For such signals we couldn’t subtract negative
+half-cycles; we’d have to use the corresponding points in the last ten
+cycles, instead.  And, since they’re not very stable in frequency,
+we’d need to extrapolate frequency shifts as well.
+
+How do you detect the frequency shifts, though?  You can look to see
+if the waveform is to the left or the right of the expected waveform,
+but of course it’s a question of how far to the left or right you’re
+looking, which perhaps you can reformulate as a question about how to
+approximate its derivative.  Or you could do a full cross-correlation
+between signals.
+
+One alternative I’ve been thinking about is to use the signal and a
+high-pass-filtered version of its *integral* to do phase detection.
+That way, you don’t have the extreme amplification of noise that
+derivatives get you.
+
+If we can have a prophecy budget, we can use subsequent cycles of the
+signal as well as previous cycles to estimate the current cycle.

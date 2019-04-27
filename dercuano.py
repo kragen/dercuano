@@ -48,6 +48,8 @@ class Bundle:
     def notes(self):
         dirname = self.filename('markdown')
         for notename in os.listdir(dirname):
+            if notename.endswith('~') or notename.startswith('.'):
+                continue
             yield Note(self, notename, os.path.join(dirname, notename))
 
     def filename(self, *parts):
@@ -99,6 +101,11 @@ class Bundle:
     def generate_index(self):
         vomit_html(self.filename(self.output_dir, 'index.html'),
                    index_html(self))
+
+    def install_liabilities(self):
+        home, _ = os.path.split(__file__)
+        liabilities = os.path.join(home, 'liabilities')
+        subprocess.check_call(['cp', '-a', liabilities, self.output_dir])
 
     def generate_archive(self):
         subprocess.check_call('cd %s; tar czvf dercuano-%s.tar.gz %s' % (
@@ -201,7 +208,7 @@ def tags(*tagnames):
     for tagname in tagnames:
         yield tag(tagname)
 
-html, title, h1, h2 = tags('html', 'title', 'h1', 'h2')
+html, title, script, h1, h2 = tags('html', 'title', 'script', 'h1', 'h2')
 div, ul, li, a = tags('div', 'ul', 'li', 'a')
 
 class RawHTML:
@@ -268,6 +275,7 @@ def note_html(bundle, note_title, body, footers):
                     head_stuff(),
                     h1(note_title),
                     RawHTML(body),
+                    script(src="../liabilities/addtoc.js"),
                     footers))
 
 def head_stuff():

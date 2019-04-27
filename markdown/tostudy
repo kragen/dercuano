@@ -1,0 +1,772 @@
+<!-- -*- markdown -*- -->
+
+I have a fairly clear idea of what stuff I want to be studying right
+now, which has taken some time to congeal.  There are 18 major themes:
+constraint satisfaction,
+mathematical optimization,
+ logic,
+ interval arithmetic,
+ tensor or array computation,
+ physical system simulation including finite element analysis,
+ automated manufacturing or digital fabrication,
+ incremental computation and caching,
+ reproducibility,
+ archival and publishing,
+real-time computation,
+ anytime algorithms,
+ probabilistic programming,
+neural networks,
+ decentralization,
+ self-replicating machinery,
+ self-sustaining software systems,
+ and physical security.  These seemingly disparate themes actually have an
+underlying unity, which I will attempt to explain.
+
+Constraint satisfaction
+-----------------------
+
+Constraint satisfaction systems search for a configuration that
+satisfies some set of boolean conditions.  Sometimes the configuration
+may be continuously variable, like a point in ℝⁿ.  Other times it may
+be discrete, like a set of choices for a set of Boolean variables.  It
+may have finite dimensionality (like ℝⁿ), infinite dimensionality
+(like a function ℝ → ℝ), or finite but unbounded dimensionality (like
+a sentence in some formal language).  The conditions may be simple and
+tractable (things like “x > 0”) or very hairy indeed (“md5(x) ==
+0xd41d8cd98f00b204e9800998ecf8427e”, which looks computationally
+intractable but is actually fairly easy).
+
+The parts of the configuration are sometimes called “design variables”.
+
+Different kinds of constraint satisfaction problems have different
+algorithms available to solve them.  Most of classical algebra and
+integral and differential calculus consist of algorithms for solving
+particular kinds of constraints.  You’re given a constraint like 2x² +
+4x = 30 and your objective is to find an x that satisfies that
+constraint, traditionally by deducing logical consequences from that
+given constraint until it’s trivial to compute the answer.  For
+example, from that equation we can deduce x² + 2x = 15, then x² + 2x -
+15 = 0, then (x - 3)(x + 5) = 0, and x=3 ∨ x=-5.
+
+You can think of a constraint as a generalization of the notion of a
+function — it’s a function that can “run backwards”, so to speak.
+This can significantly simplify the process of developing a piece of
+software, thus amplifying the intellectual abilities of its author.
+Often it is significantly easier to express attributes of the desired
+results of a program (consider the MD5 example above) than how to
+compute them.  In some such cases, it’s even possible for existing
+constraint-satisfaction software to find the results.
+
+MiniKANREN is one of the more interesting pieces of
+constraint-satisfaction software becoming available today.  The
+burgeoning field of efficient SAT and SMT solvers such as Z3 contains
+many others.
+
+Aside from the rapid advances in the efficiency of satisfiability
+algorithms, larger and larger constraint-satisfaction problems are
+coming within reach as memories and CPUs dramatically increase in
+power.  A crude understanding of complexity theory might lead you to
+think that this won’t matter much, because SAT is not known to be in
+P, so even a CPU that is 256 times faster will only allow you to
+expand the feasible problem size by 8 bits.  But in fact the base of
+the exponential has been brought down far below 2 and continues to
+diminish.
+
+Mathematical optimization
+-------------------------
+
+Mathematical optimization is the problem of finding a configuration
+that maximizes (or minimizes) some objective (or loss) function,
+subject to some feasibility constraints.  The classic example — and
+indeed nearly the only one considered in many textbooks on
+mathematical optimization today — is linear programming, where the
+feasibility constraints are linear inequalities and the objective
+function is linear.
+
+Categories of algorithms for mathematical optimization are called
+“metaheuristics”, which is a somewhat misleading name but gives some
+clue of how broadly applicable they are.  Random guessing, hill
+climbing, gradient descent, gradient descent with random restarts, and
+genetic algorithms are widely-used metaheuristics.
+
+### Constraint satisfaction and optimization ###
+
+Optimization can be seen as a generalization of constraint
+satisfaction in a few different ways.
+
+Clearly if you can find the optimal configuration among all feasible
+configurations, then you can find at least one feasible configuration,
+which is the constraint satisfaction problem.  So, from this point of
+view, algorithms to solve optimization problems can solve constraint
+satisfaction problems too, but it might be easier to say 
+
+Also, though, you can conceptualize the constraints of a
+constraint-satisfaction problem as real-valued functions that are
+multiplied together, where those functions take the value 1 when the
+constraint is satisfied and 0 otherwise.  Then, finding a maximum of
+the product is equivalent to finding a solution to the constraints.
+Many optimization algorithms will have an easier time if those factor
+functions are instead continuous and between 0 and 1 when the
+condition is false.  And in fact this sort of thing is a common method
+(the “penalty method”) for incorporating constraints into optimization
+problems for solvers that don’t natively handle constraints.  The very
+first constraint-satisfaction system for mechanical design, Sketchpad,
+apparently used gradient-descent to search for approximate solutions
+to geometrical constraint systems.
+
+However, constraint satisfaction algorithms can also be used to solve
+optimization problems if you invoke them many times.  If your
+objective function is y, you first seek a solution for y > 0.  If
+successful, you seek a solution for y > 1; if successful, a solution
+for y > 4; if successful, a solution for y > 8; and so on until you
+fail, at which point you can approximate the optimum as closely as
+desired using binary search.
+
+Logic
+-----
+
+Logic is a very broad term, but in particular what I’m interested in
+are theorem provers and predicate logic, which can produce
+machine-checkable proofs of mathematical propositions — whether
+propositions of general interest, such as (most famously) the
+four-color theorem, or propositions having to do with particular
+pieces of software.
+
+There is a lot of work currently going on in this space, with systems
+like Coq, Agda, Idris, Isabelle-HOL, Z3, Mizar, and Epigram being
+actively developed, and systems like CompCert and seL4 being proved.
+
+Much of the initial work on program correctness came from a desire to
+ensure that all programs were correct, for reasons having to do with
+the risk-averse nature of military bureaucracies, rather than any kind
+of rational cost-benefit analysis.  But in practice, many programs do
+not even have a well-defined specification that they could conceivably
+fail to conform to, nor is it a good use of the irreplaceable million
+or less hours of a human being’s life to write one.  It’s often
+adequate to try things and see what happens.
+
+To me, proving programs correct is of interest for four reasons:
+compiler optimization, user interface innovations, software security,
+and embedded systems.
+
+It’s interesting for compiler optimization because if an unoptimized
+program can be proven equivalent to the original program, the
+correctness of the optimizer or optimizers is a moot point, and indeed
+some kind of random search over all feasible programs may be adequate
+(as Sorav Bansal proposed in his thesis, _Peephole
+Superoptimization_).
+
+(Note that “optimization” here is used in a sense unrelated to the
+“Mathematical optimization” section above.)
+
+It’s interesting for user interface innovations because the
+interactive process of creating a machine-checkable proof with a proof
+assistant like Coq is very different from the traditional
+batch-job-inspired workflow of writing a program in a text editor in a
+compiled language and then feeding it to a compiler.  I don’t have
+enough experience with this process yet to figure out whether it has
+innovations that can be applied more widely to the process of creating
+things using computers.
+
+It’s interesting for software security because trying things and
+seeing what happens is never adequate to produce secure software,
+although it may be adequate to find security holes.  Often when a
+security hole is detected in the field, it is already too late to
+prevent disastrous effects.  So significant effort toward other ways
+to prevent them seems like it would be justified.
+
+It’s interesting for embedded systems for a somewhat similar reason.
+
+If my production database server crashes, the production cluster can
+fail over to a secondary and save the logs and a core dump, and in the
+morning I can inspect the core dump and the logs to figure out what
+went wrong.  Then I can fix the bug, recompile the database software,
+and upgrade across the cluster.  The cost of the failure is low
+(assuming it wasn’t a security hole), and it’s highly inspectable and
+reparable.
+
+By contrast, if the software on the Arduino controlling an autonomous
+toy car, the car may be run over by a truck, and possibly all the
+Arduino can do to make the error debuggable is to blink an LED.  It
+doesn’t have space for a core dump.  The cost of the failure is high,
+and it’s poorly inspectable and reparable.  (The situation is even
+worse if it’s an automatic implantable defibrillator.)
+
+So for embedded systems, it’s highly desirable to detect errors at
+compile time rather than run time.
+
+### Logic and constraint satisfaction ###
+
+In some sense, theorem-proving is merely an application of constraint
+satisfaction: you have some set of axioms and inference rules which
+you’ve previously decided are reasonable or at least consistent, and
+you’re searching for a proof which starts from those axioms, is valid
+according to those inference rules, and ends with your desired
+conclusion.  That’s clearly a constraint-satisfaction problem.
+
+But constraint satisfaction is also merely an application of
+theorem-proving.  A constructive theorem prover, given the task of
+proving that some set of constraints C is satisfiable, will produce a
+constructive proof, which is a way to construct a configuration
+satisfying them.  But even a non-constructive prover can be used, at
+least for a finite set of design variables; you repeatedly attempt to
+prove that a given design variable is in a given range.
+
+This conjunction between constraint-satisfaction systems and logic
+systems is sometimes called “constraint logic programming”.
+
+From another angle, all of classical algebra (the equation-solving
+stuff, not the modern abstract algebra stuff that grew out of group
+theory) is the application of logic to constraint satisfaction.  So
+you would think that that kind of theorem-proving logic could be
+applied to significantly ease more general kinds of
+constraint-satisfaction problems, where the constraints might include
+things like arbitrary lookup tables, conditionals, and iteration.
+
+### Logic and optimization ###
+
+Both theorem-proving and mathematical optimization intersect with
+constraint satisfaction, but their intersections are sort of
+complementary.  Theorem-proving is associated with (I’m being vague
+here) finite domains, algebraic structures, and various kinds of
+backtracking search.  Mathematical optimization is associated with
+continuous and therefore infinite domains, analytic structures, and
+various kinds of iterative approximation.
+
+But of course in day-to-day math, we often use theorem-proving
+techniques (often with pencil and paper) to transform problems of
+analysis into tractable forms and even to find closed-form solutions
+to them.  So it seems likely that the two approaches are likely to be
+complementary in software as well.
+
+Interval arithmetic
+-------------------
+
+Interval arithmetic is a means to bound the approximation error on an
+approximate calculation by computing on a conservative approximation
+of the answer.  The usual arithmetic operations are defined to operate
+over intervals of the real line in such a way that the result of the
+computation is a conservative approximation of the correct result.  In
+general, narrower bounds on the input will result in narrower bounds
+on the output, although sometimes not as much as you’d hope.
+
+Interval arithmetic has been most investigated as a way to bound the
+approximation error from floating-point roundoff by setting different
+rounding modes, at the cost of considerable performance.  However, it
+has a number of other applications; probably the best known is precise
+and efficient ray-tracing of implicit surfaces, a technique surveyed
+broadly in Jorge Eliécer Flórez Díaz’s 2008 dissertation, but which
+has been developed continuously over the last quarter-century.  In
+this application, it *improves* performance by avoiding redundant
+calculations that will produce the same result.
+
+### Intervals and constraints ###
+
+You can use interval arithmetic to solve constraint satisfaction
+problems over continuous variables by recursive subdivision of the
+problem space, in the same way that I outlined earlier for solving
+optimization problems with a constraint solver, except that you may
+need to recurse into more than one subinterval.  Treating arithmetic
+as constant-time, this approach is probably logarithmic-time in the
+required precision and exponential-time in the number of dimensions,
+and is therefore not practically applicable to problems of high
+dimensionality.
+
+However, it is the only general algorithm I know of for continuous
+constraint satisfaction problems, not being limited to finite domains
+or to constraints of a particular form, such as linear systems or
+polynomials.  (It only requires that the constraints be computable,
+which turns out to imply a particular kind of continuity.)
+
+It’s not completely trivial to get right, because strictly speaking,
+in the form I’ve described, it only guarantees that it wasn’t able to
+prove that *no* points in the selected region satisfy the constraints,
+not that any of them do.  For example, a simple implicit function
+grapher I wrote using interval arithmetic suggests that there may be
+zeroes anywhere the implicit function has a singularity, because the
+result of dividing by an interval containing zero is the interval
+(-∞,+∞), which contains 0.  But small regions around such a
+singularity will typically not contain any zeroes or even numbers
+close to zero.
+
+There are lots of tweaks you can apply to this algorithm, and as with
+other kinds of recursive search algorithms, even fairly minor
+improvements can have enormous effects on efficiency, since they
+exponentially reduce the number of nodes searched.  Some of the things
+I’ve been thinking about are priority queues of regions by size, a
+tighter interval representation that approximates results by  =a linear
+function of input variables over a given input interval, three-way
+partitioning, and choosing partition locations to be closer to the
+part of the region most likely to be feasible.
+
+### Intervals and optimization ###
+
+By the same token, you can use interval arithmetic to solve
+mathematical optimization problems by recursive subdivision.
+
+### Intervals and logic ###
+
+I don’t know how interval arithmetic combines with theorem proving.
+
+Array computation
+-----------------
+
+Array languages are not merely languages which support arrays, as
+almost every programming language does.  They are languages in which
+arrays are first-class values that support aggregate arithmetic and
+computational operations.  They were born in the form of APL in
+1957–1962, but in the 1980s spawned S, IDL, and MATLAB, and since then
+have spawned the languages R, J, K, A+, and Lush, and the Python
+library Numpy, the Perl library PDL, and most recently the
+neural-network-focused libraries TensorFlow and Theano.
+
+Typically the arrays are of arbitrary dimensionality, and sometimes
+they may be called “tensors” or something else.
+
+Fitting a program into the array-programming style requires a
+different kind of thinking than the mainstream record-oriented or
+object-oriented style which evolved, as far as I can tell, from 1950s
+business data processing on machines with a few kilobytes of RAM and
+tape drives.  I find it very awkward.
+
+There are two or three interesting advantages of this way of doing
+things that induce me to keep trying it:
+
+1. Efficient execution.  Originally this was only an advantage for
+   interpreted implementations like the original APLs, Numpy, or old
+   versions of MATLAB; it just pulls the interpretation overhead out
+   of your algorithm’s inner loop.  So C and FORTRAN programmers
+   scoffed, since at best it got you from wasting 99% of your CPU to
+   wasting 50% of it.  Nowadays it’s becoming an advantage even
+   compared to C, C++, or Fortran (TensorFlow originated as a C++
+   library) because the array aggregate operations can be compiled
+   efficiently onto a GPU.  The array operations are generally
+   explicitly parallel, rather than implicitly so as more imperative
+   code usually is.  (R0ml Lefkowitz is the first person I remember
+   making this observation.)
+
+2. Terser code.  By making most loops implicit, arguably the code
+   strips away much of the inessential implementation complexity and
+   reveals the intention of the programmer more clearly.  I feel like
+   this can go either way, but this may be a function of my
+   inexperience with the paradigm.
+
+3. More abstract and thus more flexible code.  Typically the code
+   `a*b` with an array language or library could mean (in Python
+   notation) any of `[ai*bi for ai, bi in zip(a, b)]`,
+   `[a*bi for bi in b]`, `[ai*b for ai in a]` just `a*b`, or even
+   `[[aij*bij for aij, bij in zip(ai, bi)] for ai, bi in zip(a, b)]`,
+   and which one depends on which of the two is a vector or array.
+   This works to your advantage more often than you’d think; if you
+   write a plotting function that takes arrays of X-coordinates,
+   Y-coordinates, and point colors, it will generally just fall out
+   that you can pass in a single color instead of an array of colors
+   when that’s what you want.  This depends, however, on the detailed
+   design of the aggregate operations provided by a particular
+   language, and sometimes it fails in surprising ways.  (And I’m not
+   sure it applies at all to TensorFlow and Theano.)
+
+I’ve been thinking for a while about how to clean up the semantics of
+array languages, and I think there’s an interesting unification
+between array languages and logic languages waiting to be birthed.
+
+One interesting possibility is being able to decide, separate from the
+specification of what is to be computed, that some of the axes of the
+arrays in question should be materialized in time rather than in
+space.
+
+### Arrays and constraints ###
+
+One of the most common uses for libraries and languages like these is
+in solving systems of simultaneous linear equations, which is the
+simplest kind of constraint satisfaction and often occurs as part of a
+larger constraint system (for example, a linear network within a
+circuit containing nonlinear elements); in Numpy, for example, to
+solve Ax = b for x, where A is a matrix and b is a vector, you use
+`numpy.linalg.solve(A, b)`.  Scipy, a library built on Numpy, has a
+sparse-matrices package that can be deployed in the service of solving
+much larger sparse linear systems.
+
+XXX explain here about logic and array languages
+
+### Arrays and optimization ###
+
+One advantage of array formulations of optimization problems is that
+automatic differentiation — which numerically computes a derivative or
+gradient together with the output of a calculation — is easily added
+to an array library like those mentioned, and indeed TensorFlow and I
+think Theano provide this functionality natively.
+
+### Arrays and logic ###
+
+Iverson got a Turing Award for inventing APL, and his lecture was
+entitled _Notation as a Tool of Thought_.  He argued that APL was a
+more formally tractable notation for programs, to which we could more
+easily apply the principles of symbolic reasoning and manipulation.
+Certainly programs in APL and related languages are compact, which is
+a major advantage for symbolic manipulation by hand; could it
+similarly make formal manipulation more tractable?
+
+### Arrays and intervals ###
+
+I don’t think there is any particular synergy between arrays and
+intervals.
+
+Physical system simulation
+--------------------------
+
+From the beginning, one of the most important uses for computers has
+been the numerical simulation of physical systems — whether wing
+flutter in Germany with Zuse’s Z-3, artillery trajectories and H-bomb
+explosions with the ENIAC, the car-crash simulations that were the
+public rationale for the Tera MTA, or the optical systems that modern
+GPUs were developed to simulate.
+
+I am just beginning to learn about finite element analysis, which is
+the most broadly applied method for physical system simulation.
+
+### Simulation and constraints ###
+
+To the extent that you can formulate a simulation in a
+constraint-satisfaction-system-tractable fashion, you can use the
+constraint-satisfaction system to design a physical system that
+satisfies your constraints.  But this is more useful in the context of
+optimization.
+
+### Simulation and optimization ###
+
+The most famous results along these lines are topology optimization,
+which has been used to optimize stiffness, heat transfer, and so on,
+but which seems to me to still be in its infancy despite a third of a
+century of development.  Still almost nobody is optimizing elastic
+bodies for specific stress-strain curves, for example, or searching
+for toolpaths that minimize the heat-affected zone around a kerf.
+
+### Simulation and logic ###
+
+I dunno, I got nothing.
+
+### Simulation and intervals ###
+
+One of the hairy problems with finite element simulation is that it’s
+conducted on a discretized approximation of the actual physical
+system, not the continuous system itself.  The discretization
+introduces errors into the simulation results, but how do you find out
+if those errors are big enough to be significant?  You can use a finer
+discretization and see if the results changed much.  If they do, you
+need to go finer.  But if they don’t, you don’t know if you’re just on
+a plateau and an even finer resolution would give you a big change, or
+not.  I’m told this is an especially big problem with fluid dynamics,
+due to “vorticity, cavitation, backflow, all sorts of wonderful
+nonlinear effects” (@sigfig).
+
+There has been work on bounding these errors using conservative error
+approximation techniques, but I don’t know about them.  The
+straightforward application of interval arithmetic is not enough.
+
+To the point that it’s feasible to bound these errors, it should be
+possible to speed up preliminary simulations enormously by only
+simulating them to very loose tolerances.  This should speed up
+optimization through simulation greatly.
+
+### Simulation and arrays ###
+
+Everybody uses arrays for numerical simulations.  It’s, like, what
+they’re best at.
+
+Automated manufacturing or digital fabrication
+----------------------------------------------
+
+Fabrication is the making of physical objects.  Digital fabrication is
+making them from a design in a computer; the most commonplace example
+is printing out a page on a printer, but it also includes things like
+integrated circuit fabrication and CNC milling.  There’s been a lot of
+excitement around 3-D printing (aka additive manufacturing) in the
+last few years, but that’s only one kind of digital fabrication.
+
+I think digital fabrication is poised to explode over the next few
+years for a variety of reasons: better sensors (producing better
+feedback), better design tools (including simulation), and the
+RepRap-derived community, including things like Thingiverse and
+OpenSCAD.
+
+### Manufacturing and constraints ###
+
+Much of robotics has to do with finding a feasible plan for achieving
+an objective under known constraints.  Toolpath planning for CNC is
+one example; a bad toolpath can do things like drive a cutting tool
+hard against a part of a workpiece it was not supposed to contact.
+
+Even without robotics, of course, things like nesting for panel
+cutting are constraint problems.
+
+### Manufacturing and optimization ###
+
+In those cases, often some plans are much better than others.  A
+manual panel-cutting plan that requires you to reset the fence on the
+panel saw three times is better than one that requires you to set it
+twelve times, unless it results in using three sheets of plywood where
+one would do.  A toolpath can take more or less time and spend more or
+less time far from the optimal feed rate.
+
+We often break down design problems into parts separated by
+abstraction layers in order to make each part tractable on its own.
+Indeed, this is one of the major forces driving additive manufacturing
+in industry in the last few years — it allows you to fabricate a much
+wider range of shapes, increasing the freedom of the design stage.
+But it seems likely that mathematical optimization should be able to
+optimize across many such stages at once, and this is likely to
+provide one or more orders of magnitude improvement in cost/benefit
+ratio.
+
+### Manufacturing and logic ###
+
+I dunno.
+
+### Manufacturing and intervals ###
+
+Likewise.
+
+### Manufacturing and arrays ###
+
+Likewise.
+
+### Manufacturing and simulation ###
+
+Simulation enables optimization in manufacturing.  It also makes it
+possible to reduce the number of prototypes enormously, conceivably
+eliminating the necessity for mass production entirely.
+
+Self-sustaining software systems
+--------------------------------
+
+Self-sustaining systems are those that can compile themselves from
+source code.  PyPy, Squeak, Oberon, and metacompiled Forth are my
+usual examples.
+
+I’m interested in self-sustaining systems for a few different reasons.
+
+XXX movethislater
+
+Incremental computation and caching
+-----------------------------------
+
+Incremental computation is adjusting the output of a computation to
+reflect a change in its input in some way that is cheaper than simply
+recomputing the output from the changed input.  A large fraction of
+our existing software infrastructure is occupied with incremental
+computation, because it’s common to get several orders of magnitude
+performance improvement from it.
+
+Caching or memoization is one strategy for incremental computation;
+this works by breaking a computation into deterministic parts with
+identifiable inputs in a way such that some of the computations have
+no change to their inputs, and therefore are guaranteed to have the
+same output as before; then you simply reuse the previously computed
+result for that part of the computation, thus limiting the work only
+to part whose input has changed.
+
+Examples include executable files (cached compiler output), font
+bitmaps (cached font rasterizer output), window contents backing store
+(cached paint output), the DOM (arguably, cached parser output), any
+in-memory data structure computed from the contents of a file, and any
+number of lower-level pieces of information in your code — basically
+almost anything for which you write a function with the word “update”
+in its name.
+
+This is a very broad topic, including perhaps the majority of software
+in existence, because it’s common for caching of the results of
+computations to convert exponential-time algorithms to linear-time or
+even constant-time algorithms, or to knock off four or more orders of
+magnitude from constant factors.  A unified system for caching that
+was capable of doing a reasonable job at solving these problems could
+increase the power per line of code of software enormously.
+
+(It’s commonly said that the only two hard problems in software are
+naming things and caching (or cache invalidation).)
+
+The few interesting projects on this front are Apache Spark, redo, and
+Self-Adjusting Computation.
+
+Caching isn’t the only way to do incremental computation.  It’s also
+possible, though less common, to compute a new output from the old
+output and some kind of description of the change.  This is typically
+the approach taken with RDBMS indices — when an indexed value is
+updated in the underlying table, rather than recomputing the index or
+part of the index from the new table contents, the database adds a new
+index entry and deletes or invalidates the old one.  This kind of
+incrementalization requires the processing being incrementalized to
+preserve some kind of homomorphism between the input and output such
+that the change to the output can be computed from the change to the
+input.
+
+### Incrementality and constraints ###
+
+There are some incremental constraint systems, which can propagate an
+incremental change to constraints more efficiently than recomputing a
+constraint from scratch.  Constraint systems implemented by
+optimization will typically have this property by default.
+Combinatorial search (for constraints over finite domains) also likely
+benefits from reusing parts or most of a previously-valid solution.
+
+The other angle on this would be using a constraint system to make a
+computation incremental.  This might work but I’m not sure how.
+
+### Incrementality and optimization ###
+
+As mentioned above, optimization systems that work by iterative
+approximation will tend to have incremental properties — a small
+change in the objective function or the constraints will get a big
+performance boost from having an existing approximately-correct
+solution.
+
+The other angle on this would be using a mathematical optimization
+system to carry out general incremental computation.  In particular,
+caching systems face difficult choices about which cached computations
+to throw away and which to keep; space is always finite, relevant
+information about what to keep is always incomplete, and good choices
+can speed things up by many orders of magnitude overbad choices.
+
+### Incrementality and logic ###
+
+Tabled resolution is the standard way to cache logical conclusions in
+Prolog-derived logic-programming systems.  I don’t know anything about
+it.
+
+In more general theorem-proving systems, which I also don’t know
+anything about, I have the impression that tactic choice and proofs
+can be reused from one run to the next of the proof assistant, saving
+the time of expensive searches; as with combinatorial search in
+constraint systems, this should be a huge win.
+
+Using theorem-provers to support strategies for incremental
+recomputation also seems feasible, both in informing cache eviction
+strategies (if you can prove that something will be used again in the
+near future, it may be a poor choice to evict from cache) and in
+proving that an incrementalization strategy doesn’t introduce bugs.
+This seems necessary if homomorphism-based incrementalization (as
+opposed to caching) is to be correct, and would be sufficient to
+introduce it automatically where applicable.
+
+### Incrementality and intervals ###
+
+One of the more interesting ideas in Flórez Díaz’s dissertation is
+that interval arithmetic can avoid computation and thus dramatically
+accelerate ray-tracing, especially of animations.  If you determine
+that for 0≤*x*≤0.1, 0.2≤*y*≤0.3, 0≤*t*≤5, some conditional yields false,
+then you don’t have to recompute anything in that x-y area guarded by
+that conditional when *t* increases from 1 to 2.
+
+Applying this idea more generally, it may be possible in some cases to
+compute a description of how *much* some input would have to change in
+order to change an output.
+
+And, of course, the recursive refinement algorithm I described earlier
+for using interval arithmetic to solve optimization and constraint
+problems could in theory benefit enormously from incrementalization,
+since each subdivision of the problem space changes only one input
+from the previous iteration.
+
+### Incrementality and array languages ###
+
+Incremental recomputation of arrays or parts of arrays seems like an
+interesting idea.  The array language K implements some version of it.
+Some relevant considerations:
+
+- Array languages expose many computations to the runtime at a higher
+  level than other languages, which could potentially make it more
+  feasible to do even homomorphism-based incrementalization
+  automatically.  The dependencies between values in different arrays
+  are generally more regular than the dependencies generated by
+  arbitrary code, so it should be feasible to keep more of them
+  around.
+
+- If the unit of caching and recomputation is individual elements
+  rather than entire arrays, tracking valid/invalid bits for large
+  arrays should be much cheaper than tracking them for numerous random
+  small objects.
+
+### Incrementality and simulation ###
+
+Incrementalizing simulation of physical systems would be super
+awesome; if you could get a 1000× speedup on second and subsequent
+simulations of slight variations of a design by reusing data computed
+in the first iteration, you could try 1000× as many variations.
+Straightforward caching won’t get you there, because typically any
+change to any part of the system design immediately reverberates
+through the system, creating tiny, possibly insignificant changes
+everywhere.  I think this might be possible, on the other hand, under
+some circumstances, with the interval-arithmetic ideas I mentioned
+earlier — you may not care to find the precise stiffness of each
+design, for example, but only to optimize the stiffness by finding the
+stiffest variant.
+
+### Incrementality and manufacturing ###
+
+I don’t think I have anything to say here that isn’t said above.
+
+### Incrementality and self-sustaining systems ###
+
+A coherent incremental recomputation system may be a key to getting a
+self-sustaining system down to a reasonable size.
+
+XXX movethislater
+
+Reproducibility
+---------------
+
+Reproducibility is the foundation of science.  Science is what can be
+demonstrated.  Irreproducible results cannot be demonstrated; you must
+take it on faith that the person reporting them is reporting them
+accurately, and so there is no tendency toward self-correction over
+time.
+
+We have a limited kind of reproducibility with our current software;
+often enough, you can download a piece of software, possibly recompile
+it with current libraries, and have it work on your computer.  But
+often this requires some work to get it running, and even if it
+appears to work, you don’t know if it works the same way it worked on
+other people’s computers in the past.  So if they reported some
+results with it, and you get conflicting results, you don’t know why
+that is.
+
+Nix and Guix are efforts to make software more reproducible by nailing
+down all its dependencies, and they enhance the reproducibility
+situation significantly.  However, the bootstrap kernel for either of
+them is fairly large, and they rely on unreliable third-party websites
+to host the tarballs of the dependencies, with the result that this
+reproducibility still has big holes in it.
+
+I think we can do considerably better, keeping the initial bootstrap
+kernel very small indeed — small enough that it can be reimplemented
+from scratch on a new platform in a few hours.
+
+### Reproducibility and constraints ###
+
+Constraint-solving systems are inherently nondeterministic in a way
+that imperative systems are not; the solutions they find, and indeed
+whether they find a solution at all even when one exists, may vary
+depending on details of their search strategies.  This potentially
+poses problems for reproducibility, since the effects of changes may
+be hard to track.
+
+For a weak form of reproducibility, this is not a problem, since we
+can compile a theoretically nondeterministic constraint-solving system
+into a deterministic imperative form before using it.  But a stronger
+form of reproducibility, in which we can reason about what effects
+will be produced by a given change, will be frustrated by it, because
+the effects of altering constraint-solving things will be mostly by
+virtue of changing which of many possible acceptable solutions will be
+found first.
+
+### Reproducibility and optimization ###
+
+Optimization is even more sensitively dependent on random nonsense and
+thus that much more difficult to achieve reproducibility in.  Worse,
+being able to take advantage of things learned during previous
+optimization sessions may be really crucial to making
+optimization-based computation feasible, in a way that it isn’t for
+traditional programming paradigms.  To some extent, it may be possible
+to paper over this using caching approaches to incrementalization.
+
+However, to the extent that optimization can be used as a way
