@@ -3,7 +3,6 @@
 
 Next up:
 
-- use H1 tags if you’ve got ’em
 - interfile links: replace "`foo-bar`" or “file `foo-bar`” with [title
   of foo bar](foo-bar).
 - some kind of fucking CSS, Jesus.  Copy Medium or whatever.
@@ -34,6 +33,7 @@ class Bundle:
         self.dirname = dirname
         self._triples = list(load_triples(self.filename('triples')))
         self.output_dir = 'dercuano-' + self.get_version()
+        self.cached_titles = {}
 
     def __repr__(self):
         return 'Bundle(%r)' % self.dirname
@@ -57,7 +57,11 @@ class Bundle:
         for notename in os.listdir(dirname):
             if notename.endswith('~') or notename.startswith('.'):
                 continue
-            yield Note(self, notename, os.path.join(dirname, notename))
+            yield self.note(notename)
+
+    def note(self, notename):
+        dirname = self.filename('markdown')
+        return Note(self, notename, os.path.join(dirname, notename))
 
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
@@ -85,7 +89,26 @@ class Bundle:
         for subj, verb, obj in self.triples():
             if subj == notename and verb == 'titled':
                 return obj
+
+        internal_title = self.internal_title(notename)
+        if internal_title is not None:
+            return internal_title
+
         return notename.replace('-', ' ').capitalize()
+
+    def internal_title(self, notename):
+        if notename not in self.cached_titles:
+            self.cached_titles[notename] = self.read_internal_title(notename)
+        return self.cached_titles[notename]
+
+    def read_internal_title(self, notename):
+        with open(self.note(notename).source_file) as f:
+            possible_title = f.readline().strip()
+            possible_title_marker = f.readline().strip()
+            if possible_title_marker and all(c == '='
+                                             for c in possible_title_marker):
+                return possible_title
+            return None
 
     def category_title(self, category_name):
         for subj, verb, obj in self.triples():

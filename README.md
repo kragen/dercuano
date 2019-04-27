@@ -35,3 +35,9 @@ Dependencies
 
 Dercuano depends on the Python Markdown module, the one started by
 Manfred Stienstra, and Python 2.  I’m using 2.7.12.
+
+Time log
+--------
+
+2019-04-26 21:41 to 02:25
+2019-04-27 10:38 to ???
