@@ -3,9 +3,8 @@
 
 Next up:
 
-- linking the note from its category pages,
-- linking the category pages from the note page,
-- linking the category pages from the index page.
+- some kind of fucking CSS, Jesus.
+- another note or two
 
 """
 from __future__ import print_function
@@ -61,8 +60,10 @@ class Bundle:
             self.generate_category(category)
 
     def category_filename(self, category):
-        return self.output_filename('categories',
-                                    as_filename(category) + '.html')
+        return self.output_filename(self.category_localpart(category))
+
+    def category_localpart(self, category):
+        return 'categories/' + as_filename(category) + '.html'
 
     def note_filename(self, notename):
         return self.output_filename(self.note_localpart(notename))
@@ -75,6 +76,16 @@ class Bundle:
             if subj == notename and verb == 'titled':
                 return obj
         return notename.replace('-', ' ').title()
+
+    def category_title(self, category_name):
+        for subj, verb, obj in self.triples():
+            if subj == category_name and verb == 'category-titled':
+                return obj
+        return category_name.replace('-', ' ').title()
+
+    def category_link(self, category_name, level=1):
+        return a(self.category_title(category_name),
+                 href='../' * level + self.category_localpart(category_name))
 
     def generate_category(self, category):
         vomit_html(self.category_filename(category),
@@ -109,6 +120,9 @@ def vomit_html(output_filename, html_contents):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
+    if isinstance(html_contents, unicode):
+        html_contents = html_contents.encode('utf-8')
+
     with open(output_filename + '.tmp', 'w') as f:
         f.write(html_contents)
 
@@ -122,15 +136,25 @@ ok(as_filename('a/bad file\\name: this\0'),
    'a%2Fbad+file%5Cname%3A+this%00')
 
 def category_html(bundle, category_name):
-    return ley(html(title('Category ', category_name),
-                    head_stuff()))
+    category_title = bundle.category_title(category_name)
+    return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
+                    head_stuff(),
+                    h1(category_title),
+                    ul([li(note.link_ley())
+                        for note in bundle.notes()
+                        if category_name in note.categories()])))
 
 def index_html(bundle):
+    categories = sorted(bundle.categories())
     return ley(html(title(bundle.get_title(),
                           ' version ', bundle.get_version()),
                     head_stuff(),
                     ul([li(note.link_ley(level=0))
-                        for note in bundle.notes()])))
+                        for note in bundle.notes()]),
+                    div(h2('Categories'),
+                        ul([li(bundle.category_link(category, level=0))
+                            for category in categories]))
+                    if categories else []))
 
 def ley(htmlish):
     "HTML generator.  Tiny version of Stan from Nevow."
@@ -174,7 +198,8 @@ def tags(*tagnames):
     for tagname in tagnames:
         yield tag(tagname)
 
-html, title, h1, ul, li, a = tags('html', 'title', 'h1', 'ul', 'li', 'a')
+html, title, h1, h2 = tags('html', 'title', 'h1', 'h2')
+div, ul, li, a = tags('div', 'ul', 'li', 'a')
 
 class RawHTML:
     def __init__(self, html):
@@ -212,7 +237,16 @@ class Note:
     def render(self):
         with open(self.source_file) as f:
             body = markdown.markdown(f.read().decode('utf-8'))
-        return note_html(self.bundle, self.title(), body)
+        categories = sorted(self.categories())
+        return note_html(self.bundle, self.title(), body,
+                         div(h2('Categories'),
+                             ul([li(self.bundle.category_link(category))
+                                 for category in categories]))
+                         if categories else [])
+
+    def categories(self):
+        return set(obj for subj, verb, obj in self.bundle.triples()
+                   if subj == self.notename and verb == 'concerns')
 
     def is_outdated(self):
         source_stat = os.stat(self.source_file)
@@ -226,11 +260,12 @@ class Note:
         return output_stat.st_mtime <= source_stat.st_mtime
 
 
-def note_html(bundle, note_title, body):
-    return ley(html(title(note_title + ' ⁑ ' + bundle.get_title()),
+def note_html(bundle, note_title, body, footers):
+    return ley(html(title(note_title, ' ⁑ ', bundle.get_title()),
                     head_stuff(),
                     h1(note_title),
-                    RawHTML(body)))
+                    RawHTML(body),
+                    footers))
 
 def head_stuff():
     return [tag('meta')(charset="utf-8")]
