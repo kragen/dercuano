@@ -5,6 +5,7 @@ Next up:
 
 - some kind of fucking CSS, Jesus.
 - another note or two
+- a more convenient way to query the triple store
 
 """
 from __future__ import print_function
