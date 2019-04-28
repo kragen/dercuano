@@ -57,7 +57,7 @@ class Bundle:
     def notes(self):
         dirname = self.filename('markdown')
         for notename in sorted(os.listdir(dirname)):
-            if notename.endswith('~') or notename.startswith('.'):
+            if notename.endswith('~') or notename[0] in '.#':
                 continue
             yield self.note(notename)
 

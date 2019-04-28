@@ -43,5 +43,7 @@ Manfred Stienstra, and Python 2.  I’m using 2.7.12.
 Time log
 --------
 
-2019-04-26 21:41 to 02:25 (4½ hours) initial version (11 notes, tables of contents, HTML generation)  
-2019-04-27 10:38 to ??? (get titles from Markdown, add links between notes, add CSS)
+2019-04-26 21:41 to 02:25 (4½ hours): initial version: 11 notes, tables of contents, HTML generation  
+2019-04-27 10:38 to 14:30 (4 hours): get titles from Markdown, add links between notes, add CSS, clean up categorization, add 11 more notes  
+2019-04-27 16:28 to ???: fix CSS to be pretty nice instead of outstandingly shitty
+

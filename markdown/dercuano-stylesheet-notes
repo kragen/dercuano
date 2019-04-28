@@ -1,0 +1,360 @@
+I want to spiff up the Dercuano display a little so that it is
+pleasant to read, but more with the objective of being like a book
+than being like an advertising brochure.
+
+Medium
+------
+
+I looked at Medium to see how they’re doing things.  They set the
+article title and article text in a serif font (falling back to
+Georgia if their proprietary font fails to load) and article section
+titles in a sans-serif font (falling back, similarly, to Helvetica);
+everything uses rgba(0, 0, 0, 0.84) except for the line underneath the
+title in gray and the pullquotes.  (0.84 is the fourth root of ½.)
+The article had a font-size of 21 pixels and a line-height of 1.4; the
+main article title had font-size of 46 pixels; and the subtitles were
+somewhere in between in size.  The subtitles were somewhat bold and
+left-aligned.
+
+The article section titles have some vertical whitespace around them,
+but I don’t remember how much.
+
+Article category links are at the end of the article in light gray
+boxes with rounded corners, generally all on the same line.
+
+They’re using a different serif font with Clarendon slab serifs for
+drop-caps, and to get hanging punctuation on paragraphs that open with
+open-quotes, they use a paragraph-opening-with-open-quotes class to
+set text-indent to -0.4em.
+
+The body text is set in a single column with a max-width of 700
+pixels, which works out to 33 ems.  It’s centered with `margin: foopx
+auto` at the appropriate level of nesting; inline images are also
+centered but in a wider column, so they can reach the margins on a
+small screen.  Despite using a serif font like a real book, they use a
+ragged right margin, at least in Chrome — possibly a concession to the
+lack of hyphenation.
+
+Font files
+----------
+
+I looked at downloading Noto to bundle, but Noto is humongous; the
+whole bundle is 1.1 GB, and even just a CJK ideograph bundle is 100+
+megs.  So I pretty much have to rely on system fonts for Dercuano,
+since keeping the download bundle self-sufficient and small is pretty
+much the whole point.  (Also, I can’t find a Noto subset that includes
+the Latin letters this text is written in.)
+
+Books
+-----
+
+There’s an interesting question as to whether type should be larger or
+smaller on a computer screen than in a book.  On a computer screen, of
+course, you never run out of paper; the “paper” is free; so maybe you
+should use larger type.  But often the screen is smaller than a
+two-page spread in a book, and if you have two books open at once they
+have to share the same screen; so maybe you should use smaller type.
+But often the screen is of much worse resolution, so maybe you should
+use larger type.  And maybe the screen is further away, so maybe you
+should use larger type.
+
+But probably the differences from standard book practices for books
+should be justifiable.  For example, books don’t have to be readable
+on a cellphone screen, and when they can take advantage of color or
+even grayscale, it adds substantial extra cost, and it suffers a
+substantial loss of resolution due to halftoning.  Furthermore,
+printing with movable type *on top of* a color or even grayscale
+background, as opposed to inserting figures, is basically impossible.
+So there might be reasons other than imitating sales brochures for
+using color.
+
+### _T<sub>E</sub>X: the Program_ ###
+
+This book is arguably some kind of referent for readable typesetting,
+but maybe not the copy of it I’m looking at.  On my monitor at a
+comfortable zoom, the line spacing in its paragraphs is about 32
+pixels, the x-height is about 11 pixels, and the spacing of lowercase
+“m”s is about 25 pixels; and a line is about 1350 pixels wide, which
+is a bit wide for my taste (about 19 words per line!) but certainly
+helps with the justification.  And the paragraphs in the book are
+mostly very short, so long lines don’t impede readability as much as
+they might.
+
+If we take the font size (1 em) to be nominally 24 pixels, that works
+out to a CSS line-height of 1.33 (ems), a width of 56.25 ems, an “m”
+of 1.04 ems, and an x-height of 0.46 ems, which is pretty readable.
+
+At this zoom, the page is 285 mm wide, which is 1.36× the 210-mm width
+of A4 paper and 1.32× the 216-mm width of US letter-size paper it was
+most probably formatted for, and those 1350-pixel lines are 217 mm
+wide, which is 161 μm per pixel (158 dpi).  We can conclude that the
+book was set in type of around 24 pix · 1.32 · 161 μm/pix = 5.1 mm =
+14.5 PostScript points.
+
+Each section (of which most consist of a single paragraph) begins with
+a boldfaced paragraph number for hyperlinking, and some of them also
+include a boldfaced topic for that “part”, which is typically several
+pages’ worth, and begins at the top of a new page.  This inline “part
+header” is the same size as the rest of the text.  Between sections,
+there is a blank space (a vertical skip) of about a line in height,
+and there is a smaller vertical skip between text and code.  Code is
+annotated below with a backlink in smaller type: “This code is used in
+section 726,” and sometimes also, “See also sections 20, 26, ...”.
+The smaller type is reduced in size by about a factor of 1.4.
+
+There is no further rubrication other than the index and table of
+contents at the end of the book.
+
+### _Tick, Tock_ ###
+
+This is a Dean R. Koontz thriller, or possibly a comedic satire of
+thrillers.  The copy I have here is a Ballantine paperback, justified
+with narrow margins (9 mm) in a traditional curved-serif font, with
+paragraph indents and no extra vertical space between paragraphs.  The
+apostrophes are poorly kerned with too much space to their right;
+combinations like “ov”, “Vi”, and “To” are also kerned with too much
+space — perhaps if Koontz had known his book would be printed like
+this, he wouldn’t have named his main character “Tommy”.  There are 32
+lines per page; the last 31 of them measure 147 mm, giving 4.7 mm or
+13.4 PostScript points per line; the spacing between letters “m” is
+about 4.0 mm or about 11 points.  This suggests that the book is set
+in 12-point type with about an extra 0.12 ems of leading between the
+lines.
+
+This book was printed in 1996, so it doesn’t have any vertical
+typewriter quotes; all of its quotes and apostrophes are of the proper
+9, double 6, and double 9 types.
+
+Each page holds about 290 words, which works out to 9.1 words per
+line; within paragraph bodies (excluding indents and last lines) the
+average is closer to 10.  Typically there are zero to two hyphenations
+per page, so at times the word spacing is a bit uneven, but the
+average word length is pretty short, so it’s not as bad as you’d
+think; to illustrate the word length, here’s a randomly chosen
+paragraph on p. 210:
+
+> “But I *don’t* believe they come all the way across the galaxy to
+> kidnap people and take them up in flying saucers and examine their
+> genitals.”
+
+There are abundant italics, but outside of titles, there is no
+boldface.
+
+The main book title on the title page (in bold capitals) has a
+line-height of about 15 mm (43 points), and the author’s name is set
+below it (in bold capitals) with a line-height of about 11 mm (31
+points).  Each chapter title (“ONE”, “TWO”, “A NOTE TO THE READER”,
+etc.) is set (in bold capitals) with a line-height of about 7 mm,
+underlined with the same small illustration.  Chapter titles start on
+new pages, but many start on even pages, leaving no pages blank.
+Other than page headers, there is no other rubrication or division in
+the book, such as horizontal rules or lines of asterisks.
+
+The book feels a bit crowded with its 2-em margins, short lines,
+narrow leading, and no vertical skips.  But I suppose lulling you into
+too much tranquility would defeat the purpose of the book, as well as
+cutting into Ballantine’s profits with extra paper costs.
+
+### _The Grammar of Graphics_ ###
+
+This is a recent (2005) semi-academic book published in hardcover by
+Springer, with, unusually, bright white glossy paper and
+color — apparently finely halftoned CMYK, on every page.  That’s
+because it’s a treatise on the visual display of quantitative
+information, and the authors have dedicated a great deal of care to
+its visual appearance; they set it in Times Roman and Times Italic
+with FrameMaker.  There is a strong hierarchical structure to the
+book, with numbered section headers that frequently run four levels
+deep (“*6.2.5.3 Fisher’s z Scale*”), which are all in Times Italic.
+There are occasional subheaders before level-4 headers, which are not
+numbered.  Paragraphs are indented (except when following a header)
+and justified, but with no extra vertical skip between them.
+
+There are about 46 lines per page, although there is extra leading
+around headings, figures, equations, and blockquotes, and the text
+never runs for an entire page without being interrupted with headings,
+figures, equations, or blockquotes.  Lines are 115 mm long, typically
+containing about 12–14 words, and the lines within a single paragraph
+are rather tight; 10 lines are 40 mm high, giving 4.0 mm or 11.3
+points as the line height, and the escapement of an “m” also measures
+4.0 mm.  (XXX apparently it’s more like 3.0 mm?)  Hyphenation is quite
+frequent, so whitespace is very consistent despite justification.
+Margins are a generous 20mm to the sides and 22mm at the bottom of the
+page; the top margin below the page header is smaller, more like 9mm,
+but there’s another 15mm above the page header.
+
+This suggests that the text is set in 11-point Times Roman with no
+leading and 30-em lines.
+
+Level-1 headings (“14. Time”) are chapter headings.  The chapter
+number is set in bold italic with a line height of about 16 mm
+(44 pt), while the chapter name is set below it below an 8-mm skip in
+medium italic at about 8 mm (22 pt).  Both of these parts of the
+header are right-aligned.  The page header above the chapter title is
+omitted, and blank pages are used to ensure that chapters always begin
+on odd pages.  Below the chapter header, there is a skip of some 24 mm
+above the body text.
+
+Level-2 headers (“14.1 Mathematics of Time”) are set in italic, with
+the header number in bold, and are set somewhat larger than the body
+text, perhaps twice the point size (8 mm, 22 pt), though it seems to
+be about 25% smaller than the chapter title somehow.  There is only a
+small extra skip below them, but about a one-line skip above them.
+There is an extra large space, about a quad, between the number and
+the title; they also do this after bullets in bulleted lists, and
+Knuth also did it after section numbers.
+
+Level-3 headers (“14.1.1 Deterministic Models of Time”) are set in the
+same bold/bold-italic combination of styles, but in a slightly smaller
+font-size, again by about 25%, but still about a 50% larger point size
+than the body text.  These *do* have extra leading below them, though
+less than above.
+
+Level-4 headers (“14.1.1 Orbits and Vibrations”) are set entirely in
+bold italic, and the body text is smaller than they are by about 25%.
+Perhaps the bold is intended to add contrast with the body text to
+compensate for the smaller difference in size, or perhaps bold was not
+used in the larger titles simply to avoid overwhelming the reader.
+Again, they have extra leading above and below.
+
+Level-5 subheaders (e.g., “Updates” on p. 438, within §14.3.3.1
+“Data”) are the same size and with apparently the same leading as
+level-4 headers, but without numbers.
+
+FrameMaker’s typesetting of the equations is very much inferior to
+T<sub>E</sub>X’s, with poor kerning, parentheses that fail to enclose
+and whose line thickness never varies (though that of the letters and
+digits does), and so on.  Aside from that, though, its layout is much
+the same.
+
+The leading above headers, of course, goes away when they are at the
+top of a page.
+
+They use a monoline sans-serif font for the names of their data
+series.
+
+Figures are captioned below in italic; text never flows around
+figures.
+
+I think a good approximation of the layout can be expressed as follows:
+
+1. Body text is 11-point Times Roman with 30-em justified paragraphs.
+   Paragraphs that don’t follow headers are indented by two ems.  Body
+   text has no extra leading, even between paragraphs.
+2. The text sizes of headers of levels 4, 3, 2, and 1 are a geometric
+   progression ending at 22 points; this would make them 13.1-point,
+   15.6-point, 18.5-point, and 22-point, or, expressed in ems of the
+   body text, 1.19 ems, 1.41 ems, 1.68 ems, and 2.0 ems.
+4. Except that chapter numbers are on a separate line in 44-point text.
+5. Chapter headers are right-aligned with page breaks to an odd page
+   before them.  All other headers are left-aligned with leading above
+   them equal to their line-height and leading below equal to the
+   line-height of the body text.
+
+Occasionally two headers (of different levels) occur in succession.
+
+### _How to Make a Telescope_ ###
+
+This is a 1957 English translation, published in the US by
+Interscience Publishers, of Jean Texereau’s 1951 French text _La
+construction du télescope d’amateur_.  This copy was apparently
+acquired by the Northtown–Shiloh Library in Dayton in 1958 (and
+rebound by The Kalmbacher Bookbinding Co., in Toledo), so it was
+probably printed in 1957.  Like _Grammar of Graphics_, it’s printed
+entirely on glossy paper, although it’s yellowed a bit in the ensuing
+60 years; the purpose is again fine halftoning, but this time only in
+black and white.
+
+Its body text is set in a serif font in justified paragraphs with what
+T<sub>E</sub>X calls "French spacing" — about twice as much space
+after periods and colons as between words.  The paragraphs
+occasionally have figures centered in the middle of them; they never
+flow around figures, and they are all indented, by about three or four
+ems.  More surprisingly, section headers within chapters (“II-18.  The
+Polishing Operation” — bold, in the same size as the body text, with
+leading below and even more extra leading above) are also indented by
+the same amount as the paragraphs.  10 lines occupy 42 mm, so the line
+spacing is 11.9 points — might as well call it 12 points.
+
+The chapter titles (“II.  Making the Main Mirror”) are preceded by
+page breaks to put them at the top of an odd-numbered page, and with a
+page-width vertical rule underneath the (right-justified) Roman
+numeral, below which is a vertical skip of some 17 mm, and
+right-justified, given extra letter-spacing, in a sans-serif font, in
+all capitals, in a somewhat larger text size (perhaps 16 points rather
+than 12), is the title.  Beneath the title is another 20mm of leading
+and then the section header of the first section of the chapter.
+
+The Roman numerals at the openings of chapters are still larger than
+the chapter titles themselves; perhaps they reach 24 points.
+
+Some of the numbered sections are contain unnumbered subsections,
+indicated in the table of contents; the subsection titles occur at the
+beginning of a paragraph in italic.
+
+References are given in footnotes in a somewhat smaller font, perhaps
+9 pt.
+
+Data tables are captioned above in all capitals (in the same font as
+the body text) and divided into sections with page-width horizontal
+rules.  Columns are separated by whitespace with no rules.  Figures
+are captioned below in the same smaller font used for footnotes.
+
+Firefox default styles
+----------------------
+
+Firefox’s default for body text on my laptop is 16 pixels with
+font-weight 400, for `<h1>` it's 32 pixels with font-weight 700, and
+for `<h2>` it’s 24 pixels with font-weight 700.
+
+As I said before, my pixels are about 161 μm, so 16 pixels is 7.3
+points, which seems pretty small to me.  The 14.5 points at which
+_T<sub>E</sub>X_ is set seems more reasonable, and the 19 points to
+which I had it zoomed is eminently readable.
+
+Firefox’s default margins for `<h2>` etc. are equal on top and bottom,
+which is semantically idiotic; headers belong to the text below them,
+not the text above them.  Right now I have an `<h2>` with 29.6px
+margin-bottom and a font-size of 35.7px, and an `<h3>` with 29.4px
+margin-bottom and a font-size of 29.4px.  And the `<h1>` on top of
+everything has a 28.1px margin-bottom and a font-size of 42px.
+
+Typewriter type
+---------------
+
+One complicating factor is that I use Markdown’s typewriter type
+fairly often to “quote” things from character-cell terminals, which
+normally have at least 80 columns.  It would be nice for those quotes
+to fit into the column.  Here’s an 80-column box:
+
+    0123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789
+    |                                                                              |
+    0123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789
+
+If that doesn’t fit nicely into the column of text, the aesthetic
+experience is suboptimal.  With a max-width of 40em and the same font
+size among the paragraph text and the typewriter text it only fits up
+to about column 66, so I need about 21% more width, or 17.5% less,
+from the other point of view.  Right now, I’m using 21-pixel body
+text, which is pretty ideal from a readability point of view.  I
+should be able to make a reasonable compromise and get things to fit:
+6.6% larger body text, 6.6% longer lines, and 6.2% smaller typewriter
+text; that works out to about 43em width, 22px body text, and 19px
+typewriter text, giving a total compression of 24.5%.
+
+That worked nicely!
+
+Looser letter spacing
+---------------------
+
+As Aristotle Pagaltzis taught me, to some extent, we can trade off
+text size against letter spacing; one of the bottlenecks in reading is
+apparently the crowding of information per unit area in the fovea.  So
+text can be hard to read because, although each letterform is
+individually fine, there are too many of them in too little space.
+This means that if you shrink the letterforms but leave them at the
+same number of letters per square inch, you can maintain the same
+readability, up to a point.
+
+I may try this with the body text: add an extra 10% letter-spacing and
+line-height and reduce the font-size by a corresponding 9.1%.
