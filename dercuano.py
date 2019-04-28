@@ -5,7 +5,6 @@ Next up:
 
 - maybe reify categories as a class?
 - add author name to pages
-- add an introductory paragraph to the index page
 - a more convenient way to query the triple store
 - maybe some metadata about word counts and time spans and unfinished
   status?
@@ -56,6 +55,10 @@ class Bundle:
                 return obj
 
         return 'Dercuano'
+
+    def get_intro(self):
+        with open(self.filename('intro.md')) as f:
+            return RawHTML(markdown.markdown(f.read().decode('utf-8')))
 
     def notes(self):
         return self.note_list
@@ -283,14 +286,18 @@ def index_html(bundle):
     bundle_title = bundle.get_title()
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(level=0),
-                    h1(bundle_title, ' notes'),
+                    h1(bundle_title),
+                    bundle.get_intro(),
+                    h2('Notes'),
                     ul([li(note.link_ley(level=0), "\n")
                         for note in bundle.notes()]),
                     div(h2('Topics'),
                         ul([li(bundle.category_link(category, level=0), "\n")
                             for category in categories
                             if len(bundle.notes_in_category(category)) > 1]))
-                    if categories else []))
+                    if categories else [],
+                    script(src="liabilities/addtoc.js"),
+    ))
 
 def ley(htmlish):
     "HTML generator.  Tiny version of Stan from Nevow."

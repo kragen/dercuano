@@ -359,6 +359,14 @@ readability, up to a point.
 I may try this with the body text: add an extra 10% letter-spacing and
 line-height and reduce the font-size by a corresponding 9.1%.
 
+I tried that, and also a more extreme version where I changed
+max-width from 45em to 54em, the font-size from 22px to 18.3px, the
+line-height from 1.4 to 1.68, and added .2em of letter-spacing.  The
+result still took up about the same space and was still readable from
+the same distance as the normal text, but it feels noticeably less
+comfortable.  Instead of spacious, it feels fussy.  The looser
+line-spacing does seem like an improvement, so I increased it to 1.5.
+
 Smaller headings
 ----------------
 
@@ -380,3 +388,47 @@ body text in any case, so perhaps I should make the last three levels
 the same size as the body text, distinguished only with different
 typography (say, bold, roman, and italic), permitting the use of sizes
 like 1.4em and 1.2em for `<h2>` and `<h3>`.
+
+(At the moment, actually, only `low-power-micros` even used `<h5>`,
+and it only does so once; nothing used `<h6>`.)
+
+So that’s how I ended up with these somewhat less extreme font styles for
+headers:
+
+    h1 { font-size: 2em }
+    h2 { font-size: 1.59em }
+    h3 { font-size: 1.26em }
+    h4, h5, h6 { font-size: 1em }
+    h4 { font-weight: bold; font-style: italic }
+    h5 { font-weight: normal; font-style: italic }
+    h6 { font-weight: normal; font-style: normal }
+    h2, h3, h4, h5, h6 { font-family: Helvetica,Arial,sans-serif }
+
+Here’s the current cascade from `<h3>` on down, with some sample body
+text I didn’t write:
+
+### Waltz, nymph, for quick jigs vex Bud `<h3>` ###
+
+He made also ten lavers, and put five on the right hand, and five
+on the left, to wash in them: such things as they offered for the
+burnt offering they washed in them; but the sea was for the priests to
+wash in.
+
+#### Waltz, nymph, for quick jigs vex Bud `<h4>` ####
+
+And there were six steps to the throne, with a footstool of gold,
+which were fastened to the throne, and stays on each side of the
+sitting place, and two lions standing by the stays:
+
+##### Waltz, nymph, for quick jigs vex Bud `<h5>` #####
+
+And the Philistines gathered themselves together to fight with
+Israel, thirty thousand chariots, and six thousand horsemen, and
+people as the sand which is on the sea shore in multitude: and they
+came up, and pitched in Michmash, eastward from Bethaven.
+
+###### Waltz, nymph, for quick jigs vex Bud `<h6>` ######
+
+The hand of the LORD was upon me, and carried me out in the
+spirit of the LORD, and set me down in the midst of the valley which
+was full of bones,

@@ -15,11 +15,11 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this piece of shit for 17½ hours,
+I’ve been hacking on this piece of shit for 19½ hours,
 which means that at this point it’s gone from an “afternoon hack”
 to a “weekend hack”.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
-compressed.  So far I have stuck 44 of them in, totaling 621K and
+compressed.  So far I have stuck 90 of them in, totaling 621K and
 240,000 words.  So I
 am about three or four doublings away from finishing the job;
 the last doubling, adding 46 documents, took less than three hours, but
@@ -50,6 +50,7 @@ Time log
 
 2019-04-26 21:41 to 02:25 (4½ hours): initial version: 11 notes, tables of contents, HTML generation  
 2019-04-27 10:38 to 14:30 (4 hours): get titles from Markdown, add links between notes, add CSS, clean up categorization, add 11 more notes  
-2019-04-27 16:28 to 21:34 (5 hours): fix CSS to be pretty nice instead of outstandingly shitty; test on Android; push to Gitlab
-2019-04-28 01:16 to 02:30 (1 hour): add 21 more notes, bringing the total to 44
-2019-04-28 13:27 to 16:24 (3 hours): add 46 more notes, bringing the total to 90
+2019-04-27 16:28 to 21:34 (5 hours): fix CSS to be pretty nice instead of outstandingly shitty; test on Android; push to Gitlab  
+2019-04-28 01:16 to 02:30 (1 hour): add 21 more notes, bringing the total to 44  
+2019-04-28 13:27 to 16:24 (3 hours): add 46 more notes, bringing the total to 90  
+2019-04-28 17:25 to 19:25 (2 hours): tweak CSS some more, add introduction to main page
