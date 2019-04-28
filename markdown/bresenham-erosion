@@ -1,0 +1,260 @@
+I was thinking about how to implement the grayscale morphological
+“erosion” and “dilation” operations efficiently with a large irregular
+structuring element, and I think I’ve found an interesting algorithm;
+it may be novel, although it isn’t *very* novel.
+
+In the contex of sampled grayscale images, erosion I ⊖ k maps each
+pixel in the image I to the minimum of some neighborhood k around that
+pixel, the neighborhood being the “structuring element”, which I will
+call a “kernel” for brevity.  (Dilation ⊕ is a similar operation with
+some differences that I won’t mention.)
+
+The naïve approach
+------------------
+
+The naïve approach to computing this gets slower with large kernels.
+Consider computing, in one dimension, a kernel that consists of the
+hotspot pixel and n-1 pixels to the right:
+
+    for (int x = 0; x < w; x++) {
+        out[x] = in[x];
+        for (int i = 1; i < n; i++) out[x] = min(in[(x+i) % w], out[x]);
+    )
+
+This takes time per pixel proportional to n.
+
+Sliding-window minimum in linear time
+-------------------------------------
+
+In one dimension, there’s a [well-known linear-time algorithm][0] for this
+“sliding-window minimum” or
+“sliding range minimum query” problem, using a deque d containing a
+nondecreasing subsequence of the window such that the leftmost element
+in the deque is always the minimum of the window.  Incrementing the
+left edge of the window may leave the deque unchanged, or it may
+involve dropping the oldest value, if that value falls out of the
+window; then the next value must be the minimum of the remaining
+pixels in the window.  Achieving this merely requires that, when we
+increment the right edge of the window, we remove any elements in the
+deque that are larger than the new pixel, and then append that new
+pixel.  This results in the pixels in the deque being in nondecreasing
+order, which means that any possible larger pixels will be in a block
+at the end of the deque, so we can remove them by popping from its
+end.
+
+This sounds trickier than it is.  In pseudocode:
+
+    d = deque()
+    for x in range(len(inpix)):
+        while d and inpix[d[-1]] > inpix[x]:
+            d.pop()
+        d.append(x)
+        if x - d[0] == n:
+            d.popleft()
+        yield inpix[d[0]]
+
+Each pixel is pushed onto the deque exactly once and removed from it
+exactly once, at either the left or right, and each pixel comparison
+either results in pushing a pixel or popping one, so there can’t be
+more than two comparisons per pixel overall.  So the algorithm is
+linear-time despite its nested-loop appearance.
+
+This depends on the assumption that the deque operations are
+constant-time operations, which is easy to guarantee even in the worst
+case if we have a bound on the deque size, which we do; it can’t be
+larger than n.  So we can render this into C with variable-length
+arrays as follows (see
+<http://canonical.org/~kragen/sw/dev3/erosion1d.c>):
+
+    unsigned d[n], di = 0, dj = 0;
+    for (int x = 0; x < w; x++) {
+      while (di != dj && in[d[(dj-1) % n]] > in[x]) dj--;
+      d[dj++ % n] = x;
+      if (x - d[di % n] == n) di++;
+      out[x] = in[d[di % n]];
+    }
+
+Despite the divisions in the inner loop, for one-byte pixels, this
+takes 45–65 nanoseconds per pixel on my laptop with window widths
+ranging from 1 to 10000, although it *is* a bit quicker with one-pixel
+windows.  (You could probably run it a lot faster without the
+divisions.)
+
+This algorithm clearly has worse constant factors than the naïve
+algorithm, so the naïve algorithm is probably faster for sufficiently
+small kernels, but I haven’t optimized and measured to see exactly how
+big the kernel needs to be for this algorithm to be faster.  I’m
+pretty sure the naïve algorithm is going to be faster for 3-pixel-wide
+kernels.
+
+I think this algorithm may be [due to Richard Harter in 2001][1], who
+called it “the ascending minima algorithm”, but I’m not sure.
+
+There’s a completely different algorithm with similar linear
+performance published by van Herk in 1992 in a paper entitled, “A fast
+algorithm for local minimum and maximum filters on rectangular and
+octagonal kernels” and concurrently by Gil and Werman.  It divides the
+array into N-sample blocks and computes prefix-sum minima within each
+block going both left “h” and right “g”.  Any N-sample window will
+include some number x ∈ (0, N] of samples in its leftmost block and
+some number N - x ∈ [0, N) of samples in the block to the right; the
+minimum of the x samples in the left block can be found in the h array
+for that block,
+
+[0]: https://www.nayuki.io/page/sliding-window-minimum-maximum-algorithm
+[1]: http://richardhartersworld.com/cri/2001/slidingmin.html
+
+Separable kernels
+-----------------
+
+As with box-filter convolution and Gaussian convolution, we can
+decompose erosions with certain two-dimensional kernels into
+compositions of two erosions with one-dimensional kernels, one in X
+and one in Y, thanks to a sort of distributive law:
+
+    (I ⊖ k₁) ⊖ k₂ = I ⊖ (k₁ ⊕ k₂)
+
+This is great because it means we can erode an image with a paraxial
+rectangle of any size and shape in 90–130 nanoseconds per pixel.
+Great, right?  But it’s a paraxial rectangle.  One could wish for
+something more.  For example, many real-world images have features
+that are rotationally invariant, so a circle or annulus or something
+might be a more interesting kernel.
+
+The distributive law says that eroding with two kernels is the same as
+eroding with the dilation of the kernels, which in
+this context is just their Minkowski sum.  For example, dilating a
+kernel with a kernel that is a line in whatever orientation, that sort
+of pulls it apart in the direction of the line, filling in the gap by
+adding two straight facets in between, facets of the orientation and
+length of the line.  So eroding an already-eroded image with such a
+kernel is the same as expanding its erosion kernel in that way.
+
+So if you erode with two kernels that are lines, you get the erosion
+of a parallelogram, or in the degenerate case, a longer line.  But so
+far we’ve only covered how to erode efficiently with horizontal and
+vertical lines.
+
+How about diagonal lines?  The one-dimensional sliding-window minimum
+algorithm is just as happy to run along a diagonal of the image pixels
+as along a row or column.  If your kernel is literally just a diagonal
+line of pixels like [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)], then you
+might get some checkerboarding artifacts in the resulting image, but
+if you’re also using a horizontal or vertical kernel, those should go
+away.
+
+This carries over to skewed-line kernels like [(-4, -2), (-2, -1), (0,
+0), (2, 1), (4, 2)] or [(0, 0), (1, 3), (2, 6)].  These have big gaps
+in them, so they would be shitty kernels by themselves, but used to
+dilate a kernel that fills those gaps on its own, they can give you
+not only excellent approximations of circles but also lines and
+arbitrarily-oriented capsules.
+
+It turns out this approach to approximating circular kernels was
+published by Adams in 1993 in the paper, “Radial decomposition of
+discs and spheres”, except for the bit about skewed-line kernels with
+gaps in them.
+
+Bresenham lines
+---------------
+
+I was also thinking that you could get a good approximation of a line
+kernel by running the one-dimensional algorithm along gap-free
+rasterized diagonal lines — essentially running it in the X or Y
+direction, but occasionally “jumping the groove” to an adjacent
+raster; this will give you a slightly different kernel at each pixel,
+but probably the errors are insignificant for most applications.  But
+now I think that there is no real advantage to that approach over the
+precise approach described earlier.
+
+It turns out that Soille, Breen, and Jones published essentially this
+algorithm in 1996 in their paper, “Recursive implementation of
+erosions and dilations along discrete lines at arbitrary angles”, but
+using the van Herk/Gil–Werman one-dimensional sliding-window minimum
+algorithm.  They note this approximation drawback:
+
+> …it is important to note that the shape of the SE [kernel] may vary
+> slightly from one pixel to another.  Indeed, except for horizontal,
+> vertical, and diagonal directions, a discrete line in the square
+> grid contains 4- as well as 8-connected pixels.  Hence, when the SE
+> of length *k* moves along such a discrete line, its shape varies
+> accordingly to its position along the line.  In practice, this is
+> not a major drawback provided that the angle specified is actually
+> defined in the neighborhood corresponding to the extent of the SE.
+
+Then they go on to define a “translation-invariant implementation”
+that avoids this non-major drawback, which has a great deal in common
+with what I’ve described above but may not be exactly the same; I’m
+not sure yet.  It does seem to work better for their
+radial-decomposition purpose.
+
+Also they point out a use of this algorithm to detect linear features
+by combining linear openings at different angles by max, rather than
+by composing linear erosions and dilations to get a round kernel.
+
+Gapped one-dimensional kernels to accelerate the naïve algorithm
+----------------------------------------------------------------
+
+One way to get an erosion with a 9-pixel-wide kernel is to erode with
+a 3-pixel-wide kernel four times.  But a better way — aside from the
+deque algorithm described previously — is to erode first with the
+kernel [-1, 0, 1] and then the kernel [-3, 0, 3]; and, to get only a
+7-pixel kernel, you could erode with [-1, 0, 1] and then [-2, 0, 2].
+If you want a 27-pixel-wide kernel, you can do [-1, 0, 1] ∘ [-3, 0, 3]
+∘ [-9, 0, 9], and by reducing the width of this last kernel, you can
+get any number less than 27, too.
+
+This points out a log-linear-time algorithm to erode with large
+kernels (linear in the image, logarithmic in the kernel) in a single
+dimension, which, unlike the deque algorithm, is easy to parallelize
+and incrementalize.  For example, this algorithm can be
+straightforwardly applied to several scan lines in parallel using
+vector instructions, while the deque algorithm can’t.  ([The
+van Herk/Gil–Werman algorithm can, though.][2])
+
+(And of course it applies to sliding-window-minimum-type problems in
+non-image-processing contexts, as well.)
+
+This implementation of the algorithm takes 16 nanoseconds per byte to
+compute a 50-byte erosion on a 10-million-byte input without paying
+proper attention to the boundary conditions:
+
+    static inline char cmin(char a, char b) { return (a < b) ? a : b; }
+    int x;
+    for (x = 0; x < w- 3; x++) out[x] = cmin(in[x],  cmin( in[x+1],  in[x+ 2]));
+    for (x = 0; x < w- 9; x++) out[x] = cmin(out[x], cmin(out[x+3], out[x+ 6]));
+    for (x = 0; x < w-27; x++) out[x] = cmin(out[x], cmin(out[x+9], out[x+18]));
+    for (x = 0; x < w-50; x++) out[x] = cmin(out[x], out[x+23]);
+
+This is about four times as fast as my implementation of the deque
+algorithm above, although probably that’s just because of the three
+divisions in its inner loop.
+
+But you can pipeline this algorithm into requiring only a single pass
+over the input:
+
+    for (x = 0; x < w-50; x++) {
+      out[x+23+18+6] = cmin(in[x+23+18+6], cmin(in[x+23+18+6+1], in[x+23+18+6+2]));
+      out[x+23+18] = cmin(out[x+23+18], cmin(out[x+23+18+3], out[x+23+18+6]));
+      out[x+23] = cmin(out[x+23], cmin(out[x+23+9], out[x+23+18]));
+      out[x] = cmin(out[x], out[x+23]);
+    }
+
+For some reason, this version runs at the same speed as the many-pass
+version, even over the same 10-million-byte input.
+
+[2]: https://www.nvidia.com/content/GTC/posters/14_Domanski_Parallel_vanHerk.pdf
+
+Union kernels
+-------------
+
+I ⊖ (k₁ ∪ k₂), the erosion by a union, is the same as (I ⊖ k₁) ∧ (I ⊖
+k₂), where ∧ is the pixelwise minimum operation.  Urbach and Wilkinson
+published an algorithm in 2008 (doi 10.1.1.442.4549) that decomposes an arbitrary kernel
+("flat", they say, meaning that — as in all of my discussion
+above — the kernel contains only full and empty pixels, no shades of
+gray) into scan lines (“chords”).  They use an algorithm I don’t
+understand yet to compute the erosion by each of those chords, then
+take the minimum.  Their algorithm is claimed to be considerably
+faster than the others I mentioned above.
+

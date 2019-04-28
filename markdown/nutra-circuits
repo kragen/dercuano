@@ -1,0 +1,356 @@
+Notes on circuitry for the Nutra seed activator
+===============================================
+
+The Nutra has a fan (I’m guessing something like a 12V PC cooler), a
+¼HP agitator motor, a small pump motor, a water inlet valve, and a
+heating element.
+
+Lucía tells me the target is for a year’s lifetime.
+
+I’m thinking that probably the control solution for these is to hook
+up an STM32 to a ULN2003 or something similar, then use the ULN2003 to
+run some relays.  None of them needs subsecond response times; I think
+they are each turned on and off less than ten times during a cycle,
+which lasts roughly a day, so a lifetime of 20000 openings/closings
+and an MTBF of 100 000 openings/closings is probably adequate.  Most
+of them will run on line power rather than a lower voltage, so the
+ULN2003 can’t handle them directly.
+
+Heating element
+---------------
+
+I back-of-the-envelope estimated the heating element at 300 W, but
+maybe 600 W is a safer level (in the sense of “we are sure it will
+work”, not in the sense of “less likely to cause injury in case of
+malfunction”.)  600 W is about 2.6 amps at 240 VAC (RMS), so a 3-amp
+relay is probably fine.
+
+But wait, this needs to be PWM-controlled.  PWM through a relay is not
+a good idea; if the PWM cycle is 20 seconds in length (50 mHz),
+100 000 openings and closings only gets us to 555 hours of dehydration
+time.  An SSR would achieve higher levels of reliability, but 500
+hours is probably already a year, since the overall cycle might have
+an hour or two of dehydration in it.
+
+### Power ###
+
+The most challenging objective is dehydrating 5 kg dry weight of
+soaked, activated beans to more or less their original dry weight.
+They will have absorbed roughly 5 kg of water.  [Water’s enthalpy of
+vaporization is about 2.4 MJ/kg][e], so this is 12 MJ which get turned
+into latent heat.  Doing this in one hour would require 3000 watts,
+which would be 12 amps.  At my previous guess of 600 watts it would
+take five hours, which might be long enough for the beans to rot.
+
+If we could use an air-countercurrent recuperative condenser like the
+ones in modern condensing clothes dryers, we could perhaps reduce that
+somewhat, but I’m not sure how much.  (There are also heat-pump
+dryers, basically air-conditioner-based dehydrators in a box, which
+cost an extra US$1200 or so.)  [Traditional vented clothes dryers use
+4–6 kW and vent 100–225 cfm][7], [or more broadly 3–9 kW, while
+non-heat-pump condenser dryers typically use 2 kW, and heat-pump
+condensers use ≈ 1 kW][8].
+
+Let’s say we don’t have a recuperator, but 2 hours is adequate, so we
+can get by with 1500 watts.  And let’s say the air stream is limited
+to 40° in order to make sure we don’t heat the food past 42°.  My
+psychrometric chart doesn’t go to 100% humidity at 40°, but it says
+that 30 mg H₂O / g air is 64% humidity at 40°, so I guess 100% is
+about 47 mg H₂O / g air, and 95% would be about 44 mg H₂O / g air.
+This means that removing 5 kg of water vapor would require passing
+about 114 kg of dry air through the beans, or a bit more, since the
+air in Buenos Aires already contains something like 10 mg H₂O / g air.
+
+[Air is about 1.23 kg/m³][5], so 114 kg of air is 92 m³.  This is
+enough air to fill a 35 m² room of 2.6 meters height, and we’re
+proposing to turn it all into the kind of fog that fills your bathroom
+after a shower.  So you really, really need to vent it outside or
+run it through a condenser.
+
+Either way, those 92 m³ of air need to be blown through the dehydrator
+during those 2 hours, which works out to about 12.8 ℓ/s, 770 ℓ/minute,
+or 27 cfm.  This is the kind of airflow associated with bathroom fans
+with 8 cm ducts, or with small or quiet fans for computer
+cases — definitely feasible.
+
+You don’t want to blow *too much* new air in because you have to heat
+it all up — [air’s heat capacity is 1.01 kJ/kg/K][6], so each
+additional ℓ/s is 1.23 g/s and 1.24 W/K, and with ΔT ≈ 20 K that works
+out to about 24 W of extra heater power, plus whatever the fan uses.
+This isn’t very much extra energy use but it’s energy use that doesn’t
+evaporate much extra water.
+
+(Or is it?)
+
+Here in Buenos Aires, we have abundant municipal water which we could
+use to chill a condenser, and the Nutra already needs access to both a
+water intake and a drain.  How much water would it waste?  If we drop
+the dewpoint of the air to 25° (thus removing more than half the
+water) by running it through a countercurrent heat exchanger cooled by
+tap water starting at 15°, well, we would need 290 ℓ of water to dump
+those 12 MJ of heat.  This might be okay in some kind of objective
+sense but people who run dietéticas are not going to tolerate it.
+
+Lucía previously calculated that she would need a 2000-watt heater.
+
+[5]: https://en.wikipedia.org/wiki/Density_of_air
+[e]: https://en.wikipedia.org/wiki/Enthalpy_of_vaporization
+[6]: https://en.wikipedia.org/wiki/Heat_capacity#Table_of_specific_heat_capacities
+[7]: http://www.greenbuildingadvisor.com/blogs/dept/musings/alternatives-clothes-dryers
+[8]: https://en.wikipedia.org/wiki/Clothes_dryer
+
+Water inlet valve
+-----------------
+
+I have no idea what the water inlet valve is like.  I’m guessing it’s
+a solenoid driven by line power (through a diode) at under an amp.
+
+Small pump motor
+----------------
+
+The pump needs to drain 6 liters (I think) of water within, I don’t
+know, 20 minutes.  5 mℓ/s, 0.08 gallons per minute, 5 gallons per
+hour.  This is a very small pump; a [US$11 aquarium pump on Amazon][0]
+is 227 GPH, 45 times as big, and it’s 18 watts.  So I think this is
+more like a 1-watt pump.  The intrinsic work being done is very small,
+possibly even negative, but pumping 5 milliliters per second against a
+pressure of 1 meter column of water would be 50 milliwatts, plus
+whatever mechanical inefficiencies are encountered.
+
+[0]: https://www.amazon.com/HOUSE-DAY-18W-Submersible-Hydroponics/dp/B078PJL9LP/ref=sr_1_2?s=pet-supplies&ie=UTF8&qid=1533348320&sr=1-2&keywords=5+gph+pump
+
+It might be feasible to run this directly off the ULN2003.
+
+¼HP agitator motor
+------------------
+
+This is 190 watts output, perhaps 220 watts input — 1 amp at 240
+volts.
+
+Fan
+---
+
+A typical PC fan is like 100 to 300 milliamps at 12 volts.  This could
+possibly be run directly off the ULN2003, which can handle 500 mA on a
+given pin at up to 50 V, though only one pin at a time.
+
+Relays
+------
+
+So we probably need a couple of 1-amp relays, a 3-amp relay, and maybe
+another sub-1-amp relay for the pump.  If we simplify this to four
+3-amp relays, well, the usual suspect seems to be something like the
+[Omron G5LE-1A4 DC12][1], which costs US$1.30 in quantity 1 and
+switches 10 amps at up to 250 VAC when you apply 12 VDC and 33.3mA to
+the coil.  It’s SPST, normally open.  Or the [TE Connectivity/Brumfield
+OJE-SH-112HM,000][2], apparently identical in every way except for
+costing US$1.32 and drawing 37.5 mA.
+
+However, the Omron datasheet has a chart that shows durability of
+200 000 operations at 3 amps and a 250 VAC resistive load or 120 VAC
+inductive load.  With a 120 VAC resistive load, it’s rated for twice
+the lifetime.  The TE relay is only rated for 10 000 ops, though
+there’s an “LM” variant rated to 100k.
+
+[1]: https://www.digikey.com/product-detail/en/omron-electronics-inc-emc-div/G5LE-1A4-DC12/Z2352-ND/369016
+[2]: https://www.digikey.com/product-detail/en/te-connectivity-potter-brumfield-relays/OJE-SH-112HM000/PB876-ND/1095201
+
+All four relays at once would only be 133 milliamps, well within the
+ULN2003’s limits.
+
+There do exist mercury-wetted reed relays with lifetimes of a million
+operations, but these probably aren’t necessary for a lifetime of one
+year.
+
+Some kind of triac-optoisolator thing might be a reasonable
+alternative, but a typical triac drops 1.5 volts, so 3 amps would
+dissipate 5 watts, requiring a hefty heatsink and posing potential
+reliability problems of its own.
+
+ULN2003 hookup
+--------------
+
+The ULN2003 only has a guaranteed β of 1000, so getting 33 milliamps
+on its output requires 33 microamps on its input.  Except that
+actually the curves in the datasheet show that you need over 100
+microamps to get anything to happen.  This means that, at 3.3 V, the
+base resistor shouldn’t be over 33 kilohms, which means you can’t
+quite use the pullup resistors integrated in the STM32 I/O pins, since
+they could be as high as 50 kΩ according to the datasheet.  You could
+maybe parallel two I/O pins, but it would probably be better to use
+external resistors, thus avoiding the chance of a software error
+burning up the STM32 or the ULN2003.
+
+The ULN2003’s maximum base current is 25 mA; 1 mA per pin should be
+plenty, so anything between 3.3kΩ and 33kΩ is adequate.  10kΩ,
+everybody’s favorite resistor, is probably optimal, giving 330 μA, and
+thus 330 mA or better on the output pin.
+
+Speaker
+-------
+
+We can hook up a speaker to an extra output of the ULN2003 and control
+it through the built-in PWM of the STM32.  If it’s a ¼W 8Ω speaker, we
+need to keep current through it under about 100mA; a dc-blocking
+capacitor is probably worthwhile here, so that if the ULN2003 is on we
+don’t have a constant current through the speaker with no sound, but
+also it would be a good idea to limit the current of ac signals and
+also perhaps filter out inaudible high frequencies.  More precisely,
+with 8Ω, to keep I²R < ¼W we need |I| < 177 mA, so a series resistance
+of 68Ω or greater is called for with 12V.  Except with dc-blocking
+that’s 12V P-t-P, so 6V RMS with a perfect square wave, so 33Ω would
+be adequate.  The resistor is going to have most of that 6V RMS across
+it, like about 5V, so it needs to be pretty hefty, nearly a watt in
+the worst case.  Probably prudent to limit the output power further,
+using 100Ω or so.
+
+At 100Ω series resistance, an instantaneous 12V spike would push
+120 mA, and 6V RMS would dissipate 360 mW in the resistor, which
+requires a largish resistor but nothing ridiculous; it would
+experience spikes to 1.3 watts.  The 60 mA RMS would output 29 mW from
+the 8Ω speaker.  You can see why people prefer to drive these damn
+things through transformers.  Still, 29 mW is probably still audible;
+it’s less than 10 dB below what I guessed was the maximum output for
+the speaker.
+
+Now, what about filtering out ultrasound?  If we shunt the speaker
+with a capacitor, we’d like its RC time constant to be in the tens of
+microseconds somewhere, so that 64 kHz (2.5 μs per radian) is strongly
+attenuated but 10 kHz (15.9 μs per radian) is minimally attenuated, if
+at all.  But the relevant R here is not the 100Ω that’s being used to
+limit the current, but rather the parallel combination of that 100Ω
+(plus the dc-blocking capacitor, which is hopefully negligible at the
+relevant frequencies) and the 8Ω of the speaker, which works out to be
+7.4Ω.  So we need something like 1.3 μF, not the 100 nF you would
+expect.  At 1 μF, we get 7.4 μs, which puts the knee around 21 kHz,
+which means that we only have about 3× attenuation at 64 kHz (like
+10 dB).  If we use 2.2 μF, the knee is at 9.8 kHz, which gives us an
+extra 6 dB.
+
+The dc-blocking capacitor needs to have a sufficiently long time
+constant with the series resistance to not mess up the bass too bad.
+Say we want its time constant to be below 40 Hz (4 ms per radian),
+then we need at least 40 μF.  100 μF is probably fine; at 12 volts
+this holds 7.2 mJ, which is what gets dissipated in that 1.3-W spike
+in the series resistance.
+
+Perhaps a second RC section is worthwhile in this case: 10 ohms before
+the 100 ohms, then a 1μF to ground.  So the whole output circuit from
+the ULN2003 pin would be `{ 100 μF 10 Ω { 1 μF gnd } 100 Ω (1 μF ||
+speaker) 12 V }`, where concatenation is series combination, `{}` is a
+branch, `()` are grouping, and `||` is parallel combination.  In a
+Falstad simulation, this configuration gives us about -4 dB at 40 Hz,
+-0 dB from 80 Hz to 5 kHz, -1 dB at 7.5 kHz, -2 dB at 10 kHz, -4 dB at
+15 kHz, -5 dB at 20 kHz, -15 dB at 40 kHz, and -22 dB at 65 kHz.
+However, at high frequencies, this puts the whole 6 V RMS across this
+new 10Ω resistor through the capacitor shunt to ground, which means it
+will be dissipating 3.6 watts!  And of course the PWM output from the
+ULN2003 is *always* close to 6 V RMS, except when it’s close to dc.
+
+So the second RC section is a bad idea.  Probably much less hassle to
+use an inductor in series with the resistor, one whose impedance
+becomes large relative to 100 ohms at somewhere around 10 kHz, like a
+4.7mH inductor.  In a Falstad simulation, this gives about 3 dB
+attenuation at 3.5 kHz, 6 dB at 6.3 kHz, 10 dB at 10 kHz, 17 dB at 20
+kHz, 27 dB at 40 kHz, 30 dB at 48 kHz, 38 dB at 80 kHz, and 42 dB at
+99 kHz.  Simulation also suggests about a 13.7 mV peak amplitude part
+of a 48 kHz PWM modulating square wave would remain across the
+terminals of the speaker, compared to some 440 mV peak for the actual
+signal.  (Maybe it works even better with L speaker || C instead of L
+(speaker || C), with a +6dB peak around 6kHz.)
+
+Wait, actually the whole thing is bad in that form.  I need a 220Ω
+pullup resistor on the ULN2003 to get current.  And then maybe I don’t
+really need an inductor.  Here’s the Falstad design:
+
+    $ 1 3.0000000000000004E-7 26.59566520631553 50 12.0 50
+    c 960 432 1088 432 0 9.999999999999999E-5 3.5513458288348803
+    r 1168 432 1264 432 0 8.0
+    R 816 304 816 224 0 0 40.0 12.0 0.0 0.0 0.5
+    w 1264 480 1264 432 0
+    r 816 304 816 416 0 220.0
+    a 592 432 672 432 0 12.0 0.0 1000000.0
+    174 272 384 368 480 0 1000.0 0.005 Resistance
+    g 272 480 272 496 0
+    R 272 384 272 352 0 0 40.0 5.0 0.0 0.0 0.5
+    R 592 416 560 416 0 4 65000.0 5.0 0.0 0.0 0.5
+    O 672 432 672 368 0
+    S 592 448 368 448 0 0 false 0
+    170 368 464 320 464 3 20.0 100000.0 5.0 0.3
+    l 1088 432 1168 432 0 0.001 0.02828594427035853
+    t 736 432 768 432 0 1 -5.526250662994705 -0.11573671215990365 100.0
+    t 768 448 816 448 0 1 -5.410513950834801 0.11562175983470305 100.0
+    w 736 432 736 496 0
+    r 736 496 816 496 0 10000.0
+    w 816 464 816 496 0
+    g 816 496 816 528 0
+    w 768 416 816 416 0
+    w 816 416 816 432 0
+    w 816 432 848 432 0
+    r 672 432 736 432 0 10000.0
+    g 1264 480 1264 528 0
+    r 848 432 960 432 0 100.0
+    c 960 432 960 496 0 1.0E-6 2.5834701256300843
+    g 960 496 960 528 0
+    o 1 64 0 35 0.5846006549323611 0.09353610478917779 0 -1
+    o 10 64 0 34 20.0 9.765625E-5 0 -1
+    o 15 4 6 35 10.0 9.765625E-5 1 -1
+    o 13 4 0 35 2.5 0.1 2 -1
+
+Oh, I think I have a reasonable approach that eliminates most of the
+inefficiencies.  `{100Ω (L || 100μF speaker) 12V}`, where the L
+provides a dc path around the speaker and capacitor, and the capacitor
+basically just protects the speaker from dc.  The resistor in series
+with the whole shebang limits the current, but maybe it could be
+bypassed with a capacitor so that it can be bigger than would be
+desirable for ac.  And you can still shunt the speaker alone with a
+capacitor to reduce ultrasound.
+
+A potential problem with this is that it could introduce a kind of
+distortion when the conduction switches from being through the
+Darlington to being through the freewheel diode, just because of the
+forward voltage drop of the freewheel diode.
+
+How much inductance does the shunt inductor need?  Ideally it
+shouldn’t steal much current from the speaker at audio frequencies,
+which means its impedance at audio frequencies should be large
+compared to the speaker’s 8Ω, although maybe the capacitor can help
+compensate for this.  But let’s say we want its impedance at 40 Hz to
+be 16Ω.  This requires a fairly hefty 68-mH inductor (like, 8 mm ×
+12 mm.)
+
+Or you could just drive the speaker through a little 4:1 100Ω-ESR
+audio-frequency transformer, which will probably filter out the
+ultrasound as a side effect.
+
+What *is* the PWM frequency?  The STM32F030x4 etc. reference manual
+RM0360 says, “If the APB prescaler is 1, the timer clock frequencies
+are set to the same frequency as that of the APB domain,” which is
+normally 48MHz except for power saving.  I think that means that if
+you want 8-bit PWM, you can get 187.5 kHz PWM.  At such a speed, 1mH
+of inductance should be plenty — and how much does the speaker itself
+have?  1mH series and 1μF in parallel reduces the 187.5 kHz square
+wave to 5.6 mV peak, while the AF signal is like 440 mV peak.
+
+Display
+-------
+
+A Nokia 5110 84×48 display ought to be adequate and might fit in well
+with the overall feeling of the device, although OLEDs are nicer on
+several axes nowadays.
+
+Sensors
+-------
+
+Monarca sells a [DHT-22 temperature and humidity sensor for $220][3].
+[Nubbeo has the cheaper DHT-11 for $60][4], but its precision is ±2°,
+which would be terrible for the Nutra, restricting it to a temperature
+of 40° or below.  By contrast, the DHT-22’s precision is ±0.1°.
+
+Apart from cost and precision, the sensors are otherwise quite
+similar.
+
+[3]: https://listado.mercadolibre.com.ar/humedad-mona#D[A:humedad%20mona]
+[4]: https://articulo.mercadolibre.com.ar/MLA-705916181-sensor-humedad-relativa-y-temperatura-dht11-nubbeo-_JM
+
+<link rel="stylesheet" href="http://canonical.org/~kragen/style.css" />

@@ -1,0 +1,344 @@
+We are witnessing the birth of a new phenomenon I haven’t seen named
+before.  I propose to call it “algorithmic scholarly communication”.
+
+[Alan Kay describes] the birth of a new genre of media as proceeding
+in a series of stages:
+
+> A new genre is established.  A few years later a significant
+> improvement is made.  After a few more years the improvement is
+> perceived as not just a “better old thing” but an “almost new thing”
+> that leads directly to the next stable genre.
+
+[Alan Kay describes]: http://worrydream.com/refs/Kay%20-%20Computer%20Software%20-%20SciAm.pdf
+
+This essay identifies an “almost new thing” which is beginning to
+transform the nature of scholarly communication.  First I provide some
+background, including my personal view of the principles underlying
+scholarly communication; then, I give some thought-provoking examples
+of the current state of the system; and then, I project where it seems
+likely to take us.
+
+Background: what are scholars, and what is scholarly communication?
+-------------------------------------------------------------------
+
+A hundred and thirty generations ago, we began to understand formal
+mental processes when Thales and the Pythagoreans including Socrates
+formulated proofs in geometry in terms of logical arguments.  Over the
+next ten generations, Mozi, the Pythagoreans, and Aristotle developed
+the study of logic as an object in itself.
+
+The academy as we know it is, in name, an homage to the estate of
+Plato, Socrates’ student; in structure it descends from medieval
+seminaries of the Roman Catholic Church, and indeed some of those
+seminaries are universities today.  It has always aimed at acquiring
+and diffusing knowledge, both in the sense of practical skill (the
+arts) and knowledge of what is objectively true (the sciences), though
+modern epistemology has demoted Christian theology and holy writ in
+general to the status of myth and metaphor rather than an
+objectively-true cosmology, tempting us to scoff at the debates of the
+European medieval Scholastics; it’s easy for us to forget that angels
+and demons seemed as real to them as states, money, and corporations
+do to us.
+
+XXX etymology of "university"?
+
+
+
+After 2600 years of work, we at last
+succeeded in fully formalizing logical reasoning and other formal
+mental processes during the 20th century; the product of this
+formalization was the digital computer, which executes processes
+called “algorithms”.
+
+What happened to mathematical tables?
+-------------------------------------
+
+We have already seen executable scholarship happen in many aspects of
+practical mathematics.  I have on my bookshelf a 1965 book by
+R.S. Burington entitled _Handbook of Mathematical Tables and
+Formulas_, first published 1933, LCCN 63-23531.  It tells me things
+like this, neatly organized into tables:
+
+    log cos x ≈ -x²/2 - x⁴/12 - x⁶/45 - 17x⁸/2520 - ... when x² < π²/4
+    roughly 53030 Americans of every 100 000 live to age 63; 1800 die that year
+    the cotangent of 38.5° (i.e. the reciprocal of the tangent) ≈ 1.2572
+    ∇²S is defined as ∂²S/∂x² + ∂²S/∂y² + ∂²S/∂z²
+    the logarithm of the cotangent of 17°21' is 0.50526
+    an endomorphism is a homomorphism of a system onto itself or part of itself
+    0.15° ≈ 0°9'00"
+    the definition of the cumulative discrete probability as a sum Σᵢf(xᵢ)
+    formulas for the sides & angles of a triangle given 2 angles & 1 side
+    ∫dx/(x√(ax + b)) = 1/√b log((√(ax+b)-√b)/(√(ax+b)+√b)) for b > 0
+
+The first half of the book is a brief but complete summary of the most
+widely useful branches of mathematics; the second half consists of
+numerical tables.  The first “mathematical table” of this sort was
+assembled by Aryabhata in the fifth century CE; it consisted of 24
+first differences of the sine function.  Calculating and disseminating
+such tables — crucial for practical manual celestial navigation,
+artillery warfare, trigonometric calculation in general, and
+statistics — was a major effort of mathematicians for centuries.  It
+inspired Babbage’s original plan to automate computation in 1822;
+computing mathematical tables was the justification for funding one of
+the three World War II projects that did successfully automate
+computation, the ENIAC.  The ENIAC was designed to compute
+mathematical tables for artillery firing.
+
+> The other two projects were Konrad Zuse hacking in his Berlin
+> apartment (and later with government support) and the secret British
+> cryptanalytic Colossus machine; arguably the Harvard Mark I ASCC,
+> based on Babbage’s work, was a predecessor to the ENIAC.  The Mark I
+> was also used to compute mathematical tables.
+
+After fifteen centuries, the publication of books of mathematical
+tables essentially ceased in about 1975, at which point the numerical
+tables were replaced in common use by HP scientific calculators, where
+they had not been replaced earlier by larger and more expensive
+computers.  (Bowditch’s American Practical Navigator is one of the few
+remnants that still includes mathematical tables, even in the 2002
+edition, the latest as of this writing; pp.565–727 are devoted to
+tables, most of which are mathematically calculated rather than
+empirically measured.)
+
+The kind of mathematical scholarship formerly devoted to publishing
+mathematical tables is nowadays devoted to publishing software
+instead.  Pages 325 to 344 of Burington’s handbook are devoted to a
+table of n², n³, √n, √(10n), and the cube roots of n, 10n, and 100n;
+given a computer that can multiply integers, the square-root columns
+of this table can be replaced in practice with a single line of C
+code, which implements the "Babylonian method" of computing square
+roots given by Hero of Alexandria (Ἥρων ὁ Ἀλεξανδρεύς) a hundred
+generations ago:
+
+    g,h;q(n){h=n;if(n)do g=h,h=(g+n/g)/2;while(g-h+2&~3);return h-=h*h>n;}
+
+However, this line of C code, although it works and replaces two
+sevenths of those twenty pages of numbers, falls short of many of the
+ideals of scholarship, as I will explore below.
+
+units(1)
+--------
+
+Several times a week, I use GNU units(1), the GNU version of the BSD
+(?) units(1) program, which is a simple desk calculator program which
+contains a comprehensive database of over two thousand units of
+measurement, compiled over decades by the tireless scholarship of
+Adrian Mariano at Cornell.  The original uses were things like this:
+
+    You have: 60 miles per hour
+    You want: furlongs per fortnight
+            * 161280
+            / 6.2003968e-06
+
+But units(1) also allows me to immediately calculate things like how
+many minutes of arc the sun subtends on average:
+
+    You have: radians (2*sunradius)/sundist
+    You want: arcminute
+            * 31.988013
+            / 0.03126171
+
+Or, in case I’ve forgotten, that a mole of ideal gas at STP occupies 22.7ℓ:
+
+    You have: gasconstant 
+    You want: 
+            Definition: 8.314472 J / mol K = 8.314472 kg m^2 / K mol s^2
+    You have: gasconstant * 1 mole * tempC(0) / 100 kPa
+    You want: liters
+            * 22.71098
+            / 0.044031565
+
+Or that Israel’s new Sorek reverse-osmosis desalination plant, which
+is [reported to use 70 atmospheres] of pressure for the reverse-
+osmosis process step, is doing 7.1kJ of mechanical work per liter,
+putting a lower bound on the economic cost of the freshwater obtained:
+
+    You have: 70 atmospheres
+    You want: kilojoules per liter
+            * 7.09275
+            / 0.14098904
+
+[reported to use 70 atmospheres]: http://ensia.com/features/how-a-new-source-of-water-is-helping-reduce-conflict-in-the-middle-east
+
+And that that is US$200 per megaliter or US$240 per acre foot if the
+energy used to drive it costs US$100 per megawatt hour:
+
+    You have: 70 atmospheres * US$ 100/MWh
+    You want: US$ / megaliter
+            * 197.02083
+            / 0.0050756054
+    You have: 70 atmospheres * US$ 100/MWh
+    You want: US$ / acrefoot
+            * 243.02308
+            / 0.0041148356
+
+I can calculate that 10 amperes of electrical current through a round
+22-gauge wire amounts to 31 amps per square millimeter; I have to be
+careful here, because units’s `wiregauge` unit gives me the wire
+diameter, but its `circlearea` unit wants the radius:
+
+    You have: 10 amps / circlearea(wiregauge(22)/2)
+    You want: amperes / mm^2
+            * 30.718763
+            / 0.032553394
+
+If I include the resistivity of copper and the equation P = I²R in the
+calculation, I can get the heat production:
+
+    You have: (10 amps)^2 * 16.78 nanoohms * meter / circlearea(wiregauge(22)/2)
+    You want: watts/meter
+            * 5.1546084
+            / 0.19400116
+
+(That’s enough heat to be dangerous if used as electrical wiring, but
+not enough to use as a heating element, except maybe in an electrical
+blanket or something.)
+
+That was actually my second try at that calculation; on the first try,
+I accidentally calculated the voltage drop per meter instead, which
+units was able to catch, but not provide a useful error message for:
+
+    You have: 16.78 nanoohms * meter * 10 amps / circlearea(wiregauge(22)/2)
+    You want: watts / meter
+    conformability error
+            0.51546084 kg m / A s^3
+            1 kg m / s^3
+    You have: 16.78 nanoohms * meter * 10 amps / circlearea(wiregauge(22)/2)
+    You want: 
+            Definition: 0.51546084 kg m / A s^3
+
+It happens that kg m / A s³ is equivalent to volts per meter, but
+that’s not at all obvious from looking at the result.
+
+You can see that as the examples get more complex, more and more of
+the knowledge is in my head, and less and less in the software.
+
+Actually, I didn’t have the resistivity of copper memorized in my
+head; I looked it up on Wikipedia and typed it in.  There’s a
+[Wikidata entry for copper] but it doesn’t yet include electrical
+resistivity as a property.  It does include its density, but in the
+format “8.94±0.01 Q15639371”, which units(1) cannot parse; Q15639371
+is the Wikidata name for “grams per cubic centimeter.”  There was an
+entry for copper in Freebase.com too, but I don’t know if it included
+electrical resistivity.
+
+[Wikidata entry for copper]: https://www.wikidata.org/wiki/Q753
+
+Wolfram Vertical Line Alpha
+---------------------------
+
+Stephen Wolfram also has a broad vision of part of what I am calling
+executable scholarship.  He calls it a “computational knowledge
+engine”, and being Stephen Wolfram, he plans to own it, and his
+version doesn’t cite any sources.
+
+The Wolfram version is called “Wolfram|Alpha”, but I decline to use
+marketing-provided punctuation in the middle of proper nouns like
+“Yahoo!” and “Re/Code”, because I don’t hate my readers enough.
+Instead I will spell out the term as “Wolfram Vertical Line Alpha”
+when necessary.
+
+Wolfram Vertical Line Alpha *does* include the electrical resistivity of
+copper, and given the input “resistivity of copper * (10 amps)^2 /
+0.326 mm^2”, it correctly computes 5.2 watts per meter.  It also claims
+that the size of 22AWG wire is 0.324 mm², which differs by about 0.5%
+from the value given by units(1), and will return it given the input
+“22awg”, but I haven’t found a way to get Alpha to combine these
+pieces of knowledge in a single formula.
+
+The aims of scholarship
+-----------------------
+
+What is [scholarship][2]?
+
+[2]: https://en.wikipedia.org/wiki/Scholarly_method
+
+valid
+trustworthy
+well-known
+
+reproducibility
+self-correcting
+interlinked
+honest
+objective
+stable
+readable
+public
+reveals preferred embodiment
+not ignorant
+creative?
+documentable?
+replicable?
+peer-reviewable?
+
+[Boyer 1990] proposed expanding the definition of “scholarship” to
+include not only the discovery of knowledge but also teaching,
+application (“the use of new knowledge in solving society's
+problems”), and what he calls “integration” (“where new relationships
+among disciplines are discovered”, a definition broad enough to
+include any research).  Boyer was unable to publish his proposed
+redefinition in a peer-reviewed venue, publishing it instead through a
+phony “Carnegie Foundation” whose declared purpose is to promote the
+interests of teachers, which is to say, university faculty who do not
+engage in scholarship; not satisfied with this, however, he
+additionally proposed to expand “scholarship” to include practitioners
+of a field in general, except those who use only old knowledge.
+
+[Boyer 1990]: E. Boyer, _Scholarship reconsidered: Priorities for the
+professoriate_, published by the “Carnegie Foundation for the
+Advancement of Teaching.”
+
+Square roots
+------------
+
+The line of code I gave above to calculate the square root of an
+integer falls short of the aims of scholarship for several reasons.
+It's hard to read (made unnecessarily so by a )
+
+On the computer I’m typing this on, square roots are generally
+calculated by proprietary Intel hardware designs that I am not able to
+see, because using specialized hardware makes it much faster, and 
+
+
+tested using a function called [sqrt_test][3].
+
+.  But the
+free software I run the computer on has an option to calculate square
+roots using addition, subtraction, comparison, bit shifts, and
+iteration, called [_FP_SQRT_MEAT_E].
+
+[_FP_SQRT_MEAT_E]: http://osxr.org:8080/glibc/source/soft-fp/extended.h#0244
+[3]: sqrt_t
+http://www.uclibc-ng.org/browser/uclibc-ng/test/math/libm-test.inc?rev=fdebbe2044653c5c84172524ed6e036d38716d88#L4446
+
+Automatic testing
+-----------------
+
+IPython notebooks
+-----------------
+
+Algorithms published in CRAN
+----------------------------
+
+Research in emulation
+---------------------
+
+Retracted results due to spreadsheet errors
+-------------------------------------------
+
+Stellarium
+----------
+
+SPICE
+-----
+
+What comes next?
+----------------
+
+Consider my 
+
+
+
+Intertextuality, transclusion, and plagiarism
+---------------------------------------------

@@ -1,0 +1,275 @@
+I’ve written a keyboard-driven interactive calculator at
+<http://canonical.org/~kragen/sw/dev3/rpn-edit>, but it’s really more
+of a prototype than anything else, and using it on a cellphone is
+painfully clumsy.  But it’s already pretty useful.
+
+It interprets an RPN program to produce a sequence of formulas and
+their corresponding numerical results, displaying both the formulas
+and the results; the values can be vectors, and vectors are plotted as
+sequences of numbers.
+
+So I’ve been thinking about how to take advantage of multitouch and
+small screens, and I’ve come up with some ideas that I think will be
+substantially easier than what I have now, even without a keyboard.
+
+One of the problems with the current approach I’m taking is that what
+you’re editing is really the RPN representation of the set of
+formulas.  This is particularly tricky when you’re rearranging a
+formula, because it’s hard to tell if you’re going in the direction
+you want; you have to go through a lot of disorienting intermediate
+states first.
+
+Another problem is that it’s pretty time-consuming to select existing
+sub-terms.  A third is that DAGs aren’t really supported, because the
+stack machine doesn’t have variables or operations like DUP, OVER, or
+PICK.
+
+So here are a few ideas that are generic to multitouch in general
+which I haven’t seen tried much or at all:
+
+1. Quasimode buttons which, while held down with one finger (and
+   possibly pushed in some direction), cause touches with the other
+   finger to have some unusual effect.  For example, a trashcan button
+   which, while held, sends everything you touch into the trash; a
+   break-apart button which, while held, splits subnodes out of
+   formulas and turns them into formulas themselves at the top level;
+   a push-up button which, while held, factors subexpressions out of
+   function definitions, copying them into all callers; etc.  In a
+   photo manager, you might have a rotate-90° quasimode, or a
+   quasimode to apply a given filter.  Quasimode buttons have the
+   advantage over pie menus (mentioned later) that you can drag your
+   finger around the display until you have the right thing selected,
+   taking advantage of visual feedback to allow you to accurately
+   select deeply nested subexpressions.  Quasimode buttons should
+   visually highlight the objects they are applicable to while they
+   are pressed; they can also display a transparent, non-interactible
+   message that explains what they do.  And of course some of the
+   buttons can be non-displayed at any given time, using scrolling or
+   tabs to bring the desired buttons into view.  Foucault et al.’s
+   “SPad” prototype uses this approach.  In Surale, Matulic, and
+   Vogel’s 2017 paper, it’s called “non-dominant hand” or
+   “non-preferred hand”, a term they took from Li et al.’s 2005
+   pen-based paper; they found it was the fastest of all
+   mode-switching alternatives tested except for two-finger strokes,
+   although it had a higher error rate when the user was standing;
+   users rated it as the easiest to learn and most accurate when
+   sitting, though it suffered somewhat on some other measures.
+
+2. A single primary selection or focus, as with Macintosh-style GUIs,
+   which can be set by tapping an object; but unlike Macintosh-style
+   GUIs, the selection of an object results in action buttons popping
+   out of the sides of other objects for binary operations that
+   combine the two objects.  For example, if you have an expression
+   “5” sitting around and another expression “[11, 12]” gets selected,
+   the “5” should grow buttons for +, -, ÷, ×, ↑, and maybe some other
+   things.  Originally I was thinking that you should just use two
+   fingers to select two objects, and that might be worth trying, but
+   then I realized that in cases like these, most of the time you want
+   to select newly created objects to do more things with them, and
+   it’s probably easier if that happens automatically without having
+   to locate the new object and move your finger to it.
+
+3. Another kind of quasimode that turns the whole area of the display
+   into a two-dimensional input for the currently selected item until
+   the quasimode button (or perhaps just the drag) is released.  For
+   example, this could allow using the whole display to spin through
+   enumerated alternatives, rather than the half of the screen that
+   iOS Safari uses for `<select>` elements.  This technique applies
+   also to the sliders and dials mentioned later.  Some FPS games may
+   use this for aiming; Bret Victor’s animation demos use it.
+
+4. To take advantage of multitouch’s higher precision in motion
+   direction than initial touch position, like the typical
+   lower-left-hand corner movement pad in video games which centers on
+   your initial tap, we can use pie menus — while your finger is on an
+   object (perhaps with no quasimode active, or perhaps with a special
+   menu quasimode active), a pie menu pops up around it to offer
+   applicable unary operations.  In the calculator, this is probably
+   better for top-level formulas than for subexpressions, because
+   selecting a subexpression could be finicky.  The Banovic et
+   al. multitouch variation of pie menus uses a second finger to
+   select the menu item, which seems like it should work a lot better
+   actually, since it’s the distance and angle between the two fingers
+   that determines the command.  Gupta & McGuffin’s 2016 pie menu
+   paper is similar to the pin-and-cross method mentioned in #10, but
+   by using two separate fingers to open the menu (selecting the
+   object) and to select the menu items, it has two touchpoints to use
+   to control the resulting operation once it’s begun, allowing
+   simultaneous rotation, scaling, and translation.  Bitwig Studio’s
+   “radial gesture menu” uses motion to select one of a small number
+   of “inner ring” menu items or a second finger touch to select items
+   from an “outer ring”.
+
+5. Operation previews, providing one step of lookahead: the arithmetic
+   operation buttons sticking out of the “5” in the above example
+   should show the results — “+ [16, 17]”, “↑ [48828125, 244140625]”,
+   “× [55, 60]”, and so on.  Once the operation is selected, a new
+   object is created, and it becomes the selected object.  In the
+   calculator, though maybe not in other contexts, the objects that
+   went into it disappear (you can break it back apart if you want).
+
+6. In addition to the usual keyboard entry of numbers, entering
+   univariate functions by drawing graphs of them with your finger is
+   a very useful feature.  You probably want some kind of weighted
+   average of recent and nearby finger strokes in order to not
+   introduce discontinuities unintentionally and in order to allow
+   changes that are small compared to your finger positioning
+   precision.  For discrete sequences of numbers, lollipop charts may
+   be a reasonable alternative.
+
+7. Each object has multiple possible views: in the case of the
+   calculator, for example, as a formula, as a sequence of computed
+   numeric values, as a graph, and so on.  Some past experimental user
+   interfaces have used “lenses” that could be dragged over objects in
+   order to provide these different views, but I think that’s probably
+   kind of gimmicky and clumsy, except for cases where you actually
+   want to scrub a boundary back and forth over small parts of an
+   image; it’s better to just display all the views for the currently
+   selected object, when there is one, and allow the user to “pin”
+   views they want to keep visible.  Video games actually do provide
+   multiple views of the same data fairly often, but they usually
+   aren’t all interactive.
+
+8. A transparent overlay keyboard.  An overlay keyboard for typing is
+   an honest-to-goodness mode, rather than a quasimode, but it’s
+   probably necessary on current cellphones due to their small
+   screens.  But there’s no reason it has to obscure your view of the
+   workspace. (GTA 3 has a slightly transparent keyboard.)  For the
+   calculator application, you probably want to be able to enter
+   several numbers in a row without stopping.  Given sufficient
+   scrollability, the always-visible quasimode buttons could be
+   transparent as well, like most buttons and most status displays in
+   most 3-D cellphone games, so that they effectively take up less
+   screen real estate.
+
+9. Sliders and dials: in addition to entering numbers with the
+   keyboard, we want to be able to adjust them interactively with a
+   movement, as in Bret Victor’s work.  So two of the views available
+   on any number literal are as a linear slider and as a logarithmic
+   dial with one decade per rotation, plus a button in the middle for
+   negation.  These two views are quasimodal in the sense that while
+   you press on them, the entire screen can be used for the
+   interaction.  The logarithmic dial in particular allows access to a
+   large range of values without having to define the range ahead of
+   time.  Making these quasimodal allows us to use multiple strokes
+   with the adjusting finger across the display.  On the other hand,
+   non-quasimodal sliders would allow us to use several fingers at
+   once to control several different quantities.
+
+10. The fidget-spinner-like pin-and-cross interaction technique
+    presented by Yuexing Luo and Daniel Vogel is maybe a better
+    alternative to pie menus; it preserves the high spatial resolution
+    of being able to drag your finger around until you find the right
+    thing with the screen real-estate advantages of pie menus.  The
+    disadvantage is that (it looks to me like) really only angles
+    almost directly to the left and right of the target object are
+    really usable, giving you four commands, although they went a bit
+    further and used a few different angles on each side, including
+    one at 45° above the X-axis which I have to think would be super
+    uncomfortable if you were left-handed.  Distinguishing between
+    different distances seems like it would multiply the number of
+    alternatives.  Gupta & McGuffin’s approach mentioned above might
+    allow further degrees of freedom, and could be used one-handed
+    within limited angles.
+
+11. Focused-item zooming: the currently-selected item should be
+    displayed larger, maybe by an areal factor of 2–4, so that you can
+    normally display things at a slightly uncomfortably small size,
+    and then make them amply large when they’re selected.  Some games
+    do do this.
+
+12. Indirect input, like Pfeuffer et al.’s “gaze-touch” and “gaze
+    shifting”, either through a draggable lens (since gaze-tracking on
+    cellphones is an unsolved problem), or through something like
+    Käser, Agrawala, and Pauly’s 2011 FingerGlass, which defines the
+    area of interest using a pair of nearby fingers.  These approaches
+    dramatically improve effective display resolution and reduce the
+    occlusion problem for drawing and selection precision.
+
+Upon observing some people in the subway using their phones, I came up
+with some observations:
+
+* By far the most frequent interaction types were vertical scrolling
+  without taking advantage of momentum and typing a letter on the
+  onscreen keyboard.  These clustered; it was common to see 20
+  interactions in a row of the same type.
+* The third most common interaction type was tapping buttons, list
+  items, or menu items.
+* The fourth most common interaction type was quasimodally recording
+  an audio message in WhatsApp.
+* Occasionally I saw horizontal scrolling.  Once I saw a double-click
+  to zoom.  I saw no photo-taking, drawing, or pinch-zooming.
+* Around 95% of the people were using their phones in portrait mode.
+* Most people typed using two thumbs on the onscreen keyboard, even
+  though the phone was in portrait mode; sometimes they even let go of
+  the subway straps while standing to do this.  They just bought
+  phones big enough that this was comfortable for their hand size.
+  The only person I saw using their phone in landscape mode was
+  playing an immersive video game.
+* Social interaction through cellphones, such as WhatsApp, Instagram,
+  and Fecebutt, was much more popular than solo video gaming, such as
+  Candy Crush.
+
+I tentatively conclude that a new interface needs to be operable with
+two thumbs in portrait mode and not break single-finger vertical
+scrolling in order to be avoid large usability problems.
+
+Some ideas specific to the calculator application
+-------------------------------------------------
+
+In a good calculator, there is some way to use a computed value more
+than once; the dataflow forms a DAG, not a tree.  In the language of
+formulas, we do this with variables.  I think there should be a
+quasimode button that allows you to factor out a subexpression into a
+variable so you can use it again.  At one point, I thought that
+probably it would be best to do this implicitly: if you selected a
+subexpression as an operand, then that would pull out the
+subexpression into a variable and use it twice.  But then I realized
+that it would be more intuitive to use that approach to edit the
+existing formula — same interaction, but sucking the standalone
+operand into the existing formula, replacing the selected
+subexpression with the newly created subexpression.  This is similar
+to how function composition worked in early versions of Subtext.
+
+Aside from adding complexity to existing subexpressions, we often want
+to simplify them or replace them altogether.  I think simple
+replacement is likely to be frequent enough to warrant the use of
+drag-and-drop of a formula for it — which, if we make it mean “swap”,
+can also function to swap arguments around and rearrange parts of an
+expression.  Simplification can be done with the inverse of the
+above-mentioned combining operation — a user-interface action that
+removes an operator and expels one of its arguments to be an
+independent formula.
+
+Given the ability to define variables like x = 2+3×4, a very
+incremental way to define functions is to select a subexpression and
+convert it into an argument; for example, if the 3, we would transform
+the definition into x(y) = 2+y×4, replacing all the existing
+references to x with x(3).  This refactoring pulls the argument into
+the caller (every caller); if the whole definition of x is selected,
+it reduces x to the identity function, and we could as a special case
+remove x entirely, thus allowing this single extract-argument
+refactoring to also serve as inline-function.
+
+The inverse refactoring is not always possible, since different
+arguments may be passed at different locations.
+
+derivatives, integrals
+
+optimization
+
+vertical layout
+
+reduction (?)
+
+different views
+
+12. Temporal univariate function input and output: in addition to a
+    static two-dimensional display of a sequence or continuous
+    function, we can cycle through the values of the independent
+    variable with time, as, for example, we do when it’s an audio
+    waveform we're playing back.  But we can use this to choose a
+    single numerical value to display at any given time, stepping a
+    cursor visibly through the values; for an input variable, if
+    augmented with a slider, we can use the slider to “push” the value
+    up or down in a given region, or just to set it.

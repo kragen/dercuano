@@ -1,0 +1,233 @@
+I saw on Hackaday that Ted Yapo made a digital clock out of diodes and
+oscillators.  This ought to be impossible, since diodes can’t invert
+or amplify, but it turns out that it isn’t, because of reverse
+recovery time.
+
+Yapo is using regular power rectifier diodes as RF switches, like PIN
+diodes.  When they’re forward-biased or even zero-biased, they pass RF
+AC with no problem.  When they’re reverse-biased, the depletion region
+grows, the junction capacitance drops, and they block RF AC (up to
+some rolloff frequency, anyway).  So you can use DC voltage biases to
+get them to block or pass RF.  Then you can use a faster small-signal
+diode to rectify the RF AC into DC, which you can use for further
+control signals.
+
+Essentially, you carry two signals from two different power supplies
+on the same wire at the same time, allowing you to do something
+thought impossible for decades.
+
+You could argue that this isn’t “really” diode logic because you need
+an external oscillator to drive it.  Yapo says this is a bogus
+criticism — the external oscillator is just another power supply, like
+how you need regulated 5VDC for TTL and regulated 3V3 or 1V8 for many
+modern CMOS chips.  You don’t need more oscillators as your logic gets
+more complicated.
+
+(Incidentally, I’ve seen an avalanche relaxation oscillator LED
+flasher that works by back-biasing the collector-base diode junction
+of a transistor until reverse breakdown, so I suspect you can get an
+RF oscillator out of relatively ordinary diodes too, not just exotics
+like Gunn diodes and tunnel diodes.)
+
+It occurred to me that maybe you don’t even need two different kinds
+of diodes for this trick.  You can use different regions of the
+response curve of a single kind of diode.  You can use a capacitor
+(with more capacitance than your back-biased diodes) to move an AC
+signal from riding on one DC voltage level to another.  If the DC
+level is close to the diode’s forward drop, it rectifies the RF
+signal.  If it’s above the diode’s forward drop, it passes the RF
+signal; if it’s below it, it blocks it.
+
+This is kind of tricky because it seems like it could be hard to get
+amplification with just one kind of diode this way.  Unless you’re
+going to use transformers, the RF voltage needs to be high enough to,
+when rectified, switch a diode from blocking RF to passing RF.  I was
+thinking that this wasn’t really a problem because you can use an
+arbitrarily small DC voltage to build up an arbitrarily large charge
+as you back-bias a diode, but it’s actually a bit trickier than
+that — the small DC voltage will stop building up the large charge
+once the voltage created by that charge gets high enough.  But I think
+you can use a standard voltage multiplier circuit (Cockcroft-Walton
+generator) made of diodes and capacitors to solve this problem.  (I
+say “I think” because I’m not sure if this would require a different
+kind of diode.)
+
+A standard 1N4148/1N914 handles 10 mA at .75 V forward and can peak at
+100 mA at 1.1 V forward, withstands up to 75 V reverse, and has .9 pF
+junction capacitance and 4 ns reverse recovery time.  I think this
+means it can usefully rectify signals up to about 60 MHz.  Common LEDs
+can also pulse up into the tens or hundreds of MHz.  Schottky diodes
+don’t have a reverse recovery time but have more capacitance; a 1N5819
+has 150pF and can handle 1 A at .4 V forward.  That capacitance will
+pass 1 A at .4 VAC at 2.7 GHz, although presumably their lead
+inductance will start to be a problem well before that, and you
+probably don’t really want to run your logic circuits at 400
+milliwatts per diode anyway, and lower currents will make the
+capacitance proportionally more important — 27 MHz already passes
+10 mA.
+
+(2.7 GHz?  Is that really true? To charge 150 pF up to a .6 volt peak,
+I guess you need 90 pC, which an amp would deliver in 90 picoseconds,
+which gives you a waveform period of about four times that, which is
+indeed about a third of a nanosecond.  Wow.)
+
+There are smaller Schottky diodes with correspondingly smaller
+capacitances.  The 1N6263 offers 0.1 pF and can carry 1 mA, which hits
+the corresponding transition at 3.9 GHz.  Amusingly, at the other end
+of the scale, things look better: the MBRP40045 can carry 400 amps (!)
+and claims only 3500 pF, which at an AC RMS voltage equal to its
+540 mV forward drop, would only start carrying 400 amps RMS at 34 GHz.
+But 3500 pF would resonate in series with its own leads at 2.7 GHz
+with only one picohenry of parasitic lead inductance.
+
+Using higher radio frequencies allows you to use smaller capacitors to
+pass them or smaller inductors to block them.  At 10 MHz, for example,
+22 pF is 700 Ω, and 100 μH is 6000 Ω; at 20 MHz, 10 pF is 800 Ω and
+47 μH is 6000 Ω.
+
+The effective switching speed of logic circuits built this way might
+be able to reach a tenth of the carrier frequency of the RF power
+supply.  The rectifier output needs to be smoothed over intervals in
+that ballpark, and the “DC” signals need to be separated from the “RF”
+by at least that much.
+
+(Speaking of inductors, square-hysteresis-loop magnetic logic had
+somewhat similar characteristics, using a DC signal to push a magnetic
+core into saturation and thus pass or block an AC signal, also
+restoring the signal edges with the sharp hysteresis.  It was much
+slower, though, because magnetic domains take a while to move around,
+like nearly a millisecond.  This approach seems like it might have the
+potential to reach into the MHz.)
+
+The AC current produced by a small AC voltage across a diode riding on
+some DC bias is an exponential function of that DC bias, which will
+then produce a nicely exponential AC voltage if fed into, say, a
+resistor or capacitor.  This suggests a sort of alternative approach:
+rather than trying to suppress the RF entirely by back-biasing the
+diode, just move down closer to the threshold voltage to attenuate it
+more, but not so close that you’re effectively rectifying.  I am not
+sure if this will work.  Let’s try to work it out.
+
+Let’s see if we can fit a curve to the 1N4148 figures I gave earlier.
+The current should grow by a factor of e every 25.3 mV, according to
+my understanding of the Ebers-Moll equation; in fact, though, it grows
+only by a factor of 10 over the 0.35 volts from .75 to 1.1 volts, when
+actually it should be growing by a factor of a million.  Horowitz &
+Hill has some diode curves, including LEDs, in figure 2.8; it gives
+the 1N914 (supposedly the same as the 1N4148) as ramping up to about
+30 mA at something like 0.7 volts.
+
+I measured some points on the curve in the Gimp.  0V is 97 pix and 1 V
+is 240 pix and 2 V is 384 pix, for 143 or 144 pixels per volt; 5 mA is
+374 pix, 10 mA is 301 pix, and 15 mA is 230 pix, for about 144 pixels
+per 10 mA.  So using the formula ((x - 97) / 143.0, (301+144-y) /
+14.4) we can transform points measured on the curve with Gimp’s
+crosshairs; we get 0.48 V, 0.1 mA; 0.59 V, 0.6 mA; 0.66 V, 1.4 mA;
+0.71 V, 2.5 mA; 0.75 V, 5 mA; 0.79 V, 7.8 mA; 0.80 V, 10.3 mA; 0.85 V,
+20 mA; 0.86 V, 30 mA.
+
+This suggests that, at some temperature, a voltage wiggle between
+0.59 V and 0.66 V (70 mV) will result in a current wiggle of 0.8 mA
+(11.4 mʊ); a voltage wiggle between 0.66 V and 0.71 V (60 mV) will
+result in a current wiggle of 1.1 mA (18.3 mʊ); a voltage wiggle
+between .71 and .75 V (40 mV) will result in a current wiggle of
+2.5 mA (63 mʊ); a voltage wiggle between .75 and .79 V 2.8 mA (70 mʊ);
+between .79 and .85 V 12.2 mA (200 mʊ); and presumably continuing from
+there.
+
+(This amounts to a factor of 5 increase in current over 270 mV, from
+590 mV to 860 mV, which would be an increase by a factor of e every
+168 mV, not evey 25.3 mV.)
+
+Let’s leave aside the delicate question of biasing the circuit to 0.48
+V or 0.59 V or whatever rather than 0.45 V or 0.65 V, which are points
+that shift with temperature.  Let’s suppose it’s feasible.
+
+The thing I’m not sure about here is that I feel like we don’t really
+get a place with more or less rectification along this curve.  As long
+as dI/dV keeps growing exponentially, an AC waveform of some fixed
+voltage will always have less conductance on its lower half, in fact
+by always exactly the same ratio, so it will always be the same
+percent rectified, leaving aside frequency-dependent effects like
+reverse recovery time.  But I guess that if we put a resistor in
+series with the diode, the resistor-diode series unit will gradually
+become more symmetric as more of the voltage is across the rectifier.
+And of course diodes have their own internal resistance, which has the
+same effect, even if it isn’t visible from the curve there yet.
+
+Again I am feeling skeptical about amplification, though.  At 800 mV
+DC and 10.3 mA, the control signal costs 8.2 mW.  If we are switching
+a 120 mV p-p RF waveform, which turns out to be roughly 17 mA p-p, are
+we really getting amplification?  It’s dissipating only about 0.25 μW
+in that diode... but maybe we can rectify that to about 6 or 7 mA DC
+and run it through two or three volts of other diodes in series (three
+or four diodes) as a control signal?  Or pump it up to 1600 mV in a
+13-stage Cockcroft-Walton generator?
+
+The thing that’s confusing me here is that I confuse the energy
+*dissipated within* the device with the energy *controlled by* the
+device.  In theory we could be driving those 17 mA ac (rms) through
+any number of other diodes in series; but I don’t have a clear idea as
+to how.
+
+By contrast, it’s totally clear to me that the mechanism of reverse
+bias and reverse recovery time exploited by Yapo provides
+amplification: the energy to maintain a diode in reverse bias is just
+the energy to replenish the leakage current — for the 1N4148 that’s
+10 nA at 20V reverse bias, which would be 200 nW, and less if you’re
+only reverse-biasing it to 2V or so — and the energy to maintain it at
+DC ground is zero.  But if you put a 125MHz sinewave at 1V RMS across
+it, it will pass it almost without resistance when it’s not
+back-biased, but block it when it’s reverse-biased.  This gives you
+near-infinite power gain, like a MOSFET.
+
+(Yapo is actually using the 1N4148 for his high-speed rectifier and a
+1N4007, a hefty power rectifier diode, as his switch, because he’s
+using only 4.5 MHz as his RF frequency.)
+
+I think I have a clearer idea of how much power you can control with
+such a switch now.  Consider a switch with some resistance in general.
+When its output is shorted, it’s controlling no power, because there
+is no voltage across the load; similarly when it’s open-circuited,
+because there is no current through the load.  As we add conductance
+starting from an open circuit, the current starts to creep up, but
+since the current causes some voltage to be dropped across the switch,
+the voltage across the load starts to fall.  Load power is at its
+maximum when precisely half the voltage is across the load, and as we
+move further toward a short circuit, although current continues to
+increase linearly with the conductance, power starts to drop.  The
+overall shape is a parabola; this is easily visualized as being the
+product of two linear ramps, one from zero current at open circuit up
+to the current from the switch’s conductance at short circuit, the
+other from zero voltage at short circuit up to all the voltage at open
+circuit.  Those are the roots of the quadratic, from which it
+immediately follows that its extremum is halfway in between.
+
+Things get a little more complex when the switch impedance is partly
+imaginary, but I think the difference is relatively small, not orders
+of magnitude — except of course that the switch doesn’t dissipate
+power from the imaginary part of its impedance.
+
+So the power that a switch can control to a load is at or near its
+maximum when the switch itself is dropping the same amount of voltage.
+So, for our example earlier, if the part of our waveform across the
+switching diode is 120 mV p-p, it could have another part across the
+load of another 120 mV p-p for optimal power, which means that at
+17 mA p-p it can be delivering uh 0.354² 120 mV 17 mA = 0.255 mW of
+power to that load, just as it’s dissipating in the switching diode,
+about 3% of the DC bias current.  So, basically, no, that part of the
+curve will not work for amplification.
+
+Yapo’s “diode-diode logic” design, by contrast, reverse-biases the
+switching diodes to empty out a generous depletion region around the
+junction in order to block the RF energy.  This is essentially
+static — a 1N4007 can, according to Vishay’s datasheet, carry 1000 mA
+forward and presumably an even larger amount as RF, and leaks 5 μA
+when back-biased to 1000 V.  At the -15 V of Yapo’s design, according
+to Yapo’s “DDL01 DDL Hex NOR Gate” datasheet, it should presumably be
+more like 75 nA of bias current and 1.13 μW, while the 12 Vpp RF ends
+up as 4.2V RMS at something like 8 mA, which works out to 34 mW, about
+30 000 times larger.  Nevertheless, the circuit barely works — he had
+to resort to two stages of amplification per gate and over 20
+components, including inductors, and supports fanout of up to about 5.
+

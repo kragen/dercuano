@@ -1,0 +1,287 @@
+The current fashion of “NoSQL” key-value stores reminds me that Unix
+has shipped with a NoSQL key-value store since Seventh Edition Unix in
+1979, written by Ken Thompson and called dbm.  Dbm files are on-disk
+hash tables mapping strings to strings, and they are used by many Unix
+programs — Sendmail and Postfix, for example, support storing
+arbitrary tables related to mail delivery in dbm files, and Apache
+supports using dbm files for many purposes.  They’re supported by a
+dbm library, which generally only works properly if at most one
+program has them open at a time.  You don’t normally connect to a “dbm
+server”, but rather open the file and lock it.
+
+History
+-------
+
+The 1979 dbm interface looks like this, in modern ANSI C parlance:
+
+    typedef struct { char *dptr; int dsize; } datum; 
+    int   dbminit  (const char *name);
+    int   store    (datum key, datum content);
+    datum fetch    (datum key);
+    int   delete   (datum key);
+    datum firstkey ();
+    datum nextkey  (datum key);
+    int   dbmclose ();
+
+(Adapted from the GDBM docs.)
+
+This is very simple, and it’s easy to figure out how to use it, aside
+from an allocation issue I mention below, but you can perhaps see some
+problems right there in the interface — not only do `store()` and
+`fetch()` and the like not have a namespace prefix, making it easy to
+have collisions with your functions, but also they don’t have a
+parameter to tell you which dbm file to access!  That means you can
+only have one dbm file open at a time in a single process, but on the
+PDP-11 that V7 Unix ran on, the process’s entire address space was
+only 64KiB, so you couldn’t do too much in one process anyway.
+
+The dbm file uses a scheme called “extendible hashing” to allow the
+on-disk hash table to grow smoothly as data is added to the file,
+though in a way that requires the underlying filesystem (and your
+backup programs!) to handle sparse files efficiently.
+
+The original dbm was more or less replaced with Berkeley ndbm in 1986,
+which solved those interface problems, but, as I understand it, still
+used the same limited disk file format.  Other more or less enhanced
+clones included sdbm (1987), GDBM (1990–2002), Berkeley DB (1991 to
+present), QDBM (2000, QDBM’s successor Tokyo Cabinet, TDB, its variant ntdb,
+tdbm, Larry McVoy’s memory-mapped MDBM (significantly enhanced this
+millennium by Yahoo), and a pure-Python implementation called dumbdbm.
+
+In the original dbm interface, it isn’t obvious from the API where the
+buffer space for the fetched data comes from, and in particular when
+it will be reused — in GDBM, at least, it’s `malloc`ed, and the caller
+must free it, even if they only cared about testing whether the key is
+present or not.  But that would be an unlikely thing for 1979 Unix to
+do (it was very shy about dynamic allocation) and GDBM’s compatibility
+ndbm interface frees it for you on the next call, whether you like it
+or not.  I infer that probably dbm and ndbm returned you a pointer to
+a static buffer.  And, indeed, [we can see the fetch function in 1979
+dbm doing exactly that][0]; `pagbuf` is a static buffer defined (!) in
+`dbm.h`.
+
+[0]: http://www.tuhs.org/cgi-bin/utree.pl?file=V7/usr/src/libdbm/dbm.c
+
+### cdb ###
+
+One dbm replacement is particularly interesting, because instead of
+being an enhanced version of dbm, it was a deliberately more limited
+version.
+
+When Daniel Bernstein decided to write a secure replacement for
+Sendmail in 1995, called qmail, he was faced with the problem that
+existing C libraries were full of unreliabilities, poor performance,
+and security holes, just like Sendmail itself.  He solved this problem
+by writing replacements for all of the standard C library
+functionality that he needed, from scratch, without any functionality
+he did not need, and without bugs.  One of the things he needed was a
+rough equivalent of dbm, but he did not need dbm’s ability to
+incrementally update an existing database.  So the qmail equivalent of
+dbm is called “cdb”, “constant database”, and it consists of 329 lines
+of C.  The read interface consists of these two functions:
+
+    int cdb_seek(int fd, char *key, unsigned int len, uint32 *dlen);
+    int cdb_bread(int fd, char *buf, int len);
+
+`cdb_seek` returns 1 if `key` of length `len` is present in the file
+open on file descriptor `fd`, 0 if not, and -1 on I/O error, storing
+the length at `dlen`; `cdb_bread` then reads the corresponding value,
+if desired, into `buf`, returning -1 on error, including truncated
+files, or 0 on success.
+
+Rather than using the extendible-hashing algorithms used by dbm, the
+cdb file is always divided into 256 hash buckets, described by a 2KiB
+table at the beginning of the file, whose format limits it to 4GiB.
+And the code to generate the file builds a hash table with separate
+chaining in memory, then writes it to the file once insertion is
+complete.
+
+cdb is less featureful and presumably less performant than other
+variants of dbm, but because it likely has no bugs and is only about 2
+kilobytes of executable code, it may be preferable at times.
+
+### Language integration ###
+
+Perl 4 had native support for dbm files, and a lot of websites that
+graduated from storing their data in static text files started to use
+dbm files instead.  Perl 4 was the first widely-used garbage-collected
+language; most of the shift from static websites to web applications
+in 1994 and 1995 was implemented in Perl, and many sites still didn’t
+have Perl 5 installed.
+
+Python, too, has shipped with support for dbm files for a very long
+time.
+
+Why not just use a filesystem directory?
+----------------------------------------
+
+You might reasonably ask why people used dbm files, which after all
+merely map sequences of bytes to sequences of bytes, when the
+filesystem already performs this function.  The reason is that, at the
+time, most Unix filesystems still used sequential search in filesystem
+directories for filenames, and as a result, directories with more than
+a few dozen files in them started to get slow.  If you are going to
+maintain a table and then sequentially search it, you can just use a
+text file for that.  (And Unix does, all over the place.)  Also, in
+most Unix filesystems, files take up at least 256 bytes or so.
+
+The Pick operating system and the ReiserFS filesystem for Linux were
+based on making the normal filesystem apt for this kind of purpose,
+rather than trying to build the facilities in userspace.  Various
+forms of Pick are still around, but ReiserFS ran into performance
+limitations in the Linux system call interface, then lost its
+influence after Hans Reiser murdered his wife in 2007 and was not able
+to effectively lead the project from prison.
+
+The filesystem interface requires at least three system calls to get
+the contents of a file: open(), read(), and (in the steady state,
+anyway) close().  Even today, [Linux system calls require on the order
+of a microsecond][1], about 300ns on my machine, so about 1 μs for the
+three put together, which will limit you to about 300k such file reads
+per second on a single thread.  By comparison, [MDBM can manage about
+450 ns per random read][2].  One of the last controversial projects of
+Reiser’s company was a system for batching up a whole sequence of
+Reiser4 operations into a single system call.
+
+[1]: http://stackoverflow.com/questions/8247331/syscall-overhead
+[2]: https://yahooeng.tumblr.com/post/104861108931/mdbm-high-speed-database
+
+Why not SQL?
+------------
+
+So we used dbm files for all kinds of things, including things where a
+relational database would worked a lot better.  You might wonder why
+we didn’t just use relational databases.
+
+The problem is, there were no decent free software SQL databases.
+University INGRES was, as I recall, available, but it had its own
+query language (“QUEL”) and didn’t support SQL; its development had
+ended in 1985, though Wikipedia tells me that Sybase and Microsoft SQL
+Server were developed from that codebase.  At Berkeley they were
+developing Postgres, which was licensed to Illustra about 1994 as an
+“object-relational database,” and eventually sold to INFORMIX, but
+Postgres was slow and unreliable, and it didn’t support SQL either,
+yet — its query language was a thing called “POSTQUEL”.  SQLite and
+MySQL and MariaDB and even Gadfly didn’t exist yet.
+
+A lot of people did build web sites and things with SQL database
+backends, including well-known companies like Amazon and eBay and
+lesser-known companies like ArsDigita, which was in many ways the
+prototype for Google.  But they had to license proprietary databases
+to do it.
+
+There was additionally the problem that relational databases were very
+heavyweight, like Cassandra today — you couldn’t run them at all on a
+low-end machine, and you universally had to run them in a separate
+process and connect your app to them via IPC — sockets or whatever.
+(This was partly ideological.  As Stonebraker said in the original
+Postgres — excuse me, POSTGRES — paper, “DBMS code must run as a
+sparate process from the application programs that access the database
+in order to provide data protection.”)  You probably had to have a
+separate machine to run the database server on, a workstation or maybe
+a tower-case PC.  This kind of nonsense meant that there was no
+possible way to use .  This may be hard to imagine now that most
+cellphones have dozens of SQL databases in them (mostly SQLite) but
+consider that, even today, starting up `sqlite3` linked with glibc and
+opening a database, you’re already using 27 megs of virtual memory:
+
+    USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+    user     26485  0.0  0.0  26916  3728 pts/3    T    01:47   0:00 sqlite3 hello.d
+
+Until the DRAM price bubble burst in 1995 or 1996, DRAM cost US$40 per
+megabyte for years due to collusion in a cartel of DRAM manufacturers,
+so that was about US$1000 worth of memory.
+
+(This level of bloat is probably mostly glibc’s fault.  The sqlite3
+binary and library are under a megabyte.)
+
+In 1994, David Hughes in Australia sparked a revolution by writing a
+simple SQL database he called “mSQL” (for “mini SQL”) and releasing it
+with source code, but not as open source — it was “free for
+noncommercial use” only.  In 1995, he founded a company he called
+Hughes Technologies to commercialize it.  But that’s another story,
+so I am going to return to talking about dbm.
+
+Crash safety
+------------
+
+In the environment Unix grew up in, a power loss was a catastrophic
+event, similar to a disk head crash, a datacenter fire, or a memory
+corruption bug in the kernel.  Some other operating systems had
+crashproof filesystems which were designed not to lose data in the
+event of power loss, but Unix did not, and indeed this was one of the
+desiderata in the original plans for the GNU system — GNU would be
+better than Unix because its filesystem would have versioning and be
+crashproof.
+
+Corrupting your filesystem and losing files on power loss was still
+common in Linux up until about 2004 or 2005, at which point ext3fs and
+other journaled filesystems put an end to that problem, for the most
+part.
+
+Nowadays, by contrast, it is very common for Unix machines to lose
+power — their batteries may run out, or you may drop them on the
+sidewalk and joggle the battery out of touch with the contacts.  By
+contrast, memory corruption bugs in the kernel and cellphone fires are
+vanishingly rare, and SSDs have no moving parts and therefore don’t
+have head crashes.
+
+However, if there are consistency constraints inside some file that is
+being written to in random places, it’s possible for an inconsistent,
+acausal snapshot of that file to be what survives.  Unix provides an
+`fsync()` system call to limit the possibilities for such
+inconsistencies — it doesn’t return until all the data for the file in
+question is safely saved on disk.  This guarantees two relevant properties:
+
+1. If `fsync()` returns and the program takes some action afterwards,
+   such as displaying a user interface message or sending a packet
+   over the network, then if we observe this action, then we know that
+   the data written before `fsync()` will not be lost.
+2. Either all data written before `fsync()` is preserved, or no data
+   written after `fsync()` is preserved, or both.  It is never the
+   case that some data written after `fsync()` is preserved, while
+   some data written before `fsync()` is lost.  That is, `fsync()`
+   serves as a “write fence”.
+
+Property #2 is necessary to guarantee the atomicity and consistency
+properties of transactions; property #1 is necessary to guarantee the
+durability property of transactions.
+
+However, because property #1 is very expensive to provide, especially
+on spinning-rust disks, it is very common that programs do not bother.
+There was a great deal of controversy a few years back over MongoDB
+doing this in order to get better performance numbers, but you will of
+course see that the MDBM numbers I cited earlier are taken under the
+same conditions, and the GDBM manual explains:
+
+> …the following may be added added to `read_write` by bitwise or:
+> `GDBM_SYNC`, which causes all database operations to be synchronized
+> to the disk, and `GDBM_NOLOCK`, which prevents the library from
+> performing any locking on the database file.  The option `GDBM_FAST`
+> is now obsolete, since gdbm defaults to no-sync mode.
+>
+> …
+> 
+> Unless your database was opened with the `GDBM_SYNC` flag, gdbm does
+> not wait for writes to be flushed to the disk before continuing.
+> The following routine can be used to guarantee that the database is
+> physically written to the disk file.
+>
+>     gdbm_sync ( dbf )
+>
+> It will not return until the disk file state is syncronized [sic]
+> with the in-memory state of the database.
+
+Unfortunately, because omitting `fsync()` endangers not only
+property #1 but also property #2, it is entirely possible for a GDBM
+file to be corrupt after a power outage.  In the case of GDBM,
+although I haven’t verified this, I think this means that some
+previously stored data that wasn’t being modified could be
+irretrievable, but not necessarily all of it.
+
+Worse, making this work properly typically involves inserting an
+`fsync()` as a write-fence in the *middle* of a sequence of write
+operations.  Doing an `fsync()` at the end can ensure that, if the
+execution gets that far, the data stored is not lost; but it cannot
+ensure that a power failure at some other point does not leave the
+disk file in an inconsistent state.

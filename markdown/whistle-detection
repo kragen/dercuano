@@ -1,0 +1,319 @@
+I can whistle from about 600Hz up to about 1600Hz.  There is often
+substantial unintentional amplitude modulation on my whistle around
+25–100 Hz.  The vibrations can’t ramp up or down by 10dB in less than
+about 8 cycles, even when I’m releasing a tongue stop, and more
+typically take 20 or 30 cycles, suggesting a Q factor of somewhere
+around 10–20.  Second, third, and fourth harmonics are detectable, but
+weak; even the second harmonic is 52dB down from the fundamental.  I
+can easily ramp up from 800Hz to 1600Hz in 1.3 seconds.  Doing the
+same ramp in 100 milliseconds is feasible with more effort.
+
+(Semitone resolution is a Q factor of about 17, so using a linear
+filter with a lower Q factor would fuzz out frequency selectivity too
+much to be useful.)
+
+A particular 70-millisecond segment of low whistle had a frequency
+peak at 615 Hz at -29.3 dB, falling off to -35.6 dB at 610 Hz and
+-38 dB at 628 Hz.  This suggests a Q factor of around 60 during the
+whistle itself.  (Maybe even a bit higher.)
+
+This suggests that the “window size” I should be looking at to detect
+a whistle could be up to about 20 or 30 cycles or milliseconds in
+length, and I could band-pass filter the signal to a bandwidth of
+about 1000 Hz as a first step.  Then I could measure the distance
+between zero crossings or calculate some autocorrelations or
+something, or run a PLL.
+
+Using high frequencies like this reduces the signal detection latency.
+
+Efficiency questions
+--------------------
+
+I’d like to run this all on an Arduino.  So, to reduce the
+computational cost of this, probably I should start by downsampling to
+about 4–8ksps.  (The Arduino could perhaps capture natively at this
+rate.)  Then, maybe I could resample to 2ksps with downconversion from
+600Hz to baseband, but maybe that’s not a good idea — among other
+things, it might increase latency.
+
+There are a variety of possible things you can do from there.  You can
+run a software PLL.  These can be quite simple and efficient; this one
+does 7 simple operations per sample and sort of works to track my
+voice frequency; you need a few more operations to detect presence or
+absence:
+
+    /* A PLL in one line of C. arecord | ./tinypll | aplay */
+    main(a,b){for(;;)putchar(b+=16+(a+=(b&256?1:-1)*getchar()-a/512)/1024);}
+
+You can do STFTs, but that’s never going to be fast.  (At least within
+barely more than a single octave, you don’t have a terrible tradeoff
+of window width; you can just use a window of about 30 ms).  You can
+count zero-crossings, but that throws away most of the information in
+the signal.  You can calculate the autocorrelation function for
+particular frequencies of interest, or when multiplication is slow,
+the sum of absolute differences.  Or you can use particle filters.
+
+### Particle filters ###
+
+A simple particle-filter-based scheme could measure prediction error
+of each sample based on various candidate lags, taking the last 20 or
+30 cycles (or whatever) as the predictor.  If you used 32 cycles, you
+could calculate the prediction like this:
+
+    s16 total = 0
+      , lag = p.lag  // 12.4 fixed-point
+      , lagi = 0
+      ;
+    for (u8 i = 0; i != 32; i++) {
+        total += latest_x[(lagi += lag) >> 4];
+    }
+    return total >> 5;
+
+But that is kind of shitty because you have to do shit 32 times: 64
+16-bit additions, 33 4-of-16 bit shifts, 32 indexed byte fetches.
+It’ll take hundreds of cycles to calculate the prediction for a single
+particle.  (Also, you get some aliasing, because you’re effectively
+resampling your signal with nearest-neighbor resampling.)
+
+#### Incremental prediction ####
+
+A better approach might be to incrementally update the totals.  I will
+explain.
+
+Suppose we’re at 8ksps and our range of frequencies of interest goes
+from 700 to 1400 Hz.  Then each cycle is from 5.7 to 11.4 samples; 32
+cycles are from 183 cycles to 370 samples.  A frequency in the middle
+of the range like 1000 Hz will have a cycle every 8 samples.  So its
+current prediction is almost the same as the prediction from 8 cycles
+ago — it will be adding up almost the same samples.  If it cycles
+through an array of 8 totals, it can update the current total by
+subtracting the sample 32 cycles ago that fell off the end of the
+window, then adding the sample from 1 cycle ago.  Then it can make the
+prediction based on that.
+
+The same kind of logic applies for cycles of exactly 7 samples
+(1143 Hz), exactly 9 samples (889 Hz), exactly 6 samples (1333 Hz),
+exactly 10 samples (800 Hz), and exactly 11 samples (727 Hz), although
+some of these will need an array of more totals, up to 11, while
+others will cycle through less.
+
+Non-integer numbers of samples are trickier, since we don’t want to
+count back by strides of 8.2 samples from the present — by the time we
+get even 3 strides back, we’re no longer looking at the same sample
+that we looked at the last time we were at this phase, so subtracting
+the sample 32 strides back from the total makes no sense — it wasn’t
+part of the total to begin with.  The solution that occurs to me is to
+maintain in each phase, associated with the running total, two
+accumulators like the variable `lag` in the above code, one for the
+beginning of the window and one for its end.  So then the update code
+for a single phase accumulator becomes something like this:
+
+    return (p->total += x[(p->head += p->lag) >> 4 & xmask]
+                      - x[(p->tail += p->lag) >> 4 & xmask]) >> 5;
+
+This is 9 operations per particle update instead of hundreds.
+However, it omits the logic to select the proper phase, which I think
+sometimes needs to update two phases.
+
+4 bits of fractional sample allows resolving between lags of
+8 samples, 8.0625 samples, and 7.9375 samples — 1000 Hz, 992.2 Hz, and
+1007.9 Hz, respectively.  This is excessive precision for 32
+cycles.  We probably can’t do better than about half a cycle during
+our window of frequency precision, which is to say 4 samples out of
+256, which means that we really only need 3 bits.
+
+An alternative that avoids the need to track the tail is just to
+exponentially decay the totals, maybe in a cascade of two or three;
+that’s what the PLL given above does.
+
+### Sinusoidal phase detection for PLLs ###
+
+If you change the particle-filter approach to try to follow the signal
+by modifying the period of a particle, rather than by spawning new
+particles with slightly different periods, you end up with a PLL.  A
+simple thing to do would be to look at the prediction error and
+compare it to the derivative.  If the prediction error is of the same
+sign as the derivative (of either the signal or the prediction),
+you’re falling behind the signal and need to speed up.  If it’s of the
+opposite sign, you’re getting ahead of the signal and need to slow
+down.  And the prediction error from the phase error will be
+proportional to the derivative, which has two contradictory
+implications:
+
+1. When the derivative is large, you should expect a large prediction
+   error from a small phase shift, so you should consider prediction
+   errors less important.
+2. When the derivative is large, the prediction error is less likely
+   to be due to noise and more likely to be due to an actual phase
+   shift, so you should consider prediction errors more important.
+
+I think #2 wins out.
+
+I think all of this will only really work right if your waveform is
+pretty simple, though, like somewhere in between a triangle, square,
+sawtooth, and sine wave.  Waveforms with weird shapes with negative
+local maxima and positive local minima will cause trouble.
+Fortunately, we’re kind of filtering those out anyway in this case,
+and my whistles are 99.75% sinusoidal, as I said at the beginning,
+even without bandpass filtering.
+
+So it might make sense to just run a sinusoidal oscillator instead of
+using an average of previous samples as the prediction.  (But maybe
+using previous samples is cheaper.)
+
+### A simpler PLL phase detector supporting weird waveforms ###
+
+Suppose we have an estimated waveform which is the average of the last
+few cycles (say, a simple moving average of 16 cycles), and we want to
+know if we’re early or late on the phase.  Well, we can subtract the
+sample xᵢ from the estimate at this point in the waveform eᵢ and get
+an estimation error: eᵢ - xᵢ.  Suppose it’s positive.  Does that mean
+we’re early or late?  It depends on the average derivative over the
+relevant timspan.  But what is the relevant timespan?  It depends on
+how big the error is; if the error is small, it’s short, and if the
+error is large, it’s long.
+
+It would be relatively straightforward to average derivatives over
+different spans: for example, (e[i + 4] - e[i - 4]) >> 3, and (e[i+8]
+- e[i-8]) >> 4, and so on.  But perhaps a simpler solution, given that
+we have a whole estimated waveform, is to look forward and backward in
+time for the next and previous place the curve crosses xᵢ.  Once we
+find it, it directly gives us a phase error estimate for that sample.
+We could get more elaborate and guess how reliable that estimate is,
+based on how steep the slope is at that point and how many other
+nearby crossings there are, and indeed we could even compute a whole
+probability distribution for the phase error and use it to update our
+prior probability distribution, but it’s probably adequate to just use
+some kind of moving average or median of the phase-error estimates.
+
+### Transfer oscillator ###
+
+An approach sometimes used in analog electronics to precisely measure
+unreasonably high frequencies is the “transfer oscillator technique”,
+in which “you phase-lock the nth harmonic of a VCO to the input
+signal, then measure the VCO frequency and multiply the result by n,”
+according to Horowitz & Hill.  It seems like you could also do
+something like this in the digital realm.  Suppose you’re trying to
+detect a whistle in the 600–1600Hz range, and you have a candidate
+frequency, say 1400Hz.  You can do a phase detection every *four
+cycles*, which is to say at 350Hz (every 2.86 milliseconds) to see
+which way you’re slipping out of phase.  This could reasonably be done
+with a modern low-power fast-wakeup microcontroller that goes to sleep
+in the middle.
+
+It seems like this approach may have some big drawbacks, though.  One
+is that, with the Q factor of 10–20 of my mouth’s whistle, you are
+going to have a really hard time detecting short whistles this way.
+
+Flying saucer sounds
+--------------------
+
+Amplitude-modulated whistles (by vocalizing with the larynx while
+whistling) are something else entirely; they have the strongest peak
+at the whistle frequency, but in one signal I looked at, the sum and
+difference components were only about 10dB weaker, while being 20dB
+stronger than the valley in between.  And the sum and difference
+components for the second harmonic of the vocal sound, while another
+20–30 dB weaker than the upconverted first harmonic, were still
+10–20 dB stronger than the valleys in between.  The frequencies in
+this case were 1349, 1476, 1604, 1732, and 1866 Hz, with spacings of
+127, 128, 128, and 134 Hz, respectively.  The most striking feature,
+though, is that these inharmonic overtones moved together with the
+whistle when it changed frequency.
+
+I did try changing my larynx frequency without changing the whistle
+frequency, but I wasn’t successful.
+
+****
+
+An amusing note: if I could whistle more consistently, with a Q of,
+say, 60, I could undersample the signal in such a way as to alias the
+notes down into a much smaller bandwidth than the 1000Hz they occupy
+now.  Each note would only need 40Hz or so, so all 17 would probably
+fit in a bit under 700 Hz, requiring just 1500 samples per second.
+(Because they’re not linearly spaced, there’s some wasted spectral
+space.)  There are a couple of downsides of this: first, a whistle
+that goes slightly astray from its pitch would be detected as a
+different note, more or less at random; second, the required Q of 60
+also applies to the filtering, and I think it might impose a really
+large latency; third, you need to bandlimit the signal to just the
+whistle band, and broadband noise within the whistle band will be
+impossible to remove.
+
+Musical notes
+-------------
+
+In A440 12-tone equal temperament, the notes in the 600–1600Hz range are:
+
+- 622.25 Hz
+- 659.26 Hz
+- 698.46 Hz
+- 739.99 Hz
+- 783.99 Hz
+- 830.61 Hz
+- 880.00 Hz
+- 932.33 Hz
+- 987.77 Hz
+- 1046.50 Hz
+- 1108.73 Hz
+- 1174.66 Hz
+- 1244.51 Hz
+- 1318.51 Hz
+- 1396.91 Hz
+- 1479.98 Hz
+- 1567.98 Hz
+
+A quick whistle test in front of my laptop with Audacity had me
+whistling a short melody (from the Myrath song “Endure the Silence”)
+at 1130Hz, 1137Hz, 1235Hz, 1127Hz, 1103/1072/1075 Hz, 1072Hz, 973Hz,
+898Hz, 849Hz, 752Hz, 728Hz, and 781Hz, which is about as far from A440
+as it’s possible to get.  As the 1103/1072/1075 indicates, the
+spectral peak frequencies reported by Audacity are perhaps somewhat
+noisy.  In 12-TET semitones relative to the frequency of the first
+note, this is 0.00, 0.11, 1.54, -0.05, -0.86, -0.91, -2.59, -3.98,
+-4.95, -7.05, -7.61, -6.40.  While it’s possible I’m 46 cents out of
+tune on some of the notes, I suspect that another reasonable
+hypothesis is that Myrath is using 24-TET.
+
+Are these frequencies really that unreliable?  Upon examining the
+(last) 1072Hz note again, it appears as 1077Hz, or -0.83 semitones
+from the first note, so Audacity’s noise in that case amounted to 3
+cents.  Upon further examination, 33 cycles in the middle of it lasted
+1352 samples (at 44.1 ksps), zero-crossing to zero-crossing, or 30.658
+ms, giving the frequency there as 1076 Hz.  20 cycles at a later point
+in the same note lasted 809 samples, giving a frequency of 1090 Hz
+there.  962 samples earlier on in the note contained 24 cycles, giving
+a frequency of 1100 Hz.  So actually they are pretty reliable.
+
+After applying a gentle 12dB/octave rolloff below 600Hz and 1600Hz,
+the vast majority of the signal power was in the whistle; it was
+typically 30dB louder than anything else, despite the major traffic
+noise.  Second and third harmonics were still visible.
+
+### How’s my rhythm? ###
+
+I was tonguing the notes to get very definite start times.
+
+The time interval from the start of the first note to the start of the
+second was 21167 samples.  From the second to the third was 21746;
+from the third to the fourth was 21312; from the fourth to the fifth
+was 21505; from the fifth to the sixth was 25652; from the sixth to
+the seventh was 11139; from the seventh to the eighth was 10752; from
+the eighth to the ninth was about 10728, though it’s fuzzy; from the
+ninth to the tenth was 10873; from the tenth to the eleventh was
+10536; and from the eleventh to the twelfth and last was 11210.  If we
+take our nominal quarter-note time as 21505 samples, which is the
+median of [21167, 21746, 21505] and 2*[11139, 10752, 10728, 10873,
+10536, 11210], then the errors here are -1.6%, +1.1%, 0, +3.6%, -.05%,
+-0.23%, +1.1%, -2.0%, and +4.3%, except that 25652 is 1.193 beat
+times, which is a pretty weird number.  The other errors might be just
+as much from the mouse selection skillz I’m using in Audacity to mark
+the time intervals as from actually being off the beat.
+
+The notes mostly each ended a bit before the succeeding note, but I
+think there was a significant amount of room echo.
+
+The great thing about this is that it provides *plenty* of margin of
+error for identifying beat timings.  If the standard deviation of
+being on-beat is ±2.0%, as it is in this case, then we can be pretty
+confident in identifying which beat a note is starting on.

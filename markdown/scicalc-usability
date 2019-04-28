@@ -1,0 +1,450 @@
+I just bought a scientific calculator (for US$27) with the purpose of
+cannibalizing its solar cell (it can also run off a button cell) and
+maybe display and keyboard.  But I got distracted with its user
+interface, which is kind of amazing given the constraints it’s under.
+
+First, I want to be clear that the calculator is unfortunately rather
+limited in its power, and there are a lot of things that are clumsy
+about its user interface.  And I’ve crashed into quite a number of
+usability problems.  Despite all this, it does achieve many amazing
+things.
+
+This is a Cifra SC-9100 sold by Unitronic SA here in Argentina, but
+likely they didn’t design the hardware or write the software, both of
+which are probably from a white-label company in China, where the
+calculator is made.  In part I base this inference on the fact that
+the error messages are in English.
+
+It has a large 5×4 keypad for the most basic functionality
+(arithmetic, entering numbers, clearing), a 6×4 area above it with two
+keys missing for most of the functions, and four navigational/shift
+and four directional keys, for a total of 50 keys.
+
+This calculator is not comparable to the TI-83 or HP-48 lines of
+graphing calculators with computer algebra systems onboard.  But then,
+they can’t run off a tiny solar cell, either.  Evidence suggests that
+it has on the order of 2K of memory.
+
+Feature list
+------------
+
+To some extent this calculator seems to have been designed to fill out
+a feature checklist, because many of the features don’t work together
+properly.
+
+- 79-step infix algebraic expression evaluation with 9 variables with
+  letter names.
+- Interactive editing of expressions before evaluating them on a
+  12-character alphanumeric line with 5×6 pixels per glyph.
+- When you have a syntax error, you can jump the cursor to it.
+- Stored history of the last few (6–8 usually) calculations and
+  results.
+- A direction pad on the keyboard, which makes the history editing
+  pretty easy.
+- Decimal floating-point, d°m's", complex, and rational numeric types.
+- The usual complement of standard numerical functions: square root,
+  cube root, square, cube, exponent, nth root, log, 10ⁿ, ln, eⁿ, sin,
+  cos, tan, sin⁻¹, cos⁻¹, tan⁻¹, sinh, cosh, tanh, sinh⁻¹, cosh⁻¹,
+  tanh⁻¹, nPr, nCr, +, -, ×, ÷, factorial, reciprocal, polar to
+  rectangular, and rectangular to polar.
+- Newton’s-method-based solver for (single) arbitrary general
+  equations; you can supply values for some of the variables and ask
+  it to solve for another one, although this may not always converge.
+- Special solvers for quadratic and cubic equations in one variable
+  and for systems of linear equations in 3 or 4 unknowns.
+- A sort of forms-based user interface for the solvers where you can
+  navigate around the fields.
+- Display modes including fixed-point, scientific notation,
+  engineering notation, which can be selected after the fact and then
+  used to review previous results.
+- A very easy but limited programming facility reminiscent of BASIC
+  without control structures.
+- Twenty predetermined unit conversions and their inverses, including
+  things like horsepower, acres, mmHg (but not psi!), and parsecs (but
+  not lightyears).
+- 40 physical constants, including things like the Stefan-Boltzmann
+  constant and the permittivity of free space.
+- Hexadecimal, octal, and binary bases and bitwise operations.
+- Statistics: mean, standard deviation, and regressions (linear,
+  logarithmic, exponential, power, inverse (reciprocal), and
+  quadratic).
+- Numerical integration using Simpson’s rule; approximation of
+  numerical differentiation using finite differencing.
+- Matrices, but only up to 3×3.
+
+Limited BASIC-like programming facility
+---------------------------------------
+
+Here’s a version of Minsky’s circle program in a 3-place fixed-point
+display mode.
+
+I type 1 SHIFT STO X to set X to 1; this results in the display
+
+    1→X
+        1.000
+
+Then 0 SHIFT STO Y:
+
+    0→Y
+        0.000
+
+Now I enter the program:
+
+    X=X-.1Y:Y=Y+.1X:X²+Y²
+
+And I press the = key (the other = key) repeatedly to single-step the
+program as an endless loop:
+
+    X=X-.1Y
+        1.000
+    Y=Y+.1X
+        0.100
+    X²+Y²
+        1.010
+    X=X-.1Y
+        0.990
+    Y=Y+.1X
+        0.199
+    X²+Y²
+        1.020
+    X=X-.1Y
+        0.970
+    Y=Y+.1X
+        0.296
+    X²+Y²
+        1.029
+    X=X-.1Y
+        0.940
+    Y=Y+.1X
+        0.390
+    X²+Y²
+        1.037
+
+Continuing in this vein, after 11 more iterations (33 presses of the =
+key) we get to X = 0.020, Y = 1.001, X²+Y² = 1.002.  (The third
+expression is just a kind of a sanity check.)
+
+To me, this is an incredible kind of immediacy: in 8 keystrokes I can
+set up the initial state of the program, in 33 more keystrokes I can
+implement Minsky’s circle algorithm with a debugging statement, and
+then I can immediately start single-stepping it.  A further additional
+keystroke — the left or right direction on the direction pad — takes
+me back into editing the program.
+
+You can similarly easily program it to, for example, tabulate the
+values of a function:
+
+    0→X
+    X(1-X):X=X+.1
+
+This gives us the sequence 0.000, 0.090, 0.160, 0.210, 0.240, 0.250,
+0.240, 0.210, 0.160, 0.090, 0.000 (-0.110, ...) just as it should,
+with two keystrokes per output number.  Or, to tabulate the logit at
+intervals of 0.05:
+
+    .05→X
+    ln (X÷(1-X:X=X+.05
+
+(Note the unterminated parentheses before the `:`.  Also note that
+`ln` was one keystroke.)  In 27 keystrokes, plus two per answer, this
+gives -2.944, -2.197, -1.735, -1.386, -1.099, -0.847, -0.619, -0.405,
+-0.201, 0, and so on, with two keystrokes per output number.  This
+agrees with the results of `scipy.special.logit(numpy.linspace(0.05,
+0.95, 19))`.
+
+Excel’s user interface is probably the most optimized for doing such
+iterative numerical calculations in the history of the universe.
+Doing the same version of Minsky’s algorithm in Gnumeric, which uses
+Excel’s user interface, is `1 TAB 0 ↵ =↑-.1*→ TAB =↑+.1*↓← TAB =←
+SHIFT ^ 2 + ← SHIFT ^ 2 ↵ ↑ SHIFT ←← ^C↓←← SHIFT PgDn ^V`, which is 45
+keystrokes as I count it — almost 50% more!  (And that’s not even
+charging extra for the fact that my netbook doesn’t have a keypad, so
+even some basic arithmetic operators need shift.)
+
+Of course, Gnumeric (or Excel) doesn’t require three more keystrokes
+to get each new answer, doesn’t forget the previous results, can
+automatically recalculate, can graph, and so on.  And in my Gnumeric
+instance, that `SHIFT PgDn ^V` at the end pasted 16 iterations, which
+would be 48 keystrokes on the calculator.
+
+But I feel that these issues of the accessibility, manipulability, and
+inspectability of the state machine’s execution history are nearly
+orthogonal to the issues of specifying the state machine’s transition
+function.  Yes, the two sets of functionality do compete for the same
+keyboard keys.  But specifying the same state machine took 33
+keystrokes on 50 keys on the calculator (about 186 bits), and about 45
+keystrokes on 82 keys on my netbook (about 286 bits).
+
+The good news kind of ends here, though.  As far as I can tell, there
+are no conditionals, no way to loop without manually single-stepping,
+no way to assign to multiple variables in a step, no way to store a
+vector in a variable, no way to (programmatically) access previous
+values of a variable, and no way to loop implicitly rather than
+explicitly.  Worse, your program is lost if you press ↑ or ↓ on the
+direction pad (although you can access single steps of it, the
+colon-separated form is gone, and you have no copy and paste to
+reconstruct it with), if the calculator automatically powers off
+from inactivity, or if you start entering another expression.
+
+It has a random number generator, but with only three digits, and I
+haven’t found a way yet to round or truncate to an integer in a
+formula.  (There is a Rnd key for rounding, but what it does is round
+the currently displayed result to the displayed precision, so to a
+first approximation it appears to do nothing.  You can’t use it in a
+formula.)  The closest I’ve come up with is
+`2√(2√(2√(2√(Ran#-.5)²-.5)²-.5)²-.5)²`; my theory was that this would
+eliminate one bit of precision each time.  However, iterating the
+formula `2√(Ans-.5)²` (here Ans being the result of the previous
+formula) starting from .555 gives me the orbit .11, .78, .56, .12,
+.76, .52, .04, .92, .84, .68, .36, .28, .44, .12; so it’s definitely
+lost some information, including after the first three iterations, but
+then it enters a period-10 orbit, so it doesn’t keep losing
+information.  .133 enters a different orbit.
+
+The above does illustrate that you can use the command-line history
+facility to supply different inputs to an iterative algorithm over
+time.
+
+So this level of programmability of this calculator is inspiring, but
+ultimately very limiting.
+
+Newton’s-method-based solver
+----------------------------
+
+In a way this is the most amazing part to me, because it’s close to a
+general interactive constraint system.  If I enter
+
+    Y=X^6-2X+1 [SHIFT] [SOLVE]
+
+(which is a bit harder than it sounds because the "=" and each of the
+occurrences of a variable requires pressing the [ALPHA] key first) it
+drops me into a “form” (one line displayed at a time!) where I can
+supply values for Y and X.  Immediately it asks me:
+
+    Y?
+        28.000
+
+If I answer by typing 2π=, it calculates that result, invisibly stores
+it in Y, and continues:
+
+    X?
+         5.000
+
+I can scroll up and down between the two lines of the form with the
+direction pad, but if I respond to the `X?` with a second use of
+[SHIFT] [SOLVE], the display goes blank for about 6 seconds and I get
+the result:
+
+    X=
+        1.418
+
+(I happen to have the display mode set to 3-place fixed-point, which
+isn’t quite enough for displaying the solutions of sixth-order
+equations.)
+
+If instead I supply the value for X, move back up to Y, and press
+[SHIFT] [SOLVE], it calculates Y rather more quickly.
+
+This isn’t quite modeless — I can supply the value for Y by an
+algebraic expression, but not by specifying a different equation to
+solve, and I can’t apply the solver to systems of equations with a `:`
+separating them (that gives a syntax error).
+
+A related but sort of redundant facility is its CALC key; given an
+algebraic expression like
+
+    √(X²+Y²)
+
+pressing CALC will query you to update X and Y in the same way (but
+mysteriously without the ability to scroll to the other fields), then
+display the result of evaluating the expression.
+
+Cubic solver
+------------
+
+To solve x³ - 4x² - 5x + 2 = 0, I have a couple of different options;
+I can try the Newton solver, or I can use its cubic solver.  The cubic
+solver is like this:
+
+    (MODE MODE MODE 3)
+     Unknowns?   →
+        2   3
+    (→)
+    ←Degree?        
+        2   3
+    (3)
+     a?
+    (1=)
+     b?
+    (-4=)
+     c?
+    (-5=)
+     d?
+    (2=)
+
+(half-second delay)
+
+    x₁=          ↓
+     4.93163002
+    x₂=          ↕
+     0.323190091
+    x₃=          ↑
+    -1.254820111
+
+These answers were quickly obtained, and they are correct as far as
+they are displayed, although at first I mistakenly thought they
+weren’t.
+
+Obtaining a result using the general solver turned out to be a little
+trickier; I entered this expression:
+
+    0=X³-4X²-5X+2
+
+and used SHIFT SOLVE twice, with X initially at 0.  This ran about as
+fast and got the .323 solution.  X initially at 2 also yields the same
+solution; with X initially at 3, I instead get the -1.25 solution.  To
+try to find the third solution if we didn’t already know it, we could
+try dividing out the other solutions; by using the left-arrow on the
+solution we can get back to edit the equation into
+
+    0=(X³-4X²-5X+2)÷(X-.323190091)÷(X+1.254820111)
+
+With this version — which unfortunately I couldn’t copy and paste the
+numbers into — I still get a solution at "-1.254820111" if X starts
+there, but now if X starts at 0, I get the 4.93 solution.
+
+This is considerably more effort, but it’s applicable to equations of
+any degree.  It’s not guaranteed to work, due to roundoff error, but
+it will often work.
+
+It turns out that the `0=` I’d stuck in there at the beginning isn’t
+necessary.  This works too:
+
+    X^6-2X+1-2π [SHIFT] [SOLVE]
+
+From some starting point, it comes up with the answer X=-1.193859 or
+so.  Given instead (X^6-2X+1-2π)÷(X+1.1939) and a start of X=-1, in
+about three seconds, it comes up with another solution at
+X=1.417685166.  If we divide that factor out too, it comes back with
+an error message, “Can’t solve”, after about 45 seconds or a minute;
+and indeed (upon graphing the equation elsewhere) those seem to be the
+only two real roots of this polynomial.  (In a sense it should be
+obvious that there are only two real roots from its form.)
+
+Numerical integration and differentiation
+-----------------------------------------
+
+To calculate ∫√(1-x²)dx from -1 to 1 with 512 partitions using
+Simpson’s rule, I type
+
+    ∫√(1-X²),-1,1,9=
+
+and wait about 13 seconds.  It yields 1.5707, which is accurate almost
+as far as it goes, but that isn’t very far.  (The exact answer is π/2,
+close to 1.570796.)  If instead of 9 I specify 7 (for 2⁷ = 128
+partitions rather than 512) it runs in about three seconds and
+produces 1.57 as the result.
+
+This manages to be simultaneously counterintuitive (I never would have
+guessed either the comma, the logarithmic notation for the number of
+partitions, or the limit of 512 partitions), opaque (it’s no easier to
+write than to read), and impressive (that the calculator can do this
+at all).
+
+As a crude approximation, this speed suggests that it’s running a few
+hundred floating-point operations per second.
+
+Numerical differentiation is faster, of course.  It uses a finite
+difference, because apparently the numbskulls who implemented the
+calculator’s software haven’t heard of automatic differentiation yet.
+To tabulate the derivative of the logit, for example:
+
+    .05→Y
+    d/dx(ln (X÷(1-X,Y,1e-9:Y=Y+.05
+
+This gives 21.052, 11.111, 7.844, 6.250, 5.333, 4.762(166667), 4.395,
+4.167, 4.041, 4.001, 4.040, and so on.  These are accurate to nearly
+four places, which is fairly underwhelming given that I specified
+using Δx=10⁻⁹.  The extra digits on the 4.762 number suggest that it’s
+not actually bothering to calculate the intermediate results to more
+than about five places.
+
+Base-N and logical operations
+-----------------------------
+
+In base-N mode, the trigonometric keys become hexadecimal digits, and
+the reciprocal key opens a menu of bitwise operations.  This allows
+you to explore mappings like `Ans and(Ans-1)` or `Ans xor(Ans-1)`,
+which last generates a Sierpinski triangle in binary, one row at a
+time, if you seed it with a power of 2.  Unfortunately in this mode
+you apparently cannot assign to variables, not even X, Y, and M.
+
+However, I did manage to get it to tabulate reflected-binary Gray code
+values using two keystrokes each.  First I set M to 0 using `RCL M
+SHIFT M-`, and then I entered and ran the program `1M+:Mxor(M÷2`,
+getting the hexadecimal sequence 1, 3, 2, 6, 7, 5, 4, C, D, F, E, A,
+B, 9, 8, 18, 19, 1B, 1A, 1E, 1F, 1D, 1C, 14, 15, 17, 16, 12, 13, 11,
+10, 30, ... sequence A003188.  (The program also works in decimal mode
+in base-N.)
+
+Modefulness
+-----------
+
+This calculator suffers terribly from modefulness.  You can’t take
+absolute values except in complex-number mode; you can’t use
+trigonometric functions in base-N mode (although you can use
+arithmetic) because the keys are remapped to hex digits.  You can’t
+use square-root in base-N mode for no apparent reason; the key just
+doesn’t do anything.  You can’t numerically integrate in complex mode.
+You can’t assign to variables in base-N mode or complex mode.  And so
+on.
+
+Worse, in some cases the meaning of programs is dependent on the mode.
+In base-N mode, any numeric constant in your program will vary
+depending on base — and most give a syntax error in base 2.  Worse,
+this happens when you merely try to scroll back in history to the
+formula.
+
+Usability lessons
+-----------------
+
+Except for when asked to do significant amounts of computation or when
+dealing with a key that maps to nothing, the calculator is always
+instantly responsive.  Its silent keyboard, despite presumably being
+rubber carbon-bottomed domes under hard keys, works reliably.  These
+are big pluses.
+
+Bigger still is the immediacy of most operations.  Doing base
+conversion with a single keypress in base-N mode is really nice.  This
+doesn’t excuse the absence of features like variable assignment in
+base-N.
+
+The form-based UI for off-the-shelf models (e.g. cubic equations)
+really eases using them, but makes composing them difficult to
+impossible.
+
+Writing the transition function of a numerical finite state machine as
+a series of colon-separated assignments works surprisingly, even
+amazingly, well.  Being able to nest assignments and to compute and
+display two or three results per keystroke (rather than just one)
+would help.  Being able to run the iteration out of user control (with
+conditional and iteration operations) would make an even bigger
+difference.  The single-step-and-see-labeled-result one-keystroke flow
+is magical, though.
+
+After my initial astonishing experiences with the device, I was
+starting to become attached to it and doubt my tentative plans to
+rebrain it with a low-power high-performance microcontroller; my
+further investigation, however, shows that it’s actually kind of an
+unusable piece of shit.  Current mass-market low-power ARM
+microcontrollers like Atmel’s picoPower line run at 12 milliwatts at
+48 million 32-bit instructions per second, which is 250 pJ/insn; my
+best estimate is that in full sun this calculator’s solar cell can
+produce 29 milliwatts.
+
+TI’s current Nspire line of graphing calculators run on 150MHz ARM
+microcontrollers with 64MB of RAM.  But they don’t run off a solar
+cell.
+
+I can’t find the information on the ARM picoPower microcontrollers I
+was thinking of.

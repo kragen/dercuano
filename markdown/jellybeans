@@ -1,0 +1,348 @@
+What parts are “jellybeans”, and what are they like?
+
+FETs
+----
+
+Normal FETs are N-channel enhancement-mode MOSFETs; JFETs,
+depletion-mode MOSFETs, and to some extent P-channel FETs are weirder.
+
+[G.M. Electronica’s power MOSFET
+list](http://www.gmelectronica.com.ar/catalogo/pag108.html)
+
+Here’s a table of 16 popular FETs I found, with prices in quantity 1
+from Digi-Key.
+
+    | PN           | Vds |    A |  ohms | Qg (nC) |   ¢ |   W | type       |
+    |--------------+-----+------+-------+---------+-----+-----+------------|
+    | 2N7000       |  60 |   .2 |   1.9 |       2 |  36 |  .4 |            |
+    | 2N7002       |  60 | .115 |     7 |       2 |  38 |     |            |
+    | IRF630       | 200 |    9 |    .4 |      45 |  86 |  75 |            |
+    | IRF9630      | 200 |  6.5 |    .7 |      29 | 151 |  74 | P-chan     |
+    | IRLI630G     | 200 |  6.2 |  .400 |      40 | 229 |  35 |            |
+    | IRLML6344    |  30 |    5 |  .029 |     6.8 |  36 | 1.3 |            |
+    | IRLML6402    |  20 |  3.7 |  .065 |      12 |  40 | 1.3 | P-chan     |
+    | EPC2036      | 100 |    1 |  .065 |    .910 |  97 |     | GaN        |
+    | SI3483CDV    |  30 |    8 |  .034 |    11.5 |  89 | 4.2 | P-chan     |
+    | FQP27P06     |  60 |   27 |  .070 |      43 | 134 | 120 | P-chan     |
+    | NTD4906N     |  30 |   54 | .0055 |      24 |     | 2.6 | obsolete   |
+    | IRF7307      |  20 |  4.3 |  .140 |         |  83 |     | dual (P&N) |
+    | BSS138       |  50 | .200 |   3.5 |         |  24 |     |            |
+    | CPC3703CTR   |     |      |       |         |  70 |     | depletion  |
+    | 2N5457       |  25 |  .01 |       |         | 230 |     | JFET       |
+    | 2N5458       |  25 |  .01 |       |         | 230 |     | JFET       |
+    | SiS410DN     |  20 |   35 | .0048 |      41 |  94 |  52 |            |
+    | PSMN4R0-40YS |  40 |  100 | .0056 |      38 |  88 | 106 | holy shit  |
+    | IRF540N      | 100 |   33 |  .044 |      71 | 145 | 130 | fuck       |
+    | IRF9540N     | 100 |   23 |  .117 |     110 | 189 | 110 | P-chan     |
+    | IRF9530      | 100 |   12 |  .300 |      38 | 138 |  88 | P-chan SyC |
+
+The IRF630 N-channel FET
+<https://www.digikey.com/product-detail/en/stmicroelectronics/IRF630/497-2757-5-ND/603782>
+is a monster.  It’s Digi-Key’s most popular IRF* part (twenty thousand
+in stock at 86¢ quantity 1, 39¢ in quantity 1000) and can switch 9
+amps (with pulses up to 36 amps) at up to 200 volts in 20 nanoseconds.
+Even G.M. Electronica, which generally only carries obsolete parts,
+lists an IRF630 in their catalog.  And the TO-220 package can
+dissipate 75 watts.  It includes an antiparallel zener capable of
+about ten amps for overvoltage and flyback protection.  Its main
+drawbacks for Arduinoish use seem to be that it doesn’t turn fully on
+until about 6 to 10 volts on the gate,
+its on-resistance is a high-for-a-power-FET 0.4Ω,
+and its max gate-source voltage
+is only 20 volts; but even at 4 volts, it’s ohmic with a reasonably
+low resistance up past two amps, maxing out at about three.  Five
+volts gets you up to 11 amps.
+[SyC Electrónica has it for
+US$0.75](http://www.sycelectronica.com.ar/articulo.php?codigo=IRF630).
+It has a P-channel counterpart, the IRF9630, of which Digi-Key only
+has 2000 in stock; it’s slightly worse at 6.5A and 0.8Ω.
+
+The logic-level counterparts to International Rectifier’s IRF* parts
+are the IRL* parts.  One popular one is the IRLML6344
+<http://www.digikey.com/product-detail/en/infineon-technologies/IRLML6344TRPBF/IRLML6344TRPBFDKR-ND/2538162>
+(36¢ for one, down to 11.3¢ each) which switches 5A, 30V, at only
+29mΩ, and turns on at 2.5V on the gate.  Digi-Key has 650,000 of them
+in stock.  A similar, slightly crappier, P-channel device is the IRLML6402
+<http://www.digikey.com/product-detail/en/infineon-technologies/IRLML6402TRPBF/IRLML6402PBFCT-ND/812500>.
+The IRF630 itself has an IRL version, the IRLI630G, with the same 200V
+but a slightly lower current of 6.2 amps and like 70 ns of delay, but
+this is apparently a rare bird — Digi-Key charges US$2.29 for one.
+
+The 2N7002 is Digi-Key’s absolute most popular FET, with 1.6 million
+in stock; it’s another N-channel FET that even G.M. Electronica
+carries; Digi-Key has 184 models, the most popular being
+<https://www.digikey.com/product-detail/en/diodes-incorporated/2N7002T-7-F/2N7002T-FDIDKR-ND/1837287>,
+which is 38¢ for one and 8¢ each for 1000.  This is a smaller-signal
+part — although it can handle 60V, it can only do up to 115mA and
+300mW, and its on-resistance is multiple ohms (like 7Ω).  But it
+switches at 2.5V, also in the same 20ns as the IRF630.  At 5V gate
+voltage it reaches 500 mA, which (because of the high resistance) will
+burn it up if you let it continue.  The ON Semiconductor version
+<http://www.digikey.com/product-detail/en/on-semiconductor/2N7002LT1G/2N7002LT1GOSCT-ND/917791>
+is cheaper, as low as 2.958¢ in quantity 1000.
+
+SyC Electrónica doesn’t have the 2N7002 (though G. M. Electrónica
+does), but they do have the similar 2N7000 for US$0.12
+<http://www.sycelectronica.com.ar/articulo.php?codigo=2N7000>.  60V,
+200mA, 1.9Ω, switches on at 3V Vgs.
+eLemon carries it too at almost the same price
+<http://www.elemon.net/BuscarSubRubros.aspx?Action=2&GrupoId=TR&RubroId=1710&SubRubroId=4>.  Even Tom Jennings recommends it!
+
+The 2N7000/2N7002 datasheet from Fairchild doesn’t give its Qg
+directly, but it seems to be designed for a 10V Vgs and has
+typically 20pF and up to 50pF
+of input capacitance, which I guess would mean 500pC?  But ST’s
+datasheet for their obsolete 2N7000 gives that for Qgd, plus another
+800pC of Qgs, for a total of 1.4 to 2 nC.
+
+The most popular non-2N7002 FET at Digi-Key is the EPC2036, which is a
+bumped gallium-nitride die (900μm square) with no packaging (to avoid
+bond-wire inductance!)
+<https://www.digikey.com/product-detail/en/epc/EPC2036/917-1100-6-ND/5224979>
+for 97¢, down to 39¢.  Needless to say, G.M. Electronica has never
+heard of it.  It switches 1.7A at up to 100V with a resistance of only
+65mΩ, which is supposedly about a 30 times higher breakdown voltage than can be
+achieved at that resistance with silicon, with a gate charge of only
+910 pC, about an order of magnitude lower than MOSFETs, on a gate
+capacitance of about 80 pF.  As a result, they can switch at over
+10MHz.  Apparently GaN power transistors like this debuted in 2010,
+which is why I hadn’t heard of them until now.
+
+Digi-Key’s most popular P-channel MOSFET is Vishay’s SI3483CDV, with
+six hundred thousand in stock at 89¢, down to 41¢.  It switches up to
+8 amps at up to 30 volts, and can handle gate-source voltages of up to
+20 volts.  Being a P-channel device, the drain and source are backward
+from the more common N-channel type: the source is positive, drain
+negative, and the gate voltage is measured below the source.
+
+In P-channel MOSFETs, SparkFun recommends the FQP27P06
+<https://www.sparkfun.com/products/10349> for 95¢; Digi-Key has them
+<https://www.digikey.com/products/en?keywords=fqp27p06> for $1.34 down
+to 61¢.  They switch up to 27 amps at up to 60 volts.
+
+[Tom Jennings
+recommends](http://sensitiveresearch.com/elec/DoNotTIP/index.html) the
+NTD4906N.  G. M. Electronica doesn’t carry it, and Digi-Key marks it
+as obsolete.
+I don’t understand its datasheet, which has wildly different current
+and power numbers.  I suspect I didn’t understand any of them.
+
+For building an H-bridge, it’s often useful to use N-channel and a
+P-channel MOSFETs together, and sometimes they come in a package for
+this purpose; the IRF7307 is a popular such device at Digi-Key
+<https://www.digikey.com/product-detail/en/infineon-technologies/IRF7307TRPBF/IRF7307PBFDKR-ND/1648232>
+for 83¢ down to 37½¢, with twenty-two thousand in stock.
+G. M. Electronica also carries it. It can switch 4.3 amps at 20 volts
+in 100ns;
+its resistance is 50 mΩ on the N-channel side and 90 mΩ on the P-channel side.
+This is convenient, but in the standard design, you kind of
+have to use the same supply for the gate as for the load.
+
+For a MOSFET with lower switching voltage, people seem to suggest the
+BSS138.
+<http://www.digikey.com/product-detail/en/on-semiconductor/BSS138LT1G/BSS138LT1GOSDKR-ND/1831753>
+lists it at 24¢ down to 4.6¢, switching 50V 200mA, with a high
+on-resistance of 3.5Ω.  Sure enough, though, it passes almost 400mA at
+a 2.5-volt gate voltage.
+
+Depletion-mode MOSFETs are apparently very exotic; Digi-Key’s most
+popular one is the high-voltage 70¢ CPC3703CTR, of which it has almost
+forty-eight thousand in stock.
+
+Of all of these, the only ones I’ve seen mentioned in Horowitz & Hill
+are the 2N7000, the 2N7002, and the BSS138.  Neither GM nor SyC has
+the BSS138.  Horowitz & Hill also tout LND150, DN3435, BS170, MMBF170,
+2N5457, 2N5458, 2N5459, and BS250 parts as popular.
+
+The 2N5457 and 2N5458 are available at SyC, though not GM.  Digi-Key
+has them for US$2.30 (!!) down to US$1.01 but they sound inferior to
+others mentioned above (25V, 10mA).  They’re JFETs, though, so not
+directly comparable to the MOSFETs above.
+
+All of the above are good only up to less than ten amps.  The
+[SiS410DN](http://www.digikey.com/product-detail/en/vishay-siliconix/SIS410DN-T1-GE3/SIS410DN-T1-GE3CT-ND/3305409),
+by contrast, handles up to 35A; it’s a 20V N-channel MOSFET in a
+somewhat unusual package with almost 215,000 available at Digi-Key for
+94¢ down to 43¢.  Even more impressive, Philips/NXP/Nexperia’s
+[PSMN4R0-40YS](http://www.digikey.com/product-detail/en/nexperia-usa-inc/PSMN4R0-40YS,115/568-4905-1-ND/2122735),
+which came out in 2010, does 100A at 40V, up to 106W, costs 88¢ down
+to 51¢, and has 77,000 available at Digi-Key.  Here in Argentina,
+apparently the only power MOSFETs people sell are higher-voltage
+International Rectifier (Infineon) HexFET parts like the
+[IRF540N](http://www.digikey.com/product-detail/en/infineon-technologies/IRF540NPBF/IRF540NPBF-ND/811869) — at
+Digi-Key, 10,000 in stock, 145¢ down to 66¢, 33A at 100V, nice low 4V
+threshold voltage, and available from both G.M. and SyC.  SyC sells it
+for 60¢.  The P-channel counterpart is the
+[IRF9540N](http://www.digikey.com/product-detail/en/infineon-technologies/IRF9540NSTRLPBF/IRF9540NSTRLPBFTR-ND/1928217).
+All SyC has in stock is the
+[IRF9530](http://www.sycelectronica.com.ar/articulo.php?codigo=IRF9530),
+which is rated for only 12A.
+
+Other drivers
+-------------
+
+Amusingly, the TIP120 bipolar NPN Darlington Jennings recommends
+replacing with an unavailable MOSFET
+is still “Active”
+<https://www.digikey.com/product-detail/en/fairchild-on-semiconductor/TIP120/TIP120-ND/1052441>.
+It switches 60V at 5A and costs 61¢ down to 26¢, but as Jennings
+points out, its 1000:1 or 2500:1 current gain is vastly inferior to
+power MOSFETs’; its voltage drop is many times higher, especially at
+low current; and its switching time is vastly longer at around 1000
+ns.
+
+The ULN2003 costs US$0.40 at SyC:
+<http://www.sycelectronica.com.ar/articulo.php?codigo=ULN2003> It’s an
+array of seven 500mA 50V 250ns current-sink Darlingtons with built-in
+flyback diodes.  It’s like a seven-pack of somewhat lower-powered
+TIP120s.
+
+There’s an 8-transistor version, the ULN2803, and (as I found in file
+`microlens-vibrating-lightfield`) there used to be a high-side
+switching version UDN2891, but it’s obsolete now.  One alternative is
+the TI TLC59123 (US$1.81), which is an 8-output latching high-side
+driver, which has the advantage that it ignores its inputs except at
+clock edges.  It’s only 13.2V, unlike the 60V ULN2003, but it’s also
+500mA per channel, and it can supposedly be clocked at “up to 1 MHz”
+with clock pulses of 100ns and 100–200 ns propagation delays.
+
+Bipolar transistors
+-------------------
+
+Aside from the TIP120 and ULN2003 mentioned above, we have
+transistors.  For example,
+<https://www.digikey.com/product-detail/en/diodes-incorporated/MMBT3904-7-F/MMBT3904-FDICT-ND/815727>,
+the MMBT3904, for 12¢ down to 2½¢, a SOT-23 NPN small-signal
+transistor.  That's the SOT-23 version of the 2N3904, thus the weird
+prefix.
+
+Thyristors
+----------
+
+SCRs, triacs, and occasionally diacs are the workhorses of powerline
+switching.  They typically turn on in 100 ns.  Unlike MOSFETs, they
+fail open rather than closed (I think), but they have the disadvantage
+that you can’t turn them off until the next zero-crossing of the
+waveform.  Also, unlike MOSFETs and unlike relays (the other
+alternative for powerline switching), they have substantial voltage
+drops and so dissipate substantial power from the load current.
+
+You might think that this would entirely prevent you from using them
+for switching DC, but the standard trick to solve this problem is to
+put an LC resonator either in series or in parallel with the thing so
+that the current drops to zero at some point, turning the thyristor
+off.  This is called a “self-commutation circuit”.
+
+Triacs are the usual thing to use for powerline switching, since they
+have a gate electrode like a regular transistor, but can handle power
+in either direction like a diac.  A typical triac might be the 95¢
+[STMicroelectronics T405Q-600B-TR][2] (“Applications: Mahjong
+machines, lighting dimmers”), which can block up to 600 volts; once
+you trigger it with 1.3V and 5 mA on the gate electrode, it can carry
+up to 4 amps (dropping 1.5 V or less), and will continue to do so
+until the load current drops below 10 mA.
+
+Diacs have no trigger electrode; they’re triggered just by reaching
+the breakover voltage, like the no-longer-produced Shockley diode.  A
+diac is like two Shockley diodes in antiparallel.  A typical diac is
+the 49¢ [Micro Commercial LLDB3-TP “silicon bidirectional diac”][1],
+which breaks over at 28–36 volts in 2 μs and can handle two amps.
+While it’s turned on, it drops 5 volts.  There are higher-voltage
+diacs, as you would expect, but they’re all fairly low power.
+
+SCRs, the classic thyristors, are unidirectional, like Shockley
+diodes, but have a gate electrode, like a regular transistor or a
+triac.  A typical SCR is [the Littelfuse SK055NRP][0], which costs
+US$4.81 and can handle 55 amps RMS when you turn it on (or surges of
+650 amps), dropping 1.8 volts, and can block up to a kilovolt when
+off, leaking 30 μA.  You turn it on by feeding 40 mA into its gate at
+1.5 volts, and it turns off when the current drops to 60 mA.  I’m not
+sure how much reverse bias it can handle.
+
+[0]: https://www.digikey.com/product-detail/en/littelfuse-inc/SK055NRP/F11310DKR-ND/8548126
+[1]: https://www.digikey.com/product-detail/en/micro-commercial-co/LLDB3-TP/LLDB3-TPMSDKR-ND/2513491
+[2]: https://www.digikey.com/product-detail/en/stmicroelectronics/T405Q-600B-TR/497-2501-1-ND/603883
+
+Op-amps
+-------
+
+The LM324, from 1975.  Available (LM324D, LM324N) at G.M. and (LM324,
+LM324-SMD) at SyC, mentioned in Horowitz & Hill, etc., 35000 available
+at Digi-Key for 48¢ down to 12¢.  A quad bipolar op-amp that runs on
+3V to 32V good to gain-bandwidth of 1.2MHz, open-loop amplification of
+100k×, not quite rail-to-rail, 10 mA output.
+
+Horowitz & Hill recommends the TLC272 as a popular MOSFET-input
+alternative to the LM324 and the LF411 and LF412 as JFET-input
+alternatives.  The LF411 (available from GM) touts being
+“pin-compatible with the standard LM741”, has 3 MHz of gain-bandwidth,
+sucks only 50pA from its input, costs US$1.19 down to 54¢ (but only
+has one op-amp on the chip), runs on up to 18 volts, 200k× open-loop
+amplification, ±12V output, like 20 mA output current.  Digi-Key has
+3000 available.  The TLC272 (available from GM) spews out 30mA at up
+to 16 V and 2.2MHz of gain-bandwidth, sips an incredible 0.7pA of
+input current, and has two op-amps on a US$1.34 (down to 60.9¢) chip.
+
+The LM741 itself (from 1968!) has stock of 68000, costs 66¢ down to
+28¢, does 1.5MHz GBP at 80nA of input, 25mA of output, and up to 36V.
+I wasn’t quite sure what its major advantages over the LM324 are, but
+it seems to cost about five times as much.  Fortunately, both chips
+are popular enough that people have discussed this very question
+previously; they claim the LM324 is noisy and has crosstalk, but runs
+off a single supply instead of needing positive and negative supply
+voltages.
+
+Digi-Key’s most popular item in the op-amp category is the tiny
+70¢–53¢ MCP6031T-E/OT, which is rail-to-rail and can spew out 23mA
+while taking in 1pA, but only up to 10kHz and 5.5V.  It’s touted as
+having super low consumption.  They suggest using it for battery
+current monitoring and “sensor conditioning”, whatever that is.  They
+have almost 165000 in stock.
+
+In non-super-low-frequency opamps, Digi-Key’s most popular item is the
+TSV321IDT, with 142000 in stock, but only available in quantity.  The
+similar TSV324IPT, by contrast, is available in quantity 1 for 58¢,
+down to 24.9¢, with 162000 in stock.  It’s a quad rail-to-rail 1.4MHz
+GBP op-amp chip with a 70nA bipolar-class input current, 80mA output
+current, and up to 6 V.
+
+If we demand another order of magnitude in gain-bandwidth product, we
+exclude 85% of the op-amps on Digi-Key and the price goes up a little;
+the LM7321MF/NOPB from 2008 is US$1.83 down to 54¢, has 45000 in
+stock, and is a rail-to-rail 20MHz op-amp with 1100 nA input bias and
+100mA output at up to 32V.
+
+An additional order of magnitude excludes half of the remainder, and
+we end up with things like the OPA356AIDBVR, for US$1.91 down to 94¢,
+a 200MHz GBW (450MHz unity-gain!) voltage feedback amplifier (?) with
+rail-to-rail output, 3pA input bias current, 100mA output at 5V, and
+80 dB (!) open-loop gain, 11500 in stock.  This seems to be where
+modern op-amps are normally.
+
+None of the popular Digi-Key opamps seem to be available locally.
+
+Power management
+----------------
+
+The LM317 is a 100mA 71¢ linear regulator adjustable over 1.2 to 32
+volts output and accepting 3.7 to 38 volts input.  It’s 30¢ at SyC.
+
+The 7805 is a 1A 62¢ linear regulator fixed at 5 volts output.  There
+are other versions with other voltages, like the 7812, and the 79xx
+series is the negative-voltage counterpart.  SyC has the 7805 for 35¢,
+and hasthe whole family, both negative and positive.
+
+Zeners
+------
+
+Digi-Key's most popular zener is the obsolete 50¢ MAZ30430ML, with
+429000 in stock: 4.3V±7%, 200mW.  Its cheapest available non-obsolete
+zener is the 5.1V 500mW 1N5231B-ND, with 16000 in stock, 11¢ down to
+2.3¢; this is the 5.1V member of the 1N5221 series Horowitz & Hill use
+as their canonical low-voltage zeners.
+
+Horowitz & Hill also suggest using the LM385 (1.23V, 63¢, 57000 in
+stock at Digi-Key, 10μA–20mA) instead of a low-voltage zener.
+Shirriff says the TL431 from 1978, an adjustable substitute for the
+LM385, is more common (42¢, 29000 in stock at Digi-Key, 2.5–20V,
+600μA–100mA).

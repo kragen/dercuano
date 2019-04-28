@@ -1,0 +1,282 @@
+I played Minetest a lot for a while (see file `minetest-addiction`)
+and I’ve been thinking a lot about lego-like construction sets and
+Minecraft voxels, in particular the voxels used for flowing water and
+lava, which have varying heights.  More like real-world sand, Minetest
+water or lava (and, I assume, Minecraft water and lava) has a certain
+angle of repose; if you have a water source on top of an otherwise
+flat surface, the water forms a very obtuse cone around it, out to a
+certain maximum radius.  The water height within any given voxel is an
+affine function of X and Y, and the water heights in adjacent voxels
+are equal along their common edge, at least in equilibrium.  The
+result is that you can get a smoothly sloping surface, with a crude
+approximation of curvature, out of a finite number of distinct voxel
+types.
+
+This led me to thinking of 3-D printing and marching cubes or marching
+tetrahedra.  If you wanted to print out cubical building blocks that
+snapped to a voxel grid to do this kind of smoothly sloping
+heightfield, you’d need to quantize the height at the points of the
+X-Y lattice; the minimal number of heights would be 2, and this yields
+five types of building blocks, with empty and full corners expressed
+in the order (0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0), (0, 1, 1),
+(1, 1, 1), (1, 0, 1), (0, 0, 1): FFFF FEEE, FFFF FFEE, FFFF FFFE, FFFF
+FFFF, and EFFF FEFF.  Here a “full” corner has material inside the
+cube touching the corner, though possibly only in some directions,
+while an “empty” corner has no material around it, and indeed no
+material anywhere nearby.  The intended shape is something like the
+convex hull of the “full” points.
+
+The fourth block is just a cube; there’s a sixth “block” EEEE EEEE
+that is just empty space and thus doesn’t need to be printed.  FFFF
+FEEE, FFFF FFEE, and FFFF FFFE are different kinds of ramped surfaces,
+two with three √2 edges forming a slanted triangle, and one in the
+middle with two √2 edges and two 1 edges forming a slanted rectangle,
+all three with 1-1-√2 triangles on some vertical sides.  The final
+block, EFFF FEFF, is missing two opposite corners, so all six of its
+paraxial faces are right triangles; it’s a triangular antiprism, and
+it isn’t needed for heightfields.  These five blocks can be rotated
+and somehow stuck together at grid nodes to approximate any surface
+mesh produced by marching cubes, rounded to the nearest grid node.
+
+If we’re looking for maximal expressiveness with minimal inventory,
+the many symmetries of the cube are helpful; four of these five blocks
+are asymmetric and can be oriented in different ways to produce
+different shapes.  (FEEE and FFFE have 8 meaningfully different
+orientations, while FFEE has 12.  EFFF FEFF only has 3.)  This
+rotational symmetry dramatically increases the expressiveness of this
+five-block vocabulary.
+
+Or so I thought.  But that’s only 1+8+8+12+3+1 = 33 total voxels that
+can be formed, which is actually still short by a factor of 8 from the
+256 I’d expect.  I realized I was missing FFFF FEFE, which can be
+realized as a ridge, a valley, or a saddle, but in any case has 12
+distinct rotations.  And EFFF FEFE, and some others.  I should
+probably write a program to make a full inventory.
+
+But this led me to the conclusion that perhaps, even though the cube’s
+24 orientations mean that any individual block can be oriented in the
+voxel structure in up to 24 different ways, its 8 vertices, which give
+256 different possible voxels, are a difficulty.  Still, five blocks
+(FEEE, FFEE, FEFE, FFFE, and FFFF) are sufficient for heightfields,
+which are sufficient for arbitrary shapes that aren’t thinner than two
+voxels.
+
+Hill’s polyhedron, an irregular tetrahedron into six of which you can
+slice a cube, is an immediately promising alternative polyhedron.  As
+it’s a tetrahedron, removing any of its vertices leaves it empty, so
+you don’t need a potentially large selection of them.  As a bonus, you
+can assemble it into cubes and also a number of the pieces I described
+having to print separately above.  I don’t think it covers all the
+possible heightfields described above, though, because its faces are
+1-1-√2 and 1-√2-√3, so it doesn’t have the √2-√2-√2 equilateral
+triangles that result from cutting off cube corners.
+
+Another alternative for approximating marching-cube surface meshes is
+to approximate just the surface, rather than voxels bounded by the
+surface, using flat triangles connected at the edges.  1-1-√2
+triangles are adequate for square faces and half-square faces;
+√2-√2-√2 triangles provide the cut-off corners; and 1-√2-√3 triangles
+provide the remaining cutting planes.
+
+Other tilings of 3-space (“honeycombs”) may also offer good tradeoffs.
+Although the close-packings of rhombic dodecahedra and cuboctahedra
+aren’t particularly promising in themselves, the duals of these
+packings packing consist of tetrahedra and octahedra.  With tetrahedra
+and half-octahedra, you could build a version of these packings that
+can be truncated at a wide variety of planes.
+
+Octahedra have the same set of 24 rotations as cubes (it’s actually
+called chiral octahedral symmetry; its point group is the symmetric
+group S₄) while tetrahedra have 12 (A₄, the alternating subgroup of
+the symmetric group S₄).  So an asymmetric octahedral piece could have
+as many as 24 usefully different orientations, and an asymmetric
+tetrahedral piece could have as many as 12.
+
+I’m having a hard time visualizing the close-packings at the moment,
+but I think each face in the octahedral-tetrahedral honeycomb is
+shared between a tetrahedron and an octahedron.  If that’s the case, a
+single asymmetric octahedron and eight asymmetric tetrahedra would
+have 12⁸ = 430 million usefully distinct configurations; by the time
+you have the six octahedra and eight tetrahedra necessary to surround
+a point in space, the configuration space is unbelievably huge.
+
+Stud patterns
+-------------
+
+Returning to a cubic honeycomb for the moment, two square faces can be
+joined together in any of four orientations; if we want all such faces
+to be compatible with all other faces, the simplest option is to make
+them all identical.  But they must be symmetric under not only those
+four rotations, but also some kind of half-turn around an axis in the
+plane of the face to bring a face around to face another identical
+face; that is, the three-dimensional contour of the face itself must
+possess chiral octahedral symmetry.  It could, for example, possess
+male organs at 1 o’clock, 4 o’clock, 7 o’clock, and 10 o’clock, and
+corresponding female organs at 11 o’clock, 8 o’clock, 5 o’clock, and 2
+o’clock.  Indeed, fully an eighth of the face could be devoted to each
+such organ.  But how should these organs interlock?
+
+*****
+
+Thinking about legos (in particular, Lego-brand legos versus inferior
+underdog knockoff legos like the “Loc Blocs” I had as a kid), I had an
+epiphany: the very short insertion distance of Lego-brand studs is a
+natural optimization result for such frictional connections.  The
+strength of the two-piece assembly is proportional to the frictional
+force (in one direction, it is precisely the frictional force), while
+the energy to assemble or disassemble it is jointly proportional to
+the frictional force and the insertion distance.  (In fact, it is
+their product.)  The impact energy the two-piece assembly can
+withstand without coming apart is also, in one direction, the energy
+to assemble or disassemble it, so lower assembly energy means lower
+impact resistance, but it need not mean lower strength.  That strength
+can be arbitrarily high despite arbitrarily low assembly energies, at
+least in the limit of arbitrarily rigid material shaped with
+arbitrarily tight tolerances.  The Lego company’s tolerances are
+around 2–10 microns.
+
+Roughly approximating, Lego-brand studs are inserted to about half a
+millimeter with about 5 newtons of force, so an 8-stud brick needs
+about 20 millijoules to assemble or disassemble.
+
+PLA
+---
+
+This is reassuring for the prospect of 3-D printing building blocks
+using PLA, which is somewhat weaker and enormously more rigid than the
+when assembled ABS used in Lego-brand legos, or even the shitty
+polystyrene used in “Loc Bloc” brand legos.  The consequence is that
+PLA has dramatically less impact resistance than ABS, and also can
+store dramatically less elastic energy when pieces are snapped
+together.
+
+Typical RepRap-style FDM has curious precision characteristics: an
+error of some 100 μm horizontally (in the X and Y directions) which
+can sometimes be reduced to 50 μm or less, but typically a worst-case
+error of 150 μm or more in the Z direction, due to quantization to
+typically 300-μm layer height to avoid unreasonably long printing
+times.  These impose a minimum scale on interference-fit parts which
+depends on the geometry: the parts need to stretch or squish or bend
+by at least the dimensional error when assembled in order to have any
+contact at all in the dimensional-error worst case.  Ideally, they
+need to deform by an amount that is large relative to the dimensional
+error, so that the dimensional error won’t result in dramatic
+variations in assembly/disassembly force (and assembly impact
+resistance), as it does with many kinds of poorly made construction
+sets.
+
+I don’t remember what PLA’s elongation at break is, but let’s suppose
+it’s around 1%, similar to steel’s yield strain.  (Nylon is around
+30%, and ABS is substantially less.)  That means that a simple
+mortise-and-tenon joint with a deformation of 300 μm needs to be at
+least 30 mm wide in the deformed dimension!  A simple mortise and
+tenon is not far from the geometry certain Lego-brand legos use, in
+particular the one-unit-thick plates.  Such a geometry will not work
+with RepRap-printed PLA until you reach pieces 1000 times the volume
+of Legos.
+
+Prong clips
+-----------
+
+However, cantilever beams as used in many molded-plastic snap joints
+should work.  1% elongation means that you can bend a
+uniform-thickness strip of it in a circle of whose diameter the strip
+thickness is 1%: 100 mm diameter if the strip is 1 mm thick, for
+example, or 30 mm diameter if it’s 300 μm thick, or 10 mm diameter if
+it’s 100 μm thick.  Cantilever beams get slightly better performance
+than that using a linear taper to get a uniform stress distribution,
+but it’s not too far; so a 300-μm-thick uniform-thickness PLA
+cantilever beam can deflect by 300 μm without breaking if it is at
+least 9.5 mm long.
+
+This is objectionably long, but it need not protrude by 9.5 mm; it can
+be recessed and zigzag as desired, in ways that are impractical in
+molded parts, reminiscent of coil springs but potentially much more
+sophisticated.
+
+I don’t know PLA’s Young’s modulus, either, but an old snapshot of
+Wikipedia gives polystyrene’s Young’s modulus as 3–3.5 GPa, which is
+probably in the ballpark; the plastics feel about equally stiff,
+although PLA is much more fragile.  This suggests that if that 9.5-mm
+strip is 1 mm wide and 300 μm thick, bent into a circular arc with a
+surface strain of 1% and thus an average strain of 0.5%, it’s under a
+total force of about 4.5 N, half tension and half compression, working
+over lever arms which vary proportionally with the stress and so
+average about 100 μm; this means the force to deflect the beam by that
+much is about 45 millinewtons.
+
+Calculating this force in another way, the specific energy of (my
+guesses about) PLA amounts to stretching it by 10 microns per
+millimeter, requiring 30 MPa of stress; ½ 30 MPa 10 μm/mm = 0.15 J/mℓ,
+so PLA can tensilely store 0.15 J/mℓ, or half that in the beam-bending
+case, 0.075 J/mℓ.  This strip is 0.00285 mℓ, so that works out to 214
+microjoules.  If that’s built up over a deflection of 300 μm, the
+average force should be 713 millinewtons, with a peak force of 1.4
+newtons.  So I biffed a calculation somewhere.
+
+By sticking a hook on the end of such a clip, we can amplify this
+force with an inclined plane, but probably only by a factor of two or
+three — at some point the frictional force will get out of control and
+the thing will just break instead of sliding in and out as desired.
+(The hook does have the major advantage that you can make it easier to
+assemble than to disassemble — same energy, but lower force.)  The
+solution is probably to put many such thin strips in parallel like the
+pages of a book.
+
+Suppose you have a 3-mm-side square hole to work with.  You can have
+two parallel prongs that fit into it, each tipped with a hook, each of
+whose shafts consists of many 3-mm-wide, 300-μm-thick strips with
+150-μm-wide spaces between them.  The shafts deform by 300 μm upon
+insertion, coming into near contact (100 μm of space left in case the
+fabrication comes out too thick) and snap back by 150 μm upon full
+insertion.  This gives us 2.6 mm of space to divide among these
+strips, meaning that there can be about 3 of them in each prong — 433
+microns rather than the 450 described above, so only 283 microns of
+thickness in each strip.  And these strips are being bent
+S-curve-style rather than cantilever-style, since their ends are not
+free to rotate relative to one another (unless we want to try for a
+living hinge pivot, which seems inadvisable) so the prongs need to be
+about 13 mm long, which could quite reasonably be half recessed
+without even zigzagging.
+
+The hook ramps can reasonably give a 2:1 mechanical advantage for
+insertion (600 microns deep for 300 of deflection) and a 1:2
+mechanical disadvantage for removal (75 microns deep for 150 of
+deflection), so that the removal force is four times the insertion
+force, plus friction.  Most of the 3-mm-wide hole can be oversized so
+as not to contact the hooks until they are almost at depth, so only
+the last 675 microns of movement have friction.  The prong tips are
+3 mm (almost) by 1.3 mm, so they are quite robust relative to the
+300-micron-tall hook on their side.
+
+Better than prong clips
+-----------------------
+
+But there’s no reason to put the springs outside the building blocks
+in long prongs like that where they’re vulnerable to breakage.  Nearly
+the entire volume of the building block can be devoted to spring
+flexures that permit hooked studs on the outside to move or help
+capture inserted studs.
+
+But you only have a sixth of the block to devote to the springs for
+each face, assuming you have connectors on all six faces.  (It might
+be better to default to connectors on three or four faces for most
+projects, both in order to ease assembly and in order to ease
+printing; passive recesses can frictionlessly accommodate excess male
+stud prongs).  If you want to be on the order of the Lego-brand
+assembly energy per face, which I estimated above at 20 millijoules,
+the one-sixth of the block devoted to that face needs to contain 0.27
+mℓ, so the block as a whole needs to contain some 1.6 mℓ of PLA.  If
+it needs to be 25% empty space, it needs to occupy at least 2.13 mℓ.
+Probably it’s best to use a large safety factor and allocate, say,
+8 mℓ per cube, which is precisely 20 mm on a side.  This is
+significantly coarser than Lego-brand resolution, but not outrageously
+so; far better than we have any right to expect, actually, given the
+outrageously inferior qualities of PLA for this sort of thing.
+
+Maybe the studs (or stud parts, since they ought to have opposing
+motion in order to grip locally rather than globally) should have
+motion that isn’t purely parallel to the surface of the block, so the
+inclined-plane effect is larger than you'd expect from the shape of
+the hooks.
+

@@ -1,0 +1,253 @@
+How do you do a very simple but high-efficiency audio output circuit
+on a microcontroller?
+
+The simplest possible approach is to connect a speaker between a GPIO
+pin and a power rail, then generate a signal on the GPIO pin.  Digital
+outputs are quite low impedance when generating either a 1 or a 0, so
+very little power is wasted in the pin driver in the microcontroller.
+
+This has wonderful linearity, but it has a few different problems:
+power, DC waste, impedance matching, and high-frequency noise.
+
+Power: the GPIO pin is typically capable of sinking or sourcing
+5–50 mA, sometimes at 5 V but often at only 3.3 volts.  50 mA at 5 V
+is 0.25 W, which is not going to be very loud unless it’s in an
+earphone.
+
+DC waste: the average value of the GPIO pin when it’s emitting a
+signal that’s symmetric around some zero value is going to be 2.5 V or
+1.7 V, half the supply voltage.  This DC component of the signal is
+going to draw current through the speaker coil without producing any
+sound.  Worse, it will typically see a lower resistance than the
+speaker’s nominal impedance.
+
+Impedance matching: when you have a source with an internal impedance
+driving a load, the maximum power applied to the load is when the
+load’s impedance equals the source impedance.  If the load’s impedance
+is too low, most of the voltage is dropped in the source impedance,
+and the voltage that actually reaches the load is too low.  If the
+load’s impedance is too high, all the voltage reaches the load, but
+only a fraction of the source’s current-delivery capacity comes into
+play.  To be concrete, driving 20 mA (ac!) through a garden-variety 8Ω
+dynamic speaker is only going to give you 160 mV (ac) across it,
+rather than the 3.3V or 5V your microcontroller can theoretically
+deliver.
+
+High-frequency noise: GPIO pin voltage transitions are fairly sharp
+and so potentially have a lot of power in the ultrasound part of the
+spectrum.  For directly driving a speaker, this may not be a problem,
+but under some circumstances the high-frequency signal can result in
+excessive heat dissipation in the speaker as well, especially once you
+solve the above power delilvery problems.
+
+So I was thinking about these ideas:
+
+First, how about just driving the speaker through an audio
+transformer?  This ensures no dc reaches the speaker, allows the
+microcontroller to see an effectively higher speaker impedance (by the
+square of the turns ratio) and the waste of driving dc through the
+transformer’s winding is potentially smaller than the waste of driving
+it through the hair-fine speaker winding.  Transformers may even
+reduce the transmission of high-frequency noise, though probably not
+in a very well controlled way.
+
+Second, how about using a transistor switch as an amplifier?  An
+N-channel MOSFET or NPN transistor to ground would work, as would a
+PNP BJT to a positive voltage supply.  The MOSFET case can work with
+extremely high efficiency!  A 2N7002 can switch 200 mA at up to 60 V
+with only 5Ω of on-resistance; in theory that would be up to 12 W of
+output, at which point it would be dissipating 1 W, requiring the
+TO-92 package for heatsinking rather than the SOT23-3L.
+
+To solve the high-frequency noise problem, though, we need analog
+filtering — and we need it *after* the transistor switch, because if
+we do it *before*, we lose the efficiency that brought us here in the
+first place.  If we use mostly LC filtering, rather than RC, maybe we
+can get high efficiency.
+
+More elaborately:
+
+Put a speaker in series with a capacitor to ground to block DC and
+stuff below, say, 20 Hz; this way the power dissipated by the speaker
+is almost all in the right frequency band to be turned into sound,
+even if the speaker’s best-case efficiency is low, like 5% or so.  Put
+another, much smaller capacitor in parallel with the speaker-capacitor
+combination in order to attenuate high frequencies, like above 20kHz
+or so.  Put an inductor in series with the capacitor-speaker-capacitor
+combination in order to attenuate high frequencies further and prevent
+short-circuit currents.  Put a Schottky clamping diode in parallel
+with the inductor-capacitor-speaker-capacitor combination, from ground
+up to the inductor’s “input”, to prevent inductive voltage spikes to
+large negative voltages.  Drive the diode-inductor junction with a
+MOSFET to the positive voltage power supply — either a GPIO output
+from the microcontroller itself (which perhaps avoids the necessity
+for the Schottky diode), a logic-level-input P-MOSFET with its gate
+hooked up to the GPIO, a regular power P-MOSFET with its gate driven
+by a logic-level-input MOSFET or by a BJT, or maybe even a
+bootstrapped N-MOSFET.
+
+Basically this is a buck converter driving a speaker through a
+DC-blocking capacitor.
+
+So far so good, but there’s one missing piece still: when there’s a
+signal, the input has a positive DC level relative to ground, and
+there’s no DC path to ground for it.  So stick an additional humongous
+inductor in parallel with the original capacitor-speaker-capacitor
+combination in order to provide a non-dissipative DC path.
+
+It might be more convenient to turn the whole passive-and-diode output
+part of the circuit upside down, hooking it up to the positive power
+supply rather than ground, so we can use an N-channel MOSFET to drive
+its input by shorting it to ground intermittently, rather than any of
+the annoying options for CMOS high-side switching.
+
+Some rough numbers.  Suppose the speaker is a standard 8Ω half-watt
+dynamic speaker.  To make the whole mess feasible, let’s use a 10:1
+audio transformer to drive it; that way 1VAC 125mA on the output works
+out to 10V 12.5mA on the input, an impedance of 800 Ω instead of 8 Ω.
+The DC-blocking capacitor then shouldn’t have too much more than 1kΩ
+of impedance at 20Hz (1/ωC < 1kΩ) which gives us 8μF, a blessedly
+quite feasible value.  The parallel capacitor to short out stuff above
+20kHz also shouldn’t have too much more than 4kΩ of impedance, but at
+20kHz, so 8nF is adequate.  The impedance of the whole
+capacitor-transformer-capacitor thing is going to be in the
+neighborhod of 2–3kΩ, so we want the input inductor to be in the
+neighborhood of that when we hit 20kHz; this requires a relatively
+large inductor of around 16mH in series.  However, the much worse
+problem is that our parallel inductor to ground — the one that’s
+supposed to drain off our DC voltage so we can keep running the
+circuit — is supposed to have an impedance in the neighborhood of
+2–3kΩ for frequencies of **20Hz**.  And *that* would require a
+humongous monster **16 HENRY** inductor.
+
+So, what’s the problem here?  I think that maybe I’ve made the load
+impedance too high, requiring high-impedance capacitors (which are
+cheap) and high-impedance inductors (which aren’t).  Maybe I don’t
+really need the transformer; then both the capacitors and inductors
+could be 100× lower impedance.  That means the capacitors would need
+to be 800μF (annoying but fairly commonplace) and 800nF (totally
+normal), while the inductors would need to be 160μH (totally normal)
+and 160mH (also annoying but not exotic).
+
+With ideal components, all the energy here would be dissipated either
+by the diode or the speaker.  In practice, the inductors in particular
+will have significant parasitic resistance, depending on how much
+copper you’re willing to lavish on them.  One 150μH inductor I have a
+datasheet for here, the toroidal SMD PM2110-151K-RC from Bourns, has
+0.049Ω of DC resistance; another, Bourns’s “dual-winding SRF0703-151M”
+(really a transformer), has 0.986Ω.  So the losses should be
+manageable.
+
+Simulation shows reasonable results with these values and 100kHz PWM,
+though there’s some serious harmonic distortion on the
+“negative-polarity” side of the wave at high amplitudes (presumably
+from the diode), and there’s about 6 dB attenuation already at 8 kHz,
+and significant bleedthrough with a 40kHz PWM carrier.  Probably a
+more judicious choice of component values would yield a sharper cutoff
+at a more appropriate frequency.  It also seems to have rather large
+currents through the diode at times, not to mention the other passive
+components.
+
+In Falstad’s circuit format:
+
+    $ 1 1.0E-7 10.20027730826997 50 5.0 43
+    r 928 336 928 384 0 8.0
+    c 928 384 928 464 0 7.999999999999999E-4 0.060217163598211165
+    w 928 304 992 304 0
+    l 992 304 992 464 0 0.16 1.0273205335302287
+    w 928 304 864 304 0
+    c 864 304 864 464 0 8.000000000000001E-7 0.10880129845424946
+    l 864 464 768 464 0 1.6E-4 1.0359085688452483
+    d 768 464 768 304 1 0.305904783
+    w 864 304 768 304 0
+    w 928 304 928 336 0
+    w 864 464 928 464 0
+    w 928 464 992 464 0
+    R 768 304 768 256 0 0 40.0 5.0 0.0 0.0 0.5
+    f 688 480 768 480 0 1.5
+    g 768 496 768 544 0
+    a 592 480 688 480 1 15.0 0.0 1000000.0
+    R 592 496 544 496 0 4 100000.0 5.0 0.0 0.0 0.5
+    170 592 464 544 448 3 20.0 40000.0 2.0 0.2
+    o 0 64 0 35 0.15625 0.025 0 -1
+    o 13 16 0 35 10.0 1.6 1 -1
+    o 17 64 0 35 2.5 9.765625E-5 2 -1
+
+I was thinking that maybe I could use an electrolytic capacitor for
+the series capacitor for the speaker, since one end of it is
+periodically almost shorted to ground, but now I realize that won’t
+actually work; the capacitor-speaker combination is in parallel with
+an inductor, which means its average voltage over time must be zero.
+(Otherwise the current through the inductor is growing without limit!)
+On the minus side, this means that you can’t use an electrolytic
+capacitor.  On the plus side, it means that by the same token, you
+don’t need any capacitor, because the parallel inductor itself
+guarantees a zero DC component to the signal as seen by the speaker.
+And that, in turn, means that we don’t really need such a large
+inductor; its impedance above 20Hz only needs to be large compared to
+8Ω, not 20–30 Ω.  (160mH at 20Hz gives us an impedance of 2πfL =
+20.1 Ω.)
+
+Fuck inductors, though.  We probably can’t get by with *just*
+capacitors because any just-capacitor circuit of this sort is going to
+have a massive shoot-through current when it first turns on, and your
+MOSFET is maybe going to explode.  But what if the only inductor in
+the system is a little choke that’s there to stop that from happening?
+Maybe with a diode or capacitor in parallel with it to keep it from
+generating massive voltage spikes that blow up the transistor when we
+turn it off.
+
+But then maybe we can use a capacitor in series with the speaker to
+high-pass filter the signal (at 20 Hz or so) and another in parallel
+with either the speaker or the capacitor-speaker combination to
+low-pass filter it (at 20 kHz or so).  Maybe we’d like the time
+constant of the high-pass-filtering capacitor to be around 50 ms, and
+the low-pass filtering cap to be around 20 μs.  Now we really do want
+to use a transformer, say 10:1, making the effective speaker impedance
+800 Ω, so our high-pass-filtering cap in series with the transformer
+can be 68 μF (and either electrolytic or MLCC ceramic), while the
+high-pass filter in parallel with that can be 22 nF.
+
+Let’s say 100kHz PWM with a 50%-max duty cycle is our working
+assumption, and we’re feeding the whole shebang from five volts.  So
+the transistor is on for up to 5 microseconds, then off for at least 5
+microseconds.  And let’s say we don’t want more than, say, 200 mA
+going through the MOSFET, because it’s a 2N7002 or something.  How big
+should the choke be?
+
+We want the current to ramp up to 200 mA in 5 microseconds when the
+choke sees all 5 volts, since that’s probably the worst case.  That’s
+125 μH.  Let’s use a capacitor in parallel with it to keep its voltage
+spikes limited without wasting any energy or introducing any
+nonlinearity; if we want the combination to resonate at 1MHz, we want
+the capacitor’s reactance to exactly cancel the inductor’s reactance
+at that frequency: 2πfL = 785 ohms = 1/(2πfC), giving 202 pF (and
+indeed 1 MHz ≈ (125 mH 200 pF)^-½).  This does reintroduce the startup
+short-circuit path we were hoping to get away from, but now it ends
+4000 times faster.  However, in simulation, this only limits the
+inductive voltage spike to 140 V, which is still too high.  So we
+probably need some kind of more aggressive damping.  A 4.7nF capacitor
+instead, in series with a 100Ω resistor, keeps the spike down to
+-23 V.
+
+An interesting thing is that whatever the ringdown network for the
+choke is, whatever losses it has are mostly switching losses, i.e.,
+they happen after each pulse, so using more pulses means more losses
+there.  So to the extent that your normal filtering is adequate to
+keep your PWM or whatever out of your audio, you can lower the PWM
+frequency to reduce the ringdown losses.
+
+If you wanted to keep the voltage spike down to 5 volts at 200 mA, you
+could use a 21.5Ω resistor in series with a regular silicon 700mV
+diode.  Except that of course the resistor's voltage drop will fall as
+the current does, so it’s more of an exponential decay than a linear
+one, and so it doesn’t come close to stopping the choke current before
+the transistor turns back on.  But maybe that’s actually what we want?
+In simulation, it does keep the voltage spike to 4.6 volts.
+
+Hmm, I just realized that maybe the body diode in the 2N7002 would
+have a similar effect.  Maybe it points the wrong way, though.
+
+Also I think the whole idea of capacitors on all the paths from power
+to ground is a dumb idea.  Sooner or later all those capacitors are
+going to be charged up to 5V and then no more current will flow.

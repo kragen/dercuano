@@ -1,0 +1,506 @@
+Golang has a *lot* built in, compared to C; for example, it has
+garbage collection, an interesting new way to do ad-hoc polymorphism,
+parametrically polymorphic finite maps, a range type, lightweight and
+relatively safe concurrency constructs, complex numbers, type-safe
+variadic parameters, run-time type identification, exception handling
+with FIFO automatic cleanup, a string type with equality and
+concatenation, and a print statement.  However, without importing at
+least some packages, there’s no way for a Go program to obtain input,
+and there are a lot of facilities that are easily accessible in the
+standard library that can save you a lot of time.
+
+I’m just starting to learn Golang, so I’m taking some notes on the
+standard library from <http://localhost:6060/pkg/>, which is
+unfortunately organized alphabetically, which means that really
+recondite stuff is mixed in with really basic stuff.  So this is my
+attempt to summarize what I think is most important.
+ 
+The standard Golang library seems to be entirely lacking facilities
+for interactive terminal I/O and GUIs.
+
+Really basic packages
+=====================
+
+These are all you need for a pretty wide range of stuff: `testing`,
+`io`, `fmt`, `os`, `strconv`, `bytes`, `strings`, `math`, and `sort`.
+Without any one of these, you’d be pretty handicapped.
+
+`testing`
+---------
+
+`go test` runs automated test suites written using functions named
+`TestFoo`, that take pointers to `testing.T` objects, in `foo_test.go`
+files.  It also has benchmarking and doctest-like functionality.  I
+have to admit I haven’t tried this yet because so far I haven’t
+written any Golang packages, just standalone programs, and I’m not
+sure how to use it with those.
+
+The `test/quick` subpackage does generative property-based testing,
+like Hypothesis.
+
+`fmt`
+-----
+
+`fmt` does formatted I/O, including `Printf`.  It can use reflection
+to dump out structs (`%v`, applicable to any type, or `%+v` to see
+field names) and even Golang-syntax representations (`%#v`).
+Naturally there’s a `fmt.Formatter` interface you can implement to
+override the default formatting.
+
+Because of reflection, `fmt.Fscan`, `fmt.Scan`, `fmt.Sscan`, etc.,
+don’t need a format string at all — you just give them some interface
+values pointing at where you want to store the results — and the same
+is true of `fmt.Print`.  Scanning can be overridden with a custom
+`Scan` method.
+
+There’s also a `print` function you can use without importing `fmt`.
+
+`io`
+----
+
+`io` is where you find the Reader and Writer protocols, among others;
+`fmt.Fprintf` takes an `io.Writer` rather than a file.  It also
+contains things like `io.Copy`, which normally copies a `Reader` to a
+`Writer`, but when possible uses more efficient methods, which I
+assume means `sendfile(2)`; plumbing utilities like `io.LimitReader`,
+`io.LimitWriter`, `io.Pipe`, `io.MultiReader` (cat), `io.MultiWriter`
+(tee), and `io.TeeReader` (tee); `io.ReaderAt`, suitable for
+concurrent random-access record I/O from multiple goroutines; etc.
+
+An interesting difference from Unix (or Python) is that `Read()` is
+supposed to return the error `io.EOF` at EOF rather than just an empty
+byte count.  This has the annoying result that if you `import "os"`
+and do file I/O with it, you probably also need to `import "io"`.
+
+The subpackage `io/ioutil` contains `ReadFile`, `WriteFile`, and
+tempfiles.
+
+`os`
+----
+
+`os` is where you find `Args` and most of the Unix API, including
+things like `Open(filename)`, `Getpid()`, and `os.Stdout`, which is an
+unbuffered `io.Writer`, which you can buffer using `bufio`.  Opening a
+file for writing requires calling either `os.Create` or `os.OpenFile`.
+
+There’s a separate `File.WriteString` method for when you have a
+`string` rather than a `[]byte` to write to a file.  This is sort of
+strange because you can convert from `string` to `[]byte` with
+`[]byte(s)`, which makes me think this method may be left over from an
+earlier version of Golang where you couldn’t do that.
+
+The design is a mix of very Unixy and somewhat portable.  File
+permissions are a 32-bit int with no place to put, for example, a
+separate “delete” permission bit, as on VMS.  But the inode returned
+by `os.Stat` (`FileInfo`) isn’t even a concrete type at all, but an
+interface.  (And it includes the file’s basename, but not e.g. ctime,
+so it’s only sort of an inode.)
+
+The `os.Process` API is an interesting design, clearly designed with
+non-Unix systems in mind.  (There’s no `os.Fork`!)  It’s somewhat
+weak; there’s no nonblocking `waitpid`, for example, and thus no way
+to get an `os.ProcessState` for a running process!  `os.exec` has a
+more convenient interface, but it’s apparently built on `os.Process`
+and therefore can’t do anything `os.Process` can’t.
+
+There also doesn’t seem to be a way to call select(2), although of
+course you can spawn off a goroutine or two per fire descriptor.
+
+`strconv`
+---------
+
+`strconv` is where you look for conversion to and from strings,
+although `fmt.Sprintf` gives you a more capable way to build strings.
+
+`bytes`
+-------
+
+Things you would expect to be utility methods on strings (`ToUpper`¸
+`Join`, `Split`, `TrimRight`, `Compare`, `HasPrefix`) are here, as are
+`io.Reader` and `io.Writer` interfaces for in-memory “files”.  There’s
+a corresponding `strings` module for strings.
+
+There are actually two different `io.Reader` implementations: the
+read-write `bytes.Buffer` and the seekable `bytes.Reader`.
+`bytes.Buffer`, in addition to converting output-generation functions
+into string-building functions, also allows you to buffer your output
+in a more controllable way than the `bufio` module mentioned
+below — it guarantees to return no errors when you write to it (it
+will `panic` instead if it runs out of memory) and allows you to
+accumulate the bytes written until you're ready to do something more
+interesting with them, like send them over a socket.
+
+`strings`
+---------
+
+This is almost the same as the `bytes` package, but for strings, even
+to the point of including the unnecessary `Compare` function.
+Naturally, though, it omits the read-write `Buffer` interface.
+
+`math`
+------
+
+This has the usual set of floating-point functions; you know, `Acosh`,
+`Cos`, `Ceil`, `IsNaN`, `Max`, Bessel functions, `Erfc`, and so on.
+Angles are in radians, logarithms are natural where not otherwise
+specified.  There are functions to convert floats to and from raw
+bits.
+
+`sort`
+------
+
+`sort` provides an exchange sort, with stable and unstable variants,
+and it’s somewhat less comfortable than its Python equivalent not only
+because you have to import it explicitly, but because it requires that
+the sequence you’re sorting implement `sort.Interface`, which is
+impossible for raw slices.  (The *sequence* implements the interface,
+not the data items being sorted.)
+
+This module contains heapsort, insertion sort, binary quicksort with
+some optimized pivot selection, and mergesort; the quicksort fails
+over to heapsort if it goes badly, an approach sometimes known as
+“introsort”.
+
+The mergesort is apparently a 21st-century optimization of binary
+mergesort which uses only logarithmic space rather than the usual
+linear space, at the cost of some extra swaps.
+
+The package also implements binary search as `sort.Search`,
+generalized to the case of a general function over integers 0..n
+(i.e. not just for searching sorted sequences in memory).
+
+For convenience, there are a number of wrappers for sorting and
+searching built-in data types.
+
+Somewhat less basic packages
+============================
+
+These are very common things but not quite as absolutely basic as the
+ones listed above.  These are `flag`, `log`, `bufio`, `math/rand`,
+`time`, `net/http`, `net/url`, `net/mail`, `mime`, `regexp`,
+`encoding/gob`, `encoding/json`, `encoding/binary`, `image`, `C`, and
+`yacc`.
+
+`flag`
+------
+
+This is the standard way to implement command-line parsing.  For
+better or worse, it doesn’t support combinable Unix-style
+single-letter flags, just long-only options, and it doesn’t support
+GNU-style options following non-option arguments.
+
+`log`
+-----
+
+`log` is the standard way to log errors and other messages.  This is
+how you debug your programs, and `log.Fatal` or `log.Fatalf` is how
+you report fatal errors and exit.  There’s no tagging, logging levels,
+complex object serialization, or filtering, but you can set a prefix
+and twiddle a couple of formatting flags.  You can create different
+`log.Logger` objects with `log.New`, sending information to the same
+or different files, and pass them around as you like.
+
+I wanted to put this in the “Really basic packages” category, since I
+import it in every Golang program I write, but the truth is that you
+can get by without it a lot more easily than you can get by without
+`math`, `sort`, or `strconv`.
+
+`bufio`
+-------
+
+This adds I/O buffering to an `io.Writer` (for performance) or an
+`io.Reader` (so you can put back already-read bytes or runes, for
+parsing reasons, as `fmt.Fscan` does).  It also contains
+`bufio.Scanner`, which parses things like (limited) CSV.  (There’s
+also a CSV parser in `encoding/csv`.)
+
+`math/rand`
+-----------
+
+This is a random number generator, which includes a shuffler in the
+form of `rand.Perm`.
+
+`time`
+------
+
+This package mixes together access to the real-time clock
+(`time.Now()`), calendrical calculations, formatting, time zones, and
+scheduling.  The time format used internally is nanosecond-precision
+and has its zero value at the beginning of year 1 CE in UTC.
+
+This package includes a syntax for durations, which are int64
+nanosecond counts; the syntax accepts “300μs”. ♥
+
+Because Go has no operator overloading, the Time type has .Add and
+.Sub methods to interact with Duration.
+
+`net/http`
+----------
+
+This includes a fairly easy HTTP/1.1 and HTTP/2 client and server with
+TLS support.  An HTTP server fits in a Tweet:
+
+    package main
+
+    import . "net/http"
+
+    func main() {
+            HandleFunc("/", func(w ResponseWriter, r *Request) { w.Write([]byte("hello")) })
+            ListenAndServe(":8080", nil)
+    }
+
+This also provides a convenient interface to the query-string parsing
+in `net/url`; the `http.Request` object above has a `FormValue`
+method.
+
+`net/url`
+---------
+
+`net/url` does URL parsing, construction, escaping, unescaping,
+relative URL resolution, and query-string encoding and decoding.
+
+    u, err := url.Parse("http://bing.com/search?q=dotnet")
+
+`net/mail`
+----------
+
+`net/mail` parses RFC-822 (well, RFC-5322) mail messages and
+addresses, but not MIME, and it doesn’t format mail messages, just
+parses them.
+
+`mime`
+------
+
+`mime` implements “parts of the MIME spec”, including reading
+/etc/mime.types and the b-encoding and q-encoding used in mail
+headers.  Subpackages implement quoted-printable and multipart
+encoding, but I don’t think there’s anything here that will give you a
+decoded email message body directly; this package is more aimed at
+handling mail headers and HTTP messages.
+
+`regexp`
+--------
+
+This implements a fairly Perl-compatible regexp engine, including
+non-greediness and the Python extension of named `(?P<foo>bar)`
+capture groups, but with no backreferences.  Given the history of Russ
+Cox and Ken Thompson in writing high-performance regular expression
+libraries, using DFAs that can’t handle backreferences, you would
+think that this library would be super fast, but usually it seems to
+be noticeably slower than Python’s and Perl’s.  It does, however,
+avoid the exponential behavior characteristic of NFA engines in cases
+like this:
+
+    // Pathological regexp.
+    // The Python equivalent takes exponentially long:
+    // __import__('re').compile('(x|xx)*y').match('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+    package main
+
+    import "regexp"
+
+    func main() {
+            regexp.MustCompile("(x|xx)*y").FindString("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    }
+
+`encoding/gob`
+--------------
+
+This is a generic serialization/deserialization system, using a
+Go-specific serialization, and it seems to be the closest equivalent
+to Python’s `pickle`, though it doesn’t support circular references.
+It supports maps, structs, arrays, slices, bools, signed and unsigned
+integers, floating-point numbers, complex numbers, and strings;
+structs include only exported fields, and functions and channels are
+omitted.  Interface types are supported with a little more hassle.
+
+It is not necessary to register user-defined types before sending them
+or for them to implement any particular interface, although there is
+an interface that they *can* define to override the default
+marshaling.  There is some limited support for schema evolution even
+in the default marshaling.
+
+`encoding/json`
+---------------
+
+`json.Marshal` converts a Golang value into JSON; it supports bool,
+numbers, strings, arrays, slices, maps from string, and structs
+(except for unexported fields or fields tagged with “-”.)  This is
+actually the only use I’ve seen so far of struct field tags.
+
+Naturally, of course you can override the JSON serialization by
+implementing an interface.
+
+`json.Unmarshal` takes an optionally-nil destination argument, which I
+suppose allows it to determine what types to deserialize things as.
+
+This module *does* support reading a sequence of JSON values from the
+same input stream; perhaps more interestingly, it has some minimal
+support for sequentially reading JSON items inside an outer JSON
+wrapper.
+
+`encoding/binary`
+-----------------
+
+`encoding/binary` contains functions `Read` and `Write` which can be
+used to parse and generate binary data in an externally-imposed
+format.  They’re slow because they use reflection (“Python-class
+slow,” as Tommi Virtanen explained to me).  This provides an easy way
+to do what the Perl `pack` and `unpack` functions do, or `struct.pack`
+and `struct.unpack` from Python.
+
+`image`
+-------
+
+This module and its submodules provide support for encoding and
+decoding PNG, GIF (including animation), and JPEG files.  You
+generally will load the images by calling `image.Decode` without
+explicitly mentioning the specific image format module, except to
+import it, but to save e.g. a PNG you need to call `png.Encode`.
+
+The `image.Image` interface looks impossibly inefficient, requiring an
+indirect function call and some coordinate arithmetic for every pixel.
+
+It looks like the PNG loading is eager and ahead-of-time, storing the
+image in RAM, although `image.Image` doesn’t strictly require that.
+
+The `image` module also contains some basic 2-D graphics stuff, like
+`image.Rectangle` (bounding boxes) and `image.Point`.
+
+`C`
+---
+
+[cgo](http://localhost:6060/cmd/cgo/) isn’t actually a Golang package;
+it’s a way to invoke statically-linked C libraries.  But you import it
+as a package named "C", and you add some special comments before that
+import in order to link in the stuff you want.
+
+...and then the Go compiler searches your directory for files named
+`*.c`, `*.s`, `*.S`, `*.cc`, `*.cpp`, or `*.cxx` (but not `*.C`) to
+compile with the C, C++, or assembly compiler.  Except that I’m not
+clear which compiler it uses for this: GCC or the Plan9 C compiler?
+
+Presumably if you want to load and invoke shared libraries written in
+C, this is the way to do it.
+
+`yacc`
+------
+
+If you want to parse something more than regular languages, `go tool
+yacc` is probably the thing to use.  It’s mostly undocumented, but
+it’s similar enough to Bison, ocamlyacc, etc., that it should be
+reasonably attainable.
+
+Somewhat more recondite packages
+================================
+
+I’ve also taken some notes on some other packages that seem less
+central to me.
+
+`html/template`
+---------------
+
+`html/template` gives you convenient XSS-safe HTML templating.  Its
+capabilities are fairly elaborate, and there's also a `text/template`
+package for doing the same kind of thing without the HTML escaping.
+
+`syscall`
+---------
+
+This deprecated package provides access to basically the entire Linux
+(or other) native system call interface, including weird things like
+epoll(7), `ETH_P_IRDA`, inotify(7), `SCM_RIGHTS`, and openat(2).  The
+`unsafe` package has some details on directly invoking Linux system
+calls.
+
+This is also the package where you get errno values, if you want to
+test those against the `Err` attribute of e.g. an `os.PathError`.
+
+`encoding/xml`
+--------------
+
+`encoding/xml` contains an XML parser and emitter, some HTML parsing,
+and something that looks suspiciously like another generic
+serialization system like Gob and the one in `encoding/json`, but
+really isn’t.
+
+The serialization system handles arrays, slices, structs, and
+interfaces, but not maps, and like the JSON serializer, it optionally
+uses struct field tags.  It seems to be designed to allow you to
+produce arbitrary XML by marshalling structs, and parse almost
+arbitrary XML by unmarshalling.
+
+This module doesn’t provide DOM or SAX interfaces, but it has
+interfaces that are sort of similar.
+
+`net`
+-----
+
+This library provides sockets, basically, but with a somewhat nicer
+interface.  Like, actually a dramatically nicer interface.  TCP
+sockets have SetNoDelay and SetLinger methods, for example, and you
+can invoke `net.Dial("tcp", "google.com:http")` to open a connection.
+
+`index/suffixarray`
+-------------------
+
+`suffixarray` provides an in-RAM search index that supports regular
+expression searches, though using a log-linear-time construction
+algorithm rather than a linear-time one.  On my laptop, it takes about
+1.8 seconds to index a megabyte, about 26 seconds to index 10
+megabytes, and 540 seconds to index 100 megabytes; then, each match
+for a simple regexp in the 10MB index takes 1.3 ms, and each match in
+the 100MB index takes 2.5 ms.  It uses 1.6 GB of RAM to index 100
+megabytes, which is maybe a bit excessive.
+
+You can write the index to a file, which is about 4.8 bytes for each
+byte that you originally indexed.  My laptop can then read the index
+in at about 100 megabytes a second, which is a necessary prerequisite
+to doing searches with it.
+
+As a point of comparison, I tried `index/suffixarray`, the raw regexp
+engine, and the Python regexp engine to find the '^From ' lines
+delimiting messages in a 100MB mbox.  The indexed search found the
+3593 `From_` lines in 17.5 seconds.  Just reading the file in and
+running the regexp engine over it found them in 12.6 seconds.  The
+Python version took 2.0 seconds.
+
+This seemed like unreasonably poor performance, so I tried searching
+for a spammer’s email address.  The Python version found the three
+matches in 430 ms; the Golang brute-force version found them in 210
+ms; and the indexed version found them in 4.3 seconds, of which 4.0
+seconds were spent reading the index.
+
+Just for kicks, I tried a Perl version.  It produced the 3593 `From_`
+lines in 220 ms and the three hits for the spammer’s address in
+195 ms, but upon trying to find all the lines *containing* the address
+(regexp `^.*VanceE.McCray.*`), I killed it after 21 minutes.  Python
+managed to finish that job in 2.7 seconds, the Golang brute force
+version in 36 seconds, and the Golang indexed version in 45 seconds.
+
+So I haven’t been able to find any cases where `index/suffixarray` is
+faster than doing a brute-force regexp search on the file data in RAM,
+even though it uses several times as much RAM.
+
+`runtime`
+---------
+
+`runtime` provides control over the garbage collector (including
+setting finalizers), a `Caller` function to walk the stack, and a
+bunch of profiling stuff I don’t know how to use yet.  (I guess I
+could call the `runtime.debug.PrintStack` function periodically and
+save the results, and that would be a crude profiler.)
+
+`net/rpc`
+---------
+
+`net/rpc` is an RPC system using the `encoding/gob` serialization; a
+JSON-serialized variant is in `net/rpc/jsonrpc`.  It doesn’t enjoy a
+lot of syntactic sugar.
+
+`zip`
+-----
+
+`zip` lets you read and write zipfiles, but only items compressed with
+the “store” and “deflate” methods.  It uses the same `io.Reader` and
+`io.Writer` interfaces everything else does (or rather `io.ReadCloser`
+and `io.Writer`.)

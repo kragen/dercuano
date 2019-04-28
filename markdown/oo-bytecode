@@ -1,0 +1,381 @@
+Suppose you have a programming system with a garbage-collected
+object-graph memory where objects are type-tagged immutable vectors of
+fields.  You really only need two stack-bytecode operations for the
+object memory:
+
+    NEW ( class [ val0 val1 ... -- ref )
+    AT ( ref idx -- val )
+
+Here `[` is a PostScript-style stack mark for variadic function
+invocation.
+
+`AT` fetches a field value, and `NEW` creates an object containing the
+given fields.  Alternatively, you could bake `idx` into AT’s bytecode
+and have it always operate on `self`, the receiver containing the
+executing method, and NEW could be an ordinary method call on `class`
+which is implemented with magical native code.  Either way, you need
+bounds-checking either at compile-time or run-time.
+
+With a reasonable generational garbage collector, this can be the most
+efficient way to do many things.  Other algorithms, however, also need
+mutation, so you need a third operation to mutate fields: ATPUT.
+
+For a Pythonish language (see file `thredsnek`) you need built-in
+dict, list, int, float, and probably string classes, plus reflection,
+dynamic dispatch of variadic method calls, an iterator protocol, and
+exceptions; and, of course, control flow.
+
+So a minimal OO Pythonish bytecode might need INVOKE, AT, ATPUT, VAR,
+VARPUT, LIT, IF, GOTO, LOOP, [, and RET: 11 operations.  I’m not quite
+sure how to implement exceptions; catch and finally blocks are rare
+enough in garbage-collected languages (unlike in C++ or Rust, where
+every new variable sort of introduces one) that doing it the
+straightforward way with PUSHJMPBUF and POPJMPBUF opcodes might be
+adequate.
+
+An alternative block-structured design might unify method scope,
+object scope, and global scope as simply being three arbitrary levels
+of an arbitrary set of nested scopes, and this does have benefits to
+recommend it.  However, this requires recovering at compile-time or
+even run-time further information that was available in the
+programmer’s mind: in particular, which blocks might become closures
+(i.e. when objects are created) and which variables are captured by
+those blocks (i.e. the instance variables of the implicitly created
+objects).
+
+Looking at existing bytecode may be instructive.  Here’s disassembly
+of the CPython bytecode for a somewhat arbitrarily chosen Python
+library function, the `difference_update` method of the deprecated
+`sets` module.
+
+    Disassembly of difference_update:
+    479           0 LOAD_FAST                0 (self)
+                  3 LOAD_ATTR                0 (_data)
+                  6 STORE_FAST               2 (data)
+
+    480           9 LOAD_GLOBAL              1 (isinstance)
+                 12 LOAD_FAST                1 (other)
+                 15 LOAD_GLOBAL              2 (BaseSet)
+                 18 CALL_FUNCTION            2
+                 21 POP_JUMP_IF_TRUE        39
+
+    481          24 LOAD_GLOBAL              3 (Set)
+                 27 LOAD_FAST                1 (other)
+                 30 CALL_FUNCTION            1
+                 33 STORE_FAST               1 (other)
+                 36 JUMP_FORWARD             0 (to 39)
+
+    482     >>   39 LOAD_FAST                0 (self)
+                 42 LOAD_FAST                1 (other)
+                 45 COMPARE_OP               8 (is)
+                 48 POP_JUMP_IF_FALSE       64
+
+    483          51 LOAD_FAST                0 (self)
+                 54 LOAD_ATTR                4 (clear)
+                 57 CALL_FUNCTION            0
+                 60 POP_TOP             
+                 61 JUMP_FORWARD             0 (to 64)
+
+    484     >>   64 SETUP_LOOP              33 (to 100)
+                 67 LOAD_GLOBAL              5 (ifilter)
+                 70 LOAD_FAST                2 (data)
+                 73 LOAD_ATTR                6 (__contains__)
+                 76 LOAD_FAST                1 (other)
+                 79 CALL_FUNCTION            2
+                 82 GET_ITER            
+            >>   83 FOR_ITER                13 (to 99)
+                 86 STORE_FAST               3 (elt)
+
+    485          89 LOAD_FAST                2 (data)
+                 92 LOAD_FAST                3 (elt)
+                 95 DELETE_SUBSCR       
+                 96 JUMP_ABSOLUTE           83
+            >>   99 POP_BLOCK           
+            >>  100 LOAD_CONST               1 (None)
+                103 RETURN_VALUE        
+
+The original source code:
+
+    def difference_update(self, other):
+        """Remove all elements of another set from this set."""
+        data = self._data
+        if not isinstance(other, BaseSet):
+            other = Set(other)
+        if self is other:
+            self.clear()
+v        for elt in ifilter(data.__contains__, other):
+            del data[elt]
+
+Here’s a longer method, from another obscure standard library module, netrc.netrc.__repr__:
+
+    Disassembly of __repr__:
+    130           0 LOAD_CONST               1 ('')
+                  3 STORE_FAST               1 (rep)
+
+    131           6 SETUP_LOOP             137 (to 146)
+                  9 LOAD_FAST                0 (self)
+                 12 LOAD_ATTR                0 (hosts)
+                 15 LOAD_ATTR                1 (keys)
+                 18 CALL_FUNCTION            0
+                 21 GET_ITER            
+            >>   22 FOR_ITER               120 (to 145)
+                 25 STORE_FAST               2 (host)
+
+    132          28 LOAD_FAST                0 (self)
+                 31 LOAD_ATTR                0 (hosts)
+                 34 LOAD_FAST                2 (host)
+                 37 BINARY_SUBSCR       
+                 38 STORE_FAST               3 (attrs)
+
+    133          41 LOAD_FAST                1 (rep)
+                 44 LOAD_CONST               2 ('machine ')
+                 47 BINARY_ADD          
+                 48 LOAD_FAST                2 (host)
+                 51 BINARY_ADD          
+                 52 LOAD_CONST               3 ('\n\tlogin ')
+                 55 BINARY_ADD          
+                 56 LOAD_GLOBAL              2 (repr)
+                 59 LOAD_FAST                3 (attrs)
+                 62 LOAD_CONST               4 (0)
+                 65 BINARY_SUBSCR       
+                 66 CALL_FUNCTION            1
+                 69 BINARY_ADD          
+                 70 LOAD_CONST               5 ('\n')
+                 73 BINARY_ADD          
+                 74 STORE_FAST               1 (rep)
+
+    134          77 LOAD_FAST                3 (attrs)
+                 80 LOAD_CONST               6 (1)
+                 83 BINARY_SUBSCR       
+                 84 POP_JUMP_IF_FALSE      114
+
+    135          87 LOAD_FAST                1 (rep)
+                 90 LOAD_CONST               7 ('account ')
+                 93 BINARY_ADD          
+                 94 LOAD_GLOBAL              2 (repr)
+                 97 LOAD_FAST                3 (attrs)
+                100 LOAD_CONST               6 (1)
+                103 BINARY_SUBSCR       
+                104 CALL_FUNCTION            1
+                107 BINARY_ADD          
+                108 STORE_FAST               1 (rep)
+                111 JUMP_FORWARD             0 (to 114)
+
+    136     >>  114 LOAD_FAST                1 (rep)
+                117 LOAD_CONST               8 ('\tpassword ')
+                120 BINARY_ADD          
+                121 LOAD_GLOBAL              2 (repr)
+                124 LOAD_FAST                3 (attrs)
+                127 LOAD_CONST               9 (2)
+                130 BINARY_SUBSCR       
+                131 CALL_FUNCTION            1
+                134 BINARY_ADD          
+                135 LOAD_CONST               5 ('\n')
+                138 BINARY_ADD          
+                139 STORE_FAST               1 (rep)
+                142 JUMP_ABSOLUTE           22
+            >>  145 POP_BLOCK           
+
+    137     >>  146 SETUP_LOOP              85 (to 234)
+                149 LOAD_FAST                0 (self)
+                152 LOAD_ATTR                3 (macros)
+                155 LOAD_ATTR                1 (keys)
+                158 CALL_FUNCTION            0
+                161 GET_ITER            
+            >>  162 FOR_ITER                68 (to 233)
+                165 STORE_FAST               4 (macro)
+
+    138         168 LOAD_FAST                1 (rep)
+                171 LOAD_CONST              10 ('macdef ')
+                174 BINARY_ADD          
+                175 LOAD_FAST                4 (macro)
+                178 BINARY_ADD          
+                179 LOAD_CONST               5 ('\n')
+                182 BINARY_ADD          
+                183 STORE_FAST               1 (rep)
+
+    139         186 SETUP_LOOP              31 (to 220)
+                189 LOAD_FAST                0 (self)
+                192 LOAD_ATTR                3 (macros)
+                195 LOAD_FAST                4 (macro)
+                198 BINARY_SUBSCR       
+                199 GET_ITER            
+            >>  200 FOR_ITER                16 (to 219)
+                203 STORE_FAST               5 (line)
+
+    140         206 LOAD_FAST                1 (rep)
+                209 LOAD_FAST                5 (line)
+                212 BINARY_ADD          
+                213 STORE_FAST               1 (rep)
+                216 JUMP_ABSOLUTE          200
+            >>  219 POP_BLOCK           
+
+    141     >>  220 LOAD_FAST                1 (rep)
+                223 LOAD_CONST               5 ('\n')
+                226 BINARY_ADD          
+                227 STORE_FAST               1 (rep)
+                230 JUMP_ABSOLUTE          162
+            >>  233 POP_BLOCK           
+
+    142     >>  234 LOAD_FAST                1 (rep)
+                237 RETURN_VALUE        
+
+Here’s the original source code:
+
+    def __repr__(self):
+        """Dump the class data in the format of a .netrc file."""
+        rep = ""
+        for host in self.hosts.keys():
+            attrs = self.hosts[host]
+            rep = rep + "machine "+ host + "\n\tlogin " + repr(attrs[0]) + "\n"
+            if attrs[1]:
+                rep = rep + "account " + repr(attrs[1])
+            rep = rep + "\tpassword " + repr(attrs[2]) + "\n"
+        for macro in self.macros.keys():
+            rep = rep + "macdef " + macro + "\n"
+            for line in self.macros[macro]:
+                rep = rep + line
+            rep = rep + "\n"
+        return rep
+
+I feel like these two functions are relatively typical Python code.
+
+From a few arbitrary files including the above, I disassembled about
+2650 bytecodes.  The top ops are:
+
+    LOAD_FAST (630 bytecodes),
+    CALL_FUNCTION (242 bytecodes),
+    LOAD_GLOBAL (238 bytecodes, usually in order to call a global),
+    LOAD_ATTR (228 bytecodes, largely split between
+        self attributes (preceded by a LOAD_FAST of self) and
+        method calls (followed by a CALL_FUNCTION)),
+    LOAD_CONST (179 bytecodes),
+    STORE_FAST (150 bytecodes),
+    RETURN_VALUE (132 bytecodes),
+    POP_JUMP_IF_FALSE (95 bytecodes),
+    POP_TOP (89 bytecodes), and
+    COMPARE_OP (80 bytecodes).
+
+These add up to 2063 bytecodes, about 78% of the total.  COMPARE_OP
+makes it there because it’s a catchall for a variety of comparison
+operators, including exception-matching, `==`, and `is`, but also
+`in`, `>`, and the like.  Most other binary operators have their own
+bytecode, like `[]` (BINARY_SUBSCR, 30 occurrences), and `+`
+(BINARY_ADD, 26 occurrences).
+
+Stack operation density
+-----------------------
+
+I’ve tried a number of things, but so far I haven’t been able to find
+a way to get tighter code than with a stack machine.  On average, a
+binary operation (two inputs and one output) on a stack machine has
+about one associated stack manipulation operation, which is typically
+between 5 and 8 bits.
+
+Typical two-register code has a 3- or 4-bit field for each operand, so
+6–8 bits, and sometimes has an additional MOV instruction associated
+to prevent one of the inputs from being clobbered; three-register code
+avoids that at the cost of a third operand field, which in extreme
+cases (like Lua bytecode) means 24 bits of operands per operation, but
+is more typically 12–18 bits.
+
+The Mill architecture’s “belt” is a third alternative; like stack
+machines, the output of each instruction is implicit, but unlike them,
+inputs are not consumed.  Consequently operands must be implicit.  I
+did some speculative analysis (file `golomb-coded-belt`) of
+variable-length encoding of a two-address belt code and found that in
+the code I looked at, the spans were very nearly geometrically
+distributed, so nearly the optimum was Golomb coding with a bin size
+of 1, which reduces to unary coding, and this works out to a bit over
+5 bits of operand information per two-operand computational
+instruction (would be 4 if the geometric distribution was exactly
+correct), which is essentially exactly the same code density as the
+stack code, just much more expensive to decode.
+
+(An encoding variation I haven’t explored in more detail: since about
+half of the operands are the output of the immediately previous
+instruction, make that implicit for two-operand instructions, and
+insert an extra copy instruction in the other cases.  It probably
+won’t work to improve density further, but it might.)
+
+The TRIPS or EDGE (“explicit data graph execution”) architecture is
+sort of a mirror image of the “belt”, where instruction inputs are
+implicit, but outputs are explicit, and point to other instructions in
+the same block.  Presumably this works out about the same.
+
+So I think that probably stack code is the best approach; it typically
+uses about 10–12 bits per binary computational operation, of which
+about 5–6 bits is operand information (in the form of stack
+manipulation operations), which is comparable to the other
+alternatives; I'm not yet convinced that anything is better.  It’s
+faster to decode and interpret than variable-length instructions,
+though slower than fixed-width register-based instruction sets.  And
+it easily accommodates operations that consume or produce unusual
+numbers of values.
+
+Truncation and Packing
+----------------------
+
+The F18A core in the GreenArrays GA4 and GA144 chips has four 5-bit
+instructions per 18-bit memory word (when there are no jump targets;
+immediate literal constants are pushed on the stack by a `@p`
+instruction anywhere in the previous instruction word).  This means
+two bits are missing from the last word; the instruction encoding is
+designed so that among the 8 expressible instructions for this last
+slot are `;` (return), `.` (nop), `dup`, `+`, and `unext` (which loops
+back to the beginning of the instruction word a number of times stored
+in the R register).
+
+In this way, you can always NOP out the truncated instruction slot if
+you can’t do anything useful with it, but you *can* fit many of the
+most common instructions — including particularly the ones that are
+most likely to be useful at the end of an instruction word.  If you
+can do this ¾ of the time, you can fit 15 instructions into four
+18-bit words, an average of 4.8 bits per instruction — and, as I
+suggested earlier, typically you need about two instructions per
+computational operation, giving 9.6 bits per computational operation,
+not counting jump targets.
+
+You could use a similar approach with 32-bit words of bytecode on a
+32-bit or 64-bit machine.  If each opcode is 6 bits, for example, you
+can fit 5 whole ones and one 2-bit truncated one into a 32-bit word,
+or 4 whole ones and two 3-bit truncated ones.
+
+However, jumps will use up the rest of the instruction word; the above
+__repr__ example code contains 99 bytecodes, of which 4 were
+`FOR_ITER` or `JUMP_FORWARD`, for an average of about 24 bytecodes
+between jumps.  This is probably roughly typical, or slightly high, so
+a substantial fraction of words will be taken up with such things.
+
+I’m not counting method invocation as a jump (though it is on the
+F18A), because I propose to carry it out in a different way, as
+explained below about “Facets and Dispatch”.
+
+Type tagging
+------------
+
+For a Pythonish language, we really need some kind of dynamic dispatch
+that allows us to use the same bytecodes to operate on native integers
+as on, for example, rational numbers.  One way to do this — the
+approach CPython takes — is to make integers heap-allocated objects
+too.  But it really helps performance, not to mention reliability and
+timing data leaks, if ordinary integers don’t need to be stored in
+memory like that.
+
+The standard approach to support runtime polymorphism between integers
+(held in registers) and pointers is to use one to four bits of the
+address word as type tags.  On byte-addressed machines with four-byte
+alignment for objects, the lowest two bits of a valid object pointer
+are always 00, so you can set them to, for example, 01 to indicate
+integers.  Then 
+
+64-bit machines with byte-addressed memory have 
+
+Facets and Dispatch
+-------------------
+
+Constant literals
+-----------------
+
+Static Checking
+---------------

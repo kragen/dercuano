@@ -1,0 +1,268 @@
+I just made a 0–11.5V adjustable power supply from an ATX power supply
+in the Ekospace hacklab.  Soldered the green wire (what is this called?) to
+ground so the power supply turns on automatically and cannibalized a
+SATA power connector to hook up the +12V yellow wire and ground to an
+emitter follower built out of a TO-220 D13007K NPN power transistor
+someone salvaged from a motherboard, three 2.2kΩ resistors (half-watt
+I think), and a 10kΩ potentiometer.
+
+This works for spinning up a tiny motor I found in the parts bin, but
+it’s not very efficient, and it’s likely to burn up the transistor at
+some point, because whatever voltage doesn’t appear on the output is
+dissipated across the transistor.  The TO-220 could theoretically
+dissipate 80W if it were like screwed to a heatsink or something, but
+it’s not.  It could maybe dissipate like 20W, which at 12V would be
+just 1.7 amps, although it can probably handle its rated 8 amps at its
+max voltage, if not the full 18 available from the power supply in
+question.
+
+It has the additional disadvantages that there’s no display for the
+voltage or current (you can set the voltage by hooking up a voltmeter
+to the output while turning the knob) and the output voltage will
+fluctuate with the input voltage from the ATX power supply, which can
+vary.
+
+So, what would a better solution look like?  You could build a buck
+converter based on the AVR ATMega328 used in the Arduino.  It has an
+internal 1.1V voltage reference.  You could use one of its six PWM
+outputs (with 8 bits of precision you get 31.25kHz; I think you can
+get 62.5kHz if you accept 7 bits of precision) to control the buck
+converter.  A couple of external resistors could form a voltage
+divider to scale down the buck converter’s output voltage to the 1.1V
+range, which feeds into the ATMega328’s 10-bit ADC.  A transistor,
+inductor, diode, and capacitor would complete the buck converter.  An
+additional low-value sense resistor could measure current on a second
+ADC channel (there’s one ADC but 6 or 8 pins that it can multiplex
+between).  Then the AVR could produce output displaying the voltage
+and current either on six seven-segment displays (13 digital GPIO pins
+in the usual multiplexing arrangement) or through a speaker on a
+second PWM channel.  A third ADC channel could be used to read a
+potentiometer to control the output voltage.
+
+How big do these external components need to be, and how much
+precision do we need?
+
+Supposing arbitrarily that I were to use a similar ATX power supply
+capable of 18A on its 12V output, which works out to 216W (a bit over
+a quarter horsepower), it would be nice to be able to carry that 216W
+most of the way down the range, say down to 2V — which would mean 108
+fucking amperes.  This is a somewhat unreasonable amount of amperage,
+as common power transistors are typically in like the 1 to 8 amp
+range.  A popular power transistor with somewhat more oomph is the
+Siliconix SiS410DN, which costs 94¢ from Digi-Key and handles 35 amps;
+then there’s the Nexperia PSMN4R0-40YS from 2010, which costs 88¢ and
+handles 100 amps.  But I’m probably not going to salvage those from
+discarded Argentine electronics.
+
+I can buy similar power MOSFETs here in town at G.M. Electrónica or
+SyC Electrónica, though, even if they are somewhat inferior and more
+expensive.  They only carry International Rectifier parts (or
+STMicroelectronics versions of them) in that range, though; they both
+have, for example, the IRF540.  SyC’s price for the ST version is 60¢.
+
+So let’s say I use one of those.  It turns on at 4V, so I don’t need a
+gate drive level shifter.  The STMicroelectronics version SyC sells
+for 60¢ handles 22 amps, which is more than the ATX power supply can
+deliver anyway (though maybe a capacitor on the input of the buck
+converter could help with that).  We only really need (or can display
+on a 3-digit LED) about 100mV precision, so 128 duty cycles is
+probably enough, so we can probably use the 62.5kHz speed.  How much
+energy do we need to store in the inductor at 62.5kHz?
+
+That’s 16 microseconds per cycle.  I’m a little unclear on exactly how
+the math of buck converters works out but I am pretty sure that it
+will not involve storing more than 16 microseconds’ worth of power in
+the inductor, which would be three or four millijoules, and I’m pretty
+sure it’s okay for the inductor current to fluctuate by 10% or so,
+maybe a lot more.  So if ½LI² = 4 mJ and I = 18 A, then L = 2·4 mJ /
+(18 A)² = 25μH, which I would have thought a fairly small inductor but
+is apparently around the 75th percentile of modern inductors.
+Combining that with the high current requirement leaves very few
+options in Digi-Key’s catalog.
+
+One such is the [Würth
+7443643300](http://www.digikey.com/product-detail/en/wurth-electronics-inc/7443643300/732-5629-ND/4865754),
+which goes for US$8.50 — 33μH, 30A, 2.4mΩ, self-resonant at 7MHz,
+ferrite, 28.5mm × 19.5mm × 18.5 mm, ferrite, saturating at only 11.5A
+(which seems like it could be a problem in this application!).  It
+seems to be five turns of flat 3.8mm × 0.8mm copper tape!
+
+So it’s feasible but maybe more study of buck converter math would
+help me more.  PDM might also help by reducing the cycle time to
+submicrosecond levels; ST’s IRF540 has a turn-on delay plus rise time
+of 105ns, which means we can’t go deep submicrosecond without losing
+efficiency, though Infineon’s part may be a bit faster.
+
+Horowitz & Hill draw the buck converter with a Schottky diode, which
+makes a certain amount of sense — 18 amps at an 0.7-volt voltage drop
+would be about 13W dissipated in the diode, and indeed most popular
+large-current diodes on Digi-Key are Schottky, like the
+VB30100S-E3/8W, which is 100V, 30A, in a TO-263AB surface-mount
+package with a cathode-body connection; this has the ordinary 300mV
+Schottky silicon voltage drop at ordinary currents, but at 10A it’s
+already up over 500mV, and at 18A it’s almost 700mV.  At its rated
+maximum 30A it’s 910mV.
+
+Horowitz & Hill also end up using a 150μH inductor for their first
+example (5V, 500mA, 50kHz).  Is that less of a pain in the ass?
+
+A 220μH 700mA ferrite inductor costs 32¢ at Digi-Key; a 150μH 1A
+ferrite inductor is 56¢.  It has axial leads and is 6.4 mm in diameter
+and 14 mm long.  A 150μH 2.2A ferrite inductor (saturating at 1.8A)
+costs US$1.03 and is 12mm × 12mm, and at this point we’re starting to
+get into lower frequencies, higher costs, and shielded construction.
+At 4A and 150μH we’re getting into US$2.37 25mm iron toroids with
+thick copper wire around them, and the price trend is clear, although
+at this point still only linear with current — this one holds 1.2
+millijoules, 500μJ/$, while the 2.2A one was only 350μJ/$.  Above 8A,
+prices start to climb proportional to energy and we’re getting into
+big wirewound powdered iron cores and then laminated silicon steel.
+
+[Someone tried making an Arduino-driven buck converter like what I’m
+suggesting](https://forum.arduino.cc/index.php?topic=354027.0) and
+discovered that since the IRF540 is an N-channel FET it’s a pain to
+switch the high side with it.  Also apparently buck converters need to
+react quickly to inductor saturation to prevent explosions.  [Some
+Croats did it
+successfully](http://docs.mipro-proceedings.com/sp/sp_09_4072.pdf).
+They did use a humongous wire-wound toroid.
+
+Man, I’ve really gotten hung up on the inductor, haven’t I?  It’s just
+that I’m worried that a giant piece of shit like that could really
+ruin what would otherwise be a tiny, cheap, ferocious power supply.
+
+The freewheeling diode itself might function as an adequate current
+sensing “resistor”; as mentioned above, a Schottky diode varies over
+the 300–900mV range on its way up to 30 amps.  This is pretty
+dependent on the temperature, but if you can somehow correct for that,
+you should be able to measure the current within about 3% over a 10mA
+to 10,000mA range, no problem.  I think the inductor-driven current
+through the freewheeling diode may generate a negative voltage with
+respect to ground, though, which is inconvenient for measurement.
+
+Alternatively, you could have like a 50mΩ sense resistor on the ground
+side; at 18A this would be 900mV, and each millivolt change (about one
+count on the ADC) would be 20 mA.  This introduces a little
+instability into the voltage regulation, although for many loads you
+could compensate for that adequately in software.
+
+Scanning six 7-segment displays should be fairly trivial if you have
+13 available GPIOs after the buck regulator PWM output and two ADCs.
+
+To run the AVR itself off the 12V supply, if you’re not using an
+entire Arduino, you could just use a 7805 regulator.  An ATMega328
+supposedly uses 12mA at 8MHz active, so probably 30mA at 20MHz (though
+another part of the datasheet says 12mA at 20MHz).  If it’s using ¼W
+or ½W, it isn’t going to burn up the 7805 to be wasting another ⅜W or
+⅝W.  Or maybe you could use a resistor and a 5V 1W zener (SyC has them
+in stock for 11¢, although I have no idea how to salvage them).
+
+Cheaper AVRs might work.  The ATTiny5 costs 35¢, runs at 12MHz, has a
+four-channel 8-bit ADC, and has four I/O pins.  The cheapest AVR with
+16 or more I/O pins is the 76¢ ATTiny40; it has 4KiB of flash, 256
+bytes of RAM, runs up to 12MHz, and has 12 channels for its 10-bit
+DAC.
+
+I think probably the very next step is to hook up an AVR display to
+the existing linear power supply to merely passively measure its
+voltage.  This involves minimally an Arduino, three current-limiting
+resistors (220Ω or 470Ω, say), three seven-segment displays, 10 GPIO
+pins to run them, and a voltage divider to get the voltage input down
+below 1.1V.
+
+As a sub-step before that, I should see if I can run this calculator
+LCD off my Arduino.  For that I won’t even need resistors.  But maybe
+I can buy some transistors too.
+
+***
+
+So, I salvaged (is that the word?) a four-digit seven-segment green
+LED clock display from a Philips clock radio.  It’s an LTC-637D1G,
+which turns out to be a Lite-On product from 2000; I already
+reverse-engineered its pinout before googling up the datasheet, which
+pretty much confirms what I’d already figured out — it’s a supremely
+shitty pinout, with the dubious grace of having only two cathodes
+instead of the expected four, so I can get by with two resistors
+instead of four.  It had the benefit of lighting up visibly when
+probed with the multimeter in the hacklab on the diode-test setting.
+LED voltage measurements on the variable-voltage power supply show
+that the LEDs start to become visible at about 4V on a 220Ω resistor,
+at which point they themselves are dropping about 2 volts, leaving 2V
+for the resistor, so the current is about 9mA.  Turning the power
+supply up to 11.5V illuminates the LED more brightly but doesn’t burn
+it out; at this point it has about 3V across it, which exceeds the
+2.6V max from the datasheet, though I guess that was at 20mA, and this
+is more like 38mA, which also exceeds the 25mA continuous current max
+in the datasheet.
+
+The datasheet says it can handle 100mA peak currents, but that’s not
+safe if they’re running straight off an AVR pin.  The AVR as a whole
+is only rated for 200mA on its Vcc and ground pins, and only up to
+40mA per channel.  And if I use the 220Ω resistors I now have soldered
+to the common cathodes, the max I’ll get at 3V (5V minus the LED’s 2V
+or more drop) dropped across the resistor is 14mA.  On the plus side
+that means I can run two diodes off one anode pin at the same time, so
+I can scan across the active anode pins, toggling the cathode pins
+between tri-stated and low according to whether that “pixel” is
+supposed to be on or off.
+
+Since this is a 24-hour clock display, the first digit is missing the
+segment that isn’t displayed in either the digit 1 or 2.  So it’s
+probably better to use just the last three digits.  These have only 11
+anode lines between them; if all 11 have active data on them, I can
+manage a 9.1% duty cycle.  This works out to an average bright current
+of 1.3 mA, which I think will be barely visible at all.  This could be
+improved slightly to like 1.8mA average, but getting it up to near the
+10mA average suggested in the datasheet would require 11 high-side
+drivers for the LED anodes, like bipolar transistors or something,
+since that would require the full 100mA peak current specified — twice
+that if both cathodes are active.  So for now I think I’ll give it a
+pass.
+
+So the AVR power supply voltmeter needs 11 anode pins, 2 cathode pins,
+and one analog input pin, which means it can fit into much smaller
+AVRs than the ATMega328.  The ATTiny40 with its 18 GPIO lines and 4K
+of Flash, for example, should be fine.  It costs 76¢ and is 3.1mm ×
+3.1mm in a VQFN.  (The 328’s smallest package is 5.1mm × 5.1mm.)
+
+Refreshing at 1kHz (again, as suggested in the display datasheet)
+would require iterating at 11kHz.  At the AVR’s internal RC oscillator
+speed of 8MHz, this gives us 727 clock cycles per display update — far
+more than necessary to respond to the timer interrupt.  At an
+Arduino’s 16MHz speed, we have twice as many.
+
+I cobbled together a voltage divider out of some carbon-composition
+resistors found lying around; it turns out they are 140kΩ and 4.2kΩ,
+so the voltage scaling factor will be 4.2/144.2 = .0291, so 12 volts
+would be measured as 350 millivolts.  However, the AVR’s 1.1V internal
+bandgap voltage reference is specified to be between 1.0 and 1.2 V, so
+that might digitize as anywhere from 298 counts to 358, and the count
+will change at least every 40 millivolts, which is about the right
+accuracy for an 0.1-volt-resolution digital voltmeter.
+
+**
+
+A thing I largely neglected above: a bench power supply needs current
+limiting.  A purely linear approach to this is to use an LM317
+(1.5A max) with ADJ connected to the load and a sense resistor between
+it and OUT — the LM317 will let the full voltage through until 1.25V
+is dropped over the sense resistor.  2Ω limits you to 625 mA, for
+example.
+
+You could reasonably run a sense resistor like this in series with the
+usual voltage divider, limiting a weighted sum of current and voltage
+rather than either one alone.  Or maybe you could use a couple of
+diodes to limit them separately with a single LM317: either a large
+enough output voltage or a large enough output current would pull down
+the ADJ pin through diodes from the ADJ pin to the end of the sense
+resistor and the middle of the voltage divider.  This also gives you
+an extra 0.7V or so, so the ADJ pin won’t get to 1.25V below output
+until the point that’s pulling it down is 1.95V below.
+
+The LM317 has internal thermal overload protection, a plus, but it
+needs 2.5 mA of output current to stay in regulation.  One big
+disadvantage it has for this purpose is that it’s not LDO — it has a
+2.5 V dropout, so it can’t deliver more than 9.5 V off a 12V ATX
+supply.  If you keep the output resistor to ground under 500Ω then
+it’ll always have enough bias current.
+

@@ -1,0 +1,339 @@
+What if we unified function definition, pattern matching, and
+dictionaries?
+
+Consider this table:
+
+    | Input | Output |
+    |-------+--------|
+    |     1 | "st"   |
+    |     2 | "nd"   |
+
+In JS or Python, we could encode it as a hash table: `{1: "st", 2:
+"nd"}`.  This has the advantage of being “just data” and therefore
+easily changed, for example to add more items, and more easily
+optimized, for example by using a hash table.
+
+But we could also encode it as code instead of data; in JS, for
+example, `x => x === 1 ? "st" : x === 2 ? "nd" : null`.  OCaml has a
+syntax that allows us to encode it as code while we omit the variable
+name: `function 1 -> "st" | 2 -> "nd"`.
+
+All of these cases benefit from having a fallback:
+
+    |   Input | Output |
+    |---------+--------|
+    |       1 | "st"   |
+    |       2 | "nd"   |
+    | (other) | "th"   |
+
+In Python, we can write this, more or less, as
+`collections.defaultdict(lambda: "th", [(1, "st"), (2, "nd")])`
+(although `defaultdict` has a fatally bug-prone interface; you
+shouldn’t use it).  As code, this function could be written in JS as
+follows:
+
+    x => x === 1 ? "st"
+       : x === 2 ? "nd"
+       :           "th"
+
+Or, in OCaml, as follows:
+
+    function
+        1 -> "st"
+      | 2 -> "nd"
+      | _ -> "th"
+
+The OCaml approach works by pattern-matching the argument against each
+of the “patterns”, potentially binding variables (just as in passing
+arguments to a function) that can then be used in the consequent of
+that pattern match.  In this case, there happen to be no variables
+either on the left or the right side.
+
+Really simplified overview of type inference in OCaml
+-----------------------------------------------------
+
+OCaml does type inference to figure out what the argument type — which
+is to say, the domain of the function — should be.  To simplify things
+and avoid subtyping relations, normal ML type inference requires that
+the domain be a known type, not some arbitrary collection of values.
+Consequently, the first example above produces a warning:
+
+    # let suffix = function 1 -> "st" | 2 -> "nd" ;;
+    Characters 13-43:
+      let suffix = function 1 -> "st" | 2 -> "nd" ;;
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    Warning 8: this pattern-matching is not exhaustive.
+    Here is an example of a value that is not matched:
+    0
+    val suffix : int -> string = <fun>
+
+However, OCaml’s type inference algorithm has been extended in ways
+that do require subtyping, including “polymorphic variants” and
+objects with methods.  Here’s an example with polymorphic variants:
+
+    # let rec int_of_peano = function `Z -> 0 | `S(x) -> 1 + int_of_peano x ;;
+    val int_of_peano : ([< `S of 'a | `Z ] as 'a) -> int = <fun>
+    # let rec peano_of_int = function 0 -> `Z | n -> `S (peano_of_int (n-1)) ;;
+    val peano_of_int : int -> ([> `S of 'a | `Z ] as 'a) = <fun>
+    # peano_of_int 11;;
+    - : [> `S of 'a | `Z ] as 'a =
+    `S (`S (`S (`S (`S (`S (`S (`S (`S (`S (`S `Z))))))))))
+    # int_of_peano (`S (`S (`S (`Z)))) ;;
+    - : int = 3
+    # int_of_peano (peano_of_int 11) ;;
+    - : int = 11
+
+Note that the return type of `peano_of_int` is not quite the same as
+the argument type of `int_of_peano`:
+
+    ([> `S of 'a | `Z ] as 'a)
+    ([< `S of 'a | `Z ] as 'a)
+
+That’s because the argument type is an upper bound, while the return
+type is a lower bound.  It’s valid to pass a value of a subtype, for
+example only `` `Z ``, as an argument; the types don’t have to match
+exactly.  Similarly, it’s valid to pass the return type into a context
+that could handle some wider array of possibilities, perhaps ``([`S of
+`a | `D of `a | `Z] as a)`` if we want to support efficient binary
+representation through both successors and doublings.  But the
+converse operations are not valid — we cannot pass `` `D (`Z) `` to
+`int_of_peano`, because it will crash, and we cannot use
+`peano_of_int` in a context that can only handle `` `Z ``.
+
+Of course, it’s not just a matter of the polymorphic variant tag
+matching; the type of its argument has to unify, too:
+
+    # int_of_peano(`Z (`D (`Z)));;
+    Characters 12-26:
+      int_of_peano(`Z (`D (`Z)));;
+                  ^^^^^^^^^^^^^^
+    Error: This expression has type [> `Z of [> `D of [> `Z ] ] ]
+           but an expression was expected of type [< `S of 'a | `Z ] as 'a
+           Types for tag `Z are incompatible
+
+Making it work with infix operators
+-----------------------------------
+
+In OCaml, the `|` and `->` tokens are not infix operators; you cannot
+make expressions with them alone.  They are part of the `function` and
+`match` productions in the grammar.  But what if they were infix
+operators?  What if we want the following expression to parse as
+infix, work by pattern-matching, and evaluate the function outlined
+above?
+
+      1 -> "st"
+    | 2 -> "nd"
+    | _ -> "th"
+
+Or, using operator tokens that make it look like JS or Python data:
+
+    1: "st", 2: "nd", _: "th"
+
+The first is fairly straightforward: `x -> y` is, more or less, JS’s
+`x => y`, a λ-abstraction.  It’s a function that takes `x` as an
+argument and returns `y`, evaluated on a context augmented with
+whatever names are bound in `x`.  But we kind of want it to be able to
+*fail*, either at compile-time or at run-time, so that we can union `1
+-> "st"` with `2 -> "nd"` and get `1 -> "st" | 2 -> "nd"`.  And, for
+this kind of case, we really want the failure semantics to be
+*ordered* — we don’t want to return `"th"` for everything, just
+everything not otherwise covered.
+
+Leaving aside the very interesting type inference question for now,
+let’s consider what this gives us.  We have a single symbol here for
+defining pattern-matching lambda-expressions that can fail, and a
+second one that extends it to pattern-matching ordered conditionals,
+which also work as dict literals.  This (plus some syntax for applying
+a function to an argument) is already more than enough for Church
+numerals, and so we’re already past the Turing-completeness line; but
+can we make it more convenient?
+
+In Perl, Python, and especially JS and Lua, it’s very common to use
+dicts as general-purpose data structures.  But here our “dicts” are
+functions (whose domain we perhaps have some way of computing, or at
+least conservatively approximating).  Can we pattern-match on those
+dicts?
+
+In ES6, pattern-matching on a “dict” (called, confusingly, an
+“object”) looks like this:
+
+    const {a: b, c: d, e: f} = {c: 1, e: 2, g: 3};
+
+This binds the variables `d` and `f` to 1 and 2, and the value `b` to
+`undefined`.  We could imagine that, given the option to declare a
+failed match, the missing value for `a: b` would cause the pattern
+match to fail, but the missing binding for `g: 3` would not — the
+point of storing your data in dicts in the first place is so that you
+can add new properties to it without breaking existing code, which is
+how email headers have remained backwards-compatible for forty fucking
+years.
+
+If the “dict” you’re matching is a function (that can fail), this
+corresponds to the pattern-match requiring it to succeed on some
+finite set of arguments mentioned in the pattern.  And those semantics
+are straightforward to implement, although maybe inefficient.
+
+This means that to try to invoke a function, you’re taking the
+function that is its argument and trying to invoke it (possibly
+several times) with the keys in the argument pattern.  This sounds
+like it’s going to be an infinite regress, but presumably at some
+point you will bottom out in symbols and other atoms, which, say,
+cannot be invoked as functions.
+
+If we try to keep our syntactic noise to a minimum, we could declare
+that lowercase barewords are symbols and variables need uppercase (as
+in Erlang), use the `:` and `,` symbols from Python/JS instead of `->`
+and `|`, and use the infix-syntax and
+function-application-by-juxtaposition syntax from OCaml.  So then our
+`peano_of_int` function ends up as:
+
+    Peano_of_int = 0: z, N: (s: Peano_of_int (N-1));
+
+And then its counterpart should look like this:
+
+    Int_of_peano = z: 0, (s: N): 1 + Int_of_peano N;
+
+And the example we started with would be written:
+
+    1: "st", 2: "nd", _: "th"
+
+Arguments first!
+----------------
+
+At this point, we start to want local variables or let-expressions.
+
+But let-expressions are just, in some sense, syntactic sugar to paper
+over the unfortunate fact that in `(λx.some long thing involving x)3`,
+the `x` argument and the `3` are spatially far apart, and we want them
+to be close together.  That is, we have the order `x Y 3`, and we want
+`x` and `3` to be adjacent.  Of the six possible orderings of the
+three items, only `x Y 3` and `3 Y x` do not have them adjacent, and
+`let` rewrites that to `x 3 Y`, omitting the literal tokens.
+
+But there are three other orderings that would also solve the problem,
+which are `Y x 3`, `Y 3 x` and `3 x Y`.  Since `Y` is an expression
+written in terms of `x`, it’s desirable for readability for `x` to
+precede it and be adjacent to it, so `3 x Y` would perhaps be the
+clearest order.
+
+Which is to say, perhaps arguments should precede functions in a
+function application expression, as, in a sense, in the ς-calculus and
+other object-oriented languages — even though, in this case, the
+functions are first-class values rather than merely selectors.
+
+This leads us to write our examples above as follows, with a needless
+Dijkstra-like `.` introduced to improve familiarity:
+
+    Int_to_peano = 0: z, N: (s: (N-1).Int_to_peano);
+    Peano_to_int = z: 0, (s: N): 1 + N.Peano_to_int;
+
+This pants-on-head syntax now gives us the sugar to avoid
+let-expressions in programs like this:
+
+    Sort = nil: nil,
+        (car: P, cdr: Xs):
+            Xs.(P.Lt.Filter).(Lesser:
+            Xs.(P.Ge.Filter).(Greater:
+            Lesser.Sort.((car: P, cdr: Greater.Sort).Append)));
+
+    Filter = F: (nil: nil,
+                 (car: X, cdr: Xs): X.F.(true: (car: X, cdr: Xs.F.Filter),
+                                         false: Xs.F.Filter));
+
+    Append = nil: (Ys: Ys),
+             (car: X, cdr: Xs): (Ys: (car: X, cdr: Xs.Ys.Append));
+
+Here my `Filter` and `Append` functions are curried, and I’m presuming
+that `Lt` and `Ge` are curried primitives such that, for example,
+`4.Lt` evaluates to a function that returns `true` for arguments that
+are less than 4.
+
+If you could arrange for the `X/Xs` destructuring pattern-match to
+fail in `Filter` when `X.F` doesn’t return `true`, maybe you could get
+a cleaner program.  I am not clear that there is a way to do that
+within the semantics I have described.
+
+If we wanted it to be more Prolog-like, we could use `;` instead of
+`,`; to be less Prolog-like, we could interchange the sense of upper
+and lower case, or use Ruby-like prefix colons for literal symbols
+instead of case, or interchange `=` and `:`.  And we could potentially
+dispense with the `.` for function application.  Four of the 11 other
+possibilities arising thus:
+
+    sort = Nil: Nil,
+        (Car: p, Cdr: xs):
+            xs (p lt filter) (lesser:
+            xs (p ge filter) (greater:
+            lesser sort ((Car: p, Cdr: greater sort) append)));
+
+    Sort = nil: nil;
+        (car: P; cdr: Xs):
+            Xs.(P.Lt.Filter).(Lesser:
+            Xs.(P.Ge.Filter).(Greater:
+            Lesser.Sort.((car: P; cdr: Greater.Sort).Append)))
+
+    sort: Nil=Nil;
+        (Car=p; Cdr=xs):
+            xs (p lt filter) (lesser:
+            xs (p ge filter) (greater:
+            lesser sort ((Car=p; Cdr = greater sort) append)));
+
+    sort = :nil: :nil,
+        (:car: p, :cdr: xs):
+            xs.(p.lt.filter).(lesser:
+            xs.(p.ge.filter).(greater:
+            lesser.sort.((:car: p, :cdr: greater.sort).append)));
+
+Yeesh, that last one looks unparseable.
+
+Raph Levien’s Io language used, approximately, `->` and a
+right-associative `;` where I am using `.(` and `:`, thus avoiding the
+pileup of right parentheses at the end.  If we tried that approach and
+terminated each alternative in the pattern match with `.` (that being
+the only symbol whose precedence in prose is lower than `;`), we might
+end up with something like this:
+
+    sort = Nil; Nil.
+        (Car; p. Cdr; xs);
+            xs -> (p -> lt -> filter) -> lesser;
+            xs -> (p -> ge -> filter) -> greater;
+            lesser -> sort -> ((Car; p. Cdr; greater -> sort) -> append.
+
+This does not seem more readable to me.
+
+Backtracking, generators, and binary relations
+----------------------------------------------
+
+All of the above is predicated on the idea that a function produces at
+most one value — so, for example, `_ -> "a" | _ -> "b"` will never
+return "b" because the first match will never fail.  But a natural
+extension of the approach is to allow any expression to yield any
+number of values, as in Icon, rather than just zero or one.  (Partly
+by coincidence, Icon uses `|` to do something closely analogous to
+chaining together cases of a pattern-match.)
+
+This, in effect, means that we are no longer talking about functions;
+we are talking about binary relations.  With an order imposed on their
+pairs, perhaps.
+
+There is a rather nice algebra of binary relations; they form a
+lattice (considering them as sets of (input, output) pairs with the
+usual set operations), a monoid (under composition), and they have a
+nontrivial isomorphism — the converse or inverse, which, unlike
+function inverses, is defined for all binary relations.
+
+One approach to programming with general binary relations would be to
+attempt a binary-relation-based pattern-matching version of
+miniKANREN, abandoning the ordering of the possibilities.  And that
+would be cool.
+
+Another approach would be to follow Icon (and Python and JS) in using
+these generators for iteration.  Io does this using no new operations,
+just a little bit of syntactic sugar for continuations.  Python, JS,
+and Icon do not allow multi-shot continuations; Python and JS, like
+Io, reify the suspended generator, while Icon usually does not,
+instead identifying the generator with the expression.  I’m not sure
+how many operations you really need to control the backtracking, but
+there are at least two: one that prevents further backtracking
+(Prolog’s cut) and one that backtracks repeatedly until no further
+backtracking is possible, then continues.

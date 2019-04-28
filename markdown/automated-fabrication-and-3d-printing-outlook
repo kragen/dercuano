@@ -1,0 +1,383 @@
+I think other kinds of automated fabrication might serve as well as 3D
+printing or better for general-purpose home use.
+
+There are several kinds of automated fabrication.  CNC machining is
+pretty important.  Lithography is pretty important; it’s how both ICs
+and printed circuit boards are made, and in one or another form it’s
+how almost all text and pictures get onto manufactured goods.  Robot
+welding has been a major part of fabricating many kinds of metal goods
+since the 1980s.  The first versions of CNC machining were
+cam-controlled, in the late 19th century; they were called “screw
+machines”.  After setup, you would feed them a piece of bar stock and
+they would conduct a programmable series of lathing operations on
+them, repeatedly, under the control of the cams, which is how screws
+have been made ever since then and why screws are cheap.
+
+The promise of 3D printing was, when 3D Systems was founded in 1986,
+that product designers could rapidly produce prototypes to experiment
+with, even if the cost was far too high to compete with mass-produced
+products.  My math teacher told the class about it in 1993; he’d seen
+a plastic apple produced by stereolithography.
+
+In 2005, Adrian Bowyer founded RepRap as a project to make automated
+fabrication accessible to the masses.  Its goal was to make
+“rapid-prototyping machines” so cheap that it’s cheaper to make things
+with them than with injection molding, by making them self-replicate.
+But it failed at that goal.
+
+Problems with RepRap-style 3-D printing
+---------------------------------------
+
+RepRap-style 3D printing — 3-axis gantry open-loop single-material FDM
+without a heated chamber — is really limited in what it can achieve
+for a variety of reasons.
+
+Most of these are problems that would not be serious if the printer
+could self-replicate at a low cost, as was the original goal — it
+could print a new version of itself that solved the problem.
+
+### Imprecision ###
+
+RepRap-style 3D printers typically have 100-micron errors even in the
+X and Y directions, and due to the nature of FDM, the Z-axis of each
+piece is quantized to typically between 250 and 500 microns, resulting
+in a stairstep appearance.
+
+This doesn’t sound like a lot, but it’s common for any ordinary
+subtractive machining operation to be carried out to 20-micron or
+10-micron precision, with 1-micron precision in areas that need it. An
+ordinary 600-dpi laser printer has 40-micron precision; an expensive
+2400-dpi printer has 10-micron precision. 1-micron feedback sensors
+are easily available, but RepRap-style printers don’t use them.  Why?
+I think it’s a design error, but I think the intention was to lower
+costs.
+
+The big problem with imprecision is that it makes the properties of
+the material unpredictable, because you get unpredictable layer
+adhesion.  Poor layer adhesion gives you a tiny fraction of the
+potential tensile strength of your material in the Z direction.
+
+Two of the main sources of poor layer adhesion are actually
+bed-leveling problems and filament diameter miscalibration.
+
+Recent RepRap-family printers have ceded somewhat on the
+open-loop-control front to do automatic bed leveling by touching down
+on each corner of the bed before starting the print, then twiddling
+the Z axis dynamically as the extruder moves around in X and Y to
+compensate for bed tilt.  This ensures that the first few layers
+deposited have a uniform thickness, greatly reducing layer adhesion
+problems.  Without bed leveling (either manual, using screws, or
+automatic as described above) it’s easy to have a bottom layer that’s
+squished flat on one side of a piece and barely touching the bed on
+the other, with lots of roundness in the deposited filament.
+
+Filament diameter miscalibration also affects layer thickness and
+dimensional precision; if the filament diameter is 10% smaller than
+expected (for example, 180 microns if your filament is 1.75 mm
+diameter, the most popular size), then the amount of plastic per
+linear millimeter is 21% smaller, and so the width of extruded traces
+will be 21% low, and you may get poor layer adhesion.  Many commercial
+filaments have significant diameter variations even within a single
+spool, and they are rarely perfectly round, making precise measurement
+difficult.
+
+Imprecision puts a severe limit on volumetric resolution.  I’m
+particularly interested in volumetric resolution because, for
+mechanical computation, that’s what counts — if a certain multiplier
+design requires 4 million voxels, then it will be 10.5 milliliters on
+a RepRap-style machine or 0.5 cubic millimeters (half a microliter) on
+a hypothetical 5-micron-resolution 3-D printer.
+
+### Material limitations ###
+
+With FDM without a heated chamber, your materials are basically
+limited to PLA, ABS, and nylon, and filled or colored versions of
+these.  (Except see below about PVA, elastomers, and PETG.)
+
+These materials are not all bad.  They come out of the machine
+sterilized, which is nice, and PLA and nylon are biocompatible; and
+the most interesting fillers I’ve seen are brass and fine sawdust,
+which give you the ability to produce objects that are mostly brass or
+wood.  PLA is very dimensionally stable, ABS is very strong, and nylon
+is very tough and easily accepts very large deformations (30%
+elongation at break is typical).
+
+But they do have many disadvantages.
+
+PLA is weak and brittle.
+
+But ABS and nylon offgas toxic fumes during printing, so you likely
+don’t want to print in them indoors without a good ventilation system.
+ABS also leaches toxic styrene when in contact with acid, so you can’t
+use it for food-contact applications.  You can’t use PLA for most
+food-contact applications, where you would expect it to shine due to
+its nontoxic nature; the problem is that it softens at a very low
+temperature, as low as 60°, even though you need at least 180° to
+extrude it.
+
+PLA is hygroscopic and aquadegradable, so by leaving a PLA spool
+exposed to air, you can run into big problems printing after a few
+weeks or months.  The water in the plastic can boil and make bubbles
+as it goes through the nozzle, or it can just degrade the plastic,
+making it even weaker and more brittle than it already is.
+
+ABS and nylon require high temperatures, like 210° and 240°
+respectively, which PLA can’t withstand; this is a problem if you
+switch from printing in nylon to printing in PLA, because you have to
+print at nylon temperatures until all the nylon is out of the nozzle,
+because it’s frozen solid at the usual PLA temperatures.
+
+ABS, because of its larger thermal shrinkage and high stiffness, has a
+terrible tendency to curl as it cools without an enclosed build
+chamber; worse, this depends on the ambient temperature, which means
+your ABS printing may be going fine all day and then fail during the
+night.  If it curls up off the bed, it can collide with the nozzle and
+be knocked entirely out of place, but even if that doesn’t happen, you
+can get delaminations which totally vitiate the strength of your
+print.
+
+PLA is vulnerable to glass-style fatigue; a piece of PLA held in a
+stressed position may crack through after weeks or months with no
+motion.  Glass does this too, but mostly only if it’s underwater.  In
+both cases there seem to be critical stresses below which the fatigue
+cracks don’t propagate.  Probably whether this happens to a given
+specimen of PLA depends in part on the amorphousness (glassiness) of
+the PLA, which in turn depends on the composition and cooling rate.
+
+I don’t have any experience printing in nylon, but it’s very soft,
+which limits its applications somewhat.  And the higher temperature
+makes the hotend fail more often.
+
+FDM prints unavoidably (?) come out with a stairstep surface because of
+Z-axis quantization.  If they are ABS, they can be smoothed by brief
+exposure to acetone vapor; this is harder to achieve with PLA, because
+PLA is invulnerable to almost all organic solvents.  People have had
+success using dichloromethane, which is outrageously toxic, and
+reportedly ethyl acetate, which is several times less toxic than table
+salt.  But the ethyl-acetate-based nail polish remover I tried didn’t
+do the job, it just swelled the plastic.  Other people just recommend
+painting the piece.
+
+Thermoplastic elastomers like “Filaflex”, “Ninjaflex”, and “Flexifil”
+are a promising new addition that I don’t have any real knowledge of;
+they don’t have the level of superelasticity that rubbers do.
+Ninjaflex is a thermoplastic polyurethane; I don’t know what the
+others are made of.  Supposedly Filaflex has 70% elongation at break,
+which is quite a bit more than nylon’s 30%, and Ninjaflex 660%, but
+neither equals an ordinary rubber band, which can easily hit 1000%.
+
+PETG filament, like Form Futura’s HDglass, is another newish product
+that claims to let you use FDM to fabricate transparent objects.  I
+don’t have any experience with it.  Being PETG, it ought to be
+food-safe, too.
+
+### Single-extruder limitations ###
+
+Standard RepRap-style machines have a single extruder nozzle, fed by a
+single filament, in order to lower the cost and improve reliability.
+That means it can only print in a single material at a time, and
+changing between materials is far from instant.  This creates a number
+of problems.
+
+Most obviously, unless you paint the piece, it’s a single solid color,
+or it’s the uncontrolled sequence of colors that the filament
+had — like when you knit with variegated yarn.
+
+I think the single-material limitation is the main thing that prevents
+RepRap replication from really taking off.  The single most
+failure-prone part of a RepRap-style printer is the hotend, and that’s
+the part it can’t print, because it’s made of brass, Teflon, Kapton,
+and a cartridge resistance heating element, which don’t melt at the
+temperatures it’s exposed to.
+
+(Somewhat less obviously, the hotend has a dimensional tolerance
+that’s tighter than RepRaps are usually capable of achieving: the
+diameter of the nozzle aperture.)
+
+Dual-extruder FDM printers are capable of doing several things that
+single-extruder models can’t manage, aside from being theoretically
+better suited to self-replication. One is printing objects that have
+controllable visible patterns on their surfaces. Another advantage is
+the ability to print support material in a soluble form: polyvinyl
+alcohol (PVA), a nontoxic water-soluble plastic that melts at a
+conveniently low temperature, is a favorite choice. But ABS, which
+easily dissolves in acetone, is a reasonable alternative for
+supporting PLA, which is invulnerable to acetone.
+
+Dissolvable support material is an enormous help in making
+preassembled mechanisms.  The usual RepRap-style support material has
+to be cut away from the finished piece using a knife, which requires
+manual intervention, leaves crap on the surface, and is difficult to
+impossible inside enclosed spaces.  Also, it’s easy to cut your hands
+that way.
+
+Here’s an example of [using a dual-extruder FDM machine][3] for
+dissolvable PVA support material.
+
+[3]: http://www.3ders.org/articles/20120128-dissolvable-support-material-used-for-3d-printing-gearbox-and-hilbert-cube.html
+
+Finally, there are a lot of kinds of machinery that inherently require
+two or more different materials to be deposited in intimate contact.
+Circuitry requires both conductors and insulators; PLA filled with
+graphite, lead, or more expensively, brass, silver, or gold, is
+totally adequate as a conductor for many circuits, but you need
+insulators too.  Electric motors could conceivably be 3-D printed, but
+as far as I can tell, practical motors need many thin layers of
+conductors, insulators, and high-magnetic-permeability materials.
+(Those are typically a poorly-conducting kind of steel, deposited in
+layers with insulating epoxy in between to reduce eddy-current
+losses.)
+
+Many of the more interesting possible applications of 3D printers are
+in metamaterials; by careful design of a repeating 3-D structure, for
+example, you can combime two materials with different thermal
+coefficients of expansion to get a bulk “metamaterial” with a TCE
+that’s orders of magnitude lower than either of the two “phases” or
+materials that compose it.  That’s super important for precision
+measurement, feedback, and control.
+
+### Self-replication problems ###
+
+As I said above, the single-extruder RepRap design is one of the major
+obstacles to self-replication.  You could imagine an alternative
+RepRap design that used two different materials for two different
+nozzles, plasticized using two separate mechanisms, such that either
+nozzle could print the other nozzle — for example, one material
+plasticized using heat, and the other plasticized with a solvent.
+
+But multiple extruders is not the only possible solution.
+
+You could also imagine a multi-step manufacturing process, where for
+example you first use FDM to fabricate a shape in PLA, then make a
+plaster cast around the PLA and use it to cast, for example, brass.
+You can find videos of people doing this on YouTube (“lost PLA
+process”).
+
+Or first you fabricate a shape in stainless-steel-filled PLA, and then
+you sinter it in an oven, or something.  There are 3-D printing
+companies that do this with selective laser melting of
+stainless-filled thermoplastic.
+
+Or you could use a material whose cradle-to-cradle life cycle includes
+more than two steps like PLA’s melting and hardening.  Plaster of
+Paris, for example, which you can deposit as a thixotropic liquid
+freshly mixed from powder and water, then allow it to harden.  The
+full cradle-to-cradle process for plaster of Paris involves calcining
+the resulting hydrated gypsum at 150° to 180° and then grinding the
+resulting calcium sulfate hemihydrate to a fine powder.  As long as
+the “nozzle” isn’t doing the calcining, it won’t have any trouble
+making an alternate nozzle.  Which is a good thing, because once you
+let plaster harden in the nozzle, you’ll need to replace it.
+
+A fully autonomous self-replicating system will probably need to be
+able to make ceramics from clay and fire them, because essentially all
+industrial processes depend on ceramics.  This might be a good place
+to start.
+
+### Open-loop stepper-motor actuation ###
+
+RepRap-style printers use open-loop stepper-motor control.  This
+results in three problems: imprecision, cost, and unreliability.
+
+Open-loop stepper motors have poor precision (or, let’s say, poor
+bandwidth) for reasons I don’t fully understand.  This is one of the
+sources of the problems in the “Imprecision” section above.
+
+The beefy NEMA 23 or NEMA 17 stepper motors used in a RepRap are rare
+to find at salvage and quite expensive to buy new, because they’re
+mostly used in industrial machinery, not consumer goods.  Older 2-D
+printers used steppers, but much wimpier ones; newer ones use DC
+motors with closed-loop control.
+
+The printer uses such large motors because the motors have to be
+strong enough to move the dynamic loads of the printer with basically
+no effort, because they cannot adjust the effort to the load without
+feedback.  (A certain limited amount of feedback is provided by the
+variation in slip in the stepper.)
+
+Finally, steppers add unreliability, because if the printer ever
+encounters resistance and misses a step, all subsequent movements will
+be offset by the missed step, resulting in a failed print, typically
+spaghetti.
+
+### That stupid gantry geometry ###
+
+The gantry construction of RepRap-style printers amplifies the problem
+of imprecision.
+
+Traditional CNC machine tools use a "gantry" geometry in which
+high-rigidity linear actuators at precisely aligned right angles
+determine the relative positioning of the workpiece and the cutting
+tool.  With a gantry, you can make precisely parallel and right-angled
+cuts by hand, without doing a lot of numerical calculation.  But
+gantries require immensely stiff beams and joints to achieve
+reasonable precision, linear slides (which are difficult to make and
+even more difficult to make precise), and linear actuation, which
+typically adds backlash and therefore imprecision.
+
+Fortunately, less stupid geometries are coming into fashion, including
+deltabots, parallel SCARA topologies, and polar robots.
+
+Gantry construction synergistically causes problems with open-loop
+control, because the precision of open-loop control depends critically
+on rigidity, since the open-loop control can’t correct for mechanical
+deformation any more than it can correct for missed steps.
+
+My favorite robot geometry, the Stewart platform, has not become
+popular.
+
+Emerging alternatives to RepRap-style 3-D printing
+--------------------------------------------------
+
+CNC laser cutters are actually far more accessible than 3D printers
+today, in the sense that there is likely a CNC laser cutter physically
+closer to you that you can use, and if you make something on it, it
+will cost you a lot less than doing the same thing on a 3D printer.
+It’s just that it’s limited to planar fabrication (as are CNC plasma
+torch tables, CNC waterjet cutters, and lithography per se.
+
+Things like the [Othermill][0] at US$2200 are only a little more
+expensive than RepRap-descended 3D printers; the [PocketNC FR4][1] is
+a fully-funded Kickstarter for a US$449 three-axis CNC milling
+machine, which is cheaper than many 3-D printers.  The FR4 is milled
+from epoxy-glass-fiber composite circuit boards, which are very rigid,
+light, and cheap, compensating for its stupid gantry geometry (see
+below for the problems with gantries).
+                 
+[0]: https://othermachine.co/store/othermill/
+[1]: https://www.kickstarter.com/projects/1090944145/fr4-machine-shield
+
+You can see that this FR4 is capable of reproducing its own circuit
+boards and the parts of its own structure, and has 5-micron precision
+in all three axes.  That is about 20×20×50 = 20000 times better
+volumetric resolution than any open-loop-control FDM 3D printer.
+
+[Norbert Heinz][2] built his 100-micron-resolution CNC machine
+entirely out of recycled junk, including closed-loop control of the
+underpowered DC motors he used.  In that video you can see him using
+it to engrave glass with a diamond cutter, cut Styrofoam with a
+soldering iron, and mill gears from acrylic or aluminum, all of which
+are materials that are out of reach with FDM.
+
+[2]: http://youtu.be/mJ-TZvFpY58
+
+With FDM, you can’t make anything transparent, anything as strong as
+glass or acrylic or aluminum, or anything as light as Styrofoam.  And,
+at the 100μm precision achieved by both Norbert’s junk heap and a
+thousand-dollar FDM 3-D printer using open-loop control, your gear
+surfaces suck, and you need a lot of extra clearance to print
+preassembled gear assemblies.  (Although, of course, with CNC cutting,
+you can’t print anything preassembled.)
+
+Norbert’s machine is 500×500×?? mm rather than the 200×200×150 of a
+typical RepRap-derived 3D printer, so it can make things that are
+about ten times as big.
+
+[Michal Zalewski has written][4] is a superb introductory guide to CNC
+machining and resin casting.  Remember what I said about a multi-step
+manufacturing process?  His multi-step process is that he cuts a mold
+or a positive, casts a mold if necessary, and then casts the part.  He
+gets 2-micron accuracy.
+
+[4]: http://lcamtuf.coredump.cx/gcnc/full
+

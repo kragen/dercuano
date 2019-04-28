@@ -1,0 +1,300 @@
+Could you design a simple virtual machine for vector math that a wide
+range of existing and future vector hardware (SIMD instruction sets,
+GPUs, FPGAs) could execute efficiently?  A sort of equivalent for C’s
+virtual machine (viewing C as a virtual machine!) but aimed at things
+that can execute efficiently across a wide range of today’s computers,
+not 1984’s — a lowest common denominator
+that’s low enough to get substantial parallelism on
+almost anything, but not so low that typical code is as slow as
+typical C code.
+
+I think it’s feasible.
+
+Of course, nonportable code will always be faster, but the idea of the
+vector VM is to be fast enough to use portable code most of the time.
+
+I was originally thinking of this approach as part of an archival
+virtual machine proposal, a successor to Chifir sufficiently improved
+to be workable, whose raison d’être was archaeological in nature — the
+objective is for an archaeologist finding the artifact to be able to
+implement the specified virtual machine as a fun afternoon hack, then
+load the ancient data into it and breathe life back into it.  I
+thought maybe a pipelined vector design could work, but upon further
+consideration, I decided it wasn’t well suited to compatible
+reimplementations without reference to an existing working
+implementation.
+
+Still, though, I think it might be interesting for less demanding
+purposes, the sort of thing OpenCL and Vulkan are aimed at.  It’s sort
+of a microscopic SPIR-V with about 30 operations, or a VM for Wadge’s
+Lucid.
+
+Unfinished notes
+----------------
+
+Old Cray machines weren’t parallel-SIMD, where you could add,
+subtract, multiply, take the square root, or whatever of each of 4 or
+8 or 16 values in a single cycle; instead they had some 8 “vector
+registers” of, say, 64 single-precision floats, and vector operations
+on them which operated elementwise.  But the machines didn’t have 64
+floating-point execution units; they might have 6.  So a
+vector-to-vector operation necessarily took place one float at a time,
+but pipelined, with one result per cycle.  Moreover, you could “chain”
+operations from one register to the next, and even to main memory.
+So, for example, you might compute mx + b, for vector values of the
+variables, as follows:
+
+    vectorload m_addr, V1
+    vectorload x_addr, V2
+    vectorload b_addr, V4
+    vectormul V1, V2, V3
+    vectoradd V3, V4, V5
+    vectorstore V5, y_addr
+    
+So with six instructions you would start the computation of the
+values, and then it might take 64 more clock cycles to finish.  This
+is how the Cray-1 got 138 megaflops, bursting to 240 megaflops, in
+1977, on an 80MHz clock.
+
+It’s also very similar to how Numpy gets reasonable performance for
+numerical code despite being an extension for dog-slow CPython.  This,
+plus Python’s “iterable” interface (now adopted by JS and Java),
+suggests the approach of computing abstract sequences of values (of
+some arbitrary length) rather than individual values or vector values
+of some fixed length, and including a stride argument in the vector
+memory fetch instruction.
+
+Consider a matrix-matrix multiply C = AB.  Here, in C-style row-major
+form (which is backwards from standard mathematical notation) C[i][j]
+= Σₖ A[i][k] B[k][j], or Cᵢⱼ = ΣₖAᵢₖBₖⱼ; writing that as nested loops:
+
+    C = {0}; // everywhere (this is not valid C syntax)
+    for (int i = 0; i < A_rows; i++) {
+        for (int j = 0; j < B_rows; j++) {
+            for (int k = 0; k < A_cols; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+
+Thus written, the code is precisely equivalent if we swap inner and
+outer loops into any of the 6 permutations.  As written, it totals
+each item of C separately, iterating over a column of A and a row of B
+for each one; but we could also, for example, multiply a cell of A by
+a row of B, sending the results to the corresponding row of C, merely
+by swapping the inner two loops:
+
+    C = {0};
+    for (int i = 0; i < A_rows; i++) {
+        for (int k = 0; k < A_cols; k++) {
+            for (int j = 0; j < B_rows; j++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+
+That is, Cᵢ = ΣₖAᵢₖBₖ.
+
+We could turn the inner loop here into a program that reads a vector
+from memory, multiplies it by a scalar (previously loaded from A),
+reads another vector from memory (the row of C), adds the product to
+it, and writes it back where it came from.
+
+In the case where C has many more rows than columns, though, it would
+be more efficient to write a column at a time.  This is the same kind
+of simple transformation:
+
+    C = {0};
+    for (int j = 0; j < B_rows; j++) {
+        for (int k = 0; k < A_cols; k++) {
+            for (int i = 0; i < A_rows; i++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+
+That is, C[...][j] = Σₖ B[k][j]·A[...][k].  Here we are updating a
+whole column of C by adding to it the product of a scalar from B and a
+column of A.
+
+This is of course not optimally cache-friendly (something the Crays
+didn’t have to worry about) but it still might be a win if C has a
+sufficiently small number of columns.
+
+Building a dataflow network on the stack
+----------------------------------------
+
+So suppose that we have a stack machine equipped with an additional
+stack where the items are not numbers but streams of some finite but
+possibly large length.  By manipulating these streams, we can set into
+motion highly parallelizable computations which may involve orders of
+magnitude more computation than that required to interpret the
+instruction stream.  The virtual machine does not know about
+multidimensional arrays, but it can efficiently execute some
+computations on them.
+
+The crucial thing to note here is that the stream operations here
+treat different indices in the stream as completely separate; there is
+no way for anything that happens at index 0 in the stream to affect
+anything that happens at index 1 in the stream, or vice versa.  So the
+execution of the entire stream is embarrassingly parallel.  Whether
+that’s useful or not depends on what you’re trying to compute.
+
+### Sources ###
+
+There are two operations which create a new sequence: `load(address,
+mode, stride, count)` and `iota(start, stride, count)`.  (They can
+take their arguments from, for example, a different stack.)  `load`
+produces a sequence of `count` items loaded from memory using `mode`
+(e.g. uint32_t or `float*8`) located `stride` bytes apart; if `stride`
+is 0, then all of them will be copies of the same value.  `iota`
+similarly produces a series of `count` items; the first will be the
+number `start`, and succeeding items will increase by `stride`, which
+may be 0.
+
+The span of addresses that will be accessed by `load` can be
+bounds-checked as soon as the `load` instruction executes, allowing
+the bounds check to be amortized over a potentially very large number
+of data accesses.
+
+### Sinks ###
+
+There are correspondingly a few different final destinations we can
+send these streams to.
+
+`store(address, mode, stride, count)` is the counterpart of `load`; it
+stores the values of a stream into memory.  With `load` and `store` we
+can copy blocks of data around memory, translate it between different
+numeric formats, and transpose matrices by using different strides.
+
+`argmax` and `argmin` each take two streams as arguments: an `index`
+stream and a `data` stream, which should be of the same length.  When
+the streams are exhausted, they yield the `index` value corresponding
+to the largest or smallest datum from the `data` stream.  If the
+`index` and `data` streams are the same, they thus produce the max or
+min of the stream.
+
+`sum`, similarly, computes the sum of a stream.
+
+### Stream transformations ###
+
+However, there are also a large collection of operations that operate
+elementwise on streams.  For example, the `~` operation computes the
+bitwise NOT of the values in a stream, consuming the stream and
+producing a new stream of the altered values.  The `+` operation
+consumes two streams (which should be of the same length) and produces
+a new stream of the sums of corresponding values from those streams.
+
+The collection of stream transformations consists of the following 16
+operations:
+
+- `+`;
+- unary `-`, which computes the numeric negation of each item in the
+  stream;
+- binary `-`, which subtracts streams elementwise;
+- `*`, which multiplies streams elementwise;
+- `divmod`, which consumes a stream of dividends and a stream of
+  divisors, and produces a stream of floored quotients and a stream of
+  nonnegative remainders;
+- `<<`, which consumes a stream of quantities and a stream of bit
+  shift distances, performing an arithmetic left shift on each
+  quantity;
+- `>>`, which is the equivalent right-shift — a logical right shift
+  for unsigned quantities, an arithmetic right shift for signed;
+- `|`, which computes the bitwise OR of two streams;
+- `&`, which computes the bitwise AND;
+- `^`, which computes the bitwise XOR;
+- `~`;
+- `\`, which computes the bitwise abjunction `(a & ~b)`;
+- `<`, which consumes two streams and produces a stream of boolean
+  values which is true when the value from the first stream is less
+  than the corresponding value from the second;
+- `=`, the same except that it tests for equality;
+- `?:`, which consumes a stream of booleans and two streams of
+  quantities, producing a single output stream; its values are
+  quantities from the first stream when the booleans are true, and
+  from the second stream when the booleans are false;
+- `⌈`, which combines two streams to produce a stream of values that
+  come from the first stream when those are greater, or from the
+  second stream when those are.
+
+### Stream stack manipulation ###
+
+You also have the usual collection of simple stack operations for the
+stream stack — `dup`, `drop`, `swap`, `over`, `rot`, `>R`, `R@`, and
+`R>`.
+
+These are particularly important here because of their effect on the
+stream execution engine.  While references to a dataflow network are
+live on the stack, the engine doesn’t yet know what use will be made
+of them; it is only once the last reference has been removed from the
+stack that it can actually execute the requested computation.  If they
+are `drop`ped, perhaps it need not do any computation at all.
+
+XXX what happens if you request the sum or argmax of a stream while
+other references are still live on the stack?  Maybe just eliminate
+`dup` and `over`, because the alternative seems to be unbounded
+buffering.
+
+### Why a stream stack ###
+
+Why use a stack machine for building the streams instead of, say, a
+register-based virtual machine?  Don’t register-based bytecodes run
+faster?
+
+The advantage of a stack machine is that the number of uses of each
+value is explicit, while in a register machine, it is implicit.  If
+you have no `drop` operation or other way to discard a value, you know
+that all values are used; if you additionally have no `dup` or `over`
+or `R@` operation or other way to duplicate a value, you know that
+each value is used exactly once.  The point at which no more
+references to a particular tree exist on the stack is precisely the
+point when it will not be used in the future.
+
+Perhaps you could design a two-operand register machine with the same
+property, if each register has an “empty”/“full” bit like the memory
+words of the Tera MTA, such that using a register as a “source”
+operand optionally “empties” it, and reading from “empty” registers or
+moving to “full” registers is not permitted.
+
+But a stack machine seems like a much simpler route to the same goal.
+
+### Okay actually fuck all this ###
+
+So what you actually want is to construct a dataflow graph from a
+sequence of inputs to an equal-size sequence of outputs.  And you want
+to do that while ensuring that your dataflow graph is acyclic, not
+only in the directed form but in the undirected form as well.
+(There’s no good reason for that restriction, but I did talk about
+imposing it, at least possibly.)  And then you want to launch it to go
+process stuff and then maybe get results.
+
+In that case, wouldn’t it be best to separate the graph construction
+and graph execution steps?  And in that case, wouldn’t it be best to
+be able to execute the same graph more than once?  In my matrix
+multiplication example, for example, you want to run your inner loop
+m×n times (e.g. `A_rows` × `A_cols` times).  There’s no benefit to
+reconstructing the graph again every time through the inner loop!
+
+Separating them also eliminates the problem of making sure all the
+lengths are equal — you supply the length, along with the input and
+output data addresses and strides, when you invoke the graph.  And it
+eliminates the question of what to do when you invoke the `sum`
+instruction but there are still things left on the stack, because the
+sum won’t be delivered at graph construction time in any case, but at
+graph invocation time.
+
+(And in that case maybe when you instantiate the sum node, you give it
+a destination register, so that you can have several of them in the
+same graph.)
+
+Getting back to the question of “a sort of equivalent for C” — is a
+stack-based virtual machine really the same level of programming as C?
+Wouldn’t you want infix syntax for programming at C level?  Why do you
+need some kind of bytecode representation of your vector dataflow
+graph?  Wouldn’t you be better off with a language extension for C, or
+maybe even a C library?  And in that case, wouldn’t you be better off
+with explicit node labels of some kind instead of this dopey
+stack-machine interface?  I mean, it would be a lot easier to read
+your code, probably, even if infix is too hard to provide because C
+doesn’t do operator overloading.

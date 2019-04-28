@@ -1,0 +1,298 @@
+Programs compiled with Ur-Scheme are about five times slower than
+similar programs compiled with GCC.  TCC is broadly similar.
+
+It occurred to me that a big part of Ur-Scheme's slowness is probably
+its complete lack of register allocation.  It treats the i386 as a stack
+machine with the top of stack in %eax.  And so it occurred to me that
+even the dumbest register allocator would probably provide a big
+speedup, maybe up to a slowdown of less than 2.
+
+What's the dumbest register allocator that might give you reasonable
+performance?  Well, on amd64, as I understand it, you have 16
+general-purpose registers, but one of them is the stack pointer.  You
+could statically allocate 8 of these registers to local variables (the
+first 8 local variables) and 7 of them to an expression evaluation stack
+which is empty in between statements, assuming you have statements and
+that control flow is a per-statement thing.  Then you can allocate the
+slots on the expression evaluation stack at compile time and spill to
+memory if your evaluation gets too deep.
+
+I feel like that would probably work well enough, and it would be very
+simple to implement.
+
+On i386, you don't have as many registers.  You could have 4 levels of
+expression evaluation and 3 local variables held in registers.
+
+Context: how well do programs get optimized?
+--------------------------------------------
+
+Here's a Karplus-Strong string synthesis program I wrote in C, something
+over a year ago, in golfed form:
+
+    enum{n=72};s[n]={1<<15},i;main(){void*o=popen("aplay","w");
+    for(i=0;i<1<<14;i++)fputc((s[i%n]=s[i%n]*.9+s[(i+1)%n]*.1)>>8,o);}
+
+Here's a deobfuscated version of the main loop:
+
+    for (i=0; i < 1<<14; i++) {
+        int j = i % n, k = (i+1) % n;
+        s[j] = s[j]*.9 + s[k]*.1;
+        fputc(s[j] >> 8, output);
+    }
+
+`n` here is 72, and `s` starts out with just an impulse in it.  (If
+you're not familiar with KS synthesis, the weighted averaging of two
+samples there serves as a gentle low-pass IIR filter, attenuating all
+frequencies but especially the highest frequencies, while feeding the
+signal back into the delay line after 72 samples limits the original
+harmonic content to harmonics of 8000 Hz / 72 = 111 Hz, and the result
+sounds exactly like the string of a six-string guitar.)
+
+I feel like this is a relatively typical piece of C code in some ways.
+It has a for loop comparing against a constant expression that can be
+folded, some array accesses and a function call inside the loop, some
+floating point and integer math, some strength-reduction opportunities,
+and a local variable (or two, although `i` is technically a global).
+
+So how badly does TCC do on this program?
+
+First, what's our gold standard?  It's actually pretty terrifying, both
+in terms of the optimizations achieved and the optimizations missed.  On
+i386, here's a commented disassembly of the 48 instructions gcc 4.8.4
+emits for the main loop with -O:
+
+     804847d:	89 c6                	mov    %eax,%esi
+     # This is the address of i; we are initializing it with 0.
+     804847f:	c7 05 64 a1 04 08 00 	movl   $0x0,0x804a164
+     8048486:	00 00 00 
+     # And we also have i in %edi at the top of the loop.
+     8048489:	bf 00 00 00 00       	mov    $0x0,%edi
+     # This magic number is the approximate multiplicative inverse of
+     # 72.  72 times this number is 0x10,0000,0008.  That means that if
+     # you multiply some 32-bit integer X by 0x38e38e39, then the high
+     # word of the 64-bit result will contain the number divided by 72,
+     # shifted four bits to the left.  So, for example, 0x38e38e39L *
+     # 146 >> 36 = 2L.  So we save it in %ebx so we can multiply by it
+     # in order to divide.  Multiplying is usually much faster than
+     # division.
+     804848e:	bb 39 8e e3 38       	mov    $0x38e38e39,%ebx
+    mainloop:
+     8048493:	89 f8                	mov    %edi,%eax
+     # Now we divide %eax by 72 by multiplying it by the magic number in
+     # %ebx.  %eax is the implicit argument of a one-argument imul in
+     # i386.  I guess this means i was in %edi and %eax.
+     8048495:	f7 eb                	imul   %ebx
+     # The high dword of the result is in %edx, so put it in %ecx.
+     8048497:	89 d1                	mov    %edx,%ecx
+     # Eliminate those 4 extra bits on its low end so %ecx contains %eax/72.
+     8048499:	c1 f9 04             	sar    $0x4,%ecx
+     # Another copy of i goes into %eax.
+     804849c:	89 f8                	mov    %edi,%eax
+     # Now we shift it 31 bits to the right, which means we are saving
+     # off just its sign bit, which is a little bit stupid because it's
+     # statically fairly trivial that it's always positive.
+     804849e:	c1 f8 1f             	sar    $0x1f,%eax
+     # Now we do some kind of negative-number correction to our quotient
+     # in %ecx with this.  This amounts to a no-op.
+     80484a1:	29 c1                	sub    %eax,%ecx
+     # Now we magically multiply %ecx (i/72) by 9 and put the result in
+     # %eax.
+     80484a3:	8d 04 c9             	lea    (%ecx,%ecx,8),%eax
+     # Then we shift it three more fucking bits, so guess what, now
+     # we've multiplied it by fucking 72.  GCC factored 72 into 8*(8+1)
+     # in order to multiply it with two obscure instructions instead of
+     # just using an imul.  Now %eax is going to contain (i/72)*72,
+     # which is to say, i-(i%n).
+     80484a6:	c1 e0 03             	shl    $0x3,%eax
+     # Now we get another copy of i into %ecx.
+     80484a9:	89 f9                	mov    %edi,%ecx
+     # And now at last we compute i%n in %ecx, which took 11
+     # instructions.  This is the number I called "j" above.
+     80484ab:	29 c1                	sub    %eax,%ecx
+     # Now we load the integer at s[j] (s[i%n]) as a floating-point
+     # number.
+     80484ad:	db 04 8d 40 a0 04 08 	fildl  0x804a040(,%ecx,4)
+     # This isn't in the listing but I bet the constant 0.9 is stored
+     # there.
+     80484b4:	dc 0d d8 85 04 08    	fmull  0x80485d8
+     # Now we increment i, which makes a certain amount of sense because
+     # now we have to compute s[k], and we aren't going to use i again.
+     80484ba:	83 c7 01             	add    $0x1,%edi
+     # Oh boy, here we go again.  Compute k as (new i) % n in another 11
+     # instructions, except now it's in %edi.
+     80484bd:	89 f8                	mov    %edi,%eax
+     80484bf:	f7 eb                	imul   %ebx
+     80484c1:	c1 fa 04             	sar    $0x4,%edx
+     80484c4:	89 f8                	mov    %edi,%eax
+     80484c6:	c1 f8 1f             	sar    $0x1f,%eax
+     80484c9:	29 c2                	sub    %eax,%edx
+     80484cb:	8d 04 d2             	lea    (%edx,%edx,8),%eax
+     80484ce:	c1 e0 03             	shl    $0x3,%eax
+     80484d1:	29 c7                	sub    %eax,%edi
+     # Compute the weighted sum, multiplying by a different constant in
+     # memory, presumably 0.1.
+     80484d3:	db 04 bd 40 a0 04 08 	fildl  0x804a040(,%edi,4)
+     80484da:	dc 0d e0 85 04 08    	fmull  0x80485e0
+     80484e0:	de c1                	faddp  %st,%st(1)
+     # Truncate the result back to an int by way of storing it in the
+     # stack frame and loading it into %eax.
+     80484e2:	d9 7c 24 0e          	fnstcw 0xe(%esp)
+     80484e6:	0f b7 44 24 0e       	movzwl 0xe(%esp),%eax
+     # Okay, I have no idea what is going on here, except that it
+     # results in storing the new value of s[j] at 0x8(%esp) and also in
+     # %eax.  Somehow this involves overwriting the high byte of
+     # some 16-bit number with 0xc!?
+     80484eb:	b4 0c                	mov    $0xc,%ah
+     80484ed:	66 89 44 24 0c       	mov    %ax,0xc(%esp)
+     80484f2:	d9 6c 24 0c          	fldcw  0xc(%esp)
+     80484f6:	db 5c 24 08          	fistpl 0x8(%esp)
+     80484fa:	d9 6c 24 0e          	fldcw  0xe(%esp)
+     80484fe:	8b 44 24 08          	mov    0x8(%esp),%eax
+     # Now we store the result into s[j]; %ecx still has j in it, and
+     # 0x804a040 is the base address of s, as indicated by its use above
+     # in the fildls.
+     8048502:	89 04 8d 40 a0 04 08 	mov    %eax,0x804a040(,%ecx,4)
+     8048509:	89 74 24 04          	mov    %esi,0x4(%esp)
+     # Here we shift the s[j] result in %eax right by 8 bits and "push
+     # it" in order to call fputc with it.
+     804850d:	c1 f8 08             	sar    $0x8,%eax
+     8048510:	89 04 24             	mov    %eax,(%esp)
+     8048513:	e8 38 fe ff ff       	call   8048350 <fputc@plt>
+     # Now we ignore fputc's return value and load the value of i again
+     # from memory and increment it, again.  fputc could have changed
+     # it, after all, since it's a global variable.
+     8048518:	a1 64 a1 04 08       	mov    0x804a164,%eax
+     804851d:	8d 78 01             	lea    0x1(%eax),%edi
+     # Save the incremented value to memory.  You never know, fputc
+     # could be reading a global variable.
+     8048520:	89 3d 64 a1 04 08    	mov    %edi,0x804a164
+     # Check to see if the loop is done.  It's interesting that the <
+     # test got turned into a <= test.
+     8048526:	81 ff ff 3f 00 00    	cmp    $0x3fff,%edi
+     804852c:	0f 8e 61 ff ff ff    	jle    8048493 <main+0x36> (mainloop)
+
+All right, so we can see GCC missed a *lot* of optimization
+opportunities there, although some of them were missed by the perverse
+choice to make i a global variable.  But it did manage to compute i%72
+without using any division instructions.  It also manages to keep j and
+k in registers and avoid recomputing j --- common subexpression
+elimination.  And the control flow is nice and clean, just a single
+conditional jump instruction at the end, because it can statically check
+that the loop will execute at least once.
+
+How does TCC do?  It's a bit messier but somewhat more straightforward,
+as you'd expect. tcc 0.9.25 emits 67 instructions:
+
+    # Initialize i to 0.  Note the unnecessary indirection through a
+    # register that isn't used afterwards.
+         242:	b8 00 00 00 00       	mov    $0x0,%eax
+         247:	89 05 00 9f 04 08    	mov    %eax,0x8049f00
+    looptest:
+    # Load i from memory and check it.  This is at the top of the loop
+    # so that it can run zero times if necessary.
+         24d:	8b 05 00 9f 04 08    	mov    0x8049f00,%eax
+         253:	81 f8 00 40 00 00    	cmp    $0x4000,%eax
+         259:	0f 8d c8 00 00 00    	jge    0x327 (exitloop)
+         25f:	e9 11 00 00 00       	jmp    0x275 (loopbody)
+    mainloop:
+    # This is "i++".  Neither %eax nor %ecx is used afterwards.  I have
+    # no idea why it makes a copy in %ecx.
+         264:	8b 05 00 9f 04 08    	mov    0x8049f00,%eax
+         26a:	89 c1                	mov    %eax,%ecx
+         26c:	40                   	inc    %eax
+         26d:	89 05 00 9f 04 08    	mov    %eax,0x8049f00
+         273:	eb d8                	jmp    0x24d (looptest)
+    loopbody:
+    # Load i from memory.
+         275:	8b 05 00 9f 04 08    	mov    0x8049f00,%eax
+         27b:	b9 48 00 00 00       	mov    $0x48,%ecx   # 0x48 == 72 == n
+         280:	99                   	cltd                # clears %edx?
+    # implicitly divides %edx:%eax by its operand; remainder is in %edx,
+    # quotient in %eax.
+         281:	f7 f9                	idiv   %ecx         
+    # Shift the quotient left two bits to use it to index dwords.
+         283:	c1 e2 02             	shl    $0x2,%edx
+    # Load base address of s into %eax and index it.
+         286:	b8 44 9d 04 08       	mov    $0x8049d44,%eax
+         28b:	01 d0                	add    %edx,%eax
+    # Save the pointer into a temporary in the stack frame.  This is
+    # where we are going to store the result of the weighted sum.
+         28d:	89 45 f8             	mov    %eax,-0x8(%ebp)
+    # Load i from memory again.  This is the common subexpression s[i%n]
+    # not being eliminated.
+         290:	8b 05 00 9f 04 08    	mov    0x8049f00,%eax
+         296:	b9 48 00 00 00       	mov    $0x48,%ecx
+         29b:	99                   	cltd   
+         29c:	f7 f9                	idiv   %ecx
+         29e:	c1 e2 02             	shl    $0x2,%edx
+         2a1:	b8 44 9d 04 08       	mov    $0x8049d44,%eax
+         2a6:	01 d0                	add    %edx,%eax
+    # Load from s[i%n] into %ecx, then into a floating-point register by
+    # way of the stack, since that's apparently how we do things.
+         2a8:	8b 08                	mov    (%eax),%ecx
+         2aa:	51                   	push   %ecx
+         2ab:	db 04 24             	fildl  (%esp)
+    # Pop it back off.
+         2ae:	83 c4 04             	add    $0x4,%esp
+    # Store the floating-point version of s[j] in an on-stack temporary?
+         2b1:	dd 55 f0             	fstl   -0x10(%ebp)
+    # Not sure what's going on here.
+         2b4:	dd d8                	fstp   %st(0)
+         2b6:	dd 05 6c 9e 04 08    	fldl   0x8049e6c
+         2bc:	dc 4d f0             	fmull  -0x10(%ebp)
+    # Okay, now we load i from memory again, increment it, and divide it
+    # to compute (i+1)%n.
+         2bf:	8b 05 00 9f 04 08    	mov    0x8049f00,%eax
+         2c5:	40                   	inc    %eax
+         2c6:	b9 48 00 00 00       	mov    $0x48,%ecx
+         2cb:	99                   	cltd   
+         2cc:	f7 f9                	idiv   %ecx
+    # And then again we index off s.
+         2ce:	c1 e2 02             	shl    $0x2,%edx
+         2d1:	b8 44 9d 04 08       	mov    $0x8049d44,%eax
+         2d6:	01 d0                	add    %edx,%eax
+    # Wait, what are we doing with the FPU?
+         2d8:	dd 55 e8             	fstl   -0x18(%ebp)
+         2db:	dd d8                	fstp   %st(0)
+    # Okay, load s[k]
+         2dd:	8b 08                	mov    (%eax),%ecx
+         2df:	51                   	push   %ecx
+         2e0:	db 04 24             	fildl  (%esp)
+         2e3:	83 c4 04             	add    $0x4,%esp
+    # I don't know what's going on here either.
+         2e6:	dd 55 e0             	fstl   -0x20(%ebp)  # ???
+         2e9:	dd d8                	fstp   %st(0)       # ???
+         2eb:	dd 05 74 9e 04 08    	fldl   0x8049e74    # Maybe 0.1?
+     # But this looks like the weighted sum.
+         2f1:	dc 4d e0             	fmull  -0x20(%ebp)
+         2f4:	dc 45 e8             	faddl  -0x18(%ebp)
+         2f7:	d9 2d 7c 9e 04 08    	fldcw  0x8049e7c  # ???
+         2fd:	81 ec 04 00 00 00    	sub    $0x4,%esp
+     # Store the weighted-sum result at the stack pointer.
+         303:	db 1c 24             	fistpl (%esp)
+         306:	d9 2d 7e 9e 04 08    	fldcw  0x8049e7e  # ???
+     # And now load it into %eax.
+         30c:	58                   	pop    %eax
+    # Load the pointer where we are going to save the result (stored at
+    # 0x28d above) into %ecx.
+         30d:	8b 4d f8             	mov    -0x8(%ebp),%ecx
+    # Save the result.
+         310:	89 01                	mov    %eax,(%ecx)
+    # Shift the result before emitting it with fputc.  Note that we
+    # don't load it from memory again.
+         312:	c1 f8 08             	sar    $0x8,%eax
+    # Load o into %ecx to push it.
+         315:	8b 4d fc             	mov    -0x4(%ebp),%ecx
+         318:	51                   	push   %ecx
+         319:	50                   	push   %eax
+         31a:	e8 f1 09 00 00       	call   0xd10     # fputc
+         31f:	83 c4 08             	add    $0x8,%esp # pop fputc args
+         322:	e9 3d ff ff ff       	jmp    0x264 (mainloop)
+    exitloop:
+         327:	c9                   	leave  
+         328:	c3                   	ret    
+
+The only real optimization TCC managed here was to keep a value in a
+register, once, and constant-fold the loop bound.  It didn't attempt
+common subexpression elimination, and its FPU code is relatively
+horrible.

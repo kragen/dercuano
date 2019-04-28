@@ -1,0 +1,230 @@
+It’s 2018-12-25, and xshmu is about 1800 lines of code (70 kilobytes),
+and overdue for its first refactoring.  So far it has a terminal
+emulator, a calculator application, a Tetris game, an audio
+oscilloscope app, some graphics demos, a Chifir virtual machine, and a
+couple of sort-of paint programs, with backends for the Linux
+framebuffer console and X11:
+
+     4105 admu.c
+     4128 admu_shell.c
+     1310 admu_tv_typewriter.c
+     3936 chifir.c
+     1338 chifir_xshmu.c
+     2335 decimal.c
+      484 decimal.h
+     1562 glyphed.c
+     2235 oscope.c
+     6909 rpncalc.c
+      375 rpncalc.h
+     7385 tetris.c
+     6778 wercaμ.c
+    13218 xshmu.c
+     1899 xshmucalc.c
+     6056 xshmu_fb.c
+     4939 xshmu.h
+      134 xshmu_hello.c
+      525 xshmunch.c
+      810 μpaint.c
+    $ cloc μpaint.c xshmu.c xshmunch.c chifir.c chifir_xshmu.c wercaμ.c \
+        admu_tv_typewriter.c admu.c admu_shell.c xshmu_hello.c tetris.c \
+        xshmu_fb.c glyphed.c oscope.c \
+        xshmucalc.c rpncalc.c decimal.c decimal.h rpncalc.h xshmu.h
+          20 text files.
+          20 unique files.                              
+           0 files ignored.
+
+    http://cloc.sourceforge.net v 1.60  T=0.06 s (350.7 files/s, 44744.5 lines/s)
+    -------------------------------------------------------------------------------
+    Language                     files          blank        comment           code
+    -------------------------------------------------------------------------------
+    C                               17            299            308           1786
+    C/C++ Header                     3             31             74             54
+    -------------------------------------------------------------------------------
+    SUM:                            20            330            382           1840
+    -------------------------------------------------------------------------------
+
+There’s a lot of half-assed stuff in there, and a lot of duplication,
+and two separate fonts, one of which has only 16 characters, designed
+with `glyphed` in about as many minutes, copied and pasted into
+tetris.c and xshmucalc.c.  Glyphed, which is the only thing that draws
+clickable things so far, would really benefit from some kind of IMGUI
+framework.
+
+The two backends have a bunch of duplicated code, namely all the
+`xshmu_subpic` (buggy clipping!), `xshmu_copy` (a
+standard-C-compliance bug fixed in xshmu.c), and `xshmu_canvas` stuff,
+which is kind of a layer that belongs underneath.  On top of this, the
+`fill` function from Tetris (copied into glyphed) and the `show`
+function from Tetris (copied into xshmucalc.c and extended) should
+probably be shared in some place, and probably `show` should take a
+font argument, and also we need some fonts.
+
+The alpha-blending stuff in wercaμ needs to integrate the SSE
+optimizations from vecalpha.c, and probably also needs to be in some
+kind of common location so that, e.g., oscope.c can use it.  (Or maybe
+oscope.c should render in a different way, for example, running three
+box filters over a monochrome 16-bit framebuffer and mapping the
+resulting intensities through a palette.)
+
+`xshmu_fd` has to go; `xshmu_fb` either needs to have separate input
+file descriptors for /dev/input/mice and the keyboard, or it needs a
+subprocess to re-encode those onto a single stream, so it won’t have
+just a single file descriptor.  Maybe `yeso_get_fds(void (*f)(void *,
+int), void*)`.  Some of the use of `xshmu_fd` can be taken over by an
+added timeout parameter to `xshmu_wait`, which would simplify Tetris
+significantly.
+
+Key repeat is potentially a big problem for Tetris.  X11 introduces
+spurious key-release events into the input stream for key repeat.
+
+(Incidentally, the mouse thing is somewhat documented in
+/usr/share/doc/linux-doc/input/input.txt.gz, and apparently it’s
+speaking a kernel-emulated PS/2 protocol, which I guess is three bytes
+per packet; looks like the second and third bytes are delta-X and
+delta-Y as signed bytes, with Y increasing up, except that there’s a
+9th sign bit in the 0x20 (y) and 0x10 (x) position in the first byte.
+The first byte low nibble is 0x08, except with bit 0x01 set for the
+left button, bit 0x02 set for the right button, bit 0x04 set for the
+middle button; dev3/psmouse.c has a PS/2 driver.  Unfortunately the
+mouse wheel doesn’t register at all!  For the mouse wheel I thought
+you need /dev/input/event5 or whatever, the evdev interface described
+in input.txt.gz and event-codes.txt.gz and /usr/include/linux/input.h
+(dev3/evdev.c has a somewhat more limited decoder for that protocol)
+but apparently you can somehow set the protocol to ImPS/2 for the
+wheel.  My keyboard is on /dev/input/event3, with scancodes (e.g. 30
+for a, 31 for s, 32 for d); key repeat shows up, including on things
+like control keys, but is distinguishable from repeated keypresses;
+type=1 (`EV_KEY`) code=30 value=1 is a press of ‘a’, value=2 is a
+repeat, value=0 is a release; the scan codes are defined in
+/usr/include/linux/input-event-codes.h and come originally from USB
+HUT apparently.  There are also type=4 (`EV_MSC`) code=4 (`MSC_SCAN`)
+value=30, but for some keys the value doesn’t match.  A great benefit
+of this interface is that it isn’t modal; an app that opens this
+interface doesn’t need to reset the keyboard mode to normal before it
+exits.)
+
+Some kind of windowing/terminal system would be super keen.  Also copy
+and paste with mouse-selection support are needed to make the terminal
+emulator usable.
+
+A notebook-style shell window manager interface could be super
+interesting, embedding graphical programs and saving their graphical
+output — by default just the last frame, with hotkeys to save
+screenshots and start full recording — as well as their textual
+input/output.  It could also limit their CPU use, memory use, and
+filesystem access, and checkpoint their state for revivification.  For
+windowing, you could have a hotkey to undock the graphical program
+from its window within the shell.
+
+(Also, I should totally have an animated GIF backend.)
+
+The size of the state to checkpoint should be manageable for many
+apps; the oscilloscope app on the framebuffer has a 135KB heap
+segment, a 139KB stack segment, its 8-megabyte framebuffer and backing
+store, and a couple of read-write segments from shared libraries:
+
+    8192 00400000-00402000 r-xp 00000000 fc:01 467163                             /home/user/dev3/oscope_fb
+    4096 00602000-00603000 r--p 00002000 fc:01 467163                             /home/user/dev3/oscope_fb
+    4096 00603000-00604000 rw-p 00003000 fc:01 467163                             /home/user/dev3/oscope_fb
+    135168 00889000-008aa000 rw-p 00000000 00:00 0                                  [heap]
+    8298496 7f018256c000-7f0182d56000 rw-p 00000000 00:00 0 
+    8294400 7f0182d56000-7f018353f000 rw-s 00000000 00:06 399                        /dev/fb0
+    1835008 7f018353f000-7f01836ff000 r-xp 00000000 fc:01 1179699                    /lib/x86_64-linux-gnu/libc-2.23.so
+    2097152 7f01836ff000-7f01838ff000 ---p 001c0000 fc:01 1179699                    /lib/x86_64-linux-gnu/libc-2.23.so
+    16384 7f01838ff000-7f0183903000 r--p 001c0000 fc:01 1179699                    /lib/x86_64-linux-gnu/libc-2.23.so
+    8192 7f0183903000-7f0183905000 rw-p 001c4000 fc:01 1179699                    /lib/x86_64-linux-gnu/libc-2.23.so
+    16384 7f0183905000-7f0183909000 rw-p 00000000 00:00 0 
+    155648 7f0183909000-7f018392f000 r-xp 00000000 fc:01 1179696                    /lib/x86_64-linux-gnu/ld-2.23.so
+    12288 7f0183ade000-7f0183ae1000 rw-p 00000000 00:00 0 
+    4096 7f0183b2e000-7f0183b2f000 r--p 00025000 fc:01 1179696                    /lib/x86_64-linux-gnu/ld-2.23.so
+    4096 7f0183b2f000-7f0183b30000 rw-p 00026000 fc:01 1179696                    /lib/x86_64-linux-gnu/ld-2.23.so
+    4096 7f0183b30000-7f0183b31000 rw-p 00000000 00:00 0 
+    139264 7ffd0242b000-7ffd0244d000 rw-p 00000000 00:00 0                          [stack]
+    8192 7ffd024ba000-7ffd024bc000 r--p 00000000 00:00 0                          [vvar]
+    8192 7ffd024bc000-7ffd024be000 r-xp 00000000 00:00 0                          [vdso]
+    4096 ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+
+That’s generated as follows from /proc/$pid/maps:
+
+    import re
+    se = re.compile(r'([0-9a-f]+)-([0-9a-f]+)')
+    for line in maps.splitlines():
+      mo = se.search(line)
+      if not mo: print(line); continue
+      length = int(mo.group(2), 16) - int(mo.group(1), 16)
+      print length, line
+
+You don’t have to checkpoint the framebuffer contents, since they’ll
+be redrawn anyway after restart.  And oscope, as it turns out, is
+already prepared to restart its child process if it dies, because its
+child process does die, due I think to bugs in the arecord code.  So
+in theory, with a different checkpoint-aware yeso backend, you could
+checkpoint just its quarter-meg or so of live data.  (As it happens,
+most of that data is garbage too, but that’s hard to know.)
+
+ASLR might complicate restarting from checkpoints, but that’s in part
+because we’re still programming at the C level; a virtual machine
+could simplify this enormously.
+
+In other directions: I really want to try writing some LuaJIT code on
+it, and I want to write Hypothesis tests for rpncalc.
+
+It’s somewhat dismaying to have so many applications for xshmu written
+in C, since, although I would like to keep it pleasant to program in
+C, I mostly want to use it to bootstrap out of the C ecosystem and
+into an archival-virtual-machine ecosystem.  At this point I have
+13 applications written:
+
+1. RPN decimal calculator (308 lines of C, not counting the 28 lines
+   in rpncalc_linux.c for tty output)
+2. PNG viewer (71 lines of C, written after the above count)
+3. Tetris (244 lines of C, though some of that needs to be factored
+   out)
+4. glyphEd fatbits bitmap editor (52 lines of C, including some
+   copy-pasted from Tetris)
+5. admu ADM-3A emulator (339 lines of C, including offline-mode and on
+   a pty)
+6. Chifir emulator (110 lines of C)
+7. Audio oscilloscope (36 lines of C)
+8. Wercaμ graphics hack (166 lines of C)
+9. Munching squares graphics hack (17 lines of C)
+10. Hello, world (7 lines of C)
+11. μpaint (21 lines of C)
+12. (the nameless graphics demo inside xshmu.c itself)
+13. The image-slicing font-making program, also written since the
+    above (161 lines of C)
+
+This works out to (+ 308 71 244 52 339 110 36 166 17 7 21 161) = 1532
+lines of C for applications which will need to be rewritten in
+whatever other language I end up using.  This contrasts with the 41
+lines of xshmu.h, the 312 lines of X11 backend, and the 201 lines of
+the fbcon backend (somewhat duplicated with the X11 backend).
+
+So I just wrote `imgui-programming-language` about what kind of
+programming language I would like.  So far it’s focusing on
+very-low-level stuff (reducing code and bugs in the small, not in the
+large) and it also describes a language with, to me, an intimidatingly
+difficult implementation.  I think I should see if I can simplify the
+design to a minimum, maybe something at the C level or even a Lisp,
+and then see what I can add to it.
+
+The simplest possible thing would of course be a Forth, but writing
+the compiler for it is a pain.  Still, a Forth-level “portable
+assembler” that does simple register allocation would simplify later
+work by a lot.  (At some point I want to extend that into a
+deterministic vector virtual machine for software archival and
+deterministic recomputation.)  It wouldn’t need to support macros,
+since its intended use is as a backend for higher-level languages.  I
+do want to expose the stack implementation sufficiently to enable
+static stack-depth bounds for applications where that’s desirable.
+
+I had thought, after reading Finkel’s book section about CLU
+iterators, that doing them required allocating the iterator activation
+record with enough slack space on the stack for whatever functions the
+yielded-to block might call — that is, that those functions would put
+their activation records in between the function invoking the iterator
+and the iterator itself.  But that isn’t true; the block can push the
+arguments for those functions on top of the iterator state.
+
+Vaguely related: <https://news.ycombinator.com/item?id=18765868> is a
+Sixel image listing program for `xterm -ti vt340`.

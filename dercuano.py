@@ -11,7 +11,10 @@ Next up:
   status?
 - maybe list categories on the link to the note?
 - maybe count notes in the category title?
-- add 44 more notes
+- A Bayesian classifier
+- add "INCOMPLETE UNVERIFIED DRAFT" to everything, and maybe
+  SPECULATIVE to some things too
+- add 90 more notes
 
 """
 from __future__ import print_function
@@ -67,7 +70,10 @@ class Bundle:
     def note(self, notename):
         dirname = self.filename('markdown')
         source_file = os.path.join(dirname, notename)
-        if '/' in notename or '\0' in notename or not os.path.exists(source_file):
+        if ('/' in notename
+            or '\0' in notename
+            or notename.startswith('.')
+            or not os.path.exists(source_file)):
             raise KeyError(notename)
         return Note(self, notename, source_file)
 
@@ -86,7 +92,7 @@ class Bundle:
         return self.output_filename(self.category_localpart(category))
 
     def category_localpart(self, category):
-        return 'categories/' + as_filename(category) + '.html'
+        return 'topics/' + as_filename(category) + '.html'
 
     def note_filename(self, notename):
         return self.output_filename(self.note_localpart(notename))
@@ -209,7 +215,7 @@ class Note:
 
         categories = sorted(self.categories())
         return note_html(self.bundle, self.title(), self.flavor()(body),
-                         div(h2('Categories'),
+                         div(h2('Topics'),
                              ul([li(self.bundle.category_link(category), "\n")
                                  if len(self.bundle.notes_in_category(category)) > 1
                                  else li(self.bundle.category_title(category))
@@ -268,7 +274,7 @@ def category_html(bundle, category_name):
     category_title = bundle.category_title(category_name)
     return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
                     head_stuff(),
-                    h1('Notes in category “', category_title, '”'),
+                    h1('Notes touching on topic “', category_title, '”'),
                     ul([li(note.link_ley(), "\n")
                         for note in bundle.notes_in_category(category_name)])))
 
@@ -280,7 +286,7 @@ def index_html(bundle):
                     h1(bundle_title, ' notes'),
                     ul([li(note.link_ley(level=0), "\n")
                         for note in bundle.notes()]),
-                    div(h2('Categories'),
+                    div(h2('Topics'),
                         ul([li(bundle.category_link(category, level=0), "\n")
                             for category in categories
                             if len(bundle.notes_in_category(category)) > 1]))

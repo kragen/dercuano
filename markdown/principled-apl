@@ -1,0 +1,463 @@
+What accounts for the power and convenience of array-processing
+languages like Matlab, R, and APL?  Can we get it without having to
+pay the high readability and bugginess costs associated with these
+languages?
+
+I feel that I may finally have an account of what’s going on here, and
+not only can we get better error-checking out of it, we can get a
+language that is more expressive (in the sense of more power in less
+tokens), more readable, and more efficient than traditional
+array-processing languages.
+
+The basic idea
+--------------
+
+A variable in a computer program has a value that varies.  Sometimes
+when a piece of code runs, it will have one value; other times, it
+will have another value.  (In many languages it can change even during
+the same run, but that is not relevant to what I am considering here.)
+
+These values are functions of some arbitrary set of inputs, often
+implicit in their context.  In image processing, a brightness value
+might vary by X, Y, color channel, and frame number; in statistical
+processing, an elapsed-time measurement might vary by trial number; in
+rendering, a pixel color might vary by shading algorithm, camera
+position, and the states of all the objects in the input scene.  It
+can be hard to tell what they depend on, and indeed assuming that a
+variable is constant relative to a given input, when in fact it ought
+to vary, is a common source of bugs.  (You could argue that this is
+the source of the difficulty of caching.)
+
+We could think of these inputs as being dimensions in a
+many-dimensional space, and each point in this space as being a
+possible universe — perhaps a very small possible universe with only a
+few variables in it, but a universe nonetheless.
+
+Array languages allow us to reify this space in runtime variables, and
+thus to write programs that act across entire subspaces of it, rather
+than the pointwise and one-dimensional approach taken by ALGOL-family
+languages like C or Java.
+
+Some examples from ray-tracing
+------------------------------
+
+Consider this C code, from My Very First Raytracer:
+
+    static color
+    pixel_color(world here, int ww, int hh, int xx, int yy)
+    {
+      vec pv = { (double)xx/ww - 0.5, (double)yy/hh - 0.5, 1 };
+      ray rr = { {0}, normalize(pv) };
+      return trace(here, rr, 1.0);
+    }
+
+This code is invoked a number of times with the same `world`, `ww`,
+and `hh` variables, but with varying values for `xx` and `yy`; but you
+can’t tell that from looking at it.  Similarly, when it invokes
+`trace`, it invokes it many times with the same `here` value,
+different `rr` values, and the same `importance` value of 1.0.  But it
+needs to be written as a function, or at least a loop, to allow this
+flexibility in `xx` and `yy`.
+
+In a sense, in this code, `xx` represents not a single integer, but an
+entire plethora of possible values, maybe even an infinite series of
+values; it’s not a scalar, but rather a function of which pixel we’re
+looking at.  When we write the division of `xx` by `ww`, we are not
+writing the division of a single floating-point number by a single
+integer, but rather all the floating-point numbers `xx` will ever
+convert to in the lifetime of humanity, by all the possible image
+widths `ww` will ever contain in the lifetime of humanity.  Or, if we
+limit our perspective to a single execution, that division instruction
+will eventually be used to divide all of the horizontal image pixel
+coordinates by the image width — redundantly, many times, in fact,
+once for each line; so it’s a machine instruction that implicitly
+represents a vector operation.
+
+But this is a rather unusual hermeneutics of the C and machine code.
+
+The C code enforces a particular order of evaluation: it is not
+capable of beginning to evaluate a second call to `trace()` until the
+first one is done, and no way to evaluate a second call to
+`pixel_color` until the first one is done.  But this may not be the
+most efficient way to do what we’re doing here.
+
+The C code, you’ll notice, also has a fair bit of syntactic overhead
+associated with allowing these variables to vary; they have to be
+declared as parameters.  What if, instead, we were programming in a
+language where these variables explicitly, in the source text and in
+memory at run time, represented an entire vector of possibilities — a
+sort of more principled APL?  Maybe we could write it something more
+like this:
+
+    pixel_color = trace(here,
+                        ray(vec(0,0,0), normalize(vec(xx/ww-.5, yy/hh-.5, 1))),
+                        1.0);
+
+(We’re also getting some brevity here by not having to name the
+temporary structs.)
+
+A language with an APL-like evaluation strategy could figure out that
+`xx` and `yy` vary independently, while `ww` and `hh` don’t vary at
+all, and so generate a ρ`xx`×ρ`yy` space of possibilities for the
+`vec`s that we’re normalizing.  (More detail on how to do this is in
+the next section.)
+
+I think that’s the ultimate philosophical justification for APL’s
+conformability and broadcasting rules; if you’re ray-tracing 640
+columns and 480 rows of pixels, for example, then a value that is
+constant for all those pixels is merely a scalar; a value that varies
+by column but not by row will be a 640-element vector; a value that
+varies by row but not by column will be a 480-element vector; and a
+value that varies by pixel will necessarily be a 640×480 matrix.  So
+it makes sense to divide `xx` by `ww`, or `yy` by `hh`, but doing
+anything with the two of them together requires an outer-product
+operation (which in APL is explicit) or reducing one or the other of
+those axes of variation into being some kind of dummy variable, like
+an index of summation or whatnot.
+
+But APL of course can’t tell that your 3-element vector representing
+the X-coordinates of the three spheres in your scene isn’t really
+compatibly dimensioned to a three-element vector that represents the
+X, Y, and Z coordinates of the camera, say.  Array-dimensions typing
+is weak typing, much like the currently fashionable approach of typing
+everything as a string.  And this is why outer products are
+necessarily explicit in APL, while I think a more principled
+array-processing language could infer most of them.
+
+Here’s another example, from the same program:
+
+    static vec
+    scale(vec vv, sc c) { vec rv = { vv.x*c, vv.y*c, vv.z*c }; return rv; }
+
+    static ray
+    reflect(ray rr, vec start, vec normal)
+    {
+      // Project ray direction onto normal
+      vec proj = scale(normal, dot(rr.dir, normal));
+      // Subtract that off twice to move the ray to the other side of surface
+      vec reflected_dir = sub(rr.dir, scale(proj, 2));
+      ray rv = { add(start, scale(reflected_dir, 0.001)), reflected_dir };
+      return rv;
+    }
+
+(The .001 fudge factor there is to keep the reflected ray from hitting
+the same surface again from the inside due to rounding errors.)
+
+The `scale` function here obviously only exists because C is not an
+array-processing language.  Or does it?  If we were trying to write a
+`reflect` that handled many normals at once in arrays, it wouldn’t be
+totally insane to use three separate arrays of X, Y, and Z components
+of the normals.  Taking just the first line of `reflect` and
+translating it into C written as if it were Fortran:
+
+    static void
+    scale(sc vx[], sc vy[], sc vz[], sc c[],
+          sc vox[], sc voy[], sc voz[], int n)
+    {
+      for (int ii = 0; ii < n; ii++) {
+        vox[ii] = vx[ii] * c;
+        voy[ii] = vy[ii] * c;
+        voz[ii] = vz[ii] * c;
+      }
+    }
+
+    static void
+    proj(sc vx[], sc vy[], sc vz[], sc dx, sc dy, sc dz,
+         sc vox[], sc voy[], sc voz[], int n)
+    {
+      sc dots[n];
+      for (int ii = 0; ii < n; ii++) {
+        dots[ii] = vx[ii] * dx + vy[ii] * dy + vz[ii] * dz;
+      }
+      scale(vx, vy, vz, dots, vox, voy, voz, n);
+    }
+
+You may not agree yourself that this would not be totally insane, but
+hopefully you can agree that this is a way to do this that Fortran
+programmers would think was not totally insane.  Also you can see that
+an enormous benefit of APL over Fortran for this kind of thing is that
+you have at least some hope of changing your mind about whether it was
+
+the rays or the normals or both that you wanted to have more than one
+of, because making the loops and indexing implicit there means that
+you don’t have to change the code to index into a `dx` array and maybe
+not index into a `vx` array.
+
+(Also there are probably some combinations of dimensions and CPU
+models for which the more predictable memory access of this version
+would actually make it faster despite its smaller ratio of computation
+to memory locations accessed.  And obviously if your loops are
+implicit and your non-implicit operations are subject to
+interpretation overhead, as in Numpy or normal APL implementations,
+the array approach is going to be hugely faster.)
+
+Coordinates in three-space, though, are definitely the kind of thing
+that it’s reasonable to think of as numbering from 0 to 2 or from 1
+to 3, rather than being unrelated attributes of the same thing.  Then
+you might want your array of normals here to be represented as an n×3
+array rather than three arrays of n or an array of n structs with
+three fields.  And then things like the `scale` function fall away
+entirely, but you need some way to specify which dimension you’re
+summing over when you compute that dot product.  APL `+/` has a
+default of operating over the *last* dimension, and the option of
+specifying a different dimension by its numerical index, as in
+`+/[1]`.
+
+This seems ad-hoc and unreadable to me, like much of APL.  But if you
+have named your axes of variation, and one of them is the XYZ
+distinction, then you could very reasonably say `XYZ.sum()` or
+`+/[XYZ]`, and it would be clear, turning the XYZ variation into a
+dummy variable; if you applied it to some kind of aggregate with more
+than one XYZ distinction (introduced with an explicit outer-product
+operator) or no XYZ distinction, you would get an error.
+
+And then you could write
+
+    proj = normal * XYZ.sum(raydir * normal)
+
+instead of the 20 lines of crap above, and furthermore keep that
+abstract over whether you have a single normal and many ray
+directions, a single ray direction and many normals, many normals of
+which each corresponds to a different ray direction, or even (what APL
+could never do implicitly) many ray directions and many normals, of
+which we implicitly want the Cartesian product.
+
+And then maybe you could write the whole function like this:
+
+    proj = normal * XYZ.sum(raydir * normal)
+    reflected_dir = raydir - 2 * proj
+    reflect = ray(start + reflected_dir * 0.001, reflected_dir)
+
+When it comes to implicitly broadcasting operations over different
+dimensions, C is equivalently succinct to an array language — modulo
+the data typing and abstraction overhead that it requires in order to
+give you variables at all.  But because C values are only implicitly,
+in an esoteric hermeneutics, vectors or universes of possibilities, it
+is difficult to write something like the `XYZ.sum` function above;
+instead we are reduced to writing explicit loops, or as in this case,
+explicitly textually repetitive code.
+
+Getting more rigorous: a functional semantics with implicit arguments
+---------------------------------------------------------------------
+
+Okay, “rigorous” and “semantics” may be an exaggeration.  But I’ll try
+to at least outline a rigorous semantics here.
+
+Suppose that, instead of considering variables such as `normal` to
+hold scalars, vectors, or matrices of some finite size, we instead
+consider them to hold computable functions, but functions whose domain
+is not necessarily known or finite.  This is not a big leap: we can
+consider the vector [6 832 4] as a function f over a domain of three
+integers: it returns 6 when invoked as f(0), 832 when invoked as f(1),
+or 4 when invoked as f(2).
+
+In this interpretation, we lift the usual arithmetic operators to
+operate over functions of one argument in the usual way: `*`, for
+example, is the function we would usually write in the λ-calculus as
+`λf.λg.λp.(f p)*(g p)`, or in Python as `lambda f, g: lambda p:
+f(p)*g(p)`; and we consider constants such as `2` to denote constant
+functions like `K 2` or `lambda p: 2`.
+
+But what is this mysterious `p` argument?  It’s a context or point in
+this multidimensional possibility space mentioned eralier, the one
+that’s usually left implicit, so it needs to include all the axes of
+variation we were talking about earlier; to get traditional APL
+semantics, you would want it to be something like a stack of numbers,
+but dicts are more fashionable these days than stacks, arrays, or
+lists, so let’s consider it to be something like a Lisp alist indexed
+by symbols, each symbol denoting some axis of variation.
+
+So now we can interpret this line:
+
+    proj = normal * XYZ.sum(raydir * normal)
+
+as meaning (in Python):
+
+    def proj(p):
+        return normal(p) * sum(raydir(q) * normal(q)
+                               for q in XYZ.possibilities_augmenting(p))
+
+Here `possibilities_augmenting` is a method of the `XYZ` dimension
+that gives you versions of the point `p` with all possible values of
+`XYZ` substituted into it.  Thus the first call to `normal` might
+return either the `x`, the `y`, or the `z` component of some
+particular normal; but all three of those will be multiplied by the
+same dot product.
+
+Of course, this is not intended to suggest that it must be calculated
+in this fashion, which would be immensely wasteful; it’s intended as a
+specification of the relationship between inputs and outputs.
+
+This suggests an implementation of the `vec` function mentioned
+earlier, which in the C program was a `struct` type:
+
+    def vec(x, y, z):
+        values = {XYZ.x: x, XYZ.y: y, XYZ.z: z}
+        return lambda p: values[p[XYZ]](p.without(XYZ))
+
+That is, the functions produced by `vec` consume the `XYZ` dimension
+of their input and dispatch to any of the three functions that were
+passed in as their X, Y, and Z components.  So this expression from
+the `pixel_color` function:
+
+    vec(xx/ww-.5, yy/hh-.5, 1)
+
+when invoked with `z` will dispatch to the constant function denoted
+by `1`; when invoked with `y`, will dispatch to the function denoted
+by `yy/hh-.5`, which itself will dispatch to `yy`, which in this
+program varies by pixel, and to `hh`, which doesn’t vary at all during
+a run of the program, and to another constant function that returns
+0.5.
+
+Another useful higher-order function is a “renaming” or “aliasing” or
+“axis rotation” or “reshaping” function which turns one axis into
+another:
+
+    def rename(a, b, f):
+        return lambda p: f(p.without(a).with(b, p[a]))
+
+Considered spatially, this prevents `f` from varying over axis `a`,
+rotating the motion of `p` along `a` into motion along the new axis
+`b`.  Considered relationally, this renames column `b` of the inputs
+to relation `f` to `a`.  This is the operator you need for carrying
+out explicit outer products; if `f` and `g` are both vectors on axis
+`b`, then `rename(a,b,f)+g` gives you their outer product sums, with
+the values of `f` varying along the new axis `a` and the values of `g`
+varying along axis `b` as before.  (This `rename` function also gives
+you general axis transposition, in a sense.)
+
+This “context” or “point” object may carry a whole collection of
+context attributes with it that most of these functions don’t bother
+to access, and can pass along to their callees without mentioning them
+explicitly.
+
+(If we think in terms of N-ary relations rather than in terms of
+functions, you could think of this “point” as a query-by-example
+partial record.  But that’s not very consistent with the functional
+semantics described above.)
+
+In theory, if all of your component functions being combined by means
+such as lifted operators, `rename`, axis-construction functions like
+`vec`, and dummy-axis-introduction functions like `XYZ.sum`, have
+finite discrete domains along some axis, you ought to be able to
+compare those domains and detect mismatches, and then you ought to be
+able to describe the multidimensional domain of the combined function.
+This is a lot like type-checking.  You might even be able to do it at
+compile time, and if you have compile-time axis variables analogous to
+type variables in parametric polymorphism, you might be able to do the
+type-checking polymorphically at compile time.
+
+(Also note that this eliminates run-time bounds-checking, just as
+structs do.)
+
+APL has some axis-transformation functions: compress, expand, take,
+drop, and the sort of hidden operation of indexing a vector by another
+vector, which is like binary relation composition or like a different
+form of compress.  You could consider these either as generating new
+axes or as subsetting the domain along an existing axis.  In APL, it’s
+the former, and so you have to be careful to compress all the
+attributes you care about by the same boolean vector, or index all of
+them through the same index vector.
+
+It seems like it might be more useful here to implicitly intersect
+domains along the same axis, which is after all what we are doing when
+we implicitly take the outer product of a scalar and a vector.
+However, the operation of *obtaining the valid indices* along some
+axis or all axes (i.e. ρ) then must introduce a new axis to arrange
+its results along.
+
+Inter-loop dependencies
+-----------------------
+
+So far, all of the above, however nicely it motivates and elaborates
+APL’s default rules for conformability and broadcasting, only covers
+scalar operations and nearly trivially parallelizable vector
+operations with no interloop dependencies.  Operations like reverse,
+rotate, grade-up (indirect sort), scan (prefix sum), and even take and
+drop don’t treat the points along the axis as floating in space
+independently, but rather having a total order, with even predecessor
+and successor operations, and correspond in languages like C to loops
+with interloop dependencies.
+
+I can imagine a bunch of different possible ways to handle these: all
+axes could be ordinal; grade-up could create an ordinal axis from a
+non-ordinal axis or axis subset, and scan, reverse, rotate, take, and
+drop could simply fail to compile when applied to non-ordinal axes;
+instead of rotation you might have a “next index” or “previous index”
+function which, since it knows which axis it’s acting along, knows
+when to wrap; and so on.
+
+This is an important area to do a good job in, and there will be
+nonobvious interactions among factors.  These are, of course, the
+areas in which ALGOL-family programs have to declare data structures
+and SQL optimizers start having to plan out join plans, so we
+shouldn’t expect easy wins in this area.
+
+My raytracer example is in some sense carefully chosen to minimize
+this; it constructs almost no intermediate data structures, unless you
+count 3-vectors as “data structures”.
+
+Efficiency
+----------
+
+GPUs, but also multithreading and SIMD instructions and cache prefetch
+and improved locality by avoiding memory access to unused columns.
+“Blocking” or “tiling” for efficiency; also “deforestation”.
+
+Parallel prefix sum and parallel sorting are well-studied problems.
+To the extent that these operations are sufficient to efficiently
+solve computational problems, we should expect programs written in
+this fashion to benefit from fine-grained parallelism more easily than
+regular programs.
+
+*****
+
+Rethinking this again, the basic idea is that some variables have
+values that depend on the circumstances, and there are a variety of
+circumstances (or dimensions or scales) that may or may not be
+relevant to the value of any given variable.  The latitude and
+longitude of each house on a block are different, but perhaps we
+consider the temperature of the entire block to be identical — but it
+varies by time of day, which the latitude and longitude do not.
+
+There are different kinds of dimensions; Stanley Smith Stevens
+described them as “levels of measurement”.  Some are
+categorical/nominal rather than quantitative; quantitative dimensions
+can be ordinal (sortable), interval dimensions (subtractable;
+affine?), or ratio dimensions (with a zero element and thus
+divisible).  Also, quantitative dimensions may be discrete or
+continuous.
+
+Pointwise operations on variables are straightforward.
+
+*****
+
+Rethinking yet again, the idea is sort of that each variable is sort
+of a function of other variables:
+
+    f = a * b + c
+
+Or we could say it invokes those other variables as subroutines, and
+eventually it bottoms out in inputs (the dimensions).  So the above
+statement is isomorphic to something similar to this:
+
+    def f(x, y, t):
+        return a(x, y) * b(y) + c(x, t)
+
+But when we quantify over a dimension (or, perhaps, even a dependent
+variable?) we are generating an argument locally rather than merely
+passing it along; similarly when we index, which is a form of
+composition!
+
+    f = c + +/[x] a * b
+
+If `+/[x]` is summing along x, this decodes to something like the
+following:
+
+    def f(x, y, t):
+        return sum(a(xi, y) * b(y) for xi in xs) + c(x, t)
+
+The difference, of course, is that all this default parameterization
+is purely implicit.
+
+This is closely analogous to dynamic scoping in Lisp.

@@ -1,0 +1,234 @@
+So I was thinking about how to dilate and erode letterforms, in order
+to generate a range of fonts from some scanned hand-drawn characters.
+This has a couple of applications.  First, hand-drawn characters may
+be fairly nonuniform in line thickness, and you may want to make the
+line thickness more consistent; some kind of nonlinear erosion to a
+skeleton, followed by dilation, can give you uniform line thickness.
+Second, scanned data may have flecks, and various compositions of
+dilation and erosion are well known to eliminate flecks below a
+critical dimension.  Third, you may want to apply calligraphic effects
+to letters, such as changing the pen angle or nib width, or providing
+a nib width to pencil-drawn characters.
+
+Thresholded-blur-based dilation and erosion
+-------------------------------------------
+
+One of the algorithms that occurred to me was to blur the characters
+and then threshold the blurred characters, perhaps at a much higher
+resolution than they were scanned at, converting each original pixel
+to a discrete impulse in the center of a much larger empty space
+before blurring.  This, in a sense, provides a vectorization mechanism
+for a bilevel image; you can blur and threshold the characters at an
+arbitrarily high resolution, and thanks to Nyquist’s sampling theorem
+and the convolution theorem, you’ll always get the same results as
+long as your blur is the sampled approximation of whatever true
+analytic blur you’re blurring with, and as long as it doesn’t have any
+significant frequency components above the Nyquist frequency, whether
+that’s a Gaussian, a sinc, or something else.
+
+However, this contains a pitfall.  What happens if we look at the
+contours of a blurred set of impulses like this?  If we fill in the
+empty area with zeroes, as the theory says we should, then we’ll find
+that the positive contours around positive impulses are convex, as are
+the negative contours around negative impulses, but as we cross zero
+going away from a positive impulse toward an adjacent negative
+impulse, we find our contours becoming concave.  If we have a
+checkerboard of ±1 impulses, for example, and a circularly symmetric
+blur kernel, then the positive contours will be near-circles around
+the +1 impulses, while the negative contours will be near-circles
+around the -1 impulses.  Only at 0 do we find the contours running in
+straight lines, dividing the checkerboard into positive and negative
+squares.
+
+So I propose that what we should do is that, before upsampling, we
+should add or subtract a constant to the impulses so that our desired
+threshold will be, in the transformed value space, 0.
+
+If the blur kernel has limited support, the contours in each cell or
+“tile” of the grid will depend only on some limited neighborhood of
+impulses, and of course the threshold.  If the support is one pixel or
+less (of the original image), it will depend only on the four
+neighboring pixels, like Perlin noise.  Like Wang tiles, the tile is
+guaranteed to match its neighboring tiles by virtue of shared edge
+colors (corner-pair colors, in this case).  Even if the kernel support
+takes into account a 4×4 area, for bilevel input images, it’s feasible
+to precompute all the possible tiles.  Cubic spline kernels will have
+continuous second derivatives, which means their contours will also
+have continuously changing curvature.
+
+Furthermore, it’s possible to compute points on the contours directly,
+without resorting to actually computing the pixels of a
+high-resolution upsampled image.  If the blur kernel is polynomial or
+piecewise polynomial by tiles, then the blurred image within a given
+tile is a single polynomial function — bicubic in the case of splines
+over 4×4 neighborhoods, and in any case a linear combination of parts
+of the blur kernel.
+
+This generalized erosion or dilation operation should be more capable
+of preserving smooth curves than the standard iterated morphological
+operations, but it might also lead to ink blotting at line joins.
+
+I thought that by using an asymmetric blur kernel, it should be
+possible to convert strokes of uniform weight into strokes of varying
+width according to their angle, but I’m not sure that’s actually true.
+It’s depending on the final thresholding operator to introduce the
+nonlinearity where, say, vertical strokes convert into more ink than
+horizontal strokes.  And I’m not sure simple thresholding is up to the
+job.
+
+Erosion to skeletons
+--------------------
+
+Erosion-to-skeletons is a nonstandard morphological operation.
+Standard erosion can be done on a 3×3 pixel window; if any input pixel
+in the window is empty, the resulting output pixel in the center of
+the window is empty.  But this can erase lines or dots completely, and
+indeed such despeckling is one of the uses for standard erosion.
+
+Suppose that instead we use a 4×4 pixel window.  Now we can see
+whether the pixel we’re about to erase is part of a line or speck
+that’s already been reduced to a thickness of 2 or 1.  In that case,
+we can preserve a thickness-1 line, although if we’re reducing
+thickness 2 to thickness 1, we have to choose a bias direction in
+which to move the line: left, right, up, or down.  My hope is that we
+can neutralize this bias by running successive passes of the algorithm
+with biases that cancel out, for example using the Thue-Morse
+sequence to alternate directions.
+
+Pipelined morphological operations
+----------------------------------
+
+In the 1970s and early 1980s, the ERIM Cytocomputer, a special-purpose
+parallel architecture, had the fastest implementation of the Game of
+Life, although it was primarily used for machine vision applications.
+Rather than dedicating one processor to each board region, it
+dedicated one processor to each time step, pipelining cells from one
+processor to the next.  In this fashion, a Cytocomputer with a
+16-stage pipeline (I don’t remember if this was a normal size) could
+output one Life cell every clock cycle, 16 generations later than the
+generation that had been fed into the pipeline, with slightly over 16
+rows of latency.  I don’t remember what the clock speed was, either,
+but I think it was a few megahertz.
+
+You might think this would require a massive memory for each
+processor, but in fact each one only needs a couple of
+reasonable-sized FIFOs.  To compute the cell marked O, it needs to
+consider the previous-generation states of the cells marked X and the
+cell marked O, and needs to retain the previous-generation states of
+the cells marked .:
+
+                       XXX........................................
+    ...................XOX........................................
+    ...................XXX
+
+In a pipeline, each pipeline stage is computing one scan line plus two
+pixels behind the previous one; note that most of the pixels are
+duplicated in two different FIFOs:
+
+                       XXX........................................
+    ...................XOXXX......................................
+    ...................XXXOXXX....................................
+    .....................XXXOXXX..................................
+    .......................XXXOX..................................
+    .........................XXX
+
+The pixels were 8-bit bytes, the FIFO size was either fixed or capped
+at 1024 or 2048 or 4096 or something, and in addition to the Life
+rule, the Cytocomputer was capable of a variety of
+machine-vision-relevant operations such as thresholding,
+edge-detection (I don’t remember, probably at least Canny), dilation,
+and erosion, which like the Game of Life can all be computed as a
+finite function on a 3×3 neighborhood, and of course in these
+applications, each stage of the pipeline could be programmed to
+perform a different function.  You programmed it with a bletcherous
+scripting language on an attached general-purpose computer.
+
+I think you can do something similar with SSE on a modern CPU, but
+perhaps many pixels per cycle instead of one, and maybe only one
+pipeline stage per instruction.  The idea, though, is to stream pixel
+data into the L1 cache (from another cache or from main memory), apply
+a whole generic pipeline of such local operations to it, and then
+stream it back out of L1 cache with the whole set of operations
+applied.
+
+### Digression: tiling ###
+
+Usually for this kind of processing you want to tile the pixel data to
+reduce the size of the necessary FIFOs, although that makes the
+indexing somewhat more complicated.  “Tiling” means that you turn the
+usual two dimensions of image data into four dimensions: an X and Y to
+locate the tile, and an x and y to locate the pixel within the tile.
+For example, with 8×8 tiles, the pixels in a 16×16 image might be in
+this order instead of the usual one:
+
+      0   1   2   3   4   5   6   7  64  65  66  67  68  69  70  71
+      8   9  10  11  12  13  14  15  72  73  74  75  76  77  78  79
+     16  17  18  19  20  21  22  23  80  81  82  83  84  85  86  87
+     24  25  26  27  28  29  30  31  88  89  90  91  92  93  94  95
+     32  33  34  35  36  37  38  39  96  97  98  99 100 101 102 103
+     40  41  42  43  44  45  46  47 104 105 106 107 108 109 110 111
+     48  49  50  51  52  53  54  55 112 113 114 115 116 117 118 119
+     56  57  58  59  60  61  62  63 120 121 122 123 124 125 126 127
+    128 129 130 131 132 133 134 135 192 193 194 195 196 197 198 199
+    136 137 138 139 140 141 142 143 200 201 202 203 204 205 206 207
+    144 145 146 147 148 149 150 151 208 209 210 211 212 213 214 215
+    152 153 154 155 156 157 158 159 216 217 218 219 220 221 222 223
+    160 161 162 163 164 165 166 167 224 225 226 227 228 229 230 231
+    168 169 170 171 172 173 174 175 232 233 234 235 236 237 238 239
+    176 177 178 179 180 181 182 183 240 241 242 243 244 245 246 247
+    184 185 186 187 188 189 190 191 248 249 250 251 252 253 254 255
+
+With 4×4 tiles, instead you would have this order:
+
+      0   1   2   3  16  17  18  19  32  33  34  35  48  49  50  51
+      4   5   6   7  20  21  22  23  36  37  38  39  52  53  54  55
+      8   9  10  11  24  25  26  27  40  41  42  43  56  57  58  59
+     12  13  14  15  28  29  30  31  44  45  46  47  60  61  62  63
+     64  65  66  67  80  81  82  83  96  97  98  99 112 113 114 115
+     68  69  70  71  84  85  86  87 100 101 102 103 116 117 118 119
+     72  73  74  75  88  89  90  91 104 105 106 107 120 121 122 123
+     76  77  78  79  92  93  94  95 108 109 110 111 124 125 126 127
+    128 129 130 131 144 145 146 147 160 161 162 163 176 177 178 179
+    132 133 134 135 148 149 150 151 164 165 166 167 180 181 182 183
+    136 137 138 139 152 153 154 155 168 169 170 171 184 185 186 187
+    140 141 142 143 156 157 158 159 172 173 174 175 188 189 190 191
+    192 193 194 195 208 209 210 211 224 225 226 227 240 241 242 243
+    196 197 198 199 212 213 214 215 228 229 230 231 244 245 246 247
+    200 201 202 203 216 217 218 219 232 233 234 235 248 249 250 251
+    204 205 206 207 220 221 222 223 236 237 238 239 252 253 254 255
+
+(This kind of tiling also made it possible to interact with
+many-megapixel images in real time on 1980s graphics workstations.
+Perhaps your LANDSAT scene was 50 megapixels and your machine only had
+8MiB of RAM.  Without tiling, in the format the LANDSAT people would
+deliver you the images, the megapixel you could fit on the monitor was
+1000 fragments splattered across 7 megapixels on disk, which was 21
+megabytes in RGB or 43 megabytes in its full multispectral glory, and
+if you want to pan 100 pixels to the right, those pixels are
+splattered across those same 21 megabytes; so even a slight panning
+would induce a multi-second disk wait.  With 16×16 tiling, your screen
+would instead contain parts of some 60–70 rows of tiles, which could
+be accessed in 60–70 seeks: about a second.  JPEG image compression
+was not yet a thing, and even today its use for remote-sensing imagery
+is dubious.)
+
+8×8 tiles are a typical size, but I suspect that 32×32 tiles (or even
+bigger, 64×64 or 128×128) might make more sense for most purposes on
+modern hardware.
+
+(End of digression.)
+
+### Bitwise morphological operations ###
+
+For morphological operations, we might really benefit from
+bit-packing, where we can get 128 pixels into an SSE register (or 256
+pixels into an AVX register).  Then, the erosion or dilation operation
+(depending on interpretation) is mostly `a | a << 1 | a >> 1 | b | b
+<< 1 | b >> 1 | c | c << 1 | c >> 1`, but that only produces 126
+correct bits of new state for b; the first and last bits are
+incorrect.
+
+Note that this is a separable operation: we can do it first
+horizontally and then vertically.  So we could, for example, compute
+`a | a << 1 | a >> 1` — plus the correction for the first and last
+bits — once, and use it to compute results on all three scan lines.

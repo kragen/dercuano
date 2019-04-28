@@ -1,0 +1,260 @@
+Object embedding
+================
+
+In Java (as in Smalltalk, Lisp, Python, ML, and many other languages)
+when an object A “contains” an object B, the in-RAM representation of
+object A contains actually just a *pointer* to B, i.e. the address at
+which B’s in-RAM representation can be found.  This is in some ways
+convenient, but it has some drawbacks — not only for efficiency, but
+even for program correctness.
+
+In C, instead, “A containing B” means that the in-RAM representation
+of B is actually contained inside the in-RAM representation of A.  I
+don’t know of a standard term for this, so I’m calling this “object
+embedding.”  (Object embedding is one aspect of one possible
+implementation of what is sometimes called “compound value types”, for
+example in C# and in _Elements of Programming_.)  C, C++, Pascal, and
+Golang do the same thing; they all inherit it from COBOL’s “group
+items”, from which Algol got “record types”, which C renamed “struct”.
+
+The benefits of by-reference object fields are significant:
+
+* A’s **reference to B is polymorphic**, i.e. you can use an object of
+  any subclass of the type that A is expecting.  This means that
+  objects-by-reference are absolutely essential to the Liskov
+  Substitution Principle.  C++ has a terrible bug resulting from its
+  misguided attempt to make embedded objects polymorphic, known as the
+  “slicing copy”.  C, Pascal, and Golang do not suffer from this
+  because embeddable objects do not have subtypes, unless you think of
+  the variants of a union type (“sum type”) as being subtypes of it.
+* B can be **aliased**: several different objects A can “contain” the
+  same object B.  This can be desirable if B is large or if it has
+  mutable state that many objects need access to.
+* A’s reference to B is **nullable**, which is particularly important
+  in languages like Smalltalk, C++, and Java, where you can access an
+  incompletely initialized object (from inside its constructor, if
+  nothing else).
+* Pointers allow circular references.
+
+However, compared to Java’s approach, it occurs to me that the
+embedding approach has some real benefits.  More than once, I’ve
+written code like this:
+
+    public class LogFileParser {
+        private Map<String, String> messageIds;
+        public void sawMessageId(String messageId, String queueId) {
+            messageIds.put(queueId, messageId);
+        }
+    }
+
+This has the tendency to throw a `NullPointerException`, because of
+course declaring that your LogFileParser objects *could* have a `Map`
+from `String`s to `String`s doesn’t give them one.  You need to say:
+
+        private Map<String, String> messageIds =
+            new HashMap<String, String>();
+
+`final` on instance variables is not nearly as useful as you might
+think when you’re obligated to use mutable objects for a lot of those
+final instance variables.  It does, however, avoid the above problem.
+
+By contrast, embedded objects aren’t nullable.  If you say:
+
+    struct foo {
+        struct foo *next;
+        struct bar my_bar;
+        int weight;
+    };
+
+then you can never have a `struct foo` whose `my_bar` is `NULL`,
+because it’s not a pointer.  So the above NullPointerException cannot
+arise, not even as a compile error.  In C++ you can even have a
+default constructor for `bar` that ensures that its memory doesn’t
+contain random garbage; in Golang it’s initially zero, and you get the
+same guarantee in C if you use `calloc` or initialize a local `struct
+foo f = {0};`.
+
+The consequence is that in C++, if you say
+
+    std::map<string, string> message_ids;
+
+— either as a local variable or an instance variable — you have a
+full-fledged empty `map` sitting there, without any need to repeat
+again the fact that you wanted one.  This kind of thing, in
+combination with the STL container library, allows you to write entire
+useful C++ programs that don’t mention heap memory allocation at all,
+because it’s all hidden away inside the STL.
+
+(ML and its descendants take another approach to this problem, one
+which inspired the `final` mechanism in Java: although relationships
+by objects are by means of pointers, there is no `null` value, and so
+you can’t create an object without supplying values for all of its
+fields.)
+
+Aside from this **implicit nullability imposed on every object
+field**, there are a few other problems with by-reference objects.
+
+* **They allow for aliasing**, which is to say, many-to-one
+  relationships: a subobject included merely by reference can also be
+  included in many other objects.  Sometimes this is what you want —
+  it’s a major reason for using pointers in languages that do support
+  object embedding — but aliasing, like nullability, is bug-prone, and
+  therefore **probably a bad default** for mutable objects.
+
+    (Of the languages I’ve mentioned, only Pascal actually forbids you
+    from making an alias to an object embedded inside another object,
+    e.g. in C, writing `&my_foo.my_bar`.  But it’s relatively uncommon in
+    practice to store such a reference into another object.)
+
+* They **greatly increase the number of separate memory
+  allocations**.  This means that the graph that your garbage collector
+  has to traverse is very much larger, and it correspondingly must do a
+  great deal more work.  This is one reason why ML garbage collectors
+  tend to be very efficient — they have to be to make ML practical at
+  all — and also the reason that Golang is reasonably efficient even
+  though its garbage collector is still kind of crappy.
+
+* In themselves, the **pointers take up memory**.  If the only
+  pointers in your memory are for object fields that you decided *ought*
+  to be nullable or aliasable, then most of your memory will probably be
+  spent on the data that your program unavoidably has to manage.  By
+  contrast, in a language like Java or Python, it’s easy to spend most
+  of your memory on pointers, especially on 64-bit CPUs.
+
+  (Having more pointers also makes the garbage collector’s job a lot
+  harder, since it has to traverse the pointers in your live objects.)
+
+  Quantitatively, it seems that half to two-thirds of a typical Java
+  program’s memory is taken up by pointers, because [moving to 64-bit
+  increases the needed heap size by 50%][2].
+
+[2]: https://wikis.oracle.com/display/HotSpotInternals/CompressedOops
+
+* CPUs **can’t generally prefetch pointer targets**, and they
+  won’t be in the same cache line; so accessing subobjects is a lot more
+  likely to generate cache misses.  By contrast, accessing embedded
+  subobjects takes not only *less* time, but often *zero* instructions
+  and zero time!  See the section below, “zero instructions”.
+
+* Allocating every object on the heap means that **any part of your
+  program that creates objects can fail unpredictably** if you run out
+  of memory; in very memory-restricted environments like an Arduino,
+  the heap can start to overwrite the stack and vice versa.  Error
+  handling mechanisms can control how the failure is handled, but they
+  can’t turn failure into success.  (Worse, if your error handling
+  creates objects, it can fail too.)  In practice, under many
+  circumstances, it’s probably better to recover from memory
+  allocation failures by [immediately aborting the program][1].
+
+  This sounds like a bigger problem than it is in practice, because
+  most software can be called upon to handle arbitrarily-sized
+  problems, which means that you can always find some way to make it
+  run out of memory and fail.  Dynamic memory allocation is built into
+  the problem, not just your solution to it.  So increasing the number
+  of places you can get an out-of-memory error isn’t a big deal.
+
+  But there is some software that needs to work *all the time* instead
+  of sometimes failing unpredictably, and that software should be
+  written without dynamic allocation, which means it should not be
+  written in a language where object fields are by reference.  It’s
+  not acceptable if your antilock braking system, your jet engine
+  controller, or your air-traffic control system gets an out-of-memory
+  exception and reboots while you’re using it.
+
+  On the other hand, if it’s okay for your software to fail every once
+  in a while, and it’s just a matter of reducing the frequency to once
+  a day, once a year, or once a millennium, dynamic allocation is not
+  a big deal.  In fact, dynamic allocation can help a lot with that.
+  One of the major reasons the Fuzz paper found that the GNU tools
+  were so much more reliable than the Unix tools they replaced is that
+  they use dynamic allocation all over the place, so they have few
+  arbitrary limits.  Every dynamic allocation is a potential failure
+  in your program; but every arbitrary limit is a potential bug.
+
+[1]: http://www.securityfocus.com/blogs/753
+
+However, these disadvantages are irrelevant if you want to practice
+OOP, because if you don’t have ubiquitous LSP polymorphism, you aren’t
+practicing OOP.  So, in a way, these can be seen as five disadvantages
+of OOP.
+
+(In theory I don’t see why you couldn’t have a functional programming
+language where object embedding was the norm, but I haven’t seen one.
+Perhaps this is because functional programming languages have mostly
+adopted other approaches to solving the problems here that are not
+questions of mere efficiency: for nullability, sum types like ML’s
+`Option` or Haskell’s `Maybe` and constructor expressions; for
+aliasing, a default of immutability; and, to some extent, for garbage
+collection, sophisticated generational garbage collectors.)
+
+Parametric polymorphism
+-----------------------
+
+One big disadvantage of object embedding is that it requires you to
+implement parametric polymorphism (aka generics, generic types, or
+parametrized types) by means of generative programming, which can
+create a combinatorial explosion in code size.  ML-family languages
+get parametric polymorphism basically for free, because every value is
+the size of a machine word (ironic that the 1980s explosion of
+functional programming traces back to Backus’s misplaced attack on the
+“conceptual von Neumann bottleneck”!)  so you only need one copy of
+the machine code for `List.map`, not one copy for each size of list
+item.
+
+Zero instructions!
+------------------
+
+My assertion above that accessing embedded objects is not only cheap
+but actually *free* may seem dubious.  What I mean is that, often,
+what you’re doing with an embedded object is accessing fields within
+it, and if those fields themselves are embedded objects, you can
+easily end up with an entire chain of three or four or more field
+accesses compiling down to a single indexed fetch instruction, rather
+than a series of three or four of them.
+
+As an example, in [My Very First Raytracer][0], I have a
+function which begins:
+
+    static bool
+    find_intersections(ray rr, sphere ss, sc *intersections)
+    {
+      vec center_rel = sub(rr.start, ss.cp);
+    …
+    }
+
+which invokes these functions:
+
+    static vec
+    add(vec aa, vec bb) { vec rv = { aa.x+bb.x, aa.y+bb.y, aa.z+bb.z }; return rv; }
+    static vec
+    sub(vec aa, vec bb) { return add(aa, scale(bb, -1)); }
+    static vec
+    scale(vec vv, sc c) { vec rv = { vv.x*c, vv.y*c, vv.z*c }; return rv; }
+
+[0]: http://canonical.org/~kragen/sw/aspmisc/my-very-first-raytracer.html
+
+So, given all this, the `center_rel` code works out to
+
+    vec center_rel = { rr.start.x + ss.cp.x * -1,
+                       rr.start.y + ss.cp.y * -1,
+                       rr.start.z + ss.cp.z * -1 };
+
+Even mild inlining optimization can turn that into six indexed memory
+fetches and three subtractions, followed by three stores, but as far
+as I can tell, GCC actually somehow manages to allocate an SSE
+register to each of the six values, and so those 12 field accesses are
+incorporated into three instructions.  (I can’t follow the generated
+assembly at all, even with the aid of `-g -Wa,-adhlns=raytracer.lst`. 
+GCC has inlined basically the entire raytracer program into a single
+giant recursive function called `trace` of some 500-plus
+instructions.)
+
+Again, that’s 12 field accesses, plus some math, in 3 instructions,
+thanks to object embedding.
+
+Further alternatives
+--------------------
+
+What was the name of that guy who advocated using parallel arrays in
+C, Fortran-style?  He was also pretty unhappy about the decline in
+hi-fi audio systems since the 1970s.

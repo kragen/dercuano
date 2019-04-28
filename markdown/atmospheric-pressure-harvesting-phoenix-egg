@@ -1,0 +1,257 @@
+I think I’ve finally found the problem to how to refresh the memory in
+the Egg of the Phoenix: use daily tidal atmospheric pressure swings to
+power programs to periodically rewrite NAND Flash.
+
+The memory retention problem
+----------------------------
+
+The problem is that the device, by definition, needs to be able to
+retain its memory when buried for a century or more; that’s its entire
+raison d’être.  But modern Flash is not designed for such a
+requirement; instead, it’s designed for memory retention of 20 or even
+10 years.  And it’s very likely that Flash memory will gradually lose
+its memory as charge tunnels away from its floating gate, at a rate
+which is IIRC exponential in temperature.
+
+It doesn’t take very much energy to refresh Flash; file
+`low-power-micros` says [the Adesto AT25SF041-SSHD-T][0] NAND chip
+requires 100 mA for 500 ms to erase 32 kB ≈ 500 nJ per byte, and
+presumably some smaller amount to write the erased memory; file
+`keyboard-powered-computers` says Flash uses 2 μJ per 32-bit write,
+which is exactly equal.  FeRAM also exists and is about 2000 times
+more energy-efficient than Flash, and MRAM is apparently about 500
+times more energy-efficient than Flash, but both are dramatically more
+expensive.
+
+(Other possibilities besides Flash, FeRAM, and MRAM exist, but nothing
+that we can confidently predict will survive a century.)
+
+The power needed is thus proportional to the amount of data archived.
+
+[0]: https://www.digikey.com/product-detail/en/adesto-technologies/AT25SF041-SSHD-T/1265-1131-1-ND/4824165
+
+Energy requirements; why not just use a battery?
+------------------------------------------------
+
+This means that preserving, say, 100 gigabytes of Flash requires about
+50 kJ every 10 years or so, which works out to an average of 160 μW.
+If we take that over 100 years, it’s 500 kJ; converted to milliamp
+hours at the 3.7 V of a lithium-ion battery, it’s 37000 milliamp
+hours.  This would be a very reasonable-sized lithium-ion battery, one
+you could hold in your hand.  So why not just use that?
+
+Well, all batteries have a self-discharge rate, and typically it’s
+enough to discharge them completely within five years.  Lead-acid
+batteries have a somewhat longer shelf life, perhaps 10 or 20 years.
+But no commercially made battery has a shelf life of a century.
+
+One possible alternative is a Zamboni pile such as, it is believed,
+the [Clarendon Dry Pile that powers the Oxford Electric Bell][1],
+which has been ringing almost continuously since 1840, on about 1 nA
+and 2000 V (2 μW).  Unfortunately, although long-lived Zamboni piles
+do exist, they are not very well characterized; we don’t know very
+much about the ways they can fail, particularly after decades.  We
+don’t even know for sure that the Clarendon Dry Pile is in fact a
+Zamboni pile.  And, as far as I know, nobody has ever built a Zamboni
+pile that yields tens of microwatts, let alone hundreds.
+
+[1]: https://fisicaexpdemostrativos.uniandes.edu.co/PDF/The%20Oxford%20electric%20bell.pdf
+
+Atmospheric pressure variation
+------------------------------
+
+[Earth’s atmospheric pressure][2] varies tidally by a few millibar (a
+few hundred pascals) around its average of 101.325 kPa at sea level,
+varying from 87.0 kPa (during Typhoon Tip in 1979) to 108.48 kPa
+(during the Siberian High in Mongolia in 2001).  (The vertical
+variation is larger than this, at about 11.3 Pa/m, so reaching the
+record low typhoon sea-level pressure only requires going a bit over a
+kilometer up.)
+
+[2]: https://en.wikipedia.org/wiki/Atmospheric_pressure
+
+As I write this, the pressure is some 103 kPa, and tomorrow it’s
+forecast to fall to 102 kPa, then as low as 100 kPa the next day as a
+rainstorm comes through.  For most of the next week, the trend is
+almost perfectly flat, staying between 101 and 102 kPa.  There are
+tidal-looking wiggles in the forecast of about 100 Pa above and below
+the trend line.  The NWS says Boston currently has 101.51 kPa, but
+earlier today it’s been as low as 101.05 kPa and as high as
+101.62 kPa; yesterday was from 100.91 kPa to 101.56, with a bit of
+rain.  So, although the dependable tidal variations are only around
+100–200 Pa, working out to a total of 400–800 Pa per day absolute
+change, it’s common to have a bit more than that, like 1 kPa or more
+per day of change in one direction or the other.
+
+Common soils and even rocks are not sufficiently rigid and impermeable
+to prevent this pressure variation from reaching underground, even to
+a depth of tens of meters, a phenomenon known in some contexts as
+“[barometrically induced variability][14]”.  So an energy-harvesting
+device that harnesses these tidal pressure variations will work even
+if it’s buried, as long as it doesn’t get all crudded up with sand or
+something.  Even if it’s filled with water, it should continue to
+work.
+
+Such energy-harvesting computational devices date back to the
+seventeenth century; one of the greatest engineers of all time,
+[Cornelis Drebbel][4], built several clocks powered by such pressure
+changes at that time, [starting in 1610][11].  [Cox’s Timepiece][6],
+built in the 1760s, ran exclusively on atmospheric pressure [until
+being acquired by the Victoria & Albert museum in 1961][11], and the
+[Beverly Clock][5], built in 1864, is still running today, 154 years
+later, though it also harvests thermal energy.
+
+Jaeger-LeCoultre currently sells [the Atmos clock][3], which harvests
+energy from temperature and pressure variations to run without
+winding; some half a million have been produced so far [since their
+1929 début][8].  Although, like the Beverly Clock, it primarily
+harvests thermal energy, a pressure variation of 3 mmHg = 0.4 kPa is
+sufficient to energize it for two days; although typical tidal
+pressure variation is slightly smaller than this, it shows that
+pressure variations in this range are suitable for harvesting even
+with a tabletop-sized device with no electrical parts, by [pressing an
+ethyl chloride bellows against a spring][7].  Michael P. Murray, a
+specialist in Atmos clocks, claims that [they use about 250 nW][9];
+Adam Sacks [claims they should have a service life of about 600
+years][10].
+
+[3]: https://en.wikipedia.org/wiki/Atmos_clock
+[4]: https://en.wikipedia.org/wiki/Cornelis_Drebbel
+[5]: https://en.wikipedia.org/wiki/Beverly_Clock
+[6]: https://en.wikipedia.org/wiki/Cox%27s_timepiece
+[7]: http://www.atmosadam.com/howitworks.html
+[8]: https://web.archive.org/web/20071229055007/http://www.atmos-man.com/atmoshistory.html
+[9]: https://web.archive.org/web/20071218061057/http://www.atmos-man.com:80/atmospic.html
+[10]: http://www.clockguy.com/SiteRelated/SiteReferencePages/AtmosLeCoultreHistory.html
+[11]: http://www.douglas-self.com/MUSEUM/POWER/oddclocks/oddclocks.htm
+[14]: http://archive.wmsym.org/1998/html/sess18/18-12/18-12.htm
+
+Underground pressure penetration
+--------------------------------
+
+Aside from the few hundred pascals of tidal variation, when it rains,
+the soil may saturate with water and go to higher pressures.  If the
+Egg is buried 2 meters deep, for example, it will experience an extra
+20 kPa of hydrostatic pressure if the water table rises past it to the
+surface.  This is some two orders of magnitude larger than daily tidal
+variations, but only somewhat larger than the 15 or so kPa of
+difference between world records.  So it’s important to design the Egg
+to withstand such pressures, even if it can’t harvest the energy they
+present.
+
+The surface tension of water in the soil can also produce [soil
+suctions up to some 30 MPa][13], which I interpret as pressure below
+atmospheric pressure and indeed below zero pressure, despite cautions
+that that’s not exactly what is meant.  Apparently typical soil
+suction for agricultural soils is 25 kPa or less.
+
+“[Barometrically induced variability][14]” is a term used for
+variability in subsurface gas concentrations, of concern in monitoring
+of toxic waste.  One paper reported pressure variation over a range of
+some 25 mb (2.5 kPa) during a few days, tens of meters below the soil
+surface, which was inversely correlated with CCl₄ concentrations.
+
+Even higher-frequency pressure variations, such as those caused by
+wind vortices, can penetrate deep underground; [Takle and colleagues
+in 2004][15] measured about 6 dB of attenuation of 2 Hz pressure
+variation by 600 mm of soil, if I’m reading the paper right, which
+suggests that the ≈20 μHz tidal pressure swings should be able to
+penetrate many, many meters of soil with no real attenuation.
+
+[13]: https://papers.acg.uwa.edu.au/d/1508_0.2_Ridley/0.2_Ridley.pdf
+[15]: https://www.fs.fed.us/rm/pubs_other/rmrs_2004_takle_e001.pdf
+
+Power
+-----
+
+How much power is available from these air pressure variations?  It
+seems like the limit is somewhere around 100 μW/ℓ, but it may be hard
+to approach that limit.
+
+Suppose we have a cubic decimeter of air (a liter) with one flexible
+or bellowed face, to which we couple some kind of harvesting device,
+piezoelectric or mechanical or whatever.  Suppose the air pressure
+changes by 200 Pa.  If that device provides no resistance to the
+pressure variations, then the volume of the cube will increase and
+decrease by 0.2%, which is some 200 μm.  But this is doing no work on
+the device, because there is no force.  At the other extreme, suppose
+that the harvesting device is absolutely rigid.  Then the force on it
+will vary from +1 N to -1 N, but the volume of the cube will not vary,
+and so it will do no work on the device, because there is no movement.
+
+In between these extremes, we can harvest energy.  For example,
+suppose that the harvesting device will rigidly resist a maximum of
+0.5 N and thereafter move, winding a spring or something at constant
+force.  Then the flexible face will move by only 100 μm, but it will
+be exerting 0.5 N over that distance, providing 50 microjoules, about
+every 6 hours.  This works out to about 2 nW, which is two orders of
+magnitude smaller than what Murray claims the Atmos clock runs on.
+And the Atmos clock bellows does not appear to occupy an entire liter.
+We can perhaps conclude that using air, as the Beverly clock does, is
+quite disadvantageous.
+
+Dividing the cube into slices to get more faces does not help, because
+the slices will expand and contract by correspondingly less distance.
+Making the cube larger does help, as the energy available is
+proportional to the expansion distance and piston area.
+
+What’s the maximum work we could potentially extract from air pressure
+on our liter?  Suppose it’s still a cube, but filled with vacuum and
+with four bellows sides, with a constant-force spring pulling on it
+producing 1013.2 N.  Now, whenever the air pressure falls below
+101.32 kPa, the spring will expand the cube to its full 1ℓ volume, and
+whenever the air pressure rises higher, the spring will contract the
+cube down to a little square pancake, which we can suppose has
+insignificant volume compared to 1ℓ.  The work that can potentially be
+extracted is a function of the height of the peak at the point that we
+allow the harvesting device to move; supposing that, as before, it’s
+200 Pa from trough to peak, we have 2 N over 100 mm, which of course
+yields 200 mJ.  This is a quite respectable 9.3 μW, though still
+considerably smaller than the 160 μW we need.  And, of course, if we
+somehow know that the pressure will fall from 103 kPa to 102 kPa
+tomorrow, then we can leave the cube fully extended until the pressure
+reaches its minimum, and then extract 10 N over 100 mm, a total of
+1 J, some 100 μW over 24 hours.
+
+(And of course we can use multiple liters to multiply the power; use a
+longer, thinner cylinder to get a longer stroke at proportionally less
+force; or use a fatter, flatter cylinder to get a shorter stroke at
+proportionally more force.)
+
+Note that 9.3 μW is some 4000 times larger than the 2 nW we’d get from
+the air cube.
+
+How close could we come to this ideal in practice?  Presumably the
+Atmos uses ethyl chloride because the pressure range is enough to
+cause much of it to condense and evaporate at room temperature,
+enabling much larger volume variations than an air tank could manage.
+At a given temperature, the equilibrium pressure within such a
+mixed-phase, single-material container is absolutely constant at the
+vapor pressure of the liquid at that temperature, so a liquid whose
+vapor pressure is 101.32 kPa at whatever your temperature is would
+actually behave precisely like the vacuum-and-constant-force-spring
+gedankenexperiment above, expanding to an almost arbitrarily large
+volume when the pressure drops, and contracting to almost none when
+the pressure rises.  (For water, the liquid to vapor density ratio is
+a few thousand to one; it’s a bit lower for ethyl chloride.)
+Unfortunately, that experiment assumes that the tidal swings center
+precisely on that known pressure, which, as described above, is far
+from true; day-to-day shifts are commonly several times the amplitude
+of the dependable tidal pressure swings.
+
+It isn’t yet obvious to me how, but I suspect that something close to
+the ideal behavior described above is feasible.  So only a few liters
+(perhaps less than the 28 used by the Beverly Clock) should be
+necessary to provide the refresh power.  I think the Atmos compromises
+its ability to harvest energy at any given pressure/temperature
+combination by using its “counterweight” Hookean spring to spread its
+response curve over a wide range of pressures and temperatures in a
+purely static fashion.  That is, at a given pressure and temperature,
+I think the Atmos’s expansion chamber will always have the same
+volume, plus or minus a small constant bit of hysteresis.
+
+Efficiently converting the mechanical power to electrical power is, I
+think, the easiest part of the problem; piezoelectric,
+electromagnetic, and electrostatic techniques are all applicable,
+though it seems likely that the fairly rigid piezoelectrics are the
+best fit for the likely small displacements involved.

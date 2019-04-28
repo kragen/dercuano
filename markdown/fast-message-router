@@ -1,0 +1,290 @@
+Suppose you have a bunch of small processes, like the size of httpdito
+(which uses 12k or 16k of memory maps), running and sending requests,
+responses, and change notifications to each other.  How fast could
+they reasonably do this?
+
+I wrote this test called syscallovh.c to get a ballpark:
+
+      char c[s];
+      int fd = open(devzero, O_RDONLY);
+      if (fd < 0) {
+        perror(devzero);
+        return 1;
+      }
+
+      for (int i = 0; i < n; i++) {
+        read(fd, c, s);
+      }
+
+It finds that, on my current laptop (Intel(R) Pentium(R) CPU N3700 @
+1.60GHz under Linux debian 4.4.0-21-generic), a system call takes
+about 300 ns, and bulk-copying bytes into userspace takes about 171 ps
+per byte, or, let’s say, 175 ns per kibibyte.  This suggests that, to
+keep the system call overhead under 10%, we need IPC message buffers
+to usually be in the neighborhood of 16 kibibytes or bigger.  Such a
+bufferful of data should take 300 ns + 16 * 175 ns = 3.1 μs to
+process.
+
+The sample CoAP request from Appendix A of RFC 7252, the CoAP RFC, is
+16 bytes long (0.01 GET /temperature MID=0x7d34) and it receives an
+11-byte response (2.05 Content "22.3 C" MID=0x7d34), so sending it
+through a Linux system call by itself incurs about 100× overhead: 300
+ns for the system call plus 2.7 ns to transmit the actual request,
+plus a comparable amount of work for each of the three steps where the
+server receives the request, the server sends a response, and the
+client receives the response, a total of 1.2 μs.  A buffer of 1024
+such requests or responses, by contrast, would require 3.1 μs, or
+3.1 ns per request — 12.4 ns per request for the full request-response
+cycle.  This would allow my four-core laptop, naïvely, to handle 32
+million request/response pairs per second, or 500 000 request/response
+pairs per 60Hz screen refresh.
+
+As some kind of comparison, on a machine similar to this, httpdito can
+serve (and ab can measure) an HTTP request in about 50 μs, which takes
+about 2700–3200 instructions in the spawned child process and 29
+instructions in the parent process, plus some unknown amount of work
+in the kernel on its behalf, which is actually the great bulk of the
+execution time.
+
+As another comparison, here’s the usual dumb fibonacci microbenchmark:
+
+    fib(n) { return n < 2 ? 1 : fib(n-1) + fib(n-2); }
+
+On my laptop, this takes 920 ms to calculate that fib(40) is
+165580141, running 2,288,656,125 instructions (2.49 billion per
+second), which works out to 5.6 ns per leaf call.  There are almost
+exactly twice as many total calls as there are leaf calls, so this is
+2.8 ns per function call and return, or 6.9 instructions per function
+call and return.
+
+This is probably an unusually serial benchmark.  One core of the
+machine can presumably run about 4 billion instructions per second
+with more typical levels of ILP, giving these crude ballpark numbers:
+
+    | task                           |    ns |  insns | reqs | insns/req |
+    |--------------------------------+-------+--------+------+-----------|
+    | syscall/ret                    |   300 |   1200 |    0 |    1200/0 |
+    | 4 syscall/rets                 |  1200 |   4800 |    1 |      4800 |
+    | httpdito HTTP txn              | 50000 | 200000 |    1 |    200000 |
+    | 1024-req buffer 4 syscall/rets | 12400 |  49600 | 1024 |   48.4375 |
+    #+TBLFM: $3=$2*4::$5=$3/$4
+
+(It’s amusing that the kernel is presumably running about 200 000
+instructions while being scripted by httpdito running about 3000
+instructions.)
+
+Perhaps for messages sent over a network, this enormous
+microsecond-scale overhead of computation per request/response pair is
+unavoidable, but for processes on a single machine, it seems like it
+should be avoidable.  A message broker that accepts buffers full of
+messages from other processes, copies the messages around
+appropriately to other processes, and sends the buffers off to the
+other processes should be able to cost somewhere between the 48
+instructions per message that copying them minimally costs and the
+4800 instructions per message that the kernel charges us for more or
+less the same job.  If we could manage 512 instructions per message,
+for example, that would be 128 ns, several times faster than doing a
+couple of system calls per message.  This would scale down to pieces
+of work as small as 32–64 function call/return pairs, and be efficient
+for pieces of work as small as 512 call/return pairs.
+
+(Even across a network, if each node has a message broker talking to
+other message brokers across the network, it may be feasible to reduce
+the overhead; alternatively, zero-copy networking hardware may be able
+to store incoming packets directly into the message buffers of waiting
+processes.)
+
+For communications topologies that change much less often than
+messages are sent over them, such as with flow-based programming, Unix
+pipelines, or farming work out to worker threads, no message broker
+would be needed to amortize per-system-call overhead over many
+messages.
+
+What might such a protocol look like?
+
+You probably want the messages to have an 8-byte-aligned fixed-length
+header with a length field counted in 8-byte units, rather than the
+bytes used by 0MQ and CoAP.  You need to be able to have thousands of
+outstanding requests at a time, which probably requires you to be able
+to accept results out of order.  You probably want your header fields
+to be either single bits or entire bytes in order to avoid the need
+for extra shift instructions.
+
+You probably don’t want per-message authentication and encryption, not
+only because it impedes routing but also because it takes too long.
+In [The security impact of a new cryptographic library][0] in 2012,
+Bernstein, Lange, and Schwabe report that NaCl can run 80 000
+public-key authenticated encryption or authenticated decryption
+operations per second an a 6-core 3.3GHz AMD Phenom II X6 1100T, which
+is presumably in the ballpark of 750 000 instructions per operation.
+The paper mentions a faster interface consisting of
+crypto_box_beforenm, crypto_box_afternm, and crypto_box_open_afternm,
+which allows you to amortize the expensive public-key operations
+across many messages to or from the same correspondent.
+
+[0]: https://cr.yp.to/highspeed/coolnacl-20120725.pdf
+
+However, even the [ChaCha20 stream cipher used by NaCl needs 5.6 clock
+cycles per byte for a 64-byte message][1] on an AMD Ryzen 7 1700 at
+3GHz, working out to 128 ns per message.  So per-message
+authentication and encryption could conceivably be affordable, but it
+will probably use more CPU time than the message routing would.
+
+[1]: https://bench.cr.yp.to/results-stream.html
+
+It’s crucially important that, if there are message brokers, whatever
+transformation they must do need not examine every byte in the
+message, including in particular breaking the 8-byte alignment
+guarantee as they copy the message from an input buffer to its
+appropriate output buffer or buffers.
+
+Messages should probably normally be in the range of 16 bytes (smaller
+messages will have space only for the 8-byte header!) to 512 bytes
+(significantly larger messages will probably gain no further
+efficiency), with 128 bytes being the normal case.  A single-byte
+length field would support messages up to 2048 bytes.
+
+So, a single message might contain a datum of a level of detail such
+as the following:
+
+- the above example request or response about temperature
+- a 512-byte disk sector (although maybe in the age of 3D XPoint
+  memory, user processes should be interacting directly with durable
+  memory rather than indirecting their access to it through kernels
+  and servers)
+- a 16×16 pixel RGBA tile (1024 bytes)
+- part or all of a scan line of pixels (2048 bytes in RGBA is 512
+  pixels; in 16-bit RGB, it’s 1024 pixels; in 8-bit grayscale, it’s
+  2048 pixels; in 1-bit monochrome, it’s 16384 pixels)
+- a rendered glyph from a font (some of the glyphs on my screen right
+  now are 20×34, 12×17, 7×9, 12×9, and 7×7, thus ranging from 49
+  pixels up to 680 pixels; some mainstream fonts have glyphs as small
+  as 5×7, and I've designed a proportional 6-pixel-tall font with some
+  2×6 glyphs)
+- a millisecond or two of PCM audio; at DAT quality this is 192 bytes
+- a drawing command
+- a Merkle tree node with 4–32 SHA-256 hashes
+- 32 single-precision floating-point numbers from one column of some
+  table
+- a touch, keystroke, or mouse event
+- a SQL query
+- a SQL table row
+- the log message for an HTTP request
+- a Redis query or response
+- a line of text (but ideally not a letter, word, paragraph, page, or
+  document)
+- a 128-node binary DAG with two bytes per node and 128 implicit leaf
+  nodes
+- an AST of some 64 nodes with up to 192 implicit leaf nodes
+- the bytecode for a method to be compiled or the machine-code
+  compilation result
+- a B-tree node containing 32–128 child node pointers, 64 bits each,
+  with or without keys
+- an SNMP request or response
+- a Git commit, but probably not an entire Git commit history.
+- a Git tree entry such as “100755 blob
+  b734283e0473b9d77f07efee066f1486a1c5a37f wifiscan.py”, but probably
+  not an entire Git tree.
+- a Tweet
+- an SMS
+- a financial transaction
+- a stock price update
+- a compilation command
+
+It probably makes sense to layer some kind of application-layer
+protocol defining semantics (routing, failure recovery, naming,
+request-reply, publish-subscribe, caching) on top of a base data
+representation layer.
+
+Many-output computations
+------------------------
+
+Thinking about how to wedge a “give me the 16×16 RGB tile (768 bytes)
+at (112, 144) from frame 1832 of foo.mp4” service into a cached RESTful
+architecture makes me question the idea of caching individual message
+responses to achieve efficiency.  Computing the tile in question, or
+even an approximation of it, is going to require decoding a
+potentially large area of the previous several frames, possibly up to
+a few seconds’ worth of video.  I’m not sure if it’s feasible to break
+that computation down into pieces whose outputs would fit into a
+single 2048-byte message so they could be cached, but it certainly
+isn’t the easiest way to bring existing video decoders into the
+system.
+
+However, if instead of “give me the 16×16 RGB tile (768 bytes) at
+(112, 144) from frame 1832 of foo.mp4”, you instead request “please
+store the next few frames following frame 1770 of foo.mp4 at
+/some/place”, the video codec could issue a few hundred thousand PUT
+requests to store its output, and then we could fetch those outputs.
+
+A similar kind of thing happens with, say, a drawing that gets
+rendered to a high resolution set of pixels — in the extreme case, the
+drawing is some view of the OpenStreetMap database.  If we move one of
+the lines in the image, naïvely, that invalidates every tile of the
+cached image.  To avoid invalidating the whole cached image, you need
+some kind of intermediate layer that efficiently partitions the
+drawing elements into those that affect different bounding boxes, then
+makes the individual pixel tiles depend only on the subset drawn
+within their bounding box.  This seems feasible, but still tricky.
+
+High-bandwidth computations
+---------------------------
+
+Copying a byte into or out of a user process may take only 171 ps of
+one core, which suggests that you could do 23 gigabytes per second on
+this laptop, or 11.7 gigabytes per second out one process and into
+another.  That’s pretty decent bandwidth; 1920×1080×60Hz×4bytes is
+only 498 megabytes per second.  But that bandwidth gets divided by the
+number of intermediary processes it ends up flowing through.
+
+Still, this seems like it should be okay.
+
+Low-latency computations
+------------------------
+
+One of my examples above is “a millisecond or two of PCM audio”.  For
+media playback applications like watching a movie with bae, fairly
+high latency is acceptable as long as you have enough buffer to even
+out the jitter.  But, if you’re building a synthesizer out of a bunch
+of processes piping PCM audio to each other, [even 10 milliseconds of
+audio latency is intolerable][2].
+
+[2]: http://superpowered.com/androidaudiopathlatency
+
+Buffering a millisecond of audio is not bad.  Earlier today I [wrote a
+softsynth in C++ to make the sound of the synthesizer in Eurythmics’
+_Sweet Dreams_][3].  It has 29 very-low-level processing nodes in an
+11-level-deep DAG, all of which are stateless and use continuous time.
+If they were being called upon to generate a millisecond of audio
+(192 bytes at DAT quality) we would expect sending that millisecond to
+require 300 ns + 192 * 171 ps = 330 ns at each node, plus another
+330 ns on the node that received it; all 29 would take a total of
+19 μs of system call overhead.  The current C++ implementation spends
+about 20 μs generating that millisecond of audio, but 90+% of that is
+in method invocation overhead (including virtual method dispatch),
+because each node is generating a single sample instead of 48 samples.
+
+[3]: http://canonical.org/~kragen/sw/dev3/sweetdreams
+
+(Some of the nodes are invoked more than once; there’s a seven-node
+sawtooth C3 note subgraph that’s used at two different times by the
+flanger, and a five-node triangle-wave C2 note subgraph that’s both
+used to amplitude-modulate the flanged signal and added to the final
+mix, and the identity function is a single node that’s used in six
+places.  So this count of 29 is slightly low.  Compiling the node
+graph into JS reveals 45 operations, but 15 of those are the identity
+function and could perhaps be skipped; another couple are redundant
+constant evaluations.  So I think 29 is in the ballpark.)
+
+So this approach, with a single millisecond of latency, would impose
+an order-of-magnitude overhead on soft-real-time audio-processing
+applications, but would still be almost two orders of magnitude more
+performant than necessary in this case.
+
+In fact, it would not even be fatal if these messages were enqueued in
+a message broker between each node behind a 16-kibibyte buffer of
+other data.  If each of the 9 levels of the tree cost 3.1 μs of
+bufferbloat, the total would be 27 μs of message-broker bufferbloat
+latency, less than the 39 μs of CPU usage to get all those tiny
+messages in and out of all those tiny processes; the total would be
+66 μs, or 6.6% of the millisecond.

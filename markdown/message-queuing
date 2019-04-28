@@ -1,0 +1,234 @@
+I’ve been thinking about a new computational model to eliminate the
+runtime costs of dynamic dispatch and take better advantage of modern
+heterogeneous hardware.
+
+Background
+----------
+
+### The Tera MTA ###
+
+The Tera MTA was a computer that achieved consistently high
+performance despite a high-latency main memory and no cache hierarchy
+by hiding the latency with multithreading — its heavily-multibanked
+RAM system could hold a lot of requests in flight, each one being
+routed to an autonomous memory unit, and the CPU’s hardware context
+switching with multiple hardware register sets meant that whenever
+some data arrived from a memory unit, it would probably wake up a
+thread that could do work on it.  In this way, the MTA was able to
+achieve very high performance not only on cache-friendly tasks like
+dense linear algebra but also on cache-unfriendly tasks like
+traversing linked lists.
+
+### The Actor model ###
+
+The Actor model unifies objects, threads, and activation records into
+a single “actor” abstraction, which reacts to an incoming message by
+sending some set of other messages and changing its internal state.
+Erlang is probably the language most directly based on this model, but
+its evolution was intimately intertwined with that of Smalltalk, in
+which an object that “receives” a “message” will “answer” it.
+
+You could imagine an implementation of the Actor model in which each
+actor is a physically separate piece of hardware, communicating with
+other actors through some kind of bus or packet-switching network that
+carries the messages; but it’s much more typical for a single CPU to
+sockpuppet the actors one by one, first executing the code of one
+actor, then the code of another.  Although the Actor model easily
+accommodates an actor sending several messages without waiting for
+responses, or receiving a message and not responding to it, the
+traditional approach is for the CPU to implement nearly all message
+sends by subroutine calls or returns.
+
+### Dynamic dispatch is slow ###
+
+One of the key difficulties in efficiently implementing Smalltalk and
+similar object-oriented languages has been the overhead of dynamic
+dispatch.  In theory, in Smalltalk, not just every function call, but
+every arithmetic operation and every conditional, is performed by
+sending a message to an object.  Conditionals are performed by sending
+messages like #ifTrue:ifFalse: to a boolean object; arithmetic is
+performed by sending messages like #+ to a number object.  The lack of
+static type information in Smalltalk and descendant languages like JS,
+Python, Objective-C, and Ruby means that in general the dispatch of
+these messages requires some pointer indirections and a hash-table
+search with the method selector.  This has led to performance in
+optimized versions of these languages typically about an order of
+magnitude worse than optimized C; Objective-C, like C++, avoids this
+by reserving such dynamic method calls for special occasions.  (C++
+additionally uses extra static type information to reduce the cost of
+method lookup.)
+
+There are two efficiency difficulties with this.  One is that the
+dynamic dispatch itself requires a certain amount of computational
+work — comparing a class identifier to the class identifier in an
+inline cache, for example, or comparing method selectors found in a
+hash table to the selector for the method being called.  The other is
+that it necessarily involves a certain amount of pointer-chasing,
+which implies random memory access patterns.  On a large memory, this
+inevitably results in higher latency.  The single-threaded programming
+model we use turns that high latency into low throughput.
+
+### Actor message queues ###
+
+Some versions of the Actor model, like the one implemented in Erlang,
+associate a message queue with each actor — rather than running the
+actor’s code immediately when a message is sent, the message is added
+to a queue, and the actor’s code can run later to process the queue.
+In Erlang, the process’s code can actually select particular messages
+from the queue to process out of order, which is used to support a
+call-response pattern in which a client sends a message to a server
+process and then blocks until the reply is available.
+
+Such queuing is a general-purpose system design pattern for
+maintaining throughput in the face of large or highly variable
+latency.
+
+### Fast dynamic allocation with good locality ###
+
+Generational copying garbage collectors typically require only about
+two or three machine instructions to allocate memory in the nursery:
+one to save the old value of a register, another to add an immediate
+constant to it, and a third to compare its value against the end of
+the nursery to see if the allocation succeeded.  In theory, if the
+nursery is large enough, the work to iterate over the root set and
+fish the few surviving objects out of the nursery will be amortized
+over enough objects that the garbage collection work per object is
+also very small.
+
+This is still a great deal more work than is needed to allocate and
+deallocate an object on the stack in C or C++, which is typically
+zero, because the compiler can determine upon entry to the function
+how much space its local variables will consume and subtract the total
+from the stack pointer in a single operation.
+
+However, maybe you can do the same thing for generational heap
+allocation — check upon entry to a function to see whether the nursery
+is big enough for everything you’re going to allocate, do a minor GC
+if necessary, then preallocate all the objects you’re possibly going
+to allocate in the function.  If the collector happens to run while
+you’re still on the stack, it can relocate your entire “heap frame”
+out of the nursery, consulting a liveness map to see which objects in
+the heap frame have been initialized thus far in the function.
+
+This should have the benefit that the objects you allocate in your
+function remain close together in memory until after the function
+returns.
+
+### Mergesort converts random memory-access patterns to near-sequential ###
+
+This is how people did compilers and databases in the days when they
+only had a few kilobytes of RAM: they used multiple tape drives to
+store data for the different passes of the compiler and to sort the
+database into an order that allowed a single sequential pass over it
+to produce the answers for all the queries (called “reports”, more or
+less).
+
+Consider the basic problem of a linker: after concatenating its input
+files, it needs to combine a potentially large amount of object code
+full of relocations with symbols providing definitions for those
+relocations.  One way to do this is to take the list of relocations,
+sort it in symbol order, and then merge it with the sorted list of
+symbols to produce a list of instructions roughly of the form “add 382
+to location 10078”.  Then, sort this list of instructions by location,
+and then merge it with the object code.
+
+If you have 100 megabytes of object code, 3 million relocations
+(totaling 36 megabytes), 300,000 symbols (totaling 4 megabytes), 64
+kilobytes of RAM, and eight “tapes”, then sorting the symbols requires
+three passes totaling 24 megabytes of sequential I/O (one to break
+them into 128-kilobyte sorted chunks, a second to merge those into
+896-kilobyte sorted chunks, and a third to merge the five chunks);
+sorting the relocations requires five passes, merging them with the
+symbols requires one pass, and sorting them again requires five more
+passes, for a total of 796 megabytes of sequential I/O; and then you
+need a final pass to generate the linked object code.
+
+Using actor queues to hide dynamic dispatch latency and increase locality
+-------------------------------------------------------------------------
+
+What if we use message queues instead of a call stack?
+
+When you start running a function, it allocates a heap frame and
+starts processing its incoming message queue.  While it’s running, it
+can send many, many messages to other actors, but it can’t get
+responses from them; it can allocate new objects in its heap frame
+that will later handle responses, if need be.  It doesn’t need to
+actually be able to access any information of those other actors; all
+of its outgoing messages could even be accumulated in an
+outgoing-queue buffer, which is perhaps part of that heap frame.
+
+This requires that all of its loops be statically bounded from the
+time you enter the function.  It’s okay if they iterate some
+dynamically-determined number of times, but that number has to be
+determined up front, because it affects how much to allocate.  This
+means that the function is guaranteed to terminate.  This unforgivable
+incursion upon Turing-completeness is not really a problem, since the
+function can send messages to itself if need be.  In the worst case,
+this reduces to continuation-passing style.
+
+Once it exits, perhaps it is time to sort the outgoing messages by
+destination.  Then we can select a next function to run, ideally one
+with at least one message in its message queue.  Maybe we select the
+function with the most messages in its message queue.
+
+If the function’s input data and computational structure are
+sufficiently regular, we can vectorize it, so that in fact it is
+processing many input messages in a single instruction.  Perhaps
+eventually those many input messages will result in response messages
+going to many different destinations.
+
+If the messages are like Smalltalk messages, consisting of a selector,
+a “receiver” (in Smalltalk terms) on whose class the selector is
+dispatched, and arguments, there are a few different ways the
+dispatching could be amortized.  If the routing system can identify
+the method, it can have a single queue for that method, with messages
+for many different receivers mixed in it.
+
+Note that in this model, unlike in Erlang, we can guarantee in-order
+message delivery between a given pair of actors, even though
+there’s a great deal of nondeterminism about sequencing otherwise.
+But taking advantage of that requires state to exist in the actor,
+unlike the actor-per-method approach suggested in the previous
+paragraph, where the actor is a stateless method.  (And it seems like
+with this amount of nondeterminism in ordering, you really want to
+keep local state to a minimum; maybe only a kind of
+barrier-synchronization primitive, which aggregates two or more
+expected messages from different sources, should be allowed to have
+any mutable state.)
+
+Alternatively, you could have queues per selector, per object, or per
+class.  The function handling the per-selector queue would forward the
+message, somehow, to the appropriate method; the per-object or
+per-class function could perhaps contain the code for all the methods.
+
+This approach, despite its obvious drawbacks in nondeterministic
+ordering of operations and potential to be slower rather than faster,
+has some potential advantages:
+
+1. You can, obviously, replicate and distribute the actors across a
+   network for (ha) performance.
+
+2. You can take advantage of heterogeneous hardware by running
+   different actors on different hardware — some might run much
+   faster, for example, on a GPU or an FPGA.
+
+3. You can distribute actors across *time* rather than *space* in
+   cases where memory is limited — you need only have one actor in RAM
+   at a time, as each message contains everything that is needed to
+   process it.  This could allow you to run large late-bound systems
+   on very minimal hardware.  (This is really just another way of
+   looking at the benefits of running in the CPU cache on a modern big
+   CPU.)
+
+4. Even very large setup and teardown costs could potentially be
+   amortized over a large number of messages.  For example,
+   reprogramming an FPGA with a bitstream that implements a particular
+   actor might take milliseconds — maybe seconds if you have to run
+   project IceStorm to generate the bitstream — but if it’s processing
+   a million queued messages, that’s likely okay.
+
+5. The ordering nondeterminism I moaned about over and over again
+   amounts to separating the scheduling concerns about latency
+   vs. throughput vs. memory usage from the algorithmic concerns about
+   what to compute.  Perhaps being able to change your scheduling policy
+   separately from the code will empower you to choose a better one.

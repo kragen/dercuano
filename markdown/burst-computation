@@ -1,0 +1,221 @@
+Timesharing was originally intended to make computing power more
+accessible by allowing you to pay for your average usage rather than
+your peak usage, also promoting economies of scale through centralized
+computing facilities, in the same way you could publish classified ads
+in the newspaper from time to time without buying a web-fed offset
+press.  In the day of the US$58 (in Argentina! retail!) 4-CPU-core
+4-GPU-core 1200MHz Raspberry Pi 3, this might seem like an outdated
+concept.  But there are still tasks that benefit from more computation
+than the Pi can provide.
+
+(At some point in the 1970–1990 time frame, the economies of scale
+moved from the individual computers to the mass-production facilities
+for their integrated circuits, so the cheapest way to provide a lot of
+computing power is currently to buy a large number of some computing
+device that is produced in high volumes.  Rather than amortizing the
+costs of building a powerful computer over many users, we amortize the
+cost of designing and making the masks for a powerful computer over
+many computers.)
+
+[Roy Longbottom benchmarked the Pi 3][0]; he got 711 million Whetstone
+operations per second, in the neighborhood of 300 Whetstone megaflops
+(single precision), 2500 VAX MIPS, 180 Linpack double-precision
+megaflops, 486 Linpack single-precision megaflops with NEON, and 200
+double-precision megaflops when memory-bandwidth limited (520 in
+64-bit mode).  Linux measures it at 38 BogoMIPS.
+
+[0]: http://www.roylongbottom.org.uk/Raspberry%20Pi%20Benchmarks.htm
+
+By comparison, the NVIDIA Pascal GP100 on a mezzanine P100 GPU
+Accelerator card, introduced in 2016, [provides 5 double-precision
+teraflops][1], about the same as 25000 Raspberry Pi 3s.  It isn’t
+available in Argentina, but [Amazon has it for about US$1500][2],
+which is about US$0.06 per Pi, showing that there still are *some*
+economies of scale in computation.
+
+[1]: http://www.anandtech.com/show/10222/nvidia-announces-tesla-p100-accelerator-pascal-power-for-hpc
+[2]: https://www.amazon.com/Ultimate-Pascal-GDDR5X-ADVANCED-ARCHITECTURE/dp/B01JYRI4A2/ref=sr_1_fkmr0_4?ie=UTF8&qid=1489877886&sr=8-4-fkmr0&keywords=nvidia+pascal+gp100
+
+Moreover, I commonly run intensive computations where latency is
+important, but the duty cycle is low — my peak usage would ideally be
+much higher than my average usage.  With the advent of per-minute
+Openstack vendors like Orange’s [Cloudwatt][3] and per-request
+services like [AWS Lambda][4], it seems like it might be quite
+feasible to spin up a temporary virtual supercomputer on demand.
+
+[3]: https://www.cloudwatt.com/fr/a-propos/index.html
+[4]: https://aws.amazon.com/lambda/pricing/
+
+Consider, hypothetically, that I am doing some interactive
+computations, like in IPython or whatever, and I would like to keep my
+interactive response time under a second; maybe I am doing 10 such
+computations in a minute, 10 such minutes in an hour, and 10 such
+hours in a day.  And let’s say that these computations are
+embarrassingly parallel, and each such computation involves about two
+minutes of calculation time on a GP100: 600 trillion floating-point
+operations.
+
+It would in theory be possible to fulfill this wish by buying three
+million Raspberry Pi 3s for US$174 million, plus the networking and
+electrical equipment to harness them together.  If we lower our aims
+to being able to complete 100 such computations per hour, we only need
+83,000 Pis, costing only US$4.8 million.
+
+A much more practical approach would be to buy NVIDIA GPUs and ATX PCs
+to plug them into, maybe two PCs per GPU; if this costs US$1750 per
+GPU, then we need two GPUs (US$3500) to provide the 36-second response
+provided by the five-million-dollar Pi cluster, or 72 GPUs
+(US$126,000) to provide the wished-for one-second response.
+
+[Cloudwatt charges €0.0102 per hour][5] for its t1.cw.tiny-1
+instances, comparable to DigitalOcean’s smallest “droplet”, and
+€0.0558 per hour for n1.cw.standard-1 instances, each with one virtual
+CPU; an “instance de type haute performance” n1.cw.highcpu-2 costs
+€0.0870 per hour and has two virtual CPUs.  Supposedly these [virtual
+CPUs are equivalent to one Xeon processor thread][7], but they don’t
+seem to say what clock speed or generation of Xeon.
+
+Suppose we’re talking about the [Xeon E5-2687W v3 Haswell-EP system
+Donald Kinghorn benchmarked at 788 gigaflops][6] (Linpack, double
+precision) at 3.1 GHz in 2014.  That’s across two CPUs with 10 cores
+each.  Then we should expect about 39 gigaflops per core, and maybe 20
+gigaflops per core thread (assuming “hyperthreading” gives two threads
+per core).  Then our 600 trillion floating-point operations work out
+to about 30000 vCPU seconds.  This means that to get the computation
+results in a second, we need to spin up about 15000 n1.cw.highcpu-2
+instances, then shut them down after they’re idle for a minute, so we
+get billed for two minutes for each of them, 30000 minutes or 500
+hours in all, €43.50.
+
+[5]: https://www.cloudwatt.com/fr/produits/tarifs.html
+[6]: https://www.pugetsystems.com/labs/hpc/Xeon-E5-v3-Haswell-EP-Performance----Linpack-595/
+[7]: https://www.cloudwatt.com/fr/produits/serveurs/fonctionnalites.html
+
+Recall that this is €43.50 for one minute of computation (with a 17%
+duty cycle within that minute), and we’re doing such minutes 100 times
+a day, so it works out to €4350 per day.  This comes out to the
+US$126,000 (€117,000) cost of the 72-GPU cluster in only 27 days.
+
+If we instead accept a 36-second response time, we only need about 420
+n1.cpu.highcpu-2 instances, but we need them for ten hours a day,
+which works out to 420·10·€0.0870 = €365 per day, which works out to
+320 days to add up to the cost of the cluster.
+
+An instructive comparison would be the cost of a personal cluster of
+Xeons, since they might be a less efficient way to run your problem,
+and a more direct comparison to Cloudwatt’s pricing.
+
+I think a currently typical price for [a 3.06GHz six-core Xeon X5675
+CPU is currently US$215 including shipping][8].  [BOINC measured the
+E5-2687W mentioned above at 3.34 GFlops/core][9] and the X5675 at 3.13
+GFlops per core, and [SETI@Home has a similar list][10], so the X5675
+cores are probably more or less comparable to the ones Kinghorn was
+benchmarking.  The X5675 is for an LGA-1366 socket, and a currently
+typical price for [a motherboard like the SuperMicro X8DTN+ with two
+LGA-1366 sockets might be US$430][11], and it has on-board Ethernet.
+(I’m not 100% sure this motherboard will work for this processor, but
+a similar one should.)  [4GiB of DDR3-1333 memory costs US$40
+now][12], and 16GiB might be a reasonable amount to include in such a
+machine, so US$160.
+
+So a Xeon machine with 12 Xeon cores on two CPUs with 16GiB of RAM
+might cost US$1020, not counting power supply, case, and labor.  A
+cluster equivalent to 420 n1.cpu.highcpu-2 instances would have 210
+cores and thus 18 machines, US$18,360 (comparable to the US$3500 GPU
+cluster); the 15000 instances would be 7500 cores and thus 625
+machines, US$637,500 (comparable to the US$126,000 GPU cluster).
+
+So, in effect, Cloudwatt lets you use a US$18k cluster for 10 hours a
+day for €365 a day (US$392/day), which pays for the cluster in 46
+days, or a US$637,500 cluster for 100 or 200 minutes per day for €4350
+a day (US$4650/day), which pays for the cluster in 137 days.  The
+higher “efficiency” in the second case is because, in our scenario,
+the duty cycle is lower for the more powerful cluster — you only have
+instances spun up for 10 or 20 minutes out of each of the 10 hours
+you’re using the thing.
+
+[8]: https://www.allhdd.com/?subcats=Y&pcode_from_q=Y&pshort=N&pfull=N&pname=N&pkeywords=N&search_performed=Y&src=pw&q=637345-B21&dispatch=products.search
+[9]: https://asteroidsathome.net/boinc/cpu_list.php
+[10]: https://setiathome.berkeley.edu/cpu_list.php
+[11]: http://www.compsource.com/ttechnote.asp?part_no=X8DTNO&vid=428&src=PW
+[12]: http://www.compsource.com/ttechnote.asp?part_no=AX275920781&vid=1242&src=PW
+
+Nevertheless, Cloudwatt’s pricing is so high that they are only a good
+choice if you are experimenting with computation for a few days, even
+in an apples-to-apples comparison with CPU hardware bought outright.
+If you continue to do computation, you would be better off buying your
+own computer; the payback time is only one to four months, and the
+useful life of the computer is probably 18 months or more.
+
+[AWS Lambda charges per 100ms multiplied by RAM usage][13],
+specifically $0.00001667 per gigabyte-second, which I guess is 16.67
+microdollars per gigabyte-second or 16.67 femtodollars per
+byte-second, plus $0.0000002 (0.2 microdollars) per request.
+
+[13]: https://aws.amazon.com/lambda/pricing/
+
+100ms is three orders of magnitude finer granularity than the
+per-minute billing of Cloudwatt, so you could imagine this would
+result in substantially improved costs.
+
+Let’s suppose you could farm out these one-second computations into
+30000 AWS Lambda requests (maybe through four levels of request tree,
+each tree request farming out to 16 subrequests, or something) which
+each take one second and use 256MB of RAM during that time.  That’s
+30000 seconds at 256MB, which works out to US$0.128 for the time for
+the computation, plus US$0.006 for the requests.  At 10 computations
+per minute, 10 minutes per hour, 10 hours per day, that’s US$128 per
+day.  This is considerably better than Cloudwatt’s US$4350 per day; it
+doesn’t become more expensive than buying the US$126,000 72-GPU rig
+for almost 1000 days, which is probably longer than the depreciation
+time for the hardware, even in the current post-Moore era.
+
+(There’s the potential problem that even AWS Lambda functions in Java
+might suffer a serious performance penalty over native code.)
+
+However, there’s still a large efficient region in between Amazon’s
+pricing and what it’s economically feasible to provide.  The 72-GPU
+rig in our scenario could support multiple users.  If we expand it to
+a 144-GPU rig (US$252,000), then three users need to submit a
+computation during the same second for the response time to exceed the
+usual second.
+
+It isn’t obvious to me how to calculate the load statistics in closed
+form, but whipping up a quick numerical simulation, it seems like with
+repeated simulations with 10 users that all use the cluster during the
+same hour, typically about 30 of their 1000 requests (10 per user; 3%)
+will be submitted during a second which has two or more other
+requests.  This lowers the cost per user to US$25,200.  So you could
+probably charge each user US$50 per day (US$5 per hour) and still come
+out ahead, assuming answering only 97% of requests in under 1½ seconds
+(answering most requests in 500ms) is acceptable.  Scaling up the
+cluster further should allow lower costs per user with lower numbers
+of slow requests.
+
+Note that the cluster could produce other value streams as well; the
+10,000 requests per day still leave it 88% idle, so it could run
+lower-priority batch computations at the same time.
+
+At a smaller scale, you could imagine 32 users using US$58 Raspberry
+Pi 3s (US$1900 total) submitting 250-millisecond tasks to a shared
+dual-GP100 rackmount box (US$3500), which has the number-crunching
+power of 50000 Pis.  At the same 100-task-per-hour pace, nearly all of
+the tasks will be completed in under 500ms, though the Pi would need
+four hours to complete one of them — in effect, at this low
+utilization, each of the 32 users are getting nearly the full benefit
+of a GP100 or two, for only US$170 each.
+
+(The costs for the rackmount box may be a bit low.  The US$430
+motherboard I linked earlier has 18 memory slots and supports up to
+144 GiB of RAM; for another US$720 you could give it 72GiB of RAM,
+which would work out to 2¼ GiB per user, which might be a bit low.
+The motherboard, a single US$215 CPU, and 72GiB of RAM work out to
+US$1365, bringing the total cost of the shared computer to US$4365,
+adding an extra US$42 per user, US$136 of shared computer per user and
+US$194 per user in total.)
+
+This is one reason Google (and, presumably, Facebook) is so effective
+at beating competition: it has been standard practice for more than a
+decade that everyday engineers can fire off a 10,000-CPU computation
+and see results within a few minutes — though not, at the time, less
+than a second.

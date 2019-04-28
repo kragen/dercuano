@@ -1,0 +1,386 @@
+In part since I’m living with a seven-year-old, I’ve been thinking
+about laser-cutting a construction set based on a design Matt Heck
+showed me at TechShop something like a decade ago.  If I recall, he
+had some things laser-cut from Masonite.  I can’t find anything he’s
+put online about it.
+
+Although the original was laser-cut from I think high-density
+fiberboard, you could realize this design with any sheet-cutting
+process, including scrollsaw cutting, plasma cutting, oxy-fuel
+cutting, laser-cutting of plastic or metal, waterjet cutting, hot-wire
+cutting, wire EDM, or sheet-metal shearing.
+
+The basic Heckballs unit is a square with rectangular slots cut
+halfway from its edge to its center, with the width of the slot being
+the same as the thickness of the square.  By slotting squares into
+each other’s slots (edge-lap joints), so that their edges match up
+with each other’s centers, you can easily assemble a somewhat
+free-form 3-D lattice.  80 mm is a reasonable size for the squares;
+1.5 mm is a reasonable thickness.
+
+To be somewhat concrete about costs, in the most basic Heckballs form,
+you can cut an 810 mm × 450 mm sheet of 1.5 mm MDF into 10×5 = 50
+squares using 10×5 cuts totaling 10·400 mm + 5·800 mm = 8 m of
+cutting; each slot is 20 mm + 1.5 mm + 20 mm = 41.5 mm, and there are
+200 of them, for another 8.3 m of slot cutting, a total of 16.3 m.  At
+30 mm/s, this is 543 s ≈ 1 hour ÷ 6.6, which is probably about US$6 of
+laser cutting time, or about 12¢ per Heckballs square.
+
+[MDF costs][2] AR$179 ≈ US$12 for 1830 mm × 2600 mm of 3 mm-thick MDF,
+which works out to about US$2.50/m², or [AR$40 for 300 mm × 600 mm][3]
+of 1.5 mm thick MDF, which works out to about US$14/m².  So the
+cutting is probably the bulk of the expense, which suggests it might
+be worth trying to cut stacked MDF.
+
+[2]: http://articulo.mercadolibre.com.ar/MLA-618975684-placa-mdf-fibrofacil-3mm-183-x-260-mts-iva-incluido-_JM
+[3]: http://articulo.mercadolibre.com.ar/MLA-612547737-plancha-de-fibrofacil-de-30-cm-x-60-cm-x-15-mm-_JM
+
+(Steel is supposedly around US$300 per tonne right now, which would be
+US$7.20/m² at 3 mm, which rather surprisingly suggests that [ASTM A36
+steel][5] only costs about twice what MDF does per unit volume,
+despite having 210 GPa of Young’s modulus, which is 50× MDF’s
+stiffness, and 290 MPa yield stress, which is 16× MDF’s strength.)
+
+[5]: http://www.makeitfrom.com/material-properties/ASTM-A36-SS400-S275-Structural-Carbon-Steel
+
+In this form, this has a few drawbacks:
+
+1. The lattice is entirely made of perpendicular and parallel planes,
+   which is the worst possible configuration for rigidity.  More
+   liberty of form would allow much more efficient material use.
+
+2. There’s no way to make a flat surface without stuff sticking out of
+   it, like for a shelf, chair seat, table top, or foot.
+
+3. The slot width is unforgiving of imprecision; if the material is
+   slightly thicker or thinner than spec, or if the slot is cut
+   slightly narrower or wider, it’s easy to get parts that won’t fit
+   together or don’t stay together reliably.
+
+4. If you fill all the slots of a square, the other squares collide in
+   the middle.
+
+5. The tensile strength of the joint is low because it is entirely
+   dependent on friction.
+
+6. The square corners of the slot create stress risers in the
+   material, resulting in much lower resistance to cracking than is
+   necessary.
+
+7. Covering a long distance demands a lot of material, because you
+   can’t make a “beam” of joined squares that’s less than 80 mm wide
+   in both dimensions.
+
+8. Covering a long distance creates a lot of angular slop, because
+   there are a lot of serial degrees of freedom in all the slot
+   joints.
+
+9. There’s no way to make joints that are free to turn or slide, only
+   rigid connections.
+
+To provide tensile strength, the joints can be provided with [tapered
+clips][0] (i.e. snap joints).  To eliminate stress risers, the
+internal corners of the slots can be [replaced with rounded
+divots][1], or better for laser cutting, chamfered divots.  The
+tapered clips should also allow making the slots a bit wider,
+eliminating the sensitivity to precision, but curving the slots
+slightly might also solve the problem without introducing more play.
+Curving the tapered clips could make it easier to fit a fingernail or
+whatever between them and what they’re clipping onto so that you can
+unclip them.
+
+[0]: http://www.deferredprocrastination.co.uk/blog/2013/so-whats-a-practical-laser-cut-clip-size/
+[1]: http://makezine.com/2012/04/13/cnc-panel-joinery-notebook/
+
+To prevent the collisions at the centers, it probably makes sense to
+chop off the edges of the squares, so that the distance between the
+centers of two edge-lapped squares is still 40 mm, but the squares are
+only 77 mm wide.
+
+To permit covering a longer distance, I think probably the right
+solution is to have more than one kind of unit.  For example, a long
+beam with 20 mm slots only at its ends, could hold the centers of the
+two squares at its ends 320 mm apart instead of 80 mm apart.  This
+gives it a total length of 320 mm (or 317 mm to avoid collisions).
+
+If the beams are 8 mm wide, we can cut an 80 mm × 320 mm rectangle
+into either 4 squares (roughly) or 10 beams.  We probably want to have
+more beams than squares, because even in a 2D square grid, you have
+twice as many beams as vertices.  The 4 squares require 320 mm +
+4·80 mm + 4·4·21.5 mm = 984 mm of cut (although adding clips might add
+another 300 mm or more to that).  The 10 beams require 10·320 mm +
+80 mm + 2·4·21.5 mm = 3452 mm of cutting, which suggests a certain
+cost disequilibrium, pressuring the scale to increase to avoid wasting
+expensive laser to conserve cheap MDF.
+
+Solving the rigidity problem involves using a different lattice.  The
+incremental change is to add diagonals: convert the squares into
+octagons with eight slots and add beams of 320√2 mm ≈ 452.5 mm.
+Alternatively, you could try to switch to a sphere-close-packing
+lattice.
+
+Once you have 8-mm-wide beams, you could enable rotation by cutting
+circular holes through the centers of some octagons or squares.
+Curves are much slower to cut on typical laser cutters, so you
+probably don’t want to do this for all the octagons, just some of
+them.  The diameter of the hole should probably be about 8.2 mm.
+
+Making flat panels that can fit snugly onto the coplanar edges of some
+octagons shouldn’t be very difficult, although they won’t be
+watertight.  You just cut slots for the edges of the octagons to peek
+through.
+
+These beams will be somewhat prone to buckling, since their
+slenderness ratio 320:1.5 is over 200; although the column effective
+length factor K is probably 0.5, this is still plenty long enough to
+enable buckling.  If you could strengthen the beam into a T-beam with
+another 8 mm beam, the problem would probably be solved.
+
+The aforementioned pressure to increase the scale adds more pressure
+to do the T-beam thing, since at a larger linear scale, buckling
+becomes a bigger problem.
+
+What would the face-centered-cubic close packing solution look like?
+The unit cell is a cuboctahedron; in different planes, the number of
+lines coming out of a vertex are 0, 2, 4, or 6, all evenly spaced.  If
+you think of the face-centered cubic arrangement as being a stacking
+of square layers, the connections within a given layer are at 0°, 90°,
+180°, and 270°, while the connections to the layer above or below are
+at 45°, 135°, 225°, and 315°.  Unfortunately, both the layer above and
+the layer below are at exactly the same angle, so they can’t both
+connect.  Still, you could enable a double-layer close-packed truss
+with this arrangement by simply having octagon joints and extra
+unit-length beams whose end slots are angled at 45°.  For the moment I
+think I’ll give up on fcc and hcp.
+
+So, what does the most basic Heckballs kit look like?  Let’s say I
+want to be able to make a cube with diagonals on most faces.  Four
+vertices, four regular beams, and one long beam make a square (320mm
+side plus an extra 40mm stickout).  But then there’s no immediate way
+to extend the lattice in a perpendicular direction.  By adding more
+joints onto the edge, we could get a perpendicular direction and thus
+a sort of cube, but now some of the diagonals are the wrong length.
+
+So here’s the part where Heckballs actually become balls.  We
+eliminate rotational symmetry from the octagon; one of its slots now
+extends to its center, and the opposite one is eliminated.  Two such
+octagons can be edge-lapped together to form something approximating a
+sphere with 12 available valences, 8 of which are among the 12
+directions needed for the fcc crystalline structure.  To make the cube
+with some diagonals, we can use the three valences along one edge of
+one octagon to make the two sides and diagonal of one square, and the
+valence in the center of the side of the other octagon to make the
+side of a perpendicular square.  Two corners of the top square must be
+made in this way, with their axes coplanar with and at 45° to the
+square’s sides.  The other two corners could be made with their axes
+coplanar to the perpendicular square and perpendicular to *its*
+diagonal, thus enabling four of the six cube squares to have
+diagonals.  The other two faces are not thus diagonalizable.
+
+If it is our priority to have three *adjacent* square faces
+diagonalized, neither this structure nor any similar structure can
+solve that problem, because connecting to the ends of the axis is
+impossible.  A possible solution is to make some beams integral with
+joints, enabling them to connect axially.
+
+Another possibility is to avoid connecting *at* vertices and instead
+connect *around* vertices, forming a polygon or polyhedron enclosing
+the vertex.  For example, beams could penetrate into one another at
+some angle near their ends.  It’s easy for me to imagine how this
+would work for 90° in a single plane around a vertex, but harder for
+me to imagine other angles.
+
+Oh, wait, it’s not that hard.  You can get an arbitrary angle with the
+plane of each beam rotated by some amount with respect to the plane of
+the angle; as long as the beam’s plane is neither parallel nor
+perpendicular to the angle plane, it’s workable (though more so if
+it’s not nearly so).  Hmm, I have to think about that some more.
+
+Anyway, back to the cube.  Here we have eight vertices, each of which
+needs two half-slitted octagonal joints, sixteen octagons in all, plus
+12 short beams and 4 long beams.  Let’s suppose we scale up a little
+bit to respond to the cost-optimization thing to ⅛m (125 mm) for the
+octagon nominal width, and add another 4 long beams for extra
+flexibility, and cut down the beam length to half the octagon width.
+Now we have:
+
+- 16 122 mm × 122 mm octagons
+- 12 250 mm × 31¼ mm short beams
+- 8 353.6 mm × 31¼ mm long beams
+
+That all adds up to about 0.42 m², slightly more than a single
+810 mm × 450 mm cut at Max58, even before worrying about packing.
+Maybe to get quicker feedback I should scale down by a factor of √2 to
+88.4 mm as the basic unit?  This is getting fiddly, I should probably
+just use 100 mm, and go back to 4× for the beams.  Also I don’t need
+to leave a whole 3 mm off at the end; I only need ¾ mm off each end,
+or 1.5 mm in total:
+
+- 16 98½ mm × 98½ mm octagons
+- 12 398½ mm × 25 mm short beams
+- 8 564.2 mm × 25 mm long beams
+
+That’s 0.39 m², still slightly too big, argh.
+
+All right, let’s bite the bullet and go down to a basic unit of
+62.5 mm:
+
+- 16 61 mm × 61 mm octagons
+- 12 248½ mm × 15 mm short beams
+- 8 352.1 mm × 15 mm long beams
+
+That’s 0.147 square meters, so I should be able to nearly double it.
+
+It’s about 41% octagons, 31% short beams, and 28% long beams.  We
+could probably do with a higher proportion of beams: maybe 24
+octagons, 28 short beams, and 20 long beams.
+
+(Actually the octagons could still be squares maybe, although the slot
+ends should still be radially symmetric.)
+
+A thing to somewhat worry about with these small octagons is that the
+slot ends will be awfully close together, and especially close to the
+deepened slot.  The distance from the center of the joint to the end
+of the slot is 31.25 mm, with another 29.75 mm to the edge of the
+octagon.  The clip hole needs to be at least 1.5 mm further in,
+probably better 3 mm further in, and the clip hole and slot probably
+need to be 1.7 mm across, and the clip hole probably needs to be 3 mm
+long, so the innermost part of the clip hole will be (31.25 - 3 -
+3) mm = 25.25 mm from the center.  But the slots at 45° from the
+deepened slot will have the center of the innermost end of their clip
+hole only √½ 25.25 mm = 17.9 mm from the deepened slot, and the
+0.85 mm diagonal reduction from the width of the clip hole reduces
+that by 0.6 mm further down to 17.3 mm.  Actually that’s the distance
+the clip hole corners will be from one another, but the deepened slot
+will also have its own clip on one side.
+
+What should the clip dimensions look like?
+
+The maximum tensile strength we can expect is the compressive strength
+of the 1.5 mm × 1.5 mm maximum possible contact area, 10 MPa · (1.5
+mm)² = 22.5 N, or 45 N when we take into account the clips on both
+sides, which is pretty wimpy.  Ideally this thing would withstand my
+harshest pulls without breaking, and with my legs I can pull close to
+twice my body weight, so about 2000 N.  So this is about 44 times
+weaker than it needs to be.
+
+It’s possible to get some improvement there with multiple clips in
+multiple holes, but there isn’t room for 44 sequential holes.  At 6 mm
+per hole, there’s really only room for 3 at most.  So this is probably
+unattainable.  It does rather strongly suggest that 1.5 mm MDF is
+suboptimally thin and will result in assemblies that are far too
+easily broken.  Indeed, probably even 3 mm is too thin.  The next size
+up stocked by Max58 is 5.5 mm, giving us about 13× as much contact
+area.
+
+So what if it’s 5.5 mm thick?  10 MPa · (5.5 mm)² · 2 = 600 N, about a
+third of what we’d like it to withstand.  So maybe a double hole in
+5.5 mm and call it a day at 1200 N of compressive strength.
+
+But for that double hole, we probably need 22 mm from the center to
+the inside of the slot, even if the hook holes are absolutely square.
+So we probably need to make our octagons bigger, more like 150 mm.  15
+such octagons would occupy our entire 810 mm × 450 mm sporting area,
+so we don’t have room for anything else on the first pass.  Which is
+fine, because this is already taking me forever.
+
+What about tensile strength?  MDF’s UTS is only 18 MPa, so to
+withstand the 600 N of tension on either of the double hooks, we need
+6.1 mm of width on the 5.5-mm-thick clip at the first hook to keep it
+from simply breaking from tension.  That’s going to make it kind of
+tough to unclip by hand, I think.
+
+(I have a new design to keep the clip head from tearing off due to a
+tension concentration on the hook side of the clip; it involves a bar
+on the other side sliding into a slot, preventing the clip from
+rotating.  But the clip still needs to withstand the tensile stress.)
+
+What about the force and energy needed to unclip the clip?  [Patrick
+Fenner tells us][4] that if we don’t taper,
+
+> the force to deflect the tip by a set distance is F = dEta³/(4l³),
+> where d is deflection, E is the Young’s modulus of the material, t
+> is beam thickness and a is the depth of the beam.
+
+In this case, d is at least 5.5 mm, E is 4 GPa, t is 5.5 mm, and a is
+6.1 mm.  So if l = 75 mm, which is kind of an absolute limit if the
+diameter of the thing is 150 mm, then we need 16 N, which is doable
+without tools.  For a more reasonable value of 40 mm, we get 107 N,
+which is going to require a screwdriver or something.
+
+[4]: http://www.deferredprocrastination.co.uk/blog/2013/laser-cut-elastic-clipped-comb-joints/
+
+We may be able to improve the situation by tapering the clip down to
+3.1 mm at the second hook, which should still be enough to resist the
+tensile force there, starting from a thicker root.
+
+The clips and clip holes shouldn’t extend all the way to the center,
+to avoid colliding with the deepened slot or excessively weakening the
+overall joint, nor should they extend all the way to the edge, in
+order to keep the angle properly controlled.  The clip beam can extend
+deeper than the slot, but not by too much.
+
+I don’t know, maybe I’m being too demanding of the tensile strength of
+a clip joint.  Suppose that instead of designing for 1200 N we settle
+for 360 N, 90 N per hook, which we can get with 3 mm MDF instead of
+5.5 mm, so we don’t need 11 mm of depth per hook hole, only 6 mm; we
+can now get 180 N tensile strength out of <3.4 mm of beam.  And maybe
+we go back down to truncated 100 mm squares for our octagons.  If the
+hook holes end 12 mm after the end of the slot, and we extend the clip
+beam by those same 12 mm, then its total length is 24 mm.  So
+dEta³/(4l³) = 3 mm · 4 GPa · 3 mm · (3.4 mm)³ / (4 (24 mm)³) = 25 N,
+which you can operate with your fingers.  It should get even better
+with tapering.
+
+(ETA: actually it's totally reasonable to have arbitrarily low
+unclipping force with arbitrarily high tensile strength.  Among the
+things you can do are to fold up the spring serpentine-style or to cut
+lengthwise slits in it to make it less stiff, in the limit becoming
+like the pages of a book.)
+
+Plasma-cutting clips like these in steel might be feasible, but they’d
+have to be much thinner, since steel’s stiffness is 50× higher; about
+3.7 times thinner to retain the same operating force they had in MDF.
+Plasma has tolerances in the 300-micron range, so if your steel clip's
+nominal thickness was 1.5 mm, it might come out as 1.2 mm (and have
+51% of the desired operating force) or 1.8 mm (and have 173%).  So the
+920-micron clip width indicated ought to be doable, and its 290 MPa
+yield stress would give it a tensile strength of 800 N (or as low as
+540 N if it came out thin).  The steel’s 0.13% elongation at yield is
+only a fourth the MDF’s 0.45% or so elongation at break, so steel
+flexures have to be quite a bit thinner in order to work at all.
+
+Anyway, back in MDF-land, the whole clip/slot perforation extends to
+13 mm from the center, which is only 8 mm in the case of the corners
+of the 45° and 315° diagonal slots next to the deepened slot.  I’m
+getting less worried about that, though.
+
+Bending strength of the joint should be good.  If you have octagon A
+and octagon B edge-lapped and B tries to rotate around its axis, it’s
+pressing against A at almost A’s center (like uh 2 1.5 mm √2 = 4.2 mm
+from the center I think?) and has one of A’s hooks in it at 25 mm +
+12 mm = 37 mm out.  It’s not totally easy to predict how that’s going
+to end up, but let’s say we have a 15 mm lever arm from where the
+fulcrum ends up being and something like 30 mm² effective surface
+area; then the surface will start to be damaged at about four or five
+newton-meters.  Hmm, that suggests that maybe the double clips are
+overkill?
+
+Trying to squish the two octagons against each other may break them
+more easily.  The surface only has a 1.5 mm lever arm at most to
+resist the 50 mm lever arm where you can apply torque.
+
+The 400 mm × 400 mm area devoted to the 16 100 mm octagons in the
+starter kit leaves a spare 400 mm × 10 mm area along one side and
+another 450 mm × 410 mm area for beams.  No long beams will fit that
+way!  We could fit long beams if we have a 200 × 400 area with 8
+octagons, and then 8 more octagons in a 400 × 200 area to the right,
+leaving a 610 × 250 area above it into which we pack 10 564.2 × 25
+long beams, leaving a 45 × 250 area to its right, and a 200 × 200 area
+below, or something.  So then one short beam can fit vertically on the
+right. Blegh.
+
+Alternatively the second group of octagons could be 600 × 100, cutting
+the total octagons to 14, and leaving space for plenty of short beams
+above it.  Actually no none of this makes any sense.  I should drag
+and drop stuff or some shit.

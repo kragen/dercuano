@@ -1,0 +1,389 @@
+[Chifir][0] is inspirational.  It’s the first archival virtual machine
+good enough to criticize.  You can implement the CPU in a page of C
+(my version is 71 lines and took me 32 minutes to write), and then all
+you need is screen emulation, which took me another 40 lines and 28
+minutes.†
+
+Archival virtual machines have applications beyond archival.
+Independent implementations of the virtual machine defeat
+Karger–Thompson attacks at the virtual machine level and potentially
+the hardware level as well.  And a stable deterministic virtual
+machine enables the publication of reference implementations of other
+virtual machines and deterministic rebuilds of derived files, such as
+compiler output, database indices, or raw pixels output from an image
+codec.
+
+Alas, Chifir is not good enough to actually use as a _general-purpose_
+archival virtual machine, which of course is not its intended purpose.
+Any of the following problems would by itself be a fatal flaw (for a
+general-purpose archival virtual machine):
+
+1. The specification does not include test cases, so there is no way
+   to debug a candidate implementation, and in particular to easily
+   disambiguate the natural-language specification of the instruction
+   set.  In fact, as far as I can tell, not even the Smalltalk-72
+   image described in the paper has been released.  This is important
+   because when I added screen output to my implementation of Chifir,
+   my first test program was a single-instruction infinite loop, which
+   had a bug and also found a bug in my implementation of Chifir.
+
+2. Also, the instruction set contains unspecified behavior, including
+   access to out-of-bounds memory addresses, execution of any of the
+   4294967280 undefined opcodes, division by zero, the appearance of
+   pixels that aren’t all-zeroes or all-ones, and arguably the
+   rounding direction of division.  Unspecified behavior is a much
+   worse problem for archival virtual machines than for the systems
+   we’re more familiar with, because presumably the archaeologist
+   implementing the virtual machine specification has no working
+   implementation to compare to.
+
+3. The straightforward implementation of the instruction set using
+   `for (;;) { ... switch(load(pc)) {...} }` is unavoidably going to
+   be pretty slow, because the instructions only manipulate 32-bit
+   quantities.  Getting reasonable performance would require a
+   JIT-compiler implementation, which is complicated by the need to
+   invalidate and recompile self-modifying code.
+
+4. Input is blocking; it is impossible to read keyboard input, which
+   is the only kind of input, without blocking.  That means that
+   Chifir will, at any given time, be either unresponsive to the user
+   or unable to execute any code until the user types a key.
+
+5. The instruction set has absurdly low code density, requiring 128
+   bits per instruction.  This is a big problem for archival virtual
+   machines because archival media are many orders of magnitude lower
+   density than media customarily used for software interchange.
+
+6. Although the specification specifies the bit order of the image
+   when stored as individual bits (as in their proposed physical
+   medium), it does not specify an image file format as a series of
+   bytes.  In my implementation, I chose to represent the image in
+   binary big-endian format, with the most significant byte first, but
+   a different implementor might make a different choice, such as
+   representing the image in a sequence of the ASCII digits “0” and
+   “1”.  Such differences would produce unnecessary incompatibility at
+   the file level between implementations, if not at the
+   micro-engraved disc level.
+
+7. Chifir has no provision for access to storage media; the only I/O
+   is the screen and keyboard.
+
+8. Because Chifir has no clock, no timer interrupts, and no keyboard
+   interrupts, there is no way within the Chifir system to regain
+   control from an accidentally-executed infinite loop.
+
+[0]: http://www.vpri.org/pdf/tr2015004_cuneiform.pdf "The Cuneiform Tablets of 2015"
+
+However, it’s worth pointing out some things Chifir got right:
+
+1. Unlike Lorie’s UVC, the Chifir virtual machine has well-defined
+   arbitrary implementation limits and overflow behavior, so it should
+   be straightforward for all implementations to have the same
+   arbitrary limits.  This will avoid incompatibilities where a
+   virtual machine image works on one implementation of the virtual
+   machine (perhaps the one used by an archivist) but fails for
+   obscure reasons on another (perhaps the one written by an
+   archaeologist.)
+
+2. Like BF, and unlike most virtual machines, Chifir does succeed in
+   being implementable in an afternoon, being a “fun afternoon’s
+   hack”.  In fact, it vastly overshoots this goal: an afternoon is
+   three to eight hours, depending on your definition, and it took me
+   32 minutes to implement Chifir without a display and an hour to
+   implement Chifir with a display.  (The COCOMO model used by David
+   A. Wheeler’s ‘SLOCCount’ instead estimates it would take a week,
+   but it’s usually wrong in such a way for such small programs.)
+   Chifir could be about three times more complicated without
+   overshooting the one-afternoon budget, especially if the
+   implementor has known-good test programs to work with instead of
+   having to concurrently write and debug their own.  Maybe a
+   complexity budget of 512 lines of C, a bit under eight pages, would
+   be a reasonable absolute maximum.
+
+3. Chifir’s CPU lacks many edge-case-rich features present in other
+   CPUs, which are common compatibility stumbling blocks.  For
+   example, it doesn’t have floating point, flag bits, signed
+   multiplication and division, different memory access modes,
+   different instruction formats, different addressing modes, for that
+   matter any general-purpose registers, memory protection, virtual
+   memory, interrupts, different memory spaces (as in modified Harvard
+   architectures like the Hack CPU).  Similarly, its I/O
+   specifications are ruthlessly simple, leaving little room for
+   compatibility problems.  It’s very likely that a straightforward
+   implementation of the specification will be, if not absolutely
+   right, at least almost right.
+
+4. In part because Chifir lacks such corner cases, nothing stops you
+   from writing a multithreaded program or JIT compiler in Chifir
+   code.
+
+† My implementation of Chifir is available via `git clone
+http://canonical.org/~kragen/sw/dev3`.  It requires the following
+files:
+
+<http://canonical.org/~kragen/sw/dev3/Makefile>
+<http://canonical.org/~kragen/sw/dev3/chifir.c>
+<http://canonical.org/~kragen/sw/dev3/chifir.h>
+<http://canonical.org/~kragen/sw/dev3/chifir_xshmu.c>
+<http://canonical.org/~kragen/sw/dev3/xshmu.c>
+<http://canonical.org/~kragen/sw/dev3/xshmu.h>
+
+I’m not counting xshmu.c and xshmu.h as part of the Chifir
+implementation because I wrote them separately.
+
+Some approaches to a possibly viable archival virtual machine design
+--------------------------------------------------------------------
+
+How should we design an archival virtual machine to make it easy to
+write correct and sufficiently fast emulators for existing systems we
+want to preserve?
+
+### Use a register-based instruction set ###
+
+Register virtual machines are faster than stack machines or belt
+machines (like the Mill) when all three are implemented in a
+straightforward way; typically the benefit is about a factor of 2.
+Register virtual machines have a small instruction density penalty,
+and their assembly code doesn’t factor as nicely as stack machines’
+and isn’t as easy to generate as stack machines’.  But I find it
+easier to write by hand, and in any case, reasonable register
+allocation can be fairly simple.
+
+Register virtual machines can also, in theory, eliminate the need for
+jump instructions if the PC is as accessible as any other register,
+though the overhead on this mechanism is a bit high to use it as a
+calling mechanism as well.
+
+Look to Thumb (and the curiously similar Cray-1 instruction set) for
+code density tricks.
+
+Other things we’ve considered include: MOV machines
+(“transport-triggered architectures”) like my “dontmove”; stack
+machines like the MuP21; and RTL designs where the only operation was
+producing new bitvectors from the NAND of slices of existing
+bitvectors.
+
+### Focus the instruction set design on video with SIMD instructions ###
+
+The most performance-critical part of computers with graphical
+displays has always been the graphical display.  This was true in 1963
+when Ivan Sutherland wrote SKETCHPAD; it was true in 1974 when the
+Alto implemented bitblt in microcode; it was true in 1980 when
+6502-based microcomputers competed to provide more hardware sprites on
+the display at once; it was true in 1996 when Andy Glew designed MMX
+for the Pentium MMX; it’s true today in 2018 when we’re using GPUs
+instead of CPUs to mine Ethereum, crack passwords, and train neural
+nets.
+
+If updating the screen is slow, everything will feel slow.  If
+updating the screen is fast, probably the other parts of the system’s
+code will be fast enough too.
+
+So probably wide SIMD registers, like SSE, NEON, or AVX, are a good
+model to follow.  Unlike SSE (but like GPUs) it’s probably better to
+have *only* wide SIMD registers.  You can always ignore the rest of
+the vector if you only care about a scalar operation!
+
+GCC offers a particularly simple and reasonably effective way to apply
+such facilities, documented in its manual in the section “Using Vector
+Instructions through Built-in Functions”.  Briefly, it provides only
+“vertical” operations (those that operate on corresponding vector
+items), except that you can subscript vector values to fetch
+individual items, you can broadcast scalars across vectors, and
+there’s a `__builtin_shuffle` function which can rearrange vector
+items.  And of course each operation can operate on any vector type.
+(Heterogeneous operations, e.g. 4 floats with 4 uint32s, are not
+supported.)  This is mupch simpler than the irregular zoo of 600+
+vector instructions provided by Intel, and if it’s at times somewhat
+less efficient, it’s still dramatically more efficient than just
+writing scalar code.
+
+(In C++, GCC also offers `?:`, `!`, `&&`, and `||` for these vector
+values.)
+
+SIMD instructions provide the opportunity for a naïve for-switch loop
+to get reasonable performance, because each instruction is doing
+enough work to pay for the heavy interpretation overhead.  This can
+also helps with the cost of bounds-checking, at least if you don’t
+have scatter-gather — a bounds-check every 16 or 32 bytes is less
+costly than a bounds-check every byte.
+
+Originally I thought you could get by with only 32-bit unsigned math,
+like Chifir, and that might actually be true.  But then I got a tiny
+bit of experience writing SSE code, and it sure is nice when you can
+get 16 byte additions in an instruction instead of 4.
+
+(However, I don’t think the saturating arithmetic mode is worth it.)
+
+### Or use vector instructions as an alternative to SIMD ###
+
+“Vector instructions” here is referring to Cray-style or NEC-SX-style
+vector instructions.  I don’t think this is a good idea for archival
+because it’s far too easy for implementation optimizations to leak
+through to the visible semantics, but see file `vector-vm` for more
+details.
+
+### Forget about floating point ###
+
+Floating-point math is profoundly important and very tempting to
+support, but even with near-universal adherence to the IEEE-754
+standard, which requires that the basic arithmetic operations produce
+results accurate to within half an ulp (which means that all
+conforming implementations will produce bit-identical results), it’s
+impossible to argue that floating point is easy to get right.  Even in
+the last few years, the introduction of the FMA facility in Intel
+processors has introduced divergence from bit-identical results in
+expressions as simple as `a+b*c`, which may produce results differing
+by an ulp depending on whether your compiler compiles it to use FMA or
+not.
+
+Aside from that, getting gradual underflow, rounding modes, and NaN
+handling right requires lots of special cases, and it is often omitted
+for the sake of performance.
+
+### Don’t have unspecified behavior ###
+
+This means no undefined instructions, no undefined video results, no
+undefined results of out-of-bounds memory, no race conditions, nothing.
+
+### Have nonblocking I/O ###
+
+It’s absolutely essential to be able to run code while periodically
+checking whether the user has provided any input.  It may not be
+necessary to make the input interrupt-driven — modern machines are
+fast enough to poll a keyboard at 100Hz without producing undue CPU
+load, even in emulation.  A “hardware” input event ring buffer is
+probably the right mechanism here.
+
+### Have a timer interrupt ###
+
+Without a timer interrupt, you can’t do preemptive multitasking, and
+without either a timer interrupt or a pollable system clock, you can’t
+do animation at a correct speed, because you have no way to tell what
+speed you’re doing it at.  The timer interrupt should be able to run
+at a high enough frequency that you can poll the keyboard at over
+100Hz.  A fixed 1000Hz is probably fine, but it’s possible that it may
+need to be configurable by the program, like the Unix alarm(2) system
+call or JS's `setTimeout` and `setInterval`.
+
+This thought is scary because it inevitably introduces nondeterminism
+into the system, because it potentially provides side-channel
+communication into the virtual machine, and because bugs in interrupt
+handlers are hard to debug.  But the cost of not having it is just too
+high.
+
+(With respect to nondeterminism — consider possible implementations in
+which timer interrupts are handled at the end of each instruction, at
+the end of each basic block, and at backward jumps or calls.  How
+likely is it that a program that is tested and working in one of the
+later cases will turn out to have previously undetected heisenbugs
+when run on a simulator with more possible interruption points?)
+
+For non-interactive tasks or those in which determinism is paramount,
+this facility can be disabled.
+
+As an alternative sufficient for animation timing, a purely
+deterministic facility could freeze the virtual machine’s execution
+until a given timestamp had passed, but provide no way for the program
+to determine the current timestamp.  (Waiting for a time in the past
+would simply return immediately.)  Since the program cannot execute
+any instructions while frozen, it cannot observe whether any time has
+passed or not.  However, this doesn’t enable you to implement a
+preemptively multitasking operating system.
+
+### Write a comprehensive set of test cases ###
+
+You don’t need any testing hooks in the virtual machine definition for
+this, just a breakpoint facility and the ability to look at memory
+when a breakpoint is hit, which are entirely external to the VM as
+seen by the program — they are a _deus ex machina_ from the program’s
+point of view.
+
+For math operations with up to 32 bits of input, such as 16-bit binary
+operations and 32-bit unary operations, there’s no reason not to
+exhaustively test them.
+
+### Specify a file format ###
+
+That means a concrete representation as a sequence of 8-bit bytes, not
+just glyphs engraved on a disk.  Provide the test cases in this
+format.
+
+### Don’t have memory protection ###
+
+Memory protection is probably not worth the complexity it would add to
+the virtual machine.
+
+### Minimal set of ALU operations ###
+
+BF only provides increment and decrement ALU operations, which is
+insufficient.  Chifir provides `+`, `-`, `×`, `÷` (presumably floor
+division), modulo, `<`, and NAND.  C provides `+`, `-`, `*`, `/`
+(usually floor division), `%`, `?:`, `<`, `!=`, `==`, `>`, `<=`, `>=`,
+`|`, `^`, `&`, `~`, `<<`, `>>`, and unary `-`.  Golang adds
+abjunction, `&^`, which is also in AVX2 and (IIRC) ARM; Java adds
+`>>>`, unsigned right shift, as a separate operation, while in C the
+choice between logical and arithmetic right shift is based on the
+declared data type.  The F18A offers `2*`, `2/`, `+`, and `~` (spelled
+`-`), `&`, `^`, and `+*`, which executes an 18-bit multiply if you run
+it 18 times.  Various kinds of vector instruction sets (for example,
+SSE and APL) also offer min and max; many languages support
+exponentiation; and lerp, a sort of continuous generalization of `?:`,
+is often offered as a fundamental operation.  I saw somewhere an
+instruction set whose `>` operation was actually unary; it was just `x
+> 0 ? x : 0`, so applying it to the result of a subtraction would give
+you a nonzero value precisely when the result had been positive.  CPU
+instruction sets traditionally have rotation instructions as well as
+shift instructions, but I find them useful very rarely.
+
+You also have really out-there stuff like CLMUL, AES, CRC32, and the
+like, the abominable children of the dark-silicon age.
+
+So how much do you really need?  For an archival virtual machine,
+probably the F18A’s seven operations (three of them unary) is too
+minimal, since it means that (in the absence of a sufficiently smart
+compiler, which is not an afternoon hack) a CPU or FPGA with hardware
+multipliers must emulate the very common operation of multiplication
+through an arduous sequence of simulated instructions, and similarly
+for barrel shifters and multi-bit shifts.  On the other hand, the cost
+of emulating `>` given `<` is generally nil, and the cost of emulating
+`>=` given `<` is small.  Where it comes to bitwise operations,
+abjunction (with constants) or NAND alone is sufficient to produce all
+the others, but producing XOR with either of these alone requires five
+operations, which seems excessive (thus the F18A’s three bitwise
+operations).
+
+I suggest the following set:
+
+1. Unsigned binary integer `+`.
+2. Two’s-complement unary integer `-`.
+3. Unsigned integer `*`, producing a double-width result.
+4. Unsigned integer divmod, taking a double-width dividend but
+   producing two single-width results.
+5. Unsigned integer `<<` and `>>>` with arbitrary shifts.
+6. Signed integer `>>`.
+7. Bitwise `&`, `^`, `|`, and `~`.  (See file `bitwise-sets` for the
+   exploration of this.)
+8. Two’s-complement signed integer max, i.e. λ(x, y).(x > y ? x : y).
+9. `==`.
+10. The ternary operator `?:`, which is particularly important with
+    vector registers, since you can’t implement it the traditional way
+    using control flow.
+
+This is 14 operations, considerably more than the F18A’s 7 but
+substantially less than C’s 19; they are chosen with the intention
+that the missing 7 operations, plus many other useful ones, can be
+constructed in two operations:
+
+1. `a - b` = `a + -b`
+2. `a > b` = `max(0, a - b)`
+3. `a < b` = `max(0, b - a)`
+4. `a >= b` = `0 == max(0, b - a)`
+5. `a <= b` = `0 == max(0, a - b)`
+6. `a &^ b` = `a & ~b (or a ^ (a & b))`
+7. `a NAND b` = `~(a & b)`
+8. `a NOR b` = `~(a | b)`
+9. `a != b` = `0 == (a == b)`
+
+It’s arguable that maybe we shouldn't include both `~` and unary `-`,
+since you can get from one to the other with a simple +1 or -1.

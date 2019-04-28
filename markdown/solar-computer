@@ -1,0 +1,296 @@
+Today, with off-the-shelf microcontrollers, you could build a
+computer, somewhat superior in speed and screen size to a Sun 4, that
+runs off a solar cell from a solar calculator.
+Memory is somewhat trickier.
+The hardware BOM
+cost is about US$30 or US$40.
+
+Computational power would not be the power
+bottleneck, even with a fairly powerful CPU;
+rather, memory power (to erase Flash especially) and
+display power are likely to outweigh the CPU.
+
+Suns
+----
+
+First, a word on the class of machine that desktop software was
+designed for.
+
+The Unix workstation revolution was sparked by what Raj Reddy called
+the “3M computers”: one MIPS, one megapixel, one megabyte of RAM, for
+under a megapenny.  This was what you needed for a PARC-style GUI.
+The SUN (later called the Sun-1) was one of these,
+as were the NeXT, the Apollo, and the doomed PERQ.
+These machines all came with dozens of megabytes of disk.
+
+The diskless Sun-3/60 I used to use as an X terminal is about 3 MIPS
+(InfoWorld, 1988-11-14, “Sun Shows Tempest Versions of Sun-3/4
+Workstations”, by Scott Mace) with an 1152×900 display (I think it has
+a bwtwo and a cgfour in it, but I think I was using a monochrome
+monitor).  By the end of the 1980s, various Sun 4 models (based on the
+1987 SPARC family) exceeded 10 MIPS; the contemporary DECStation 3100
+was 20 MIPS, with DEC forcing its competitors down to a price of a
+thousand dollars per MIPS.  Some DECStations at UNM provided internet
+access to 50 or 100 concurrent users when I started using them around
+1994.
+
+By that time, much more than a megabyte of RAM was commonplace on
+these workstations.  There was a memory-price bubble from about 1992
+to about 1996 during which a RAM cartel held prices steady at around
+US$40 per megabyte before finally collapsing to the Moore’s-law trend
+line at about US$10 per megabyte; before that, memory was halving in
+price every couple of years, so, in 1990, it was around US$80 per
+megabyte.  My Sun-3/60 from 1988 has, IIRC, a full complement of 48
+megs of RAM, which at US$160 per megabyte would have cost Sun about
+US$8000, a bit out of line with the cost of the rest of the
+machine — but I suspect that RAM was added later.
+
+But 16 megs would be an entirely reasonable amount.
+
+So, our target is 10 MIPS, 1 megapixel, 16 megabytes of RAM, and let’s
+say a gigabyte of disk.
+
+Displays
+--------
+
+An E-ink display needs about 1 mW on average to keep it updated for
+continuous comfortable reading.  (This number comes from the file
+`keyboard-powered-computers`, which says that a [6" E-Ink display needs
+about 750 mW during a 120 ms screen update][9], for 122×91 mm at
+167 dpi, 190 nJ/pixel, 8100 nJ/mm²; 8 20-em lines of 7-point text work
+out to 49 mm × 20 mm, or 8 mJ per update, and about 50 words, so about
+0.16 mJ per word; at 350 words per minute that’s almost a milliwatt.
+Larger text is more power-hungry.)
+
+[9]: http://wiki.mobileread.com/wiki/E_Ink_display
+
+They can be a little hard to come by; [the Seeed Studio one I found on
+DX][10] is AR$390 (US$26) and only 200×96 pixels at 111 dpi (57 mm ×
+29 mm), enough for 12 lines of 40 characters.  Old reflective
+passive-matrix feature phone replacement displays might be a viable
+alternative, and they are very cheap if you can find them (US$3, say).
+[The Nokia 2730 display][11] costs AR$78 (US$5) on MercadoLibre at the
+moment; it’s QVGA resolution (which I guess is 320×240) and does
+200 dpi 18-bit color.  More recent smartphone displays are probably
+too power-hungry.
+
+[10]: http://www.dx.com/p/2-0-e-paper-panel-w-spi-interface-wide-angle-391537
+[11]: http://articulo.mercadolibre.com.ar/MLA-629981800-display-nokia-5000-5130-5220-5320-2730-_JM
+
+Microcontrollers
+----------------
+
+Various kinds of off-the-shelf low-power microcontrollers consume a
+bit less than a nanojoule per instruction, which has been stable for a
+decade or more and might finally start trending down again.
+
+Processing power can scale down smoothly with available energy up to a
+point.  Atmel picoPower ARMs, which go up to 48MHz (at 1 insn/cycle),
+do 1–10 μW in standby (and only 250 pJ/insn) but take 4–20 μs to wake
+up.  Some MSP430s are below 0.3 μW idle, while others are in the same
+range as the Atmel chips, but wake up much faster.  (These numbers
+come from file low-power-micros in this repo.)
+
+ARMs are ubiquitous these days, and they’re power-efficient and do a
+lot of work per clock cycle and per instruction.  However, it might
+make bootstrapping quicker to use a different processor architecture,
+one that has existing self-hosted assemblers, compilers, and
+development environments available as relics from the homebrew
+personal computer era that have some chance of running in the very
+limited RAM on a microcontroller.  That basically means 6502, 8080, or
+8086, and nowadays that basically means 8080, specifically Z80.
+
+Zilog — now a fabless semiconductor house — still makes Z80s (now the
+“eZ80” and “ZGATE” lines) for microcontroller applications.  Toshiba
+has a Z80-compatible microcontroller line called the 870/C.
+Unfortunately all of these are fairly overpriced and underpowered.  A
+typical part is the EZ80F93AZ020SG, which costs US$6.14, runs at
+20MHz, and has 64K of Flash and 4K of on-chip RAM, but supports
+off-chip RAM too.  It’s not designed for low-power operation — it
+sucks 180 milliwatts when not sleeping, working out to a rather hefty
+9 nanojoules per instruction, assuming one instruction per cycle.
+Even Zilog is switching to ARMs nowadays.
+
+For a while, many MP3 players used Z80-derivative DSP chips like the
+ATJ2085; some of them were called "S1mp3", and an alternative firmware
+was developed for them.  Digi-Key doesn't carry the ATJ2085.
+
+Nowadays it probably makes more sense to try to run a Z80 emulator in
+software on an ARM core than to run an actual Z80.  An
+LPC4310FET100.551 runs you US$7.74 from Digi-Key, has 168 kB of RAM,
+is ROMless (it has a bootloader in ROM that loads code from an
+external NOR Flash or other device at startup), runs its two ARM cores
+at 204MHz, and runs down to 2.2 volts, and even then it uses only 160
+milliwatts, less than the EZ80F93AZ020SG.
+
+Solar calculators
+-----------------
+
+I walked by a cheap-shit electronics store today and saw a bunch of
+small solar calculators for AR$40 (US$2.60).  It occurred to me to
+wonder how much computational power you could run off one of their
+solar cells.
+
+I think they use inefficient amorphous silicon photovoltaic cells
+rather than the standard 16%-efficient polycrystalline silicon used
+for rooftop and utility-scale solar panels, and the cells look like
+they’re about 9 mm × 36 mm.  This means about 320 milliwatts of
+sunlight falls on them even in direct sun.  If we suppose it's 9%
+efficient, as Wikipedia’s “Thin-film cell” article says of production
+thin-film amorphous (silicon?) cells, then that’s 29 mW, which at the
+1.7-V a-Si bandgap voltage would be 17 mA.
+
+At a nanojoule per
+instruction, 29 mW is 29 MIPS!
+
+    You have: 9 mm * 36 mm * 1000 W/m^2 * 9% / nanojoule
+    You want: MHz
+            * 29.16
+
+Energy storage in capacitors
+----------------------------
+
+Can you extend the usefulness
+of a wimpy solar cell with some solid-state energy storage?
+
+Off-the-shelf ceramic capacitors can store in the range of 1–4 mJ; you
+can get a 1 mJ 6.3 V 47 μF ceramic capacitor, holding 1 mJ, for
+US$0.12.  If you were to try to stuff the calculator with US$2.60
+worth of these, you would have 21 mJ of storage, enough for about 21
+million instructions (or 84 million on the picoPower chips).  This is
+enough for a minute or so of CPU word processing, but it’s not enough
+to update the display.
+
+Garden lights and batteries
+---------------------------
+
+I bought some solar garden lights at the supermarket a few months ago
+for AR$40 (about US$2.90 I think; XXX check this).  They have a 300 mAh 1.2 V NiCd AA
+cell inside powering a white LED and a polycrystalline solar cell on
+top that’s about 40 mm × 40 mm; they claim it provides light for about
+8 hours, although I haven’t tested how much current it takes.  It
+probably doesn’t have a MPPT controller (the only component visible on
+the tiny PCB is a through-hole ⅛ W resistor, although there’s a tiny
+blob of epoxy that might be hiding something).  But it probably
+doesn’t need one, in the sense that the cell should produce about a
+quarter watt in full sun, which would fully charge the cell in 1.4
+hours:
+
+    You have: (300 milliamp hours 1.2 volts) / (40 mm * 40 mm * 1000 W/m^2 * 16%)
+    You want: hours
+            * 1.40625
+
+So it’s probably limited by the battery, not the solar cell, so it
+probably fully charges the battery to its full charge of 1.3 kJ (!!),
+which is 1.3 trillion nanojoules and thus about 1.3 trillion
+instructions, which would be 1.3 million seconds (about two weeks) at
+1 MIPS, or about two weeks of continuous E-ink reading.  ¼ W at
+1 nJ/insn is of course 250 MIPS.
+
+Memory
+------
+
+Unfortunately, the microcontrollers I mentioned above are plenty fast,
+have very little memory.  A typical example is the NXP MKW01Z128
+mentioned in file `transceiver-ics`: a 48 MHz 32-bit RISC in-order
+Cortex-M0 CPU with a built-in 600 kbps license-free RF transceiver,
+with 128 KiB of Flash and 16 KiB of RAM.  (It uses about 1.2
+nanojoules per instruction if it’s receiving data at the same time.)
+
+For many year, it has been normal for a desktop computer to have about
+as much RAM as it can access in a second, which works out to have been
+very roughly a megabyte per megahertz.  You will note that this
+microcontroller is nowhere close to this balance, with 48 MHz (and
+about 48 MIPS) but 0.144 megabytes, a factor of some 300 away from the
+balance for a desktop computer.  This is a very common problem with
+current microcontrollers.
+
+At this point, old 36-pin and 72-pin SIMMs are e-waste that can be
+freely scavenged or bought for prices in the neighborhood of a dollar
+or less, typically ranging from 4 MB to 32 MB.  But these run on 5 V
+and typically have standby currents of a few milliamps and operating
+currents of over an amp, which means they use on the order of 5000 mW
+running at full speed and tens of milliwatts just to retain data.  So
+they aren’t really an option.
+
+Chips to look at:
+
+https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS42S16100H-7TL/706-1446-ND/5683868
+https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS62WV1288BLL-55HLI/706-1046-ND/1555419
+https://www.digikey.com/product-detail/en/microchip-technology/23LC1024-I-SN/23LC1024-I-SN-ND/3543084
+https://www.digikey.com/product-detail/en/microchip-technology/23LCV1024-I-SN/23LCV1024-I-SN-ND/3543093
+https://www.digikey.com/product-detail/en/on-semiconductor/N01S830HAT22I/N01S830HAT22IOS-ND/6166720
+https://www.digikey.com/product-detail/en/fujitsu-electronics-america-inc/MB85RS1MTPNF-G-JNERE1/865-1255-1-ND/4022688
+https://www.digikey.com/product-detail/en/rohm-semiconductor/MSM51V17405F-60T3-K/MSM51V17405F-60T3-K-ND/2695010
+https://www.digikey.com/product-detail/en/adesto-technologies/AT25SF041-SSHD-T/1265-1131-1-ND/4824165
+https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS25LQ080-JNLE-TR/706-1463-1-ND/5872437
+https://www.digikey.com/product-detail/en/fremont-micro-devices-usa/FT25H04S-RT/1219-1190-1-ND/5875686
+https://www.digikey.com/product-detail/en/winbond-electronics/W25X40CLZPIG/W25X40CLZPIG-ND/3008616
+https://en.wikipedia.org/wiki/Programmable_metallization_cell
+https://www.pjrc.com/mp3/simm/simm.html
+
+There are reasonably inexpensive SRAM chips out there that can provide
+a megabyte or two of RAM for a few dollars, but nothing bigger.  DRAM
+is thousands of times cheaper (right now Pricewatch lists DDR3-1600
+DIMMs at US$30 for 8 GiB, under US$4/GiB, which would be 6¼¢/16 MiB)
+but very power- hungry.  Even just retaining data in DRAM uses a lot
+of power.
+
+(You will note that US$4/GiB today in 2016 and US$40/MiB in 1992 is a
+factor of ten thousand in 24 years, which is a bit over 13
+doublings — a doubling time of about 22 months, reasonably close to
+the Moore’s trend line I mentioned.)
+
+Flash memory, by contrast, can typically retain data for ten years
+while turned off and dissipating only tiny amounts of energy it had
+stored while turned on, and always at least a few months.  And it's
+even cheaper than DRAM: Pricewatch lists 64GB SDHC cards at US$18, or
+US$0.28 per GB, almost 15 times cheaper than DRAM.  It even uses a
+little less power to read than SRAM or DRAM do.  But erasing Flash is
+enormously more power-hungry than erasing SRAM or DRAM.
+
+(Other kinds of nonvolatile memory — FeRAM/FRAM, MRAM, CBRAM, PCM
+RAM — have broadly similar characteristics to Flash.)
+
+It’s tempting to think of Flash as having similar access
+characteristics to a hard disk, but that’s only really true for
+erasing.  Reading written data is very fast, and can typically be done
+a byte at a time only a few times slower than reading entire blocks.
+This means that with the appropriate data structures, Flash can
+replace much of the RAM in our 1990 workstation, as well as its disk.
+
+Erasing and writing data to Flash is about a thousand times slower
+than reading it.
+
+Writing to erased blocks is somewhat fast, Even when you have to write
+by pages, they’re 256-byte or 264-byte pages, and writing them takes
+about 700 microseconds — you can do 1400 pages per second on a single
+cheap Flash chip, compared to the 50 random spinning-rust disk writes
+you could do in 1990, or the 120 you can do nowadays.  Sequentially,
+you could write a megabyte per second (2048 pages) to pre-erased disk
+at the time, or a third of a megabyte per second (1400 pages) to
+pre-erased Flash now.  And these Flash chips are so cheap that it
+makes sense to use several of them, multiplying your bandwidth and
+allowing block erases to be concurrent with reads and writes.
+
+Many Flash chips have bit-serial interfaces, which makes them much
+easier to hook up to a microcontroller.  None of the SRAM or DRAM
+chips I’ve been able to find on Digi-Key have bit-serial interfaces,
+which means that driving them from a cheap microcontroller is going to
+require hooking up some kind of shift register to control the address
+bus.
+
+So maybe we can get by with only a megabyte of real RAM and, say, 32
+gigabytes of Flash.
+
+There’s a distinction I’m ignoring here, which is that the Flash
+that’s fast to read a byte from is NOR, and a megabyte of it costs
+about US$0.46.  So 32 gigabytes of it would be about US$15000, which
+is significantly more than the US$9 of NAND Flash.  In practice you
+probably want all three types: maybe a couple megabytes of real RAM
+(US$8), 16 megabytes of NOR Flash (US$7), and 32 gigabytes of NAND
+Flash (another US$7).
+
+Final bill of materials
+-----------------------
+

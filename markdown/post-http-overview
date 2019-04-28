@@ -1,0 +1,274 @@
+<http://pad.partidopirata.com.ar/p/sxf3VU4fNT>
+
+Stuff I've posted to kragen-tol over the years about post-HTTP
+==============================================================
+
+I've argued that we need a browser that supports accessing resources
+stored in decentralized content stores like Tahoe-LAFS or Git, rather
+than named according to a path defined by the administrator of a
+particular domain name over time.  I haven't done a very good job
+of gathering my thoughts on the matter into one place yet.
+
+This all seems a little silly, given that other people have contributed
+so much more to solving this problem than I have, but there may be one
+or two things in here that aren't currently easy to find, but that are
+important.
+
+I've only dug through the archives back to 2000.  There might be stuff in 1998 or 1999
+that's relevant, but surely not very important.
+
+Reasons why
+-----------
+
+### ["What's wrong with HTTP?"][1] ###
+
+> In this essay, the first of a pair on browser apps, I explore how
+> they are better than traditional desktop apps in some ways, but
+> worse in others.  Some of the disadvantages of browser apps are
+> deeply rooted in the use of HTTP URLs for naming.  In the second
+> essay, I will present a design sketch for a new platform, a
+> replacement for HTTP combining both styles' advantages.
+
+I still haven't published the second half, and it needs thorough revision now.
+
+[1]: http://lists.canonical.org/pipermail/kragen-tol/2006-November/000841.html
+
+### ["The equivalent of free software for online services"][2] ###
+
+Explains why it's crucial to implement communication systems as cooperating software
+running on users' computers, rather than on centralized servers.
+
+> So people use free software because of its guaranteed low cost, because
+> it does what its users want, and because it's trustworthy.  And they use
+> web services because they get low system administration costs, they can
+> use huge databases without downloading them first, they can get software
+> updates quickly, they can do very-CPU-intensive things, and they can
+> collaborate with their friends easily.  How can we get both of these
+> sets of advantages at once?
+> 
+> I think there is only one solution: build these services as
+> decentralized free-software peer-to-peer applications, pieces of which
+> run on the computers of each user.  As long as there's a single point of
+> failure in the system somewhere outside your control, its owner is in a
+> position to deny service to you; such systems are not trustworthy in the
+> way that free software is. ...
+> 
+> So we need a platform, something like a web browser, that supports a
+> universe of constantly-changing code written by a multitude of authors,
+> which migrates to where it's being used, and simultaneously supports
+> individual control over what version of the code is running on your
+> system and no-hassle updating when someone else has a change you want;
+> that replicates your data transparently to other machines so that you
+> don't have a single point of failure, but without allowing the owners of
+> those other machines to spy on you or corrupt your data; that runs
+> programs in a high-level language; that supports conflicting updates to
+> different replicas of the data and allows a human being to resolve the
+> conflicts; and that makes it easy for you to share particular bits of
+> your code or data with anyone, everyone, or no one.  Maybe we could even
+> start with a web browser and add the other stuff to it.
+> 
+> If we don't build such a platform, we will eventually lose the
+> advantages of free software, because we will use web services instead.
+
+There's actually a lot of detail in this essay about specifically how you
+could structure such a system.
+
+[2]: http://lists.canonical.org/pipermail/kragen-tol/2006-July/000818.html
+
+### ["Why I do not want to work at Google"][3] ###
+
+> Google has an orientation that is opposed to my agenda. ...
+> 
+> I imagine a different future, where if Alice wants to talk to Bob and
+> Bob wants to talk to Alice, there’s no unaccountable intermediary that
+> can interfere with their communication, whether they’re speaking text,
+> or video, or 3-D models, or simulation.  If Alice’s email gets marked
+> as spam, Bob ought to be able to find out why — and fix it!  I imagine
+> a future where every human being can participate in creating the
+> culture they live in, without needing permission from anybody, and
+> without fearing repercussions. ...
+> 
+> I believe that warehouse-scale client-server computing will, in the
+> end, undermine the kind of democratic freedom of communication that we
+> need to deal with today’s global menaces.  It’s more practical than
+> peer-to-peer computing at the moment, but that pendulum has swung back
+> and forth several times over the decades.  (Some of my friends were
+> among the first employees of a hot cloud-computing startup, in 1964,
+> called Tymshare.)  The proper response to the current impracticality
+> of decentralized computing is not to sigh and build centralized
+> systems.  The proper response is to build the systems to *make*
+> *decentralized computing practical again*.
+
+[3]: http://lists.canonical.org/pipermail/kragen-tol/2011-August/000938.html
+
+Things contributing to building the solution
+--------------------------------------------
+
+There's a lot of software out there now that wasn't there when I wrote
+this stuff; I should probably make a list of it here too.  See above,
+too, the item about "The equivalent of free software for online services."
+
+### ["Imagine decentralizing Wikipedia with Codeville"][4] ###
+
+Codeville was an early decentralized version control system, like Git or
+Mercurial, that didn't take off.  Functionally the systems are equivalent:
+they replicate the entire version history to every user and provide hash-based
+retrieval.
+
+> So support for individual points of view amidst general disagreement
+> is one of the benefits of del.icio.us over dmoz or Yahoo, and it's
+> built into the architecture of the system --- it's not just a social
+> practice.  Could Wikipedia's architecture change to support divergent
+> points of view better?..."arch", darcs, monotone,
+> Codeville, git, and other decentralized version-tracking systems aim
+> to support a wider array of development models; in particular, they
+> aim to allow each person's tree to stand alone as a first-class
+> citizen, easily sharing its changes with other similar trees.
+> 
+> Imagine that we applied one of these systems to Wikipedia.  We would
+> have several benefits: tolerance of controversy, disconnected
+> operation, higher availability, and potentially organizational
+> decentralization.
+> 
+> We could tolerate controversy better because Holocaust deniers would
+> have their own version of Wikipedia, which they could modify to their
+> heart's content.  This would reduce their desire to modify the
+> Wikipedia that everyone else reads, but it would not eliminate it.
+
+[4]: http://lists.canonical.org/pipermail/kragen-tol/2005-June/000784.html
+
+### ["DHTML persistence: a design for a generic Ajax server-side"][5] ###
+
+Probably the first essay I wrote advocating what we were doing at KnowNow in 2000,
+which kind of went mainstream in 2004 with Gmail and 2005 with Google Maps:
+putting all the application logic on the client side in JavaScript, relegating the
+server to basically being a dumb data store.  Once you do this, of course, you no
+longer need a server as such; you need a dumb data store, which can be provided by
+a peer-to-peer network — but this essay doesn't talk about that at all.
+
+I'm not convinced that I actually achieved a usable protocol design here.
+
+> In my view, the most sensible thing to do is to write the application
+> entirely in JavaScript from the beginning and run it all on the client
+> side.  Doing this prevents you from having to rewrite bits from time
+> to time, and puts the application code on the machine of its user, who
+> can then use bookmarklets and Greasemonkey to customize its
+> functionality.
+
+[5]: http://lists.canonical.org/pipermail/kragen-tol/2005-April/000769.html
+
+### ["Decentralized chat using CouchDB"][6] ###
+
+> I was just chatting with Noah on IRC about how IRC sucks and we need
+> to replace it and whether we could do that using CouchDB.
+
+More broadly, what's needed for decentralized secure chat, which is to say, 
+pub/sub, or event notification.  Pub/sub is one of the fundamental services
+needed for distributed, including decentralized, applications.
+
+CouchDB is one of the current systems that contemplates Lotus-Notes-style
+mobile-code secure applications, which it calls CouchApps.  Unfortunately,
+I think the discussion that followed this email showed that it's not
+capable of providing the kind of support for secure collaboration that we
+need — its security model is too simple.
+
+[6]: http://lists.canonical.org/pipermail/kragen-tol/2012-November/000968.html
+
+### ["distributed posting list joins"][7] ###
+
+One of the hardest problems in decentralized systems is how to query a decentralized
+database with acceptable efficiency.  In this post, I finally found a solution that
+allows you to build a *distributed *if not decentralized full-text web search engine.
+This followed some work in <http://lists.canonical.org/pipermail/kragen-tol/2004-February/thread.html>.
+
+[7]: http://lists.canonical.org/pipermail/kragen-tol/2004-October/000767.html
+
+### ["rumor-oriented programming"][8] ###
+
+> Suppose we want to build a distributed application with automatic
+> change synchronization.  Here's a persistence system with coordination
+> functions somewhat similar to mod\_pubsub or Linda, but specifically
+> designed for replicating the state of an application.
+
+I actually wrote some things kind of like this, but never built the full system
+described.  In fact I never finished describing it :(  But it's kind of like
+CouchDB or Meteor.
+
+[8]: http://lists.canonical.org/pipermail/kragen-tol/2004-January/000749.html
+
+### ["Peer-to-peer overlay networks are a bad idea on a DSL-based internet."][9] ###
+
+> Peer-to-peer overlay networks are inefficient on ADSL networks.  ADSL networks
+> are almost twice as efficient as SDSL networks.  Better alternatives require
+> redesigning the physical layer.
+
+[9]: http://lists.canonical.org/pipermail/kragen-tol/2011-August/000935.html
+
+### ["mailing lists, blog posts, and Git: what to do next with kragen-tol?"][10] ###
+
+Lamenting that neither Git nor the Web provide distributed autentication
+of publication date, which is a thing I want for kragen-tol, which is why
+kragen-tol is still a mailing list.
+
+[10]: http://lists.canonical.org/pipermail/kragen-tol/2010-March/000910.html
+
+### ["web services, operations as a strategic advantage, and decentralization"][11] ###
+
+Suggesting that if we can decentralize web services onto individual users'
+machines, then maybe we'll be able to reduce deployment headaches.  In retrospect,
+I think this is kind of a dead end — instead we have devops — but it contains 
+the concept.
+
+> Just because the software runs on its users' machines doesn't mean
+> it can't be providing a networked service; consider BitTorrent or
+> Skype or, for that matter, Sendmail, ircd, or INN.
+
+[11]: http://lists.canonical.org/pipermail/kragen-tol/2008-July/000900.html
+
+### ["the end-to-end principle in human society: scholarly writing and freedom of speech"][12] ###
+
+Describes web browsers as "mere conduits" for information; suggests
+content-centric networking.
+
+[12]: http://lists.canonical.org/pipermail/kragen-tol/2007-April/000858.html
+
+### ["offline web reading"][13] ###
+
+Nothing earthshaking but does mention I was able to use Google Maps offline
+with WWWOFFLE because of its RESTian architecture.
+
+[13]: http://lists.canonical.org/pipermail/kragen-tol/2006-November/000840.html
+
+### ["lazy evaluation in a distributed system"][14] ###
+
+Some notes on how to build an event-notification/pub-sub/cache-invalidation
+system that supports decentralized operation --- for changeable resources
+that live at an identifiable network node.
+
+[14]: http://lists.canonical.org/pipermail/kragen-tol/2005-May/000778.html
+
+### ["level-triggered 'event notification': condition notification"][15] ###
+
+More notes on event-notification and pub-sub systems.
+
+[15]: http://lists.canonical.org/pipermail/kragen-tol/2002-February/000681.html
+
+### ["P2P resource discovery"][16] ###
+
+I suggest storing current physical location information for mobile P2P nodes in a DHT,
+so that you can route packets to them.  Really, that's it; you don't need to read the post.
+
+[16]: http://lists.canonical.org/pipermail/kragen-tol/2002-February/000683.html
+
+### ["distributed mailserver"][17] ###
+
+How to build a fault-tolerant distributed SMTP/IMAP server, supporting mailing lists
+(pub-sub!) using distributed transactions.
+
+[17]: http://lists.canonical.org/pipermail/kragen-tol/2002-January/000655.html
+
+### ["DWOF"][18] ###
+
+Earlier, sketchier notes on how to build a distributed mailing list server.
+
+[18]: http://lists.canonical.org/pipermail/kragen-tol/2000-June/000603.html

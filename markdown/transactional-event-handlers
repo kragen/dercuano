@@ -1,0 +1,239 @@
+I was thinking about event loops and transactional memory, and it
+occurred to me that applying transactional memory to event loops might
+solve their problems.  In some sense this is just plain “use
+transactional memory” but it’s a particular choice of where to draw
+the transaction boundaries: each event that would normally invoke an
+event handler in an event-loop system (network data, mouse click, I/O
+completion, timeout, or whatever) invokes it inside a transaction.
+
+Event loops
+-----------
+
+One of the major concurrency models in modern software (and actually
+historical software going back many decades) is the event loop.  A
+CICS pseudo-conversational transaction was initiated when a message
+came in from a terminal, and ran on the CPU until it yielded it;
+KeyKOS server domains synchronously awaited incoming invocations, then
+did some processing, usually sent a response, and returned to
+awaiting; Oberon’s “central loop” keeps the processor engaged
+“continuously polling event sources”; Win16 and Win32 WndProcs are
+invoked once for each event on the window, handling it as they see
+fit, but always on the same thread; Node.js servers and browser JS and
+Tcl/Tk all use event loops, where a single-threaded process chews
+through a queue of events by invoking previously registered callbacks.
+
+The event-loop model is efficient (no need to allocate memory to
+per-thread stacks), easy to understand, and relatively free from race
+conditions, since each event handler must run to completion before the
+next event handler can begin to run.  In effect, the event handler has
+a lock on the entire memory space.  In a system with a single event
+loop, as with other systems with a single lock, there’s no danger of
+deadlock, because there’s only one lock.  In theory, multiple
+communicating event loops can suffer from deadlock, but this seems
+much less frequent in practice than system composed from threads and
+locks.
+
+(CICS also supports a “conversational” model in which a task can
+suspend until it receives input, but that’s not what I’m discussing
+here; after 51 years systems can get a bit muddled.)
+
+Event-loop problems: parallelism and responsiveness
+---------------------------------------------------
+
+However, event-loop systems do have two major weaknesses: parallelism
+(in the modern sense of taking advantage of multiple processors) and
+responsiveness.  Almost any event-loop system can take arbitrarily
+long to respond to any event, because a slow handler for a
+lower-priority event can prevent the system from even noticing a
+higher-priority event in time.  This is especially a problem since
+event loops are only used in more-or-less real-time situations — if
+only computing a correct result matters, but not how long it takes,
+you can wait for all the input data to become available before you
+start the computation, and then you don’t need an event loop or any
+other kind of concurrency.  Typical solutions to this problem include
+interrupts (re-introducing a pervasive risk of race conditions),
+watchdog timers that reset the entire system when a deadline is
+missed, and running separate event loops, especially for tasks of
+different priorities (creating the difficulty of communicating between
+them).  The BeOS GUI famously had a much more responsive UI than other
+contemporary GUIs because of pervasive multithreading, i.e., running a
+lot of separate event loops.
+
+A less-common solution to the responsiveness problem used in MOO and
+browser JS is to kill event handlers that hit a timeout.  To prevent
+this from producing overall system instability, the timeout is only
+checked at “safe points”, where all the invariants of some “system
+layer” have been re-established, and only mere user code is vulnerable
+to having its state corrupted.  This works far better than you would
+expect, in part because that user code already has to be
+exception-safe, and a thrown exception has results similar to a
+handler being killed due to a timeout.  However, it pretty much
+eliminates the simplicity advantage of event-loop programming over
+using threads and locks.
+
+The least-common solution is to ensure that every handler in your
+event loop has bounded and acceptable worst-case execution time (WCET)
+that permits an acceptably fast response to the most demanding event.
+This solution does have the benefit of working, but it makes
+programming for the system extremely demanding.
+
+Optimistically-synchronized transactional memory as a possible solution
+-----------------------------------------------------------------------
+
+As an alternative, what if we adopt the solution used by CICS back in
+the 1970s, and used by most web servers today?  Let’s run each event
+handler (“transaction” or “task” to CICS) in its own little universe,
+unable to access any shared state directly — it can only access shared
+state mediated by an ACID, or at least ACI, _transaction_ (“unit of
+work” to CICS).  The transaction logs all the data it reads and
+buffers all the data it writes, and ensures that its execution is
+_serializable_, in the sense that the end result of running some set
+of event handlers is the same as running them all one at a time in
+some order.  This gives you the same freedom from race conditions as
+the simple event loop model, more or less by definition.
+
+There are lots of different ways to achieve serializability, though.
+One way is of course to *actually* run all transactions in some order,
+or at least all transactions that write to shared data; you can do
+this by just running a single thread with one transaction at a time,
+with the problems described earlier, but if you have a lot of
+read-only transactions, you may be able to get some performance
+benefit with just a reader–writer lock, or, as SQLite3 does, a
+reader–writer–pending lock.
+
+This is called “pessimistic synchronization” because it’s working to
+prevent problems, rather than fix them.  More sophisticated
+pessimistic-synchronization strategies with more locks that permit
+higher levels of concurrency are possible, but they all have the
+property that if any state is shared between high-priority code and
+low-priority code, it’s possible for the high-priority code to have to
+wait on the execution of the low-priority code.  If the problem is
+merely scheduler priorities, you can solve this with priority
+inheritance, but if the problem is that the low-priority code just has
+too much work to do before it finishes, you don’t want pessimistic
+synchronization, which is to say, you don’t want locks, because you’re
+back to the event-loop situation where any piece of code in your
+system can potentially make the response to any event too slow.
+
+(There’s also the risk of deadlock once you have multiple locks,
+although there are strategies that avoid this — acquiring all locks at
+transaction start in a deterministic order, for example.  This breaks
+procedural compositionality, though, because you need to know all the
+possible locks any transitively invoked subroutine might need when you
+start the transaction.)
+
+Pessimistically-synchronized transactions typically provide the
+ability for the user code to roll back the transaction at any time,
+for example in response to a violation of data integrity constraints.
+This prevents any of the transaction’s writes from being saved; it’s
+as if the transaction never happened, except for the error message
+returned.  But, in general, this (or deadlock) is the only reason a
+pessimistic transaction can fail; other concurrent transactions have
+no influence on whether they fail or succeed, and they can be written
+to always succeed.
+
+As Joe Duffy notes in his 2010 retrospective blog post about [the
+canceled planned software-transactional-memory support in the .NET
+CIL][0], as long as everything you care about is in the transactional
+store, this also gives you a great way to recover from exceptions: any
+exception inside the transaction rolls back the transaction.  However,
+you may need some kind of special debug interface to read the debug
+printfs from the aborted transaction — because, as noted above, you
+don’t want arbitrary I/O from inside the transaction to be possible.
+
+[0]: http://joeduffyblog.com/2010/01/03/a-brief-retrospective-on-transactional-memory/
+
+Optimistic synchronization, by contrast, can guarantee forward
+progress and worst-case execution times, but they can always fail.
+Optimistic synchronization works as follows: if, when a transaction is
+ready to commit, any of the data it read has been changed by another
+transaction, the transaction is rolled back and retried from the
+beginning, using the same code but the new data.  This can be done at
+the microscopic level using multi-word compare-and-swap primitives, or
+you can do it at the system level with unbounded optimistic
+transactions.
+
+Because optimistic synchronization detects conflicts after they’ve
+happened, instead of preventing them, any transaction may be aborted
+at any time for reasons outside of its control.  This means that it is
+unsafe for it to do any I/O before it commits or, more generally,
+affect anything outside of the transaction-controlled universe — if it
+has to be rolled back and retried twice, you don’t want it to send
+three emails or delete the same file three times (failing on the
+second and third attempts).  (This property is why Microsoft canceled
+the .NET STM mentioned earlier.)
+
+This gives us precisely what we need to fix event loops: you can
+guarantee the response time to a high-priority event simply by pausing
+all lower-priority transactions when they try to commit, so they can’t
+write to the shared store, and then the high-priority event is
+guaranteed to complete in only the time it needs to execute its own
+code and do the required accesses to the shared store.  If this
+conflicts with any ongoing lower-priority transactions, that will be
+discovered once those transactions are resumed; they will be rolled
+back and tried again.  Also, as long as you don’t have interference
+and consequent rollbacks, you can get the full benefit of however many
+CPUs you’re running on — unlike a CICS region, which uses cooperative
+multitasking between event handlers, all on a single thread.
+
+Mutability
+----------
+
+Transactional memory is not a great fit with pervasive mutability of
+shared data; most of the intractable problems Duffy mentions in the
+CIL implementation stem from pervasive mutability.  Immutable
+(“persistent”) data structures can be read safely, inside or outside
+transactions, without any chance that another thread is modifying them
+and thus with no need to log the reads and revalidate them later.
+
+However, this really only works if you have a garbage collector, which
+is going to make it hard to guarantee responsiveness.  Without a GC,
+whoever deallocates the data structure is “mutating” it.  To some
+extent you might be able to keep the GC from interfering with
+high-priority tasks by ensuring that those tasks always have enough
+memory to run without invoking the GC, but it’s also important to
+ensure that the GC doesn’t hold any locks that the high-priority task
+might need to wait on, or if so that it releases them promptly.
+
+To the extent that the GC only has to run over shared data that
+persists across transactions, though, the GC load may be light enough
+to never be a problem.
+
+Composable Memory Transactions
+------------------------------
+
+There’s a lovely paper called “Composable Memory Transactions”
+describing the Haskell STM with its “fail” and “orElse” constructs;
+these provide a way to use transactional memory to wait for arbitrary
+predicates to become true, and also to compose such single-event waits
+into multiple-event waits or nonblocking polls, and similarly to
+convert nonblocking polls into blocking polls.
+
+The approach is very simple.  First, for blocking, you have a “fail”
+construct which fails your transaction as if from interference from
+another transaction, prompting the transaction system to retry it.
+But it would be futile, though correct, to try it again immediately,
+since it will fail in the same way.  So at least one of the things it
+read inside the transaction before failing needs to have changed
+before it will be able to succeed.
+
+Waiting for a conjunction of such conditions is simple: you invoke
+each of the wait procedures, one after the other, inside of a
+transaction.  Since the transaction is isolated, you are guaranteed
+that nothing changes from the beginning to the end of the sequence, so
+you know that all of the wait-predicates are simultaneously allowing
+execution to continue.
+
+Waiting on a disjunction requires a new `orElse` construct, which
+recovers from the failure of a nested transaction by trying an
+alternative nested transaction.  In effect, it composes two
+transactions into a single ordered-choice or disjunction transaction.
+For example, if the first transaction was an attempt to read from some
+queue X, while the second is an attempt to read from some queue Y,
+each failing when its respective queue is empty, then the combination
+will fail precisely when both queues are empty.  Alternatively, the
+second transaction could simply be some computation to carry out in
+the case where queue X is empty, thus transforming blocking into
+nonblocking polling.
+
+I don’t know why I started writing this section.

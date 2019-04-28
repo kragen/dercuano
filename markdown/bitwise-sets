@@ -1,0 +1,243 @@
+For file `bootstrapping-instruction-set`, I did some studies of
+different possible sets of bitwise operations using
+<http://canonical.org/~kragen/sw/dev3/abjsearch.py>.  Of the
+Boolean-complete sets, abjunction alone and NAND alone had nearly the
+worst worst case; computing `x ^ y` with them requires 5 operations,
+not counting the constant all-ones -1 (which it needs because it’s
+falsehood-preserving): -1 &^ ((-1 &^ (x &^ y)) &^ (y &^ x)) for
+abjunction, (y &̄ (x &̄ x)) &̄ (x &̄ (x &̄ y)) for NAND.
+
+Considering the case with only abjunction, which is to say, set
+subtraction or ANDNOT, which Golang spells `&^`.
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = 0 (truth table 0000, cost 1) = 0
+    r[ 3] = -1 (truth table 1111, cost 1) = -1
+    r[ 4] = r[0] &^ r[1] (truth table 0010, cost 1) = x &^ y
+    r[ 5] = r[1] &^ r[0] (truth table 0100, cost 1) = y &^ x
+    r[ 6] = r[3] &^ r[0] (truth table 1100, cost 2) = -1 &^ x
+    r[ 7] = r[3] &^ r[1] (truth table 1010, cost 2) = -1 &^ y
+    r[ 8] = r[0] &^ r[4] (truth table 0001, cost 2) = x &^ (x &^ y)
+    r[ 9] = r[3] &^ r[4] (truth table 1101, cost 3) = -1 &^ (x &^ y)
+    r[10] = r[3] &^ r[5] (truth table 1011, cost 3) = -1 &^ (y &^ x)
+    r[11] = r[6] &^ r[1] (truth table 1000, cost 3) = (-1 &^ x) &^ y
+    r[12] = r[3] &^ r[8] (truth table 1110, cost 4) = -1 &^ (x &^ (x &^ y))
+    r[13] = r[3] &^ r[11] (truth table 0111, cost 4) = -1 &^ ((-1 &^ x) &^ y)
+    r[14] = r[9] &^ r[5] (truth table 1001, cost 5) = (-1 &^ (x &^ y)) &^ (y &^ x)
+    r[15] = r[3] &^ r[14] (truth table 0110, cost 6) = -1 &^ ((-1 &^ (x &^ y)) &^ (y &^ x))
+
+With only binary NAND, the situation is almost as bad, but without
+needing -1, and with more reuse:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = r[0] &̄ r[0] (truth table 1100, cost 1) = x &̄ x
+    r[ 3] = r[0] &̄ r[1] (truth table 1110, cost 1) = x &̄ y
+    r[ 4] = r[1] &̄ r[1] (truth table 1010, cost 1) = y &̄ y
+    r[ 5] = r[0] &̄ r[2] (truth table 1111, cost 2) = x &̄ (x &̄ x)
+    r[ 6] = r[0] &̄ r[3] (truth table 1101, cost 2) = x &̄ (x &̄ y)
+    r[ 7] = r[1] &̄ r[2] (truth table 1011, cost 2) = y &̄ (x &̄ x)
+    r[ 8] = r[2] &̄ r[4] (truth table 0111, cost 3) = (x &̄ x) &̄ (y &̄ y)
+    r[ 9] = r[3] &̄ r[3] (truth table 0001, cost 2) = a &̄ a where a = x &̄ y
+    r[10] = r[3] &̄ r[8] (truth table 1001, cost 5) = (x &̄ y) &̄ ((x &̄ x) &̄ (y &̄ y))
+    r[11] = r[5] &̄ r[5] (truth table 0000, cost 3) = a &̄ a where a = x &̄ b and b = x &̄ x
+    r[12] = r[6] &̄ r[6] (truth table 0010, cost 3) = a &̄ a where a = x &̄ b and b = x &̄ y
+    r[13] = r[7] &̄ r[7] (truth table 0100, cost 3) = a &̄ a where a = y &̄ b and b = x &̄ x
+    r[14] = r[8] &̄ r[8] (truth table 1000, cost 4) = a &̄ a where a = c &̄ b and b = y &̄ y and c = x &̄ x
+    r[15] = r[6] &̄ r[7] (truth table 0110, cost 5) = (x &̄ (x &̄ y)) &̄ (y &̄ (x &̄ x))
+
+If we have 2-, 3-, and 4-input NANDs, the situation is pretty much
+exactly the same as with just 2-input NANDs.
+
+Actually, though, separate `&` and `~` operations (or equivalently `|`
+and `~`) are even worse:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = ~r[0] (truth table 1100, cost 1) = ~x
+    r[ 3] = ~r[1] (truth table 1010, cost 1) = ~y
+    r[ 4] = r[0] & r[1] (truth table 0001, cost 1) = x & y
+    r[ 5] = r[0] & r[2] (truth table 0000, cost 2) = x & (~x)
+    r[ 6] = r[0] & r[3] (truth table 0010, cost 2) = x & (~y)
+    r[ 7] = r[1] & r[2] (truth table 0100, cost 2) = y & (~x)
+    r[ 8] = r[2] & r[3] (truth table 1000, cost 3) = (~x) & (~y)
+    r[ 9] = ~r[4] (truth table 1110, cost 2) = ~(x & y)
+    r[10] = ~r[5] (truth table 1111, cost 3) = ~(x & (~x))
+    r[11] = ~r[6] (truth table 1101, cost 3) = ~(x & (~y))
+    r[12] = ~r[7] (truth table 1011, cost 3) = ~(y & (~x))
+    r[13] = ~r[8] (truth table 0111, cost 4) = ~((~x) & (~y))
+    r[14] = r[9] & r[13] (truth table 0110, cost 7) = (~(x & y)) & (~((~x) & (~y)))
+    r[15] = r[11] & r[12] (truth table 1001, cost 7) = (~(x & (~y))) & (~(y & (~x)))
+
+Darius Bacon suggests considering the bitwise ternary operator
+`(x & y | ~x & z)` as a primitive operation.
+
+The bitwise ternary operator is almost as universal as abjunction,
+which is to say that, since it’s falsehood-preserving, it requires
+access to a constant -1 to be universal, and since it’s also
+truth-preserving, it also requires a constant 0; but it’s somewhat
+more efficient.  It computes `x ^ y` in two operations plus a constant
+0 as `x ? (y ? 0 : x) : y`, and reaching the negating operations NAND
+and NOR is barely more difficult.  NAND is `x ? (y ? 0 : x) : -1` and
+NOR is `x ? 0 : y ? x : -1`.
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = 0 (truth table 0000, cost 1) = 0
+    r[ 3] = -1 (truth table 1111, cost 1) = -1
+    r[ 4] = r[0] ? r[0] : r[1] (truth table 0111, cost 1) = x ? x : y
+    r[ 5] = r[0] ? r[1] : r[0] (truth table 0001, cost 1) = x ? y : x
+    r[ 6] = r[0] ? r[1] : r[3] (truth table 1101, cost 2) = x ? y : -1
+    r[ 7] = r[0] ? r[2] : r[1] (truth table 0100, cost 2) = x ? 0 : y
+    r[ 8] = r[0] ? r[2] : r[3] (truth table 1100, cost 3) = x ? 0 : -1
+    r[ 9] = r[1] ? r[0] : r[3] (truth table 1011, cost 2) = y ? x : -1
+    r[10] = r[1] ? r[2] : r[0] (truth table 0010, cost 2) = y ? 0 : x
+    r[11] = r[1] ? r[2] : r[3] (truth table 1010, cost 3) = y ? 0 : -1
+    r[12] = r[0] ? r[1] : r[9] (truth table 1001, cost 3) = x ? y : (y ? x : -1)
+    r[13] = r[0] ? r[2] : r[9] (truth table 1000, cost 4) = x ? 0 : (y ? x : -1)
+    r[14] = r[0] ? r[10] : r[1] (truth table 0110, cost 3) = x ? (y ? 0 : x) : y
+    r[15] = r[0] ? r[10] : r[3] (truth table 1110, cost 4) = x ? (y ? 0 : x) : -1
+
+The negated version of the bitwise ternary operator is even more
+expressive in this sense, as it has no need for constants; it reaches
+NAND, NOR, constant 0, constant -1, and the negation of either input
+in a single application, and needs only a single additional
+application to reach the rest of the binary boolean functions,
+including AND, OR, XOR, and XNOR. OR is `~(x ? a : a) where a = ~(x ?
+x : y)`, AND is `~(x ? a : a) where a = ~(x ? y : x)`, XOR is `~(x ? y
+: (~(x ? x : y)))`, and XNOR is `~(x ? (~(x ? y : x)) : y)`.
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = ~(r[0] ? r[0] : r[0]) (truth table 1100, cost 1) = ~(x ? x : x)
+    r[ 3] = ~(r[0] ? r[0] : r[1]) (truth table 1000, cost 1) = ~(x ? x : y)
+    r[ 4] = ~(r[0] ? r[1] : r[0]) (truth table 1110, cost 1) = ~(x ? y : x)
+    r[ 5] = ~(r[0] ? r[1] : r[1]) (truth table 1010, cost 1) = ~(x ? y : y)
+    r[ 6] = ~(r[0] ? r[0] : r[2]) (truth table 0000, cost 2) = ~(x ? x : (~(x ? x : x)))
+    r[ 7] = ~(r[0] ? r[0] : r[3]) (truth table 0100, cost 2) = ~(x ? x : (~(x ? x : y)))
+    r[ 8] = ~(r[0] ? r[1] : r[2]) (truth table 0010, cost 2) = ~(x ? y : (~(x ? x : x)))
+    r[ 9] = ~(r[0] ? r[1] : r[3]) (truth table 0110, cost 2) = ~(x ? y : (~(x ? x : y)))
+    r[10] = ~(r[0] ? r[2] : r[0]) (truth table 1111, cost 2) = ~(x ? (~(x ? x : x)) : x)
+    r[11] = ~(r[0] ? r[2] : r[1]) (truth table 1011, cost 2) = ~(x ? (~(x ? x : x)) : y)
+    r[12] = ~(r[0] ? r[3] : r[3]) (truth table 0111, cost 2) = ~(x ? a : a) where a = ~(x ? x : y)
+    r[13] = ~(r[0] ? r[4] : r[0]) (truth table 1101, cost 2) = ~(x ? (~(x ? y : x)) : x)
+    r[14] = ~(r[0] ? r[4] : r[1]) (truth table 1001, cost 2) = ~(x ? (~(x ? y : x)) : y)
+    r[15] = ~(r[0] ? r[4] : r[4]) (truth table 0001, cost 2) = ~(x ? a : a) where a = ~(x ? y : x)
+
+Similarly, the closely-related AOI and-or-invert function of four
+bits, sometimes realized as a single gate, can also reach all of the
+binary boolean functions in only two applications.
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = ~(r[0] & r[0] | r[0] & r[0]) (truth table 1100, cost 1) = ~(x & x | x & x)
+    r[ 3] = ~(r[0] & r[0] | r[1] & r[1]) (truth table 1000, cost 1) = ~(x & x | y & y)
+    r[ 4] = ~(r[0] & r[1] | r[0] & r[1]) (truth table 1110, cost 1) = ~(x & y | x & y)
+    r[ 5] = ~(r[0] & r[1] | r[1] & r[1]) (truth table 1010, cost 1) = ~(x & y | y & y)
+    r[ 6] = ~(r[0] & r[0] | r[2] & r[2]) (truth table 0000, cost 2) = ~(x & x | a & a) where a = ~(x & x | x & x)
+    r[ 7] = ~(r[0] & r[0] | r[3] & r[3]) (truth table 0100, cost 2) = ~(x & x | a & a) where a = ~(x & x | y & y)
+    r[ 8] = ~(r[0] & r[1] | r[2] & r[2]) (truth table 0010, cost 2) = ~(x & y | a & a) where a = ~(x & x | x & x)
+    r[ 9] = ~(r[0] & r[1] | r[3] & r[3]) (truth table 0110, cost 2) = ~(x & y | a & a) where a = ~(x & x | y & y)
+    r[10] = ~(r[0] & r[2] | r[0] & r[2]) (truth table 1111, cost 2) = ~(x & a | x & a) where a = ~(x & x | x & x)
+    r[11] = ~(r[0] & r[4] | r[0] & r[4]) (truth table 1101, cost 2) = ~(x & a | x & a) where a = ~(x & y | x & y)
+    r[12] = ~(r[0] & r[2] | r[1] & r[2]) (truth table 1011, cost 2) = ~(x & a | y & a) where a = ~(x & x | x & x)
+    r[13] = ~(r[0] & r[3] | r[3] & r[3]) (truth table 0111, cost 2) = ~(x & a | a & a) where a = ~(x & x | y & y)
+    r[14] = ~(r[0] & r[4] | r[4] & r[4]) (truth table 0001, cost 2) = ~(x & a | a & a) where a = ~(x & y | x & y)
+    r[15] = ~(r[0] & r[4] | r[1] & r[4]) (truth table 1001, cost 2) = ~(x & a | y & a) where a = ~(x & y | x & y)
+
+These exotic three- and four-input Boolean functions, despite their
+attractive formal properties, are probably not ideal for a virtual
+machine design in practice; they are generally not provided by CPUs,
+so in a naïve implementation, they probably need to be emulated by a
+few instructions, possibly increasing register pressure.
+
+If we limit ourselves to the full set provided by any CPU I’m familiar
+with — `&`, `|`, `~`, `^`, and `&^` — we never need more than two ops
+to reach any binary Boolean function:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = r[0] & r[1] (truth table 0001, cost 1) = x & y
+    r[ 3] = r[0] | r[1] (truth table 0111, cost 1) = x | y
+    r[ 4] = ~r[0] (truth table 1100, cost 1) = ~x
+    r[ 5] = ~r[1] (truth table 1010, cost 1) = ~y
+    r[ 6] = ~r[2] (truth table 1110, cost 2) = ~(x & y)
+    r[ 7] = ~r[3] (truth table 1000, cost 2) = ~(x | y)
+    r[ 8] = r[0] ^ r[0] (truth table 0000, cost 1) = x ^ x
+    r[ 9] = r[0] ^ r[1] (truth table 0110, cost 1) = x ^ y
+    r[10] = r[0] &^ r[1] (truth table 0010, cost 1) = x &^ y
+    r[11] = r[1] &^ r[0] (truth table 0100, cost 1) = y &^ x
+    r[12] = r[0] ^ r[4] (truth table 1111, cost 2) = x ^ (~x)
+    r[13] = r[0] ^ r[5] (truth table 1001, cost 2) = x ^ (~y)
+    r[14] = r[1] | r[4] (truth table 1101, cost 2) = y | (~x)
+    r[15] = r[0] | r[5] (truth table 1011, cost 2) = x | (~y)
+
+Removing `&^` does not worsen the situation in that sense, although `x
+&^ y` and `y &^ x` become two ops instead of one:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = r[0] & r[1] (truth table 0001, cost 1) = x & y
+    r[ 3] = r[0] | r[1] (truth table 0111, cost 1) = x | y
+    r[ 4] = ~r[0] (truth table 1100, cost 1) = ~x
+    r[ 5] = ~r[1] (truth table 1010, cost 1) = ~y
+    r[ 6] = ~r[2] (truth table 1110, cost 2) = ~(x & y)
+    r[ 7] = ~r[3] (truth table 1000, cost 2) = ~(x | y)
+    r[ 8] = r[0] ^ r[0] (truth table 0000, cost 1) = x ^ x
+    r[ 9] = r[0] ^ r[1] (truth table 0110, cost 1) = x ^ y
+    r[10] = r[0] ^ r[2] (truth table 0010, cost 2) = x ^ (x & y)
+    r[11] = r[0] ^ r[3] (truth table 0100, cost 2) = x ^ (x | y)
+    r[12] = r[0] ^ r[4] (truth table 1111, cost 2) = x ^ (~x)
+    r[13] = r[0] ^ r[5] (truth table 1001, cost 2) = x ^ (~y)
+    r[14] = r[1] | r[4] (truth table 1101, cost 2) = y | (~x)
+    r[15] = r[0] | r[5] (truth table 1011, cost 2) = x | (~y)
+
+If we leave `&^` in, it’s also possible to remove `|` without the
+worst case getting any worse, and indeed the only impact is that we
+need two ops to compute `|` as `x ^ (y &^ x)`:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = r[0] & r[1] (truth table 0001, cost 1) = x & y
+    r[ 3] = ~r[0] (truth table 1100, cost 1) = ~x
+    r[ 4] = ~r[1] (truth table 1010, cost 1) = ~y
+    r[ 5] = ~r[2] (truth table 1110, cost 2) = ~(x & y)
+    r[ 6] = r[0] ^ r[0] (truth table 0000, cost 1) = x ^ x
+    r[ 7] = r[0] ^ r[1] (truth table 0110, cost 1) = x ^ y
+    r[ 8] = r[0] &^ r[1] (truth table 0010, cost 1) = x &^ y
+    r[ 9] = r[0] ^ r[3] (truth table 1111, cost 2) = x ^ (~x)
+    r[10] = r[0] ^ r[4] (truth table 1001, cost 2) = x ^ (~y)
+    r[11] = ~r[8] (truth table 1101, cost 2) = ~(x &^ y)
+    r[12] = r[1] &^ r[0] (truth table 0100, cost 1) = y &^ x
+    r[13] = ~r[12] (truth table 1011, cost 2) = ~(y &^ x)
+    r[14] = r[3] &^ r[1] (truth table 1000, cost 2) = (~x) &^ y
+    r[15] = r[0] ^ r[12] (truth table 0111, cost 2) = x ^ (y &^ x)
+
+This is not true of `&`, `~`, and `^`; removing any of them causes
+some binary Boolean functions to require three ops.  If we remove both
+`|` and `&^`, then we also get some Boolean operations requiring three
+ops:
+
+    r[ 0] = x (truth table 0011, cost 0) = x
+    r[ 1] = y (truth table 0101, cost 0) = y
+    r[ 2] = r[0] & r[1] (truth table 0001, cost 1) = x & y
+    r[ 3] = ~r[0] (truth table 1100, cost 1) = ~x
+    r[ 4] = ~r[1] (truth table 1010, cost 1) = ~y
+    r[ 5] = ~r[2] (truth table 1110, cost 2) = ~(x & y)
+    r[ 6] = r[0] ^ r[0] (truth table 0000, cost 1) = x ^ x
+    r[ 7] = r[0] ^ r[1] (truth table 0110, cost 1) = x ^ y
+    r[ 8] = r[0] ^ r[2] (truth table 0010, cost 2) = x ^ (x & y)
+    r[ 9] = r[0] ^ r[3] (truth table 1111, cost 2) = x ^ (~x)
+    r[10] = r[0] ^ r[4] (truth table 1001, cost 2) = x ^ (~y)
+    r[11] = r[0] ^ r[5] (truth table 1101, cost 3) = x ^ (~(x & y))
+    r[12] = r[1] ^ r[2] (truth table 0100, cost 2) = y ^ (x & y)
+    r[13] = r[1] ^ r[5] (truth table 1011, cost 3) = y ^ (~(x & y))
+    r[14] = r[3] & r[4] (truth table 1000, cost 3) = (~x) & (~y)
+    r[15] = r[0] ^ r[12] (truth table 0111, cost 3) = x ^ (y ^ (x & y))
+
+So reasonable minimal sets
+for implementation on existing hardware
+include `&`, `~`, `^`, and `&^`; and `&`,
+`~`, `^`, and `|`.  The former is more widely supported, and it’s hard
+to argue that the latter is even more convenient.

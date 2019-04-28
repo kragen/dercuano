@@ -1,0 +1,260 @@
+Generally speaking, the REST constraints that requests and responses
+be fully self-describing and that servers be stateless makes REST
+protocols fairly bandwidth-intensive, not suitable for low-bandwidth
+links (in the range of 0.001–10000 bits per second).  This is actually
+cited as one of the drawbacks of REST in Fielding’s dissertation.  But
+there is an approach fully within the spirit of REST that can fix
+this.
+
+Inspirational examples from HTTP
+--------------------------------
+
+A web server wants a web browser to display a page with some inline
+images.  So it sends the browser some HTML containing the URLs of the
+images.  The HTML is interpreted in the context of that connection,
+allowing the server to use short “relative URLs” to refer to the
+images.  If the browser already has the images, it can avoid fetching
+them again (according to a caching policy which may have many factors,
+including commitments made by the server about image changes and
+demands made by the user about freshness) and thus use very little
+bandwidth.  Or, if the connection is using HTTP/2 or SPDY, the server
+has the option to “push” the images to the browser before they are
+requested, if it thinks the bandwidth cost is worth the potential
+improvement in latency.
+
+A web browser wants eBay’s web server to add a product image to an
+image a user is listing on eBay.  Rather than sending the image data,
+it sends an URL to an imgur image, thus using very little bandwidth.
+
+The generalization of the inspirational examples: including by reference, context-sensitive abbreviation, caching
+-----------------------------------------------------------------------------------------------------------------
+
+These are two examples of a more general mechanism for enabling the
+REST architecture to work well even for applications with very
+stringent bandwidth constraints.  Specifically, any large chunk of
+data is made into a separate resource and *included by reference*
+rather than inlined; the references are *abbreviated in a
+context-sensitive way* according to the context of the connection; and
+the chunks of data are then *cached* so that they need not be fetched
+every time.
+
+You could argue that allowing the client to use context-sensitive
+abbreviations in its request amounts to requiring the server to
+maintain session state, a violation of REST.  But as long as this
+abbreviation layer is a layer below the requests and responses, it
+affects the protocol semantics no more than the RFC3749 data
+compression that used to be a feature of TLS before the CRIME and
+BREACH attacks were discovered.
+
+The crucial properties are that any request message that would be
+valid on one connection at some time is also valid on a newly opened
+connection at that time, even if its on-the-wire representation might
+need to use more bytes, that the amount of abbreviation state is
+small, and that the client knows the entire session state to be able
+to tell the server in a new conneciton if necessary.  This largely
+preserves the advantages of the client-stateless-server style REST
+derives from: visibility is preserved because a monitoring system can
+easily maintain the abbreviation state, partial failures (of a server)
+are no more difficult to recover from, and the server is free to close
+connections to free up resources whenever desired.
+
+A database query example, starting with HTTP
+--------------------------------------------
+
+For example, suppose you want to run a query against a large database
+and fetch some of the results.  You could send a request like this
+(newlines added for clarity):
+
+    GET http://elephant-server/walrusdb/v18032
+        ?q=select+*+from+walruses+where[2000 bytes omitted]order+by+size
+        &p=1&n=10
+
+to fetch 10-item page 1 of the results of a 2000-character query,
+evaluated on immutable snapshot 18032 of some walrus database.  This
+is a workable interface, but inefficient, because every page of
+results is going to involve a 2100-byte request.  Suppose instead that
+you could say this:
+
+    GET http://elephant-server/walrusdb/v18032
+        ?q=https://pastebin.com/raw/FhnZFrGN
+        &p=1&n=10
+
+This gets us down to 90 bytes, a 23-fold improvement.  If the server
+doesn’t have a valid cached version of the query, it can go fetch it
+from Pastebin and cache it.  (Pastebin marks it as cacheable for 1801
+seconds.)  What’s more, the server can cache the query plan and even
+query results as long as that cache item is valid — and the cache key
+is only 34 bytes.
+
+If at some point the server decides to evict the query from its cache,
+this is transparent to the client.
+
+Departing a bit from HTTP
+-------------------------
+
+But we can do better.  First, note that in real, non-proxied HTTP/1.0,
+we didn’t actually say
+
+    GET http://elephant-server/wa...
+
+because we allowed the connection context to determine the scheme and
+host/port parts of the URL.  Instead, we said
+
+    GET /wa...
+
+substantially abbreviating the URL.  Later on, because of the IPv4
+address shortage, we decided that it was better to put it back in, and
+so we ended up with this as a backwards-compatible hack:
+
+    GET /wa...
+    Host: elephant-server
+
+And, later still, TLS gained SNI, which would in theory allow us to
+take the “Host:” header back out.  In fact, maybe HTTP/2 did.  I don’t
+know.
+
+Anyway, suppose that we use some kind of escape sequence to represent
+base URLs, and that each request includes the base URL it’s for, and
+that there's a separate kind of request line that defines such an
+escape sequence.  If we use “$” for clarity, rather than the perhaps
+more realistic choice of some kind of unprintable character, we end up
+with this:
+
+    $s=http://elephant-server/walrusdb/v18032
+    $p=https://pastebin.com/raw/
+    get $s?q=$p/FhnZFrGN&p=1&n=10
+
+So now, at the cost of 71 extra bytes at connection establishment
+time, each of our requests is down to 30 bytes.
+
+Involving Pastebin is kind of shitty, though.  Your queries are
+public, Pastebin can alter them as they wish, they are identified by
+8-letter strings, and it may take you a long time to upload them there
+even if the server doesn’t use them.  It would be much better if the
+client of the query processor could simply be the server for when the
+query processor wants to fetch the query; then it could allocate
+resource identifiers as it sees fit, reducing them down to perhaps two
+letters or digits until it gets over about 3700 of them.
+
+You could do that with connection-specific resource identifiers, but
+that’s kind of suboptimal because then a connection loss and
+reconnection invalidates the server’s cache.  A better approach is for
+the client to generate a session signing key and sign the responses
+with it.  Then it only needs an abbreviation for its public key or a
+hash thereof.  For example:
+
+    $s=http://elephant-server/walrusdb/v18032
+    $p=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/
+    ihave $p
+    get $s?q=$p/2q&p=1&n=10
+
+Now we have 126 bytes of setup, but we’re down to 24 bytes per
+request, 20% less, with no external servers or non-end-to-end
+encryption involved, without losing connection-to-connection
+cacheability.
+
+24 bytes per request is little enough that it would be usable over a
+300-baud modem — although the response might be unpleasantly large,
+depending on how the response is structured.
+
+Attempts at tighter encoding: CoAP (fail)
+-----------------------------------------
+
+You could try to do better than 24 bytes.  For example, CoAP tries to
+provide a tighter encoding of HTTP-like semantics, but without
+requiring a reliable connection-oriented protocol underneath.  It
+isn’t successful in this case:
+
+    >>> import aiocoap
+    >>> req = aiocoap.Message(code=aiocoap.GET, mtype=aiocoap.CON, mid=1)
+    >>> req.opt.uri_path = ('$s',)
+    >>> req.opt.uri_query = ('q=$p/2q', 'p=1', 'n=10')
+    >>> req.encode()
+    b'@\x01\x00\x01\xb2$sGq=$p/2q\x03p=1\x04n=10'
+    >>> len(_)
+    24
+
+What it buys us is that the message-id and the request for
+confirmation are bundled into the first four bytes along with the GET.
+(GET itself is represented by the second byte being 0x01; 0x02 is
+POST, 0x03 PUT, and 0x04 DELETE; 0x45 'E' is the most common
+equivalent of HTTP 200 OK, while for example 0x84 is 4.04 Not Found.)
+
+Attempts at tighter encoding: ncompress and gzip (these help)
+-------------------------------------------------------------
+
+ncompress implements LZW and has very little overhead and almost no
+codec latency.  The following file contains 10 requests and, without
+compression, is 367 bytes, including 126 bytes of initial setup.
+
+    $s=http://elephant-server/walrusdb/v18032
+    $p=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/
+    ihave $p
+    get $s?q=$p/2q&p=1&n=10
+    get $s?q=$p/2q&p=2&n=10
+    get $s?q=$p/2q&p=3&n=10
+    get $s?q=$p/2q&p=4&n=10
+    get $s?q=$p/2q&p=5&n=10
+    get $s?q=$p/2q&p=6&n=10
+    get $s?q=$p/2q&p=7&n=10
+    get $s?q=$p/2q&p=8&n=10
+    get $s?q=$p/2q&p=9&n=10
+    get $s?q=$p/2q&p=10&n=10
+
+This works out to 36.7 bytes per request.  ncompress reduces it to 241
+bytes, or 24 bytes per request; the initial setup was inflated to 135
+bytes, but the marginal cost per request was then just 10.6 bytes.
+
+By comparison, if we rely only on ncompress with no other
+abbreviations, we could try this:
+
+    ihave dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=1&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=2&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=3&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=4&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=5&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=6&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=7&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=8&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=9&n=10
+    get http://elephant-server/walrusdb/v18032?q=dat://12c09257a5f9320fb00b769bf6b68b17fee5c33a1b6c89b723941a06e7c7b19e/2q&p=10&n=10
+
+Uncompressed, this is 1359 bytes.  Compressed with ncompress, it is
+626 bytes.  We can conclude that ncompress is not an adequate
+replacement for the abbreviation system.
+
+What about LZ77?  With gzip -9, this same file compresses to 168
+bytes, 16.8 bytes per request, the best showing so far.  However,
+that’s relying somewhat on a certain amount of cross-request
+compression.  Flushing the compressor after every line brings the
+compressed size up to 266 bytes — 26.6 bytes per request.  We can
+conclude that gzip is a nearly identically performing replacement for
+the abbreviation system.
+
+Why not both?  gzip -9 reduces the abbreviated 367-byte version we
+started with to 171 bytes, or 17.1 bytes per request; 127 bytes of
+this is the initial setup, leaving only 4.4 incremental bytes per
+request thereafter.  However, if we flush every line, it’s even worse
+than before — up to 283 bytes.
+
+Clients composing things from pieces on the server or out in the world
+----------------------------------------------------------------------
+
+Suppose the server you’re talking to supports constructing some kind
+of filesystem environment to run programs in.  You tell it what the
+filesystem looks like (with a list of Docker-like layers or a
+Git-style tree hash or whatever) and it downloads whatever files it’s
+missing.
+
+Suppose the files are mapped to resources on the network.  Now you can
+build your filesystem environment from references to files that are
+located on the server itself, if it happens to also be a fileserver,
+but also on other servers near it, as well as files you yourself have.
+And you can do all of this without making the server responsible for
+maintaining that state in any kind of long term.  You just need some
+kind of naming system for the resources.
+
+Unifying abbreviations with resources
+-------------------------------------
+
