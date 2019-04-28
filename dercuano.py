@@ -3,6 +3,7 @@
 
 Next up:
 
+- get dates from Git
 - maybe reify categories as a class?
 - add author name to pages
 - a more convenient way to query the triple store
@@ -150,6 +151,9 @@ class Bundle:
         return [note for note in self.notes()
                 if category_name in note.categories()]
 
+    def category_size(self, category_name):
+        return len(self.notes_in_category(category_name))
+
     def generate_index(self):
         vomit_html(self.filename(self.output_dir, 'index.html'),
                    index_html(self))
@@ -185,12 +189,22 @@ class Note:
         self.notename = notename
         self.source_file = source_file
         self.category_set = self._categories()
+        self._word_count = None
 
     def __repr__(self):
         return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
 
     def link_ley(self, level=1):
         return a(self.title(), href=("../" * level + self.localpart()))
+
+    def extra_ley(self):
+        return [' (', str(self.word_count()), ' words)']
+
+    def word_count(self):
+        if self._word_count is None:
+            with open(self.source_file) as f:
+                self._word_count = sum(1 for line in f for word in line.split())
+        return self._word_count
 
     def flavor(self):
         for subj, verb, obj in self.bundle.triples():
@@ -216,10 +230,14 @@ class Note:
         with open(self.source_file) as f:
             body = f.read()
 
-        categories = sorted(self.categories())
+        categories = sorted(self.categories(),
+                            key=self.bundle.category_size,
+                            reverse=True)
         return note_html(self.bundle, self.title(), self.flavor()(body),
                          div(h2('Topics'),
-                             ul([li(self.bundle.category_link(category), "\n")
+                             ul([li(self.bundle.category_link(category),
+                                    " (%d notes)" % self.bundle.category_size(category),
+                                    "\n")
                                  if len(self.bundle.notes_in_category(category)) > 1
                                  else li(self.bundle.category_title(category))
                                  for category in categories]))
@@ -277,9 +295,11 @@ def category_html(bundle, category_name):
     category_title = bundle.category_title(category_name)
     return ley(html(title(category_title, ' ⁂ ', bundle.get_title()),
                     head_stuff(),
-                    h1('Notes touching on topic “', category_title, '”'),
-                    ul([li(note.link_ley(), "\n")
-                        for note in bundle.notes_in_category(category_name)])))
+                    h1('Notes concerning “', category_title, '”'),
+                    ul([li(note.link_ley(), note.extra_ley(), "\n")
+                        for note in sorted(bundle.notes_in_category(category_name),
+                                           key=word_count)
+                        ])))
 
 def index_html(bundle):
     categories = sorted(bundle.categories())
@@ -289,15 +309,22 @@ def index_html(bundle):
                     h1(bundle_title),
                     bundle.get_intro(),
                     h2('Notes'),
-                    ul([li(note.link_ley(level=0), "\n")
-                        for note in bundle.notes()]),
+                    ul([li(note.link_ley(level=0), note.extra_ley(), "\n")
+                        for note in sorted(bundle.notes(), key=word_count)]),
                     div(h2('Topics'),
-                        ul([li(bundle.category_link(category, level=0), "\n")
-                            for category in categories
+                        ul([li(bundle.category_link(category, level=0),
+                               " (%d notes)" % bundle.category_size(category),
+                               "\n")
+                            for category in sorted(categories,
+                                                   key=bundle.category_size,
+                                                   reverse=True)
                             if len(bundle.notes_in_category(category)) > 1]))
                     if categories else [],
                     script(src="liabilities/addtoc.js"),
     ))
+
+def word_count(note):
+    return note.word_count()
 
 def ley(htmlish):
     "HTML generator.  Tiny version of Stan from Nevow."
