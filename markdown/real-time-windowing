@@ -1,0 +1,175 @@
+Your user interface is a hard real-time program and should be designed
+and implemented as such.
+
+I’ve been thinking a lot about how to build a full computing
+environment “from scratch”, in the sense that it wouldn’t depend on
+any previously-designed hardware or software.  This is for a few
+different reasons.  One is Dan Ingalls’s contention that if the system
+is too complicated for a person to understand, they are limited in how
+they can use it as a medium for creative expression.  Another is that
+current systems are insecure by design, and for economic reasons, this
+is unlikely to change.  A third is that current systems are
+irreversibly addicted to the astoundingly-high-performance computing
+hardware that we currently only know how to produce with
+correspondingly-astounding concentrations of investment, to the point
+that only three companies in the world — TSMC, Intel, and
+Samsung — are currently able to produce devices at the 10-nm process
+node.
+
+But a fourth reason is that in some important ways, in particular user
+interface responsiveness, current systems are dramatically worse than
+they could be; fixing it will require a rewrite.  There are other such
+ways, such as security, but I will focus on responsiveness here.
+
+Hard real-time programming versus normal programming
+----------------------------------------------------
+
+There’s an established discipline of “hard real-time programming”,
+which I will distinguish from normal programming by first describing
+normal programming.  In normal programming, the most important thing
+is that, if your program runs successfully, the output it produces is
+correct; the second most important thing is that it run successfully,
+or at least produce a helpful error message explaining what caused it
+to fail; and, if these criteria are met, it is always more desirable
+for the software to run faster, especially on average, so we would
+like the software to be as fast as possible, as long as that does not
+interfere with correctness or success.
+
+Hard real-time programming is very different from normal programming;
+it’s programming software for things like antilock brakes and jet
+engines.  What distinguishes it from normal programming can be
+summarized in two slogans:
+
+* Late answers are wrong answers.
+* Failure is not an option.
+
+That is, in hard real-time programming, each piece of output has a
+deadline; if it misses that deadline, it is worthless.  Overdue
+answers are unusable.  Consistency of execution time is more important
+than its shortness.  Also, almost invariably, it is not acceptable for
+a program to fail some of the time, for example due to lack of
+resources.  The antilock braking program must work every time you
+press the brake pedal, not 99% of the times.
+
+Hard real-time programming isn’t “hard” in the sense of “difficult”;
+you can do it on an Arduino.  It’s “hard” in the sense that the
+deadlines that the program’s execution must meet are hard.
+
+Hard real-time programming and what I’m calling “normal programming”
+are two ends of a spectrum, representing two different reasons we
+might use computers.  In normal programming, we run a program because
+we do not know what the output will be, but we want to find out,
+because we imbue it with some kind of meaning.  In hard real-time
+programming, we know exactly what the output will be, and rather than
+goggling at it, we want to use it to control some aspect of our world.
+
+In between there are many shades of gray, and most programs have some
+aspects of both.  But it isn’t unidimensional.  For example, in “soft
+real-time programming”, it’s important to not miss deadlines, but
+results computed too late for their deadline are still of some use.
+In another category, somewhat incorrect answers are acceptable, as
+long as they are on time; there exists a whole field of algorithm
+design for this, known as “anytime algorithms”, many of which are for
+mathematical optimization problems.  More about this later!
+
+Most of academic computer science focuses on normal programming, and
+most programming languages and tools are written with normal
+programming in mind.  Enormously more code is written for normal
+programming than for hard real-time programming.
+
+As a consequence of these profound differences, it is often impossible
+to repurpose code written for a normal program as a real-time program,
+or vice versa.
+
+The user interface should be written as a hard real-time program
+----------------------------------------------------------------
+
+My core argument is that the part of the user interface closest to the
+user should be written as a hard real-time program, for the following
+three reasons:
+
+* because human beings are very sensitive to user interface latency;
+* because a crashing user interface is very similar to a whole
+  crashing computer (or maybe a whole crashing cluster of computers);
+* because they interact directly with video hardware, which generally
+  pumps out frames of video at a constant rate, so pixels that are
+  computed too late will be lost.
+
+By “the part of the user interface closest to the user” I mean the
+hardware and code that interfaces with human-interface output devices,
+such as sound cards, video cards, or laser projectors, and
+human-interface input devices, such as touchscreens, accelerometers,
+microphones, cameras, mice, keyboards, and joysticks.  If the same
+interface device is used as an interface to more than one different
+program, the user interface code in question has the task of safely
+multiplexing that device among those programs.
+
+How are hard real-time programs written?
+----------------------------------------
+
+They are much smaller than other programs, because — partly because of
+being written with tools designed for normal programming, and despite
+what I said above about “hard” — they are actually harder to write
+than normal programs.
+
+Typically they don’t do any dynamic memory allocation, both because
+dynamic memory allocation generally takes a nondeterministic amount of
+time and because it can fail, which is not an option.  As a result,
+they usually run in statically bounded memory space, making them
+formally executable by finite-state machines.
+
+Typically when they do do dynamic memory allocation, they use simple
+arena allocators or per-type allocators, which are constant-time.
+
+They virtually never use virtual memory.  Virtual memory is instant
+death to hard real-time systems, except in the unusual case that the
+deadline is so long that it can tolerate disk seeks.
+
+Typically they use very simple algorithms, because these are often
+easiest to prove time bounds for and because more complicated
+algorithms often require dynamic allocation.
+
+More often than you would expect, they are written in assembly
+language, which simplifies the task of worst-case time analysis.
+Occasionally they are written in ladder logic or other such
+hardware-focused formalisms.
+
+Often, they run on dedicated hardware, which is often a stripped-down
+microcontroller; timing becomes more predictable with less
+peripherals, no virtual memory, and less tasks per processor.  Since
+in a sense the desired outputs are already known before the program
+starts, it is often possible to perform useful tasks even with very
+little processor power, so even today, many hard real-time systems run
+on 8-bit processors such as 8051s, PICs, and Z80s.
+
+Formal methods of logical proof are somewhat more frequently used for
+hard real-time programs than for normal programs.
+
+The above is, of course, somewhat idealized.  But it provides the
+general outlines of the situation.
+
+Anytime algorithms are not currently widely used for hard real-time
+programming, perhaps because they are viewed as exotic.  An “anytime
+algorithm” is one that can provide an answer at any time after
+starting, but will produce better answers if allowed to run longer.
+Most often, these work by computing a series of progressively better
+answers, each an improvement on the previous answer.  Many
+mathematical optimization algorithms, such as those often used to
+approximately solve constraint-satisfaction problems, work in this
+mode normally.
+
+Instead of anytime algorithms, hard real-time programs typically use
+algorithms that execute in constant time or a time with a hard upper
+bound.  Instead of amortized-constant-time or amortized-logarithmic-
+time algorithms, they must use algorithms with a worst-case constant
+or logarithmic time bound, and keep their dataset size small enough
+that the necessary linear-time-or-worse algorithms don’t miss
+deadlines.
+
+It’s common to use bounded-size nonblocking FIFOs to communicate with
+real-time code.
+
+How can a windowing server be a real-time program?
+--------------------------------------------------
+
+So suppose we undertake to make a user interface layer 

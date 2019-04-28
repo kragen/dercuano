@@ -1,0 +1,108 @@
+A nonscriptable design for the Wercam windowing system
+======================================================
+
+A simpler design as an alternative to the latency-minimizing design in
+the file `wercam-scriptable-windows`.
+
+Modern CPUs are fast enough that we ought to be able to get by, at
+least for many applications, without any kind of graphics acceleration
+at all.  The role of the window system in such a system is just to
+multiplex screen space among different windows, composite the windows,
+and route events to the relevant applications.
+
+The simplest approach — the same one used in xshmu — is to let each
+application draw on a window buffer, and when it’s done, display that
+window buffer.
+
+Let’s assume that window flicker is intolerable, that latency is
+important, and that more enough RAM is available for several
+framebuffers.  Then we need to ensure that the display is never
+reading a partially-updated window buffer; at any given time, either
+the display or the application owns the buffer.  Since latency is
+important, we would like to initiate the redraw as late as possible
+before the vertical synchronization, so that the window contents can
+get composited into the framebuffer only 8ms before they’re drawn
+(assuming 60Hz) instead of, say, 24ms.
+
+But Wercam can’t ensure that the application finishes drawing into the
+buffer and relinquishes ownership in time for compositing.  Even if it
+could forcibly steal the buffer away when the deadline passed, it
+would have a partially-drawn window image to work with.  So it needs a
+backup plan — it needs the previous contents of the window.
+
+It isn’t good enough to keep the previous contents of VRAM, because
+the window may be translucent and something *underneath* it may have
+changed.  In fact, I would like to ensure that this happens as often
+as possible.
+
+So we need at least two buffers for each window — the current contents
+and the previous contents in case the current contents are unavailable
+when the deadline passes.  When we get the current contents back, we
+can relinquish the other buffer back to the application so that it can
+draw the next frame when the time comes.
+
+The Porter–Duff **over** operation — the one we’ll use for compositing
+translucent windows — involves a multiply-accumulate per pixel
+component, typically in 8-bit integer arithmetic.  I think my Intel
+Gen8 GPU (see file `asus-gpu`) can do about 100 billion 16-bit
+floating-point multiply-accumulates operations per second (400 MHz ·
+128 FP32 ALUs · 2 16-bit ops per ALU), and my CPU can do 128-bit SIMD
+(32 bytes) on I think four cores at 1.6 GHz each, which works out to
+204.8 billion such operations per second, or 52 billion pixels.  My
+screen draws 1920·1080·60Hz = 124 megapixels per second.  This
+suggests that the CPU should be able to handle on the order of 419
+layers, or the GPU half that (although the GPU also has a
+special-purpose blitter, which is probably competitive with the CPU.)
+
+If the depth of translucent windows starts approaching this limit, it
+should be possible to request updates from windows deeper in the stack
+less frequently, perhaps every other frame.  Then the foreground
+windows only have to be composited with the pre-composited background
+window stack.
+
+We can go even further in this direction since the “over” operation is
+associative.  We can group the windows by Z-order in groups of, say,
+3, and composite each group separately, then composite the groups in
+supergroups of 3, and so on, until we have composed the whole scene.
+Then we can update any subset of windows, regardless of where they are
+in the Z-order, with a relatively small logarithmic cost.  (But using
+saturating arithmetic might violate this associativity.)
+
+The Dep kernel (see file `bubbleos`) provides the application and
+the window system the facility to securely transfer the window buffers
+back and forth such that each can be sure that the other has
+relinquished access before it starts to write.  (When running Wercam
+on other platforms, we just have to hope.)  Normally, the application
+doesn’t allocate window buffers; it lets Wercam do that.  If the
+application doesn’t have possession of a buffer, it has nowhere to
+draw, and this is one way Wercam can limit the frame rate of
+background windows when necessary, or indeed eliminate the frame rate
+of invisible windows entirely.  Also, though, normally applications
+will wait for a paint event from Wercam before drawing and sending a
+new frame.  And they may not send a frame for a long time.
+
+In the degenerate case where no windows are being updated, Wercam
+could avoid spending CPU time on compositing entirely; similarly with
+no windows being updated in a certain part of the screen.  But its
+design goal is good worst-case performance, not good average-case
+performance.
+
+Performance tests
+-----------------
+
+I write a simple dumb alpha-compositor test in C.  It appears to work,
+and it runs smoothly.  At 828×512, just drawing a background, it runs
+at 1.13–1.16 ms (user CPU) per frame.  Alpha-compositing an (opaque)
+copy of the background on top of itself, it runs at 4.23–4.31 ms (user
+CPU) per frame, implying a cost of 3.07–3.18 ms of compositing per
+frame, or 7.2–7.5 ns per composited pixel.  Some preliminary analysis
+with Cachegrind finds 0.9 instructions per pixel without compositing
+plus 29.7 instructions per pixel added with compositing, but almost no
+difference in D-cache misses (0.125 per pixel with background only,
+0.127 with compositing).
+
+A [little work with GCC vector extensions][0] gets this down to, if my
+tests are valid, 1.46 ns per pixel, which is fast enough to put 5.5
+layers on the screen, or 22 layers on all four cores.
+
+[0]: http://canonical.org/~kragen/sw/dev3/vecalpha.c

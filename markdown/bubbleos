@@ -1,0 +1,284 @@
+Speculative plans for BubbleOS
+==============================
+
+BubbleOS is a tiny bubble of sanity in a universe of insane operating
+systems.  It’s self-bootstrappable — it includes all the tools needed
+to build it, edit its source code, and so on — and it can be used as a
+robust front end to a family of less sane systems.  This provides a
+variety of benefits.
+
+You can use BubbleOS as a standalone computing environment, run it as
+dom0 under Xen, or run it as a process under Linux (including
+Android), MacOS X, Microsoft Windows, or an HTML5 browser.
+
+BubbleOS contains the following:
+
+- A hard-real-time secure windowing system.
+- A hard-real-time secure microkernel designed to protect the user
+  from malicious applications.
+- A couple of hard-real-time secure terminal emulators.
+- A hard-real-time layout system built on a simplified version of the
+  CSS box model.
+- A text editor.
+- A minimal TCP/IP implementation.
+- Minimal cryptographic facilities, an ssh client and server, and a
+  Bitcoin client.
+- Encrypted swap and disk.
+- Unicode fonts.
+- Unicode text rendering including bidi and combining characters.
+- A bootstrapping chain of compilers, including assembler, low-level,
+  high-level, and very-high-level languages.  The assembler is a
+  variant of Forth, the low-level language is a subset of C, while the
+  others are extended subsets of JS.
+- A compiler for a subset of C++ sufficient to cross-compile GCC.
+- A SAT solver which provides some of the horsepower for these
+  compilers.
+- A virtual CPU machine set, with simulators for i386, amd64, RISC-V,
+  and ARM(32), which runs all the other code.
+- A hardware design for this CPU.
+- A library of engineering models of many different physical
+  phenomena.
+- A circuit design and synthesis system capable of synthesizing this
+  CPU for certain Lattice FPGAs.
+- An analog circuit simulation program similar to SPICE.
+- A general mathematical optimization system that provides most of its
+  horsepower.
+- Emulators capable of running CP/M, MS-DOS, or Apple ][ programs.
+- An image-format library capable of reading and writing most common
+  image file formats, including JPEG, PNG, TIFF, and GIF.
+- A minimal web browser capable of fully rendering Wikipedia and Stack
+  Exchange, though it lacks support for most modern web standards.
+- Snapshots of Wikipedia and Stack Exchange for offline viewing.
+- A fast, capable, secure web server.
+- The ability to checkpoint and migrate either a full machine image or
+  an individual process.
+- Its full source code as a hypertext literate program.
+- A fast, secure, crashproof content-addressable filesystem that
+  supports transactions.
+- A fast key-value store similar to LevelDB.
+- A minimal SQL database.
+- A terser database query language than SQL, but equally powerful,
+  better suited to interactive exploration.
+- A fairly full set of data-wrangling facilities similar to Unix
+  software tools, but implemented differently.
+- An implementation of Git.
+
+It does not provide a POSIX API.
+
+This is 32 major components in all.  I’d better get cracking!
+
+Naming
+------
+
+Bikeshed-style, the thing I am currently devoting my attention to is
+what to name the components.  Names from Consider Phlebas:
+
+Perosteck Balveda (Juboal-Rabaroansa Perosteck Alseyn Balveda dam
+T’seif), Gravant (alias for Perosteck Balveda), Amahain-Frolk,
+Egratin, Bora Horza Gobuchul (Horza, shapeshifting traitor),
+Xoralundra, Farn-Idir (sect), Schar, Heibohre, Rairch (species),
+Kraiklyn, Zallin, Wubslin, Yalson, Gow, kee-Alsorofus, Marain
+(language), Tzbalik Odraye, Mipp, Rava Gamdol, Aviger, Lenipobra, Lamm
+(traitor), Cifetressi, Dorolow, Jandraligeli, Chicel-Horhava, Neisin,
+Sro Kierachell Zorant, Fwi-Song (cannibal), Twenty-seventh (redshirt),
+First (acolyte), Sarble the Eye, Ghalssel, Tengayet Doy-Suut, Wilgre,
+Neeporlax, Xoxarle, Unaha-Closp (drone), Stafl-Preonsa Fal Shilde
+’Ngeestra dam Crose (Fal ‘Ngeestra), Gimishin Foug.
+
+Names from The Dispossessed: 46.  32 Pravic names along the same
+lines:
+
+Bebach, Chagvol, Chapis, Chekoks, Chigvigv, Dupin, Gvegob, Komush,
+Kvakot, Kvushab, Lassep, Logog, Makul, Mokob, Pabar, Palab, Pechol,
+Pevip, Pichok, Reshub, Shishek, Shivaks, Shumin, Sikvok, Siroks,
+Skemun, Sotat, Suvun, Trapan, Trekvish, Vabon, Vavun.
+
+Those are too similar.
+
+Names from gen24.py:
+
+Slilg, Floung, Gealgpru, Grapvirveag, Quiphdrusp, Kalgspricloost,
+Theagproohool, Shophslylg, Wimsplup, Houbdrid, Quyngdryg, Azpream,
+Greashgrystscoul, Yynpraint, Speazwhof, Scrussbres, Bealggusssprush,
+Kelpluf, Kasplach, Ploonchag, Prontseng, Graispclooshchuss,
+Kreassweaxheaph, Nyz, Yoontstaif, Doontdoup, Noosh, Clackblum,
+Dechspat, Plosttaix, Splez.
+
+Those are too silly.
+
+Names from gen24.py generated with some English probabilities, with
+real words removed:
+
+    ./gen24.py 40 /usr/share/dict/words .1 | awk '{print $1}' | LANG=C sort
+
+Achem, Dep, Dirness, Atafli, Essdi, Enlini, Rera, Tiomtru, Dercal,
+Bii, Abhar, Difodent, Nibanspo, Lincalent, Semeed, Veskeno, Ingex,
+Lum, Onel, Chantcor, Iiz, Reelfin, Blocklo, Leconscrip, Ura, Satyrpo,
+Editdish, Igstrud, Cing, Inon, Harfa, Etordot.
+
+Okay, I think that’ll work.
+
+Another candidate naming convention takes sequences of letters,
+numbers, and symbols that spell words in Spanish.  For example, “5p”
+means “faint away” and would work well for the checkpoint-and-restart
+facility (as might “k+” “beds” or “ck” “dry”), “g+” means “jewels” and
+would work well for a packaging system, “kb0” means “headboard” or
+“header”.  And “ogo” means “glance” and would work well for the
+windowing system.
+
+Oops, unfortunately “ogo” is already “an OpenFlow Network controller
+in Go”, a handheld computer sold from 2004–2006, an abbreviation for
+“OpenGroupware.Org”, and a mobile phone dating app similar to Tinder.
+So, without more detail, that name is right out.  Something like
+“ogoak” (“ojeo acá”, “a glance here”) or "ogoc2o" (“silky glance”) or
+"ogo☼o" (“ojeo solo”, “just a glance”) might work; none of them exist.
+
+Wercam: a hard-real-time secure windowing system
+------------------------------------------------
+
+Wercam securely multiplexes input and output between mutually
+untrusting applications while guaranteeing glitch-free animation and
+instant responsiveness to system commands 100% of the time, despite
+the efforts of malicious applications.  Additionally, applications can
+upload executable bytecode to Wercam to provide glitch-free
+bounded-latency visual feedback to user actions without writing the
+whole application as a bounded-latency system.
+
+It includes VNC and RDP clients for remote access to other graphical
+systems.
+
+Wercam is about 1000 lines of real-time Leconscrip.
+
+(The predecessor to 8½ was “a few hundred lines of source code using
+[Newsqueak]”, and 8½ itself was about 5–15kloc, but 8½ supported 23
+operations in /dev/bitblt and a bunch of font nonsense.  Rio was
+smaller and simpler.)
+
+See also files `wercam-scriptable-windows`, `window-systems`, and
+`real-time-windowing`.
+
+Intranin: a hard-real-time secure microkernel
+---------------------------------------------
+
+Intranin securely multiplexes the CPUs, memory, disk, and GPU between
+mutually untrusting application processes, which are isolated using
+objet-capability discipline, and furthermore securely enables
+hard-real-time control applications to meet microsecond deadlines 100%
+of the time.
+
+Intranin is about 2000 lines of real-time Leconscrip, plus a few
+hundred lines of Abhar assembly for each platform.
+
+Oops, “DEP” (the original name) already has a meaning in infosec, “data execution
+prevention”: <https://seclists.org/oss-sec/2018/q4/82>.  Renamed to
+Shang.
+
+Oops, “Shang” (the name replacing Dep) is already <https://github.com/etherzhhb/Shang>, free
+software for compiling C to RTL.  Intranin!
+
+Atafli: hard-real-time secure terminal emulators
+------------------------------------------------
+
+Atafli is a set of character-cell terminal emulators that are hardened
+against resource-exhaustion attacks.  They run on Wercam and are
+useful for running older programs or providing access to remote
+machines, but when writing programs for BubbleOS, it’s easier and
+provides better results to use Essdi.
+
+Atafli is about 500 lines of real-time Leconscrip.
+
+Essdi: a hard-real-time layout system
+-------------------------------------
+
+Essdi is a modern replacement for character-cell terminal output
+streams, preserving their ease of programming and guaranteed real-time
+performance (a particularly big contrast when compared to the janky
+pause-filled experience that is an HTML5 web browser) but providing
+enough of the CSS box model that it’s easy to write things that look
+good.  Most applications that run on Wercam use it to do their
+layouts.
+
+At times, Essdi privileges responsivity over correctness.
+
+Essdi is about 800 lines of real-time Leconscrip.
+
+Editdish: A text editor
+-----------------------
+
+In the 1970s, text editors were separate application programs, but
+they turned out to be useful for handling the user interfaces of other
+application programs.  Graphical user interfaces embedded tiny text
+editors all over other applications.
+
+Enlini, a minimal TCP/IP implementation
+---------------------------------------
+
+Enlini implements enough of TCPv4, IPv4, and UDPv4 to support the
+minimal BubbleOS network services: an ssh client and server, a Bitcoin
+client, and an HTTP client and server.  It uses a parser-driven
+approach reminiscent of the STEPS TCP/IP stack.
+
+- Minimal cryptographic facilities, an ssh client and server, and a
+  Bitcoin client, Rera.
+- Encrypted swap and disk, Tiomtru.
+- Unicode fonts, Dercal.
+- Unicode text rendering including bidi and combining characters, Bii.
+- A bootstrapping chain of compilers, including assembler, low-level,
+  high-level, and very-high-level languages.  The assembler, Abhar, is
+  a variant of Forth; the low-level language, Difodent, is a subset of
+  C; and the others, Leconscrip, are extended subsets of JS.
+- A compiler for a subset of C++ sufficient to cross-compile GCC,
+  Lincalent.
+- A SAT solver which provides some of the horsepower for these
+  compilers, Semeed.
+- A virtual CPU machine set, with simulators for i386, amd64, RISC-V,
+  and ARM(32), which runs all the other code, Veskeno.
+- A hardware design for this CPU, Ingex.
+- A library of engineering models of many different physical
+  phenomena, Lum.
+- A circuit design and synthesis system capable of synthesizing this
+  CPU for certain Lattice FPGAs, Onel.
+- An analog circuit simulation program similar to SPICE, Chantcor.
+- A general mathematical optimization system that provides most of its
+  horsepower, Reelfin.
+- Emulators capable of running CP/M, MS-DOS, or Apple ][ programs,
+  Blocklo.
+- Nibanspo: An image-format library capable of reading and writing most common
+  image file formats, including JPEG, PNG, TIFF, and GIF.
+- Ura, A minimal web browser capable of fully rendering Wikipedia and
+  Stack Exchange, though it lacks support for most modern web
+  standards.
+- Satyrpo: snapshots of Wikipedia and Stack Exchange for offline
+  viewing.
+- Igstrud: A fast, capable, secure web server.
+- Cing: The ability to checkpoint and migrate either a full machine
+  image or an individual process, which produces an executable.
+- Inon: its full source code as a hypertext literate program.
+- Dirness: A fast, secure, crashproof content-addressable filesystem
+  that supports transactions.
+- Harfa: A fast key-value store similar to LevelDB.
+- Etordot: A minimal SQL database.
+- Binate: A terser database query language than SQL, but equally
+  powerful, better suited to interactive exploration.
+- Atsoled: A fairly full set of data-wrangling facilities similar to
+  Unix software tools, but implemented differently.
+- Bonlar: An implementation of Git.
+
+Bootstrapping sequence
+======================
+
+Veskeno, the virtual machine, is, in some sense, the bedrock of the
+system; everything else runs within it.  But Veskeno alone is
+unusable; you need programs for the virtual machine in order to do
+things with it.  And for that you need at least some version of Abhar,
+the assembler, running.
+
+Given a definition for Veskeno’s instruction set and I/O architecture,
+this ought to be a matter of a few hours of programming (initially in
+C or Python), but coming up with the instruction set could easily take
+longer than that.  Probably writing a few drafts is a good idea, but
+then I need to test each one with some kind of code generator.
+
+In Abhar or low-level Leconscrip I can write a bootstrap interpreter
+for high-level Leconscrip, and then I can write a compiler for
+high-level Leconscrip in itself.

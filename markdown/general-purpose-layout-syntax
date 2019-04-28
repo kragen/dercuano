@@ -1,0 +1,452 @@
+(File `quicklayout` concerns the speed of text reflow.)
+
+Graphviz has this really clever way to handle layouts inside nodes of
+shape “record”.  Fields are separated by “|”, and by default are laid
+out left to right; within “{}” the default layout is transposed, top
+to bottom instead.  So “A|{B|C}|D”, for example, is a three-column
+layout with two rows, B and C, in the middle column.  Hboxes nest
+inside vboxes; vboxes nest inside hboxes.
+
+There are some other details, and now this is sort of deprecated in
+favor of a subset of HTML they’re implementing.  But I think the
+“|”-separation layout is brilliant, and can be extended in interesting
+ways.
+
+First modification: use friendlier characters “[,]'\n”, and vertical by default
+-------------------------------------------------------------------------------
+
+Instead of “{|}”, which are optimized for not occurring by accident,
+and “\” to escape them, let’s use “[,]” for nesting and separators,
+and “'” for quoting, as in Lisp.  So “65,535” is written as “65',535”.
+All of these characters are easily reachable on a standard QWERTY
+keyboard without shift or extreme reaches.
+
+Let’s make the top level of nesting be vertical by default, rather
+than Graphviz’s horizontal.
+
+Also, let’s add newline as a shorthand for “],[“.  This allows us to
+write this table
+
+    | a | b | c |
+    | 1 | 2 | 3 |
+
+as
+
+    [a,b,c
+    1,2,3]
+
+rather than “[a,b,c],[1,2,3]”.
+
+XXX maybe this should be reversed in some way?  Gotta think about
+that.
+
+I was thinking that maybe the quote or escape character should be “/”
+and should follow the character being quoted, but I think that’s
+probably bad in that it involves arbitrary lookahead to see if a
+sequence of escape characters is going to be even or odd and thus
+determine whether it quotes the character before it or not.
+
+Second modification: table layout
+---------------------------------
+
+Let’s establish the rule that sequences of sibling nested boxes, like
+the hboxes “a,b,c” and “1,2,3” in the previous example, have aligned
+fields, so they lay out as a table.  If there is an intervening
+sibling box with no nesting, that terminates the table.
+
+To soften this, let’s add boxes whose content is merely “continuation
+of box to the left” and “continuation of box above”.  For these we can
+use “>” and “^” respectively rather than “,”, so that this table
+
+    procs -----------------------memory---------------------- ---swap-- -----io---- -system-- --------cpu--------
+     r  b         swpd         free         buff        cache   si   so    bi    bo   in   cs  us  sy  id  wa  st
+     1  0            0      1738140       120936      1405284    0    0    22    14   55  961   2   2  97   0   0
+     0  0            0      1737876       120936      1405292    0    0     0     0 1117 1180   1   2  97   0   0
+
+can instead be written as follows:
+
+    [procs>,memory>>>,swap>,io>,system>,cpu>>>>
+    r,b,swpd,free,buff,cache,si,so,bi,bo,in,cs,us,sy,id,wa,st
+    1,0,0,1738140,120936,1405284,0,0,22,14,55,961,2,2,97,0,0
+    0,0,0,1737876,120936,1405292,0,0,0,0,1117,1180,1,2,97,0,0]
+
+This provides substantial layout power and is actually easier to use
+than fixed-width ASCII table layout, as far as it goes.
+
+If you actually want hboxes vertically adjacent to one another not to
+share columns, you can add extra levels of nesting:
+“[[[a long name,b,c]]],[[[1,2,3 million tons]]]”.
+
+XXX the following part is half-baked.
+
+As a possible modification of this to support outline-type structures,
+you could maybe allow a nested box with fewer cells to partially
+terminate a table structure.  Take this example:
+
+    [+,usr>
+    ,+,local>
+    ,,+,bin>
+    ,,,,ncftp
+    ,+,bin>
+    ,,,bash]
+
+Here the first line has three cells (the third of which is merged with
+the second), while the fourth line has five (the first four of which
+are empty).  The next line has only four cells again, so the boundary
+between the fourth and fifth cell on the previous line is forgotten.
+
+Third modification: hashtags
+----------------------------
+
+To identify particular cells or classes of cells, we can insert
+hashtags into them which are not displayed by default.  Perhaps
+“[a #th,b #th,c #th #ch],[1,2,3]” tags all three of a, b, and c with “th”,
+but only c is tagged with “ch”, identifying it uniquely.  You can put
+the hashtags anywhere in the cell; at the beginning or the end,
+separating whitespace will be removed.
+
+There are at least five kinds of things you might want to do with
+hashtags: style cells, set or append to cell contents, link to cell
+contents, read cell contents, and listen for user interaction in
+cells.  All of these might query hashtags (or contents!) in the cell
+itself, in its ancestors, in its siblings, or in other cells aligned
+with it.  In a syntax for these, we need three or five directional
+indicators, plus some way to indicate whether we mean an immediate
+neighbor or an eventual one.
+
+For example, you might use “>” to indicate an immediately preceding
+sibling node, “>\*” to indicate any sibling node, “/” (or maybe “.”)
+to indicate an immediate parent node, “/\*” to indicate any ancestor
+node, “^” to indicate a corresponding node in the second dimension of
+the table (such as a column), and “^\*” to indicate a previous node.
+So perhaps “th” indicates a cell tagged “th”, “ch” indicates the cell
+tagged ch, “ch^” indicates the cell below the cell tagged ch, “ch^^”
+indicates the cell two below it, “ch^\*” indicates the entire column,
+and “ch^\* sydney>\*” indicates any cell in any column containing the
+“ch” hashtag and any row containing the “sydney” hashtag.  (Or vice
+versa if the table is laid out in columns?  Bleh.  Also maybe one of
+these operators should be postfix and you should be able to stick them
+before or after the hashtag.)
+
+As an alternative to identifying cells with hashtags, you can identify
+them with search strings with "?string?" or maybe regexps.
+
+Of course there are other kinds of things than hashtags you might want
+to put into cells and not show up as pure text: sparklines, progress
+bars, character-level markup, URLs to link to, raster and vector
+images, and so on.
+
+You could use cursor movement commands as an alternative to hashtags
+as a way to identify text to modify.
+
+Cheap in-memory representation
+------------------------------
+
+It would be nice if we could represent a node unambiguously as a
+pointer into the string representation (or *some* string
+representation), which would require that each tree node has a unique
+first byte in that string representation.  We might have to make some
+minimal changes.  Consider again “[a,b,c;1,2,3]”, which is a vbox
+containing two hboxes which each contain three leaf cells.  If we
+expand this to have a unique root node and expand out the “;”, it
+becomes “[[a,b,c],[1,2,3]]”, and now each node indeed has a unique
+first byte.  Also, the commas and “]”s are not the first byte of any
+node, so expanding out the “;” was unnecessary; “[[a,b,c;1,2,3]]” is
+adequate.  This gives us a 15-byte representation of the whole tree,
+although proceeding from one sibling node to the next may be somewhat
+slow.  (A cache for large jumps could limit this problem.)
+
+Compare this to a Lisp-style or C-style record-and-pointer
+representation:
+
+    digraph abc123 {
+        rankdir=LR;
+        node [shape=record];
+        subgraph rows {node [label="{count|3}|<0>|<1>|<2>"]; row0 row1;}
+        root [label="{count|2}|<0>|<1>"];
+        root:0 -> row0; root:1 -> row1;
+        row0:0 -> a; row0:1 -> b; row0:2 -> c;
+        row1:0 -> 1; row1:1 -> 2; row1:2 -> 3;
+    }
+
+Just the internal nodes of this tree take up 11 pointers of storage,
+typically 4 bytes each nowadays, and that’s not even counting the leaf
+nodes that contain the labels.  If you make linked lists of siblings
+you can ditch the count fields, but then you pay even more in
+next-sibling pointers:
+
+    digraph abc123 {
+        node [shape=record];
+        subgraph i {node [label="<k>kids|<n>next"]; d e f g h i j k;}
+        d:k -> e:k -> a;        e:n -> f:k -> b; f:n -> g:k -> c;
+        d:n -> h:k -> i:k -> 1; i:n -> j:k -> 2; j:n -> k:k -> 3;
+    }
+
+This has 16 pointers instead of only 11, because it needs 8
+next-sibling pointers (two of which are null) instead of 3 count
+fields.
+
+A friendlier syntax variant with more special cases
+---------------------------------------------------
+
+Suppose the top-level separator is “\n” and if there’s a “\t” it gets
+inferred as a second-level separator, and we use “{}” for further
+nesting.  Then we can ingest tab-separated values (with some strange
+quoting conventions) natively, without losing the power of nesting.
+The main disadvantage is that it’s much more irregular, and there are
+lots of cases where a level of nesting can fail to be inferred because
+there’s only one item.
+
+Some failed ideas
+-----------------
+
+ASCII has separate horizontal and vertical separators: HT and VT (^K).
+Suppose you adopt the rule that you infer a surrounding hbox when you
+find an HT, and a surrounding vbox when you find a VT.  Then maybe you
+could infer all your hboxes and vboxes instead of having to mark their
+beginnings explicitly, and then you would be winning because you would
+only have to mark the endings, with some third control character, like
+LF, which would end the current hbox or vbox.  For example, given this
+text:
+
+    a	b	c
+    d	e	f
+
+which is to say, `a<HT>b<HT>c<LF>d<HT>e<HT>f<LF>`, you would infer an
+hbox upon finding the HT after “a”, and then pack “a”, “b”, and “c”
+into it, and then end the inferred hbox upon finding the LF.  Then
+upon finding the HT after “d”, you would infer a new hbox (and perhaps
+a vbox to contain it and the previous hbox).  The idea was that you
+would never infer an *end* to any current box; they would all be
+explicit.
+
+This doesn’t work for a couple of reasons:
+
+- You can put a vbox as the second field of an hbox with a sequence
+  like `a<HT>b<VT>c`, but never as the first, because you haven’t
+  inferred the hbox yet.  So the `<VT>` will be treated as a separator
+  for the surrounding vbox.
+- It’s too easy to accidentally end the outer vbox.  For example,
+  `a<HT>b<LF>c<LF>` would end it, because no `<HT>` has yet been seen
+  to infer an hbox to pack the `c` into.  To be consistent, if more
+  text followed, you’d want to infer an outer wrapping hbox
+  surrounding that vbox, and so on.
+- You can’t have a box with only one child.
+
+I also thought about using a stack machine model: first you output
+some boxes separated by separator bytes, and then you combine them by
+emitting some combining bytes that will join them into hboxes and
+vboxes.  This has most of the same problems and additionally makes
+text hard to edit.
+
+Some better ideas
+-----------------
+
+It’s probably best to stick to LF as the separator.  Then, what do we
+use for group start and group end codes?  Nonprintable characters
+would be nice.  ASCII-1967 has STX and ETX, ^B and ^C, which sound
+promising, but STX is really EOH (end of header).  And ^C has acquired
+the meanings of killing processes or copying text, either of which
+would be unfortunate to invoke accidentally.  ^R and ^T (DC2 and DC4)
+would work; they used to turn your paper tape punch on and off.  SO
+and SI (^N and ^O) would also work; on VT100s they select the
+graphical character set, which is a nicely parallel meaning, although
+they don’t nest there.
+
+ECMA-48 defines a variety of opening delimiters in whose closing
+delimiter is ST, String Terminator, 0x9c; specifically APC
+(application program command, 0x9f), DCS (device control string,
+0x90), OSC (operating system command, 0x9d), PM (privacy message,
+0x9e), and SOS (start of string, 0x98).  Nesting is explicitly
+forbidden; according to the spec, most of the strings need to be
+printable ASCII, not even printable ISO-8859-1.  There are also PU1
+and PU2 codes, 0x91 and 0x92.  These are all in the little-used C1
+control codes area of ISO-8859-1 (originally ANSI X3.64), which
+Windows-1252 repurposed for characters that are more commonly used.
+
+So our table might look like
+`<DC2>a<LF>b<LF>c<DC4><DC2>1<LF>2<LF>3<DC4>`.  This is kind of
+suboptimal in a number of ways:
+
+- as I said before, it’s more bytes than the usual CSV;
+- with the unprintable delimiters, if rendered by a traditional
+  terminal, it’s actually even more misleading than before, because
+  “c1” appears as a single line.  Maybe it would work better to use CR
+  (^M) and VT (^K), which xterm, konsole, libvte display as if it were
+  ^J.
+- if you’re editing it byte by byte, if you delete either the opening
+  or closing delimiter in the middle, you will get a change of
+  orientation of the text, which could be confusing.  Or maybe useful
+  if you actually wanted to transpose a table, I guess, but it also
+  transposes all the subtables.  Worse, though, all the text
+  afterwards will change orientation.
+
+A possible further alternative would be to determine box type by its
+internal delimiters (^I vs. ^J), but still have separate nesting
+delimiters (^K and ^M, say).  Then you could go one step closer to
+regular terminal ASCII interpretation by inferring (only) hboxes
+within vboxes when necessary to handle ^I and ^J occurring within the
+same container.  This requires four characters instead of three, but
+eliminates all the other problems previously mentioned.
+
+You still have the problem of unmatched delimiters swallowing the rest
+of the document, at least temporarily, when they’re inserted in the
+middle.  There must be some kind of possible solution to that but I
+don’t know what it is.  Maybe eliminating arbitrary nesting entirely
+and switching to transclusion of named chunks (maybe with Knuth-style
+1f, 1b labels) for nesting?  Sigh.
+
+Use cases
+---------
+
+The most obvious use case is a human being interactively preparing a
+two-dimensional nested layout of text for another human being to read,
+and I think this approach (supplemented with a few restructuring
+commands) is probably superior to anything I’ve seen for that purpose.
+
+The second most obvious case is to produce human-readable output from
+a computer program.  This syntax provides an easy way for program
+output to be tabular, nested, and semantically tagged for styling.
+
+You might also want to use that semantic tagging for data extraction
+and to specify additional transformations to make.
+
+The layout algorithm for this format is not quite as simple and fast
+as the layout algorithm for fixed-width ASCII text, but it’s
+dramatically simpler and faster than the CSS box model, especially if
+you don’t do word wrap.
+
+You also might want to use this data model for parsing data from other
+sources — HTML tables, spreadsheets, discussion threads, XML files,
+JSON, relational databases, that kind of thing.
+
+Implementing a prototype
+------------------------
+
+What would it take to get a prototype of this thing running so I can
+see what it feels like to type into it?  Probably the easiest
+substrate available is DHTML, and although part of my motivation is to
+have something that reliably lays out and redisplays faster than DHTML
+does, maybe a DHTML prototype would be adequate.
+
+Given that desire, though, it seems like I’ll still have to use JS to
+do all the computations.  In a situation like {{A|B}|{C|D}}|{E|F}, we
+have to satisfy the following constraints:
+
+- {E|F} is below the ABCD row.
+- {E|F} is the same width as the ABCD row.
+- E is the same width as {A|B}
+- F is the same width as {C|D}.
+
+So far so good — that’s just a 2×2 table.  But there’s more:
+
+- {A|B} is to the left of {C|D}.
+- A is the same height as C.
+- B is the same height as D.
+
+Again, that’s okay; it’s just turned our 2×2 table into a 2×3 table.
+But there are cases where it’s essential to not have certain
+constraints that would flow from treating the whole thing as just one
+big table.  For example, if you replace A|B with {{A|B}}, the
+constraint with {C|D} goes away.  Maybe you can still use rowspan and
+colspan with nested tables to get this effect, I’m not sure.
+
+The interesting thing here is that each level of nesting has its own
+parallel cell constraints to deal with.  If a table like
+{a|b|c}|{d|e|f}|{g|h|i} is in a cell that has sibling cells, the
+table’s own rows (or columns) may be subject to alignment constraints
+with the contents of those sibling cells — but only to that one level,
+as the individual cells within those rows or columns will not be.
+
+I still feel that the whole thing can still be pretty much done with
+two passes: one pass to figure out which heights and widths have to be
+equal, and a second bottom-up pass to calculate them.
+
+Yes, it’s fairly simple.  If we just do nesting, without tables, each
+minimum width is either a constant, for text boxes; the maximum of
+some other widths, for a vbox; or a sum of other widths, for an hbox.
+These minimum widths are strictly arranged in a tree.  (A
+corresponding, parallel, and independent tree is present for heights.)
+So the minwidth of each hbox is a sum of maxima of minwidths of hboxes
+(or text boxes).  If we switch to strict tables, instead, the minwidth
+of a column is a maximum of sums of minwidths of vboxes.  I think this
+will be simple but I still don’t have it entirely clear in my mind.
+
+Ragged tables, where different rows or columns have different numbers
+of items, and so, for example, a column may only affect certain rows
+of a table, seem like they will be more complexity.
+
+We can compile the layout into a tree of data dependencies: the
+minwidth of a column is the maximum minwidth of its cells; the
+minwidth of a table is the sum of the minwidths of its columns; and so
+on.  Ragged tables make the topology more complicated because the
+minwidth of the table may come from a row which may actually have a
+contribution from the actual width of one of its cells that is imposed
+by the minwidth of a cell in a different row, while that row may have
+fewer cells and thus not actually impose its own row-minwidth on the
+table as a whole; I don’t know if there’s a way to ensure that the
+dependencies in that case are noncircular, but I suspect so.
+
+Other approaches to the layout problem include, of course the CSS box
+model, and TeX’s boxes-and-glue model, in which each character is a
+box, hboxes line up vboxes or vrules or characters on a baseline, and
+vboxes string together hboxes; TeX flows the text into a bunch of
+hboxes of length `\hsize`.  Glue has nine-dimensional flexibility: a
+default size, a maximum shrink, a maximum stretch, and then three more
+optional transfinite levels of maximum shrinks and stretches.  This
+allows space between words to be flexible, but not take advantage of
+that flexibility when you want to, say, center a line with equal
+infinite stretches on both left and right.
+
+Quasi-unrelated: escape sequence tags
+-------------------------------------
+
+How do you specify things like font size, borders, padding, and the
+like?  The standard ASCII approach is using escape sequences, but
+those have some big problems; they involve a mode switch, and so as
+you’re typing them (or receiving them) you can’t see what’s going on.
+And if there’s an interrupted transmission, they can eat some
+following text.
+
+The org-mode approach to handling links is kind of nice.  If you type
+`[[http://x.org/][foo]`, it’s just text; but once you add a final `]`,
+it just displays as `foo` with underlines, and it’s a link.  Movement
+commands skip the hidden characters, but if you delete one of them,
+the pattern breaks and the remainder becomes visible.
+
+WordPerfect’s Alt-F3 “Reveal Codes” screen was one of its most
+distinctive features.  It displayed boldfaced escape sequences like
+[HRt] for a paragraph break (“hard return”), [UND] and [und] for
+beginning and ending underlines, [Just:Left] for a beginning of
+left-justification, and so on.  But this didn’t provide any clue as to
+how you would go about typing them.  The current “WordPerfect” product
+still has such a feature, but now it draws little tags around the
+“codes”.
+
+HTML tags are nice but require a WordPerfect-like mode switch to make
+them effective.
+
+So here’s a thought.  If we’re going to have inline markup, maybe
+instead of *preceding* an escape sequence with an escape character, we
+should *follow* it.  Maybe you write `just:left` or `border:black` or
+`href:http://x.org/` or `18pt` or `sparkline:3,5,1,18,12,19` in your
+document and then add a ^] (GS, group separator) to interpret the text
+back to and including the previous whitespace as an “escape sequence”,
+thus removing it from view.  This solves most of the problems of
+escape sequences and provides a sort of command line; it also allows a
+sort of immediate feedback as you’re typing the escape sequence or
+receiving it, and it’s harmless if the escape sequence is truncated.
+The choice of whitespace as the other delimiter ensures that a
+corrupted escape sequence can’t eat too much text.  If you’re
+receiving data really slowly then you will have transient mysterious
+text appearing on the screen but that’s hardly the worst display
+problem resulting from slow data reception.
+
+Cursor positioning escape sequences
+-----------------------------------
+
+The best way for software to position the cursor in such a terminal,
+aside from cursor forward and back, is probably with escape sequences
+to push, pop, search, and move-to-end.  Then you can insert text by
+sending it, or delete text with the DEL character, say.
+

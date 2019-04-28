@@ -1,0 +1,492 @@
+So I want to write an immediate-mode GUI library (see file `imgui-tk`)
+for this experimental programming system I’m writing.  But I also want
+to write a programming language for the purpose, because (see file
+`yeso-notes`) even without the IMGUI library, I’ve written 1500+ lines
+of C for graphical applications, and I feel like a more reasonable
+programming language would make those applications both significantly
+less code and significantly less bug-prone.
+
+IMGUI is a lot easier when I can take addresses of local variables to
+do things like this:
+
+    static int item_current_2 = 0;
+    ImGui::Combo("combo 2 (one-liner)", &item_current_2,
+                 "aaaa\0bbbb\0cccc\0dddd\0eeee\0\0");
+
+Here, `item_current_2` contains the current selection in the combo
+box.  In C, you can also do this with struct fields and whatnot.  This
+is a feature that is missing from Lisp-memory-model programming
+languages, in general.  You typically end up providing “slot” objects
+with a get method and a set method, which is inconvenient if it
+involves changing the definition of the thing you’re trying to change,
+or writing a special-purpose wrapper.  (Common Lisp took a different
+approach.)
+
+But C makes IMGUI harder when you have to do things like this:
+
+        if (ImGui::BeginMenu("Help"))
+        {
+            ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
+            ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
+            ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+
+In a language like Smalltalk or Ruby with a block facility, you could
+write this as follows, avoiding the EndMenu and EndMenuBar calls and
+the potential bug of forgetting them:
+
+        ImGui::BeginMenu("Help") {
+            ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
+            ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
+            ImGui::MenuItem("About Fear ImGui", NULL, &show_app_about);
+        }
+
+Possibly MenuItem would also take a block to specify the action to
+take:
+
+        ImGui::BeginMenu("Help") {
+            ImGui::MenuItem("Metrics", NULL) { show_app_metrics(); }
+            ImGui::MenuItem("Style Editor", NULL) { show_app_style_editor(); }
+            ImGui::MenuItem("About Mere ImGui", NULL) { show_app_about(); }
+        }
+
+Block arguments can also give you resource managers (with-open-file,
+save-excursion) and iteration, all without the garbage-collection
+difficulties and compiler complexities of full-fledged closures.  I
+feel like iterators implemented with block arguments are somewhat
+inferior to first-class sequence objects as in Python and D, but
+they’re relatively passable.
+
+In conventional GUI toolkits, a strong argument for first-class
+garbage-collected closures is that it allows you to write
+event-handling code like the above.  In IMGUI, downward-funarg blocks
+are adequate!
+
+Perhaps address arguments (the `&item_current_2` in the above example)
+could be subject to a discipline like Pascal’s downward-funarg
+discipline: you can pass an address as an argument or store it in a
+local variable, but you can’t store it in a global variable, a
+variable in an outer scope, a record field, or an array item, and you
+can’t return it.  (Alternatively, storing it into a record or array
+would cause the record or array to inherit the downwardness; in this
+direction eventually lies Rust.)  This would make it statically safe
+to pass addresses of local variables without requiring garbage
+collection.  (It’s very roughly equivalent to Algol call-by-name, or to
+passing a getter function and a setter function.)
+
+In fact, I had forgotten this, but it turns out that Pascal has
+precisely this feature: its “var parameters” are precisely the
+downward-only-passable address arguments being described here, except
+that you can’t store them in a local variable or reseat them, and
+(more disconcertingly to my eye) they look just like input parameters
+at the callsite.  Oberon follows Pascal in this, despite having
+garbage collection and thus no need for the downward-only discipline.
+
+I really hate C’s single program-wide namespace (give me method
+namespaces and a module system, please), verbose type syntax, lack of
+multiple return values, lack of list comprehensions, lack of any kind
+of real error handling, clumsiness with ad-hoc polymorphism,
+inflexible argument passing, bug-prone coercions, bug-prone error
+reporting, and lack of memory-safety.  (The NULLs in the above code
+example are perhaps avoidable in C++, but in C they’d be a consequence
+of the inflexible argument passing.)  I like the fact that in C you
+can copy records by value and avoid aliasing them, just as I like the
+fact that you can alias fields with pointers when you want.
+
+You probably want optional named arguments for IMGUI; record literals
+are probably fine for that if you can invoke operations on them, and
+of course Tk does it by parsing command lines.  Without those, you’re
+stuck with something like a PostScript graphics context to change
+things like font sizes and colors.
+
+For pixel slinging, you probably want numeric vector types, at least
+fixed-size ones.
+
+I’ve been wondering if you could do most of Hindley-Milner type
+inference, including sum types, without any parametric polymorphism,
+though perhaps supporting ad-hoc polymorphism.  (I want sum types
+primarily to avoid null pointers and secondarily because of the
+usefulness of pattern-matching in compiler-like work.)  That is, every
+variable and every function would have a fully concrete type, but it
+would be inferred from context as much as possible.
+
+I really like the Golang interface construct.  It conflicts to a
+minimal extent with the desire for type inference, because if method
+calls on concrete types and method calls indirected through interfaces
+are written with the same syntax, the most you could ever infer about
+a value from the method calls is a lower bound on its interface.
+
+You ought to be able to infer the structure of a sum type from any
+wildcardless pattern match that matches on an object of that type.
+
+I don’t have a completely clear idea of how the kind of value
+references I’d like to be able to pass to things like `ImGui::Combo`
+above should interact with interfaces and heap pointers.
+
+Here is some existing code written with Yeso:
+
+    #include "yeso.h"
+
+    int main()
+    {
+      ywin w = yw_open("munching squares", 1024, 1024, "");
+
+      for (int t = 0;; t++) {
+        ypic fb = yw_frame(w);
+        for (int y = 0; y < fb.h; y++) {
+          ypix *p = yp_pix(fb, 0, y);
+          for (int x = 0; x < fb.w; x++) p[x] = (t & 1023) - ((x ^ y) & 1023);
+        }
+
+        yw_flip(w);
+      }
+    }
+
+Here is what I would like it to look like:
+
+    #include "yeso.h"
+
+    int main()
+    {
+      yw_open("munching squares", 1024, 1024, "") for (ywin w) {
+        for (int t = 0;; t++) {
+          yw_frame(w) for (ypic fb) {
+            yp_scanlines(fb) for (int y, ypix *p) {
+              for (int x = 0; x < fb.w; x++) p[x] = (t & 1023) - ((x ^ y) & 1023);
+            }
+          }
+        }
+      }
+    }
+
+or:
+
+    use xshmu
+
+    xshmu.window("munching squares", 1024, 1024) w:
+        (0..) t:
+            w.events:
+                be it Die: return 0
+                be _: None
+            w.frame:
+                it.each_line y, p:
+                    (..#p):
+                        p[it] <- bitand(t, 1023) - bitand(xor(it, y), 1023)
+
+This looks very much like Ruby, actually, though with Lobster syntax.
+Some improvements over the C version:
+
+0. It’s less than half as much code.
+1. Opening and closing the window is taken care of by the xshmu.open
+   function, which passes the window object to the argument block, and
+   implicitly closes the window upon exit from that block.  If you
+   call it without a block, it returns the window object, and you have
+   to close it explicitly.  Similarly, `w.frame` flushes the
+   framebuffer to the display when the block exits.  This is much less
+   bug-prone than the C version.
+2. The options argument in the C version is optional and omitted.
+3. No types are mentioned except `Die`.
+4. The event dispatch is done with pattern-matching instead of a bunch
+   of functions.
+5. Numeric ranges are first-class callable objects; invoked with
+   blocks, they iterate.
+6. Parentheses are not needed for function calls without non-block
+   arguments; you use some other syntax to get a reference to a method
+   when that is necessary.
+7. Bitwise operations are written with function-call syntax rather
+   than infix operators.
+8. Mutation `<-` is distinct from declaration and initialization `=`.
+9. The length of a slice is extracted with `#`.
+
+Block syntax is `arg1, arg2, arg3: INDENT body OUTDENT`, where the
+argument list may be empty.  The special identifier `it`, if mentioned
+in the body, is added as an argument to the argument list.
+
+Here’s a function from my Tetris implementation:
+
+    void rotate_piece(char *piece, char piece_rotated[][4], int piece_r)
+    {
+      int origin, xs, ys;
+      switch (piece_r) {
+      case 0:
+        origin = 0;
+        xs = 1;
+        ys = 4;
+        break;
+      case 1:
+        origin = 3;
+        xs = 4;
+        ys = -1;
+        break;
+      case 2:
+        origin = 15;
+        xs = -1;
+        ys = -4;
+        break;
+      case 3:
+      default:
+        origin = 12;
+        xs = -4;
+        ys = 1;
+        break;
+      }
+
+      for (int y = 0; y != 4; y++) {
+        for (int x = 0; x != 4; x++) {
+          piece_rotated[x][y] = (' ' != piece[origin + x*xs + y*ys]);
+        }
+      }
+    }
+
+This converts a 16-byte piece into a 4×4 array of booleans with a
+particular rotation in a pretty crappy way.  Instead:
+
+    to rotate_piece(piece, piece_rotated, piece_r):
+        (origin, xs, ys) = ((0, 1, 4) if piece_r == 0 else
+                            (3, 4, -1) if piece_r == 1 else
+                            (15, -1, -4) if piece_r == 2 else
+                            (12, -4, 1))
+        (..4) y:
+            (..4): piece_rotated[it][y] = (' ' != piece[origin + it*xs + y*ys])
+
+The compiler can here infer that `origin`, `xs`, `ys`, `y`, `it`, and
+`piece_r` are ints, that `piece_rotated` is an array of arrays of
+bools, and that `piece` is an array of chars.  There’s also a tuple of
+three ints here.
+
+We can do better, though, if we can return the array of arrays, and
+our loop is actually a list comprehension producing that array:
+
+    to rotate_piece(piece, piece_r):
+        (origin, xs, ys) = ((0, 1, 4) if piece_r == 0 else
+                            (3, 4, -1) if piece_r == 1 else
+                            (15, -1, -4) if piece_r == 2 else
+                            (12, -4, 1))
+
+        (..4) x: (..4) y: ' ' != piece[origin + x*xs + y*ys]
+
+Can the compiler infer that this returns specifically a 4×4 array
+rather than just an array of arrays (of bools)?  If it could infer
+that, then the caller could allocate space for the return value on the
+stack.  An alternative that doesn’t involve dynamic allocation for
+such sequences is to return a generator object, which the caller can
+then unpack as they see fit, but that isn’t a good default semantics
+for a for loop.
+
+Or we could take a block argument to store the result:
+
+    to rotate_piece(piece, piece_r):
+        (origin, xs, ys) = ((0, 1, 4) if piece_r == 0 else
+                            (3, 4, -1) if piece_r == 1 else
+                            (15, -1, -4) if piece_r == 2 else
+                            (12, -4, 1))
+
+        (..4) x: (..4) y: yield x, y, ' ' != piece[origin + x*xs + y*ys]
+
+(Arguably the procedure header should have some indication that it
+expects a block.)  Then you could invoke it like this:
+
+    rotate_piece(pieces[piece], piece_r) x, y:
+        piece_rotated[x][y] = it
+
+I really miss list comprehensions a lot in C and Golang.
+
+Here’s some annoying code from another xshmu program, makefont.c:
+
+    for (xshmu_event *ev; (ev = xshmu_get_event(w));) {
+      if (xshmu_as_die_event(ev)) {
+        xshmu_close(w);
+        free(img.p);
+        img.p = 0;
+        return 0;
+      }
+
+      xshmu_key_event *kev = xshmu_as_key_event(ev);
+      if (kev && kev->down) {
+        if (kev->keysym <= '~') current_char = kev->keysym;
+        if (kev->keysym == xks_shift_l) display_text = 0;
+        if (kev->keysym == xks_left && xoff) xoff -= 128;
+        if (kev->keysym == xks_right) xoff += 128;
+        if (kev->keysym == xks_up && yoff) yoff -= 128;
+        if (kev->keysym == xks_down) yoff += 128;
+      }
+      if (kev && !kev->down && kev->keysym == xks_shift_l) display_text = 1;
+
+      xshmu_mouse_event *mev = xshmu_as_mouse_event(ev);
+      if (mev) {
+        int x = mev->x + xoff, y = mev->y + yoff;
+        if ((mev->buttons & 1) && !(buttons & 1)) {
+          font.g[current_char].x = x;
+          font.g[current_char].y = y;
+          font.g[current_char].w = 0;
+          update_height(&font, current_char, 0);
+
+This becomes something like:
+
+    w.events ev:
+        be ev Die ->
+            return 0
+        be Key(_, keysym, Down) -> (
+            be keysym Ascii(ch) -> current_char <- ch
+            be Shift_L -> display_text <- False
+            be Left -> if (xoff): xoff -= 128
+            be Right -> xoff += 128
+            be Up -> if (yoff): yoff -= 128
+            be Down -> yoff += 128
+            be _ -> None
+        )
+        be Key(_, Shift_l, Up) -> display_text <- True
+        be Mouse((x, y), new_buttons) ->
+            x += xoff
+            y += yoff
+            if bit(new_buttons, 1) && !bit(old_buttons, 1):
+                update_height(&font, current_char, 0)
+                font.g[current_char] = ((x, y), (0, 0))
+
+The cleanup code is taken care of elsewhere by wrappers and deferred
+cleanup functions.  I’m not sure how the keysym names and other
+constructor names are in scope so we don’t have to say `xshmu.Up` or
+indeed `xshmu.Key`; maybe a declaration like `use xshmu.keys as xk`
+would allow us to use `xk.Up` and be adequate.  The name collision
+between `Down` for a keydown event and `Down` for the down-arrow key
+is unfortunate.
+
+Some amount of type declaration might simplify that — if we know that
+keysym is a keysym, we could bring the keysym constructors into scope
+for the pattern-matches.
+
+An interesting possibility for dynamic allocation is to use explicit
+region-based allocation, in which each function has the possibility of
+constructing an arena that is freed when it returns, and can pass that
+region to other functions so that they can dynamically allocate things
+in it that will survive their return.
+
+Uncorp
+------
+
+I feel like the above is a very ambitious language design for someone
+who’s only done much simpler languages before, and perhaps it isn’t
+ideally suited for a language that will need to have two
+implementations kept in sync for bootstrapping purposes.
+
+As a first step, I think I should implement a reverse-polish-notation
+portable assembler, “uncorp”, which supports most of the semantics of
+my desired language but without types or syntax.  You’d have the usual
+unsigned integer ALU operations (`+` `-` `*` `/` `&` `|` `~` `^` `<<`
+`>>` `<` and maybe `sex8` `sex16` `sex32`), the usual memory-access
+operations (`!` `@` `C!` `C@`), a stack operation or two (`DROP`,
+say), and some basic control structures — at least `IF`-`ELSE`-`THEN`
+and `LOOP`-`WHILE`-`REPEAT`.  For function call, yield, and return, I
+propose:
+
+- `: foo` to define the label `foo` at the current position,
+  potentially backpatching earlier references;
+- `foo call` to call `foo` with access to the current operand stack,
+  which is far less convenient than the usual RPN syntax, but avoids
+  the need to predeclare labels before calling them;
+- `28 enter` to create a 28-byte stack frame containing a link to the
+  old stack frame and install it on the frame pointer;
+- `28 ret` to restore the frame pointer, pop the 28 bytes, and return,
+  preserving the operand stack;
+- `fp` to get a pointer to the current stack frame;
+- `n fp+` `n fp+@`, `n fp+!`, `n fp+c@`, and `n fp+c!` to get
+  addresses or load and store into the current stack frame (the last
+  four are strictly speaking superfluous, but will make it much easier
+  to generate reasonable code on i386 and amd64);
+- `foo bar yield` to set the frame pointer to `foo` and jump to `bar`
+  with the previous frame pointer and the program counter after
+  `yield` on the operand stack, ready for another `yield` to return to
+  where you were.
+
+This is not quite powerful enough for cooperative threading or
+exception handling, for both of which `yield` would also need to set
+the stack pointer, but it’s adequate for the downward-funargs case,
+whether you’re passing the frame pointer implicitly (as for the
+single-level downward-funargs cases I contemplated above) or
+explicitly.  Given that, it’s probably better to have separate
+operations for setting the stack pointer, if desired.
+
+This version of Uncorp has some desirable properties.  A completely
+naïve compiler should be very easy to write and usably efficient, if
+several times slower than decent code.  A slightly less naïve compiler
+that just does register allocation for the operand stack should come
+within a factor of two or so of optimized C for a reasonably wide
+range of code.  It can be extended with vector operations easily.  And
+it can support the features I was describing above.
+
+One tricky bit is how big the frame pointer is supposed to be.
+Remember this is supposed to be a *portable* assembler, targeting at
+least AVR, armel, armeb, aarch64, i386, and amd64, and I’d like it to
+also be *deterministic*.  I think this design is too untyped to be
+efficiently deterministic for several reasons:
+
+- because of the endianness issues across these architectures;
+- because address arithmetic is going to have word-size-dependent
+  overflow;
+- and because it’s impossible to bounds-check address arithmetic, so,
+  say, subtracting a stack pointer from a function pointer is going to
+  produce platform-dependent results that moreover may be too large
+  for some platforms to even represent.
+
+For now I’m going to not worry about that, but it’s a thing to keep in
+mind as a reason to replace Uncorp.  A little bit of compile-time
+computation, like `[ 24 ptrsize + ] enter`, might be enough to take
+care of this.
+
+So the bootstrapping plan is to write an Uncorp interpreter in
+something easy and widespread, like JS or Python, and then an Uncorp
+compiler for amd64-ELF in Uncorp.  Then I can write a compiler for the
+more usable imperative language above in Uncorp, and then compilers
+and interpreters for higher-level languages in that language.
+
+StoneKnifeForth is 204 lines of code or 132 lines without comments,
+and compiles a language with 20 primitives.  The 32 or so primitives
+of Uncorp should therefore require something like 300 lines of code,
+per platform.  This is a lot worse than the 104 lines of my
+implementation of Chifir but barely more than my implementation of
+Tetris.
+
+But wait!  Uncorp also needs to be able to initialize variables by
+putting labeled binary numbers into the executable.  It probably
+doesn’t need explicit .data and .text directives (unless we want to
+support .bss or generate machine code from binary numbers) but it does
+need `d8`, `d16`, `d32`, and `d64` compile-time operations.  And, as
+mentioned above, it needs support for compile-time computation — maybe
+not defining functions at compile-time, but at least things like `[ 23
+ptrsize * 11 + ]`, and probably alignment too, which means you need
+access to the current compilation address in both .data and .text.  So
+maybe it will be twice that, like 600 lines, though maybe more of that
+can be shared between platforms.
+
+I don’t think it should be the job of the source program to generate
+ELF headers or symbol tables, because the objective of Uncorp is to be
+a *portable* assembly: it should at least be possible and ideally very
+easy to write reasonably efficient Uncorp programs that can run
+without change on several different platforms.
+
+What would list comprehensions look like in a C-level language?  We
+don’t want to saddle the containing function with handling failures,
+so we would like to avoid heap allocation.  Stack allocation can, of
+course, fail, but perhaps this is less of a problem; it has no
+fragmentation to deal with, so proving that it won't fail seems more
+tractable — although it does require bounding the list length.
+
+Allocation doesn't entirely go away as a concern, though.  For things
+like any(), all(), sum(), min(), or max(), or foreach, there is no
+real allocation problem, because we can probably evaluate the sequence
+lazily.  But what if we really do want to store the results in an
+indexable or reiterable sequence?  We need an array.
+
+The stack-allocation discipline means that a callee’s arrays will not
+be available to the caller, but block arguments can come to the rescue
+here — the callee can yield control to the caller’s block with the
+freshly-allocated array.
+
+Conventional downward-growing stacks and addition-indexed arrays are
+not a very good match here.  Either you must implicitly reverse the
+array generated from the comprehension at the end, you must grow it
+upwards, you must periodically relocate it during the comprehension to
+a larger buffer size, or you must index it by subtraction.  Of these
+options I think the implicit reversal is the best.

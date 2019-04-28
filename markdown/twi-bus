@@ -1,0 +1,435 @@
+Most AVRs support “TWI”, their slightly bastardized version of Philips
+I²C.  In theory, this should allow you to hook up any number of AVRs
+(and maybe other devices) on a shared two-wire bus (SDA and SCL), or
+up to 113 of them, anyway, and communicate at 400 kbps.  It even
+supports address-recognition wakeup, even from deep sleep modes that
+don’t run a clock to the TWI interface — it uses the bus clock itself
+for wakeup!
+
+In particular, the ATMega328P used in Arduinos supports it.
+
+Actually, it turns out that only slave devices need addresses; because
+masters can initiate both reads and writes, they do not need
+addresses.  So you could connect an infinite number of masters to the
+bus.  Fat lot of good that’ll do you, though, if they can’t talk to
+each other!
+
+What I was thinking with this is that if you want a bunch of GPIO
+pins, more than the Arduino has, or want to control more power than
+the Arduino can, it might make the most sense to add some more chips
+on a TWI bus in order to add those GPIO pins.  This could potentially
+also give you modularity — you can plug boards together with just four
+wires, as long as you don’t have slave address conflicts, which will
+probably happen around 10 devices without some mechanism to assign
+addresses dynamically.
+
+I don’t think the I²C bus deals with chips running at different
+voltages.
+
+Fatal problems with I²C
+-----------------------
+
+As I dig more into this, it seems increasingly impractical as a way of
+building a modular system that is easy to extend, for the following
+reasons:
+
+- Address assignment: aside from the occasional awful IC with a [fixed
+  I²C address][4] or only a few bits assignable, even randomly assigned
+  addresses over the whole 7-bit space will give you collisions after
+  11 devices, on average.  To avoid this, you have to intervene to
+  assign addresses by hand, but even then, [Elliot Williams says][3]
+  he’s never seen as many as 20 devices on an I²C bus.  Some kind of
+  daisy-chaining arrangement like JTAG uses would be a lot better.
+- Voltage incompatibility: I²C high is 0.7 Vcc or above, which means
+  that the 3.3 V power rail isn’t high enough to be high on a 5V
+  system.  There’s a [standard technique to work around this][5] with
+  a discrete MOSFET per pin.
+- Speed: 400kbps is pretty slow.  This results in part from the
+  single-ended nature of the I²C bus.
+- Fanout: the drive capability you need to make your I²C bus work
+  depends on the speed you’re running it at and the total capacitance
+  of the devices attached to it.  If you have too much capacitance
+  attached for the drive current of a device, you can’t make it all
+  the way down to 0.3 Vcc (its low level) in time.  5 mA should be
+  fine for a couple of devices but maybe not 10 devices, depending in
+  part on signal routing, and the standard specifies 400 pF as the
+  maximum.  And you need stronger pullups if you have more devices,
+  which of course requires still stronger pin drive.
+- Bus hangs: [there’s a known bug in I²C][6] where resetting a master
+  in the middle of a transfer can leave a slave hanging the bus
+  indefinitely.  SMBus fixes this with timeouts.
+
+[3]: https://hackaday.com/2016/07/19/what-could-go-wrong-i2c-edition/
+[4]: https://learn.adafruit.com/i2c-addresses/the-list
+[5]: https://cdn-shop.adafruit.com/datasheets/AN10441.pdf
+[6]: http://processors.wiki.ti.com/index.php/I2C_Tips#External_Slave_Device_Hanging_the_Bus_by_Holding_SDA_Low
+
+Addresses
+---------
+
+You would think that with 7-bit addresses, you would get 128 devices,
+but the address 0000 000 and the 8 addresses 1111 xxx are reserved, so
+you actually only get 119 devices.  And actually 0000 xxx are
+reserved for other purposes, though Atmel doesn’t document this,
+so you only get 113.  0000 000 is for broadcast.  The
+bus arbitration algorithm provides strict priority among slave
+addresses; the broadcast address is the highest-priority possible
+address.
+
+Bit rates
+---------
+
+An address packet is 9 bits long, and following an address packet, you
+can transmit any number of 9-bit data packets, each bearing 8 bits of
+data.  There are an additional two bit-times at the beginning to
+indicate the START condition and two more at the end to indicate the
+STOP condition. This ought to mean that you can transmit 20000
+one-byte packets per second, or up to 44000 bytes per second in large
+transmissions.
+
+The AVR implementation supposedly supports clock stretching, and
+indeed depends on it in order to give interrupt handlers time to
+respond.
+
+The bit rate is set by the TWBR register to (CPU clock frequency)/(16
++ 2 · TWBR · prescaler), which puts a maximum bit rate of 1/16 of the
+clock speed.  For clock speeds over 6.4 MHz (including the maximum
+internal RC oscillator speed of 8 MHz) this should not be a
+consideration, but systems that use lower clock speeds to get better
+power consumption might be limited.  (And apparently the CPU clock
+needs to be at least 250 kHz for TWI to work at all).  In theory this
+only affects communications that include the slow chip.
+
+The possible prescaler values are 1, 4, 16, and 64.
+
+Electrical limitations
+----------------------
+
+For reliable operation, the AVRs’ 20 mA drive needs to be able to
+discharge all of the input capacitances on the bus at well over
+400 kHz — say, in a microsecond.  Worse, the pullups need to be able
+to charge them, and the drive needs to be able to fight the pullup.
+This suggests that only a couple of thousands of pF of input
+capacitance on the bus can be tolerated.
+
+However, some other devices have smaller drive capabilities.
+
+Chip support
+------------
+
+Bit-banging I²C or TWI seems very challenging, due to requirements of
+bidirectional open-collector pins with slew rate limiting and spike
+filtering.  It seems like something you could do with an external
+chip, but that’s kinda what we’re trying to avoid here.
+
+AVRs have interrupt support for TWI, but the interface involves one
+interrupt per byte transferred, and occasionally more.  At 400 kbps
+and an 8 MHz CPU clock, you have at least 180 cycles between
+successful complete byte transfers.
+
+The slave address register TWAR can be set to whatever address you
+want.
+
+The ATmega328P, like its smaller variants the ATmega48A, ATmega48PA,
+ATmega88A, ATmega88PA, ATmega168A, ATmega168PA, and ATmega328,
+supports a single TWI bus on pins 27 and 28, or balls 4B and 4A in its
+UFBGA incarnation.  The ATmega48/88/48PB/88PB/168PB supports a single
+TWI bus on pins 27 and 28.  The ATmega16U4 used on the Arduino for its
+USB interface, and its larger version the ATmega32U4
+(also the core of the Adafruit Feather), support a single
+TWI bus on pins 18 and 19.  The ATmega8A supports a single TWI bus on
+pins 27 and 28.  The ATtiny20 has a TWI bus for slave mode only on
+pins 6 and 3 (out of 14), pins 12 and 15 of its 20-pin VQFN, balls 2B
+and 2B of its UFBGA, or balls 3C and 5C of its 12-ball WLCSP.  The
+ATtiny40 has a TWI bus for slave mode on pins 16 and 13 (out of 20),
+or 11 and 14 in VQFN.
+
+The ATmega328P comes in a 4 mm square VQFN and a 4 mm square, 0.6 mm
+thick UFBGA, but no smaller packages.  This is smallish but even the
+UFBGA is 8 times the size of the ATtiny20 12-ball WLCSP mentioned
+above.
+
+The obsolete ATtiny2313’s USI claims to support TWI, but without slew
+rate limiting and spike filtering, and it sounds like you pretty much
+have to implement the protocol in software.  It is not clear to me
+that this will work, and definitely it is not interrupt-driven.
+
+The ATtiny25/45/85 and ATtiny13/ATtiny13V do not support TWI, just
+SPI.  (I think the 25/45/85 may have a 2313-like USI.)  The
+ATTiny4/5/9/10 don’t support either TWI or SPI.
+
+More detail on the ATtiny20
+---------------------------
+
+The ATtiny20, despite being slave-only, is especially appealing for
+adding I/O lines to a distributed system linked by a TWI bus because
+its WLCSP incarnation is 1.56 × 1.40 mm and 0.54 mm thick, and its
+UFBGA (like the VQFN for the ATtiny40) is 3 mm square.  Even its TSSOP
+and VQFN are only 5 mm square.
+
+The ATtiny20 additionally supports 10-bit extended addresses and
+address masking, although that isn’t useful without a similarly
+capable master to communicate with.
+
+This tiny size still has a substantial current drive capability,
+though; at a drop of 0.8 volts, it can sink or source the usual 20 mA
+per pin at 5 V or 10 mA at 3 V, except on its reset pin.  Running at
+lower voltages lowers the possible current substantially.
+
+Digi-Key sells ATtiny20s in most packages from 56¢ in quantity 1, but
+the WLCSP costs 92¢.
+
+Non-AVR chip support
+--------------------
+
+Many other things nominally support I²C, although apparently
+compatibility problems are not unusual.  Many EEPROMs support
+I²C — this is the main use of I²C actually — and
+the popular Cypress CY7C68013A/CY7C68014A/CY7C68015A/CY7C68016A EZ-USB
+FX2LP 8051 supports 100 or 400 kHz I²C, for example, but only as a
+master; it can use this for booting from an EEPROM at startup.  The
+popular ultra-low-power TI MSP430G2x53/MSP430G2x13 microcontroller
+supports I²C; not sure how much of the rest of their family does.
+
+As an example of EEPROMs that support I²C, consider the AT24C32/64,
+with 4096 and 8192 bytes, respectively, 5 mm × 4 mm in SOIC or 3 mm ×
+4.5 mm in TSSOP.  These use 3 of their 8 pins to set the I²C address
+of the EEPROM to 1010xxx (so you can gang up to 8 of them on a bus)
+and support the 400 kHz rate at 5 V.  They support writes of up to 32
+bytes at a time, or longer if what you want is a 32-byte ring buffer.
+
+These EEPROMs have their own internal charge pump for erasing, so they
+need only a single supply.  They can drive 5 mA and have 8 pF of input
+impedance, which works out to 50 kΩ at 400 kHz, so in theory support
+fanout of about 50.  This is much less than the total of 119 from the
+address limits.
+
+The other microcontrollers I’m most interested in are the STM32
+family, the LPCxxxx family, and the ESP8266/ESP32 family, just because
+they seem to be the most popular at the moment (other than PICs, which
+I would prefer to avoid entirely).
+
+The STM32F0 does support I²C, including 10-bit addresses
+(and some even have two I²C interfaces), and
+it’s even functional in “low-power stop modes”, which I guess means it
+can turn the chip on.  I think it’s only 3.3 volts, though, which
+seems like it could pose interoperability problems.  [The cheapest
+STM32 at Digi-Key is the STM32F030F4P6][7], which goes for US$1.30,
+down to 59¢ in quantity.  [The cheapest STM32 with CAN is the
+STM32F042F4P6][8], which is US$2.18 down to US$1.07.
+
+The LPC1769 naturally supports I²C, and actually supports more than
+one bus per chip, I think.
+
+The ESP32 supports I²C.
+
+The TI DRV8830 is a 6.8V 1A H-bridge chip controlled over I²C.
+
+Other peripherals?  ADCs probably don’t make sense (the AVRs have ADCs
+built in, and higher-speed ADCs are too fast for the I²C bus; they
+would need to just be high-precision, low-speed ADCs) but things like
+LCDs, DACs, and high-power switches (“drivers”) might make sense.
+Also radios, of course.  H-bridges or ESCs would be super nice.  RAMs
+might be useful too, even if a bit slow.  How about other radios,
+including LoRa and BLE?
+
+The [ONSemi NCP5623][0] is a linear I²C RGB LED driver that can drive
+three LEDs at up to 90mA on 2.7 to 5.5 V using current mirrors, but
+with only 32 PWM levels.  I can’t figure out how its address is
+determined or what its PWM frequency is.
+
+The [ONSemi LV8498CT][1] is a voice-coil motor driver IC with I²C
+control; it’s basically a current-mode 10-bit DAC running up to 150 mA
+at 5 VDC.  Its slave address is 0110011, so you can only use one of
+them on a bus.  I can’t figure out how fast or slow it is.
+
+The [ONSemi LV5236V][2] is a 24-channel 5V I²C LED driver with 5-bit
+PWM and/or up to 50–100mA per LED, or maybe 30 mA per LED controlled
+by a DAC, I can’t tell.  It’s 5.6 mm × 15.45 mm.  It has five address
+pins, so you can set its address to any 10xxxxx.  Digi-Key will charge
+you US$3 for one, which works out to 12.5¢ per LED.
+
+Maxim has an LM75 I²C temperature sensor with three address pins to
+configure its address to any 1001xxx address.
+
+[0]: https://www.onsemi.com/pub/Collateral/NCP5623-D.PDF
+[1]: http://www.onsemi.com/pub/Collateral/ANDLV8498CT-D.PDF
+[2]: http://www.onsemi.com/pub/Collateral/ENA1943-D.PDF
+[7]: https://www.digikey.com/product-detail/en/stmicroelectronics/STM32F030F4P6/497-14044-5-ND/4357517
+[8]: https://www.digikey.com/product-detail/en/stmicroelectronics/STM32F042F4P6/497-17343-ND/5268187
+
+Alternatives to I²C
+-------------------
+
+### SMBus ###
+
+SMBus is a slight tweak on I²C which adds a few requirements to
+prevent hung or powered-off components from screwing up the bus, but
+it doesn’t solve the fundamental problems.
+
+### CAN ###
+
+The CAN bus sort of seems to be designed as an answer to some of these
+problems, but for some reason CAN bus drivers are expensive, and
+anyway they don’t solve the problem of address assignment.
+
+### JTAG ###
+
+JTAG has the desirable attributes of being daisy-chained and thus
+partly avoiding the problems of address assignment and fanout.  It
+uses four or five wires, not counting power supplies: TCK, TMS, TDI,
+TDO, and optionally TRST*; you chain TDO of one chip to the TDI of the
+next, but you run TCK and TMS to all the chips, thus still potentially
+having fanout limits.
+
+TMS is “test mode select”, which clocks in a sequence of bits to drive
+the JTAG controller state machine.  In particular, the sequence 11111
+will always drive the state machine to its reset state, where it will
+remain as long as it gets more 1 bits; from there, the introduction of
+strategically placed zeroes into the TMS data stream can navigate it
+to other states, five of which are stable on 0 (i.e. have 0-edges to
+themselves).  TMS bits are clocked in on the rising edge of TCK, and
+then the resulting states can cause TDI bits to be clocked into things
+on the falling edge of TCK.
+
+The reset via TMS is somewhat fault-tolerant in the sense that a
+single spurious 0 is not sufficient to transition the state engine to
+take any action; three more 1s in succession will successfully drive
+the state machine back to the reset state.
+
+At times, depending on the state of the JTAG state machine and the
+“current instruction”, TDI is clocked directly to TDO, converting a
+whole chip into just a single clock delay.  At other times, a shift
+register is interposed between TDI and TDO, but which one depends on
+both the JTAG state machine and the current instruction — it can be
+the current-instruction register or a data register determined by the
+current instruction.  Two of the aforementioned five stable states,
+Shift-DR and Shift-IR, are the ones that interpose shift registers.
+
+The instruction register is required to be at least 2 bits because
+there are 4 required instructions: BYPASS (all 1s), EXTEST (once, all
+0s, but then they decided that was a bad idea), PRELOAD, and SAMPLE,
+which may be the same as PRELOAD.
+
+The TDO line is supposed to be “set to its inactive drive state except
+when the scanning of data is in progress”, which turns out to be when
+the chip is in Shift-DR or Shift-IR state.  This allows you to share
+TDI and TCK between chains and wire their TDO lines together, using a
+separate TMS for each line to select which one will be active.
+
+Two other optional states in the rather complicated (16 states!) state
+machine permit either overwriting the shift register from data held
+elsewhere (i.e. moving data from an internal register into the shift
+chain) and overwriting data held elsewhere from the shift register.
+
+Although the state machine is complicated, the standard actually
+includes a circuit diagram showing that you can implement it with 32
+NAND gates and 8 D flip-flops, under 200 transistors.
+
+I like this idea of using a sequence of bits to maneuver a state
+machine around, and I like the idea of bucket-brigading a bunch of
+bits through a daisy chain, but I don’t like the fanout of TMS and
+TCK, even though they’re always driven by the bus master, and so in
+the worst case just need a couple of big Darlingtons.  I really like
+the idea of altering the bucket-brigade topology at runtime by
+bypassing some devices in order to prevent latency from the bucket
+brigade.  I don’t particularly like the separation of TMS and TDI,
+which seems unnecessary — JTAG ends up needing 6 wires if you include
+power, while CAN and I²C make do with only 4.
+
+### A hypothetical super-JTAG ###
+
+What if you could redesign JTAG?
+
+#### Bit-stuffing nonsense ####
+
+To unify TMS and TDI, a very simple kind of bit-stuffing could use a
+sequence of 5 1 bits as a magic resynchronization/reset sequence, and
+when transferring data, send nybbles of 4 arbitrary bits preceded by a
+non-optional 0, thus preventing the magic sequence from occurring
+regardless of the data being transmitted, at only a 25% overhead.
+
+Following the magic reset sequence, or indeed following a single 1
+following a nybble of data, we could maybe have a variety of different
+states.
+
+To provide addressing of individual slave devices, one possibility is
+to have a state that decrements a fixed-width little-endian hop-count
+address field, for example of 8 bits; if the borrow is set at the end,
+it means it rolled over from 0 to 0xFF, which means you’re the
+intended destination!  This entitles you to overwrite whatever payload
+data may follow, so that when it eventually gets shifted around to the
+master again, it contains your reply.
+
+If we want to get rid of the clock line too, we might want a different
+kind of bit-stuffing that ensures frequent transitions.
+
+#### A better, connection-oriented approach for unicast ####
+
+Consider a simpler approach in which the bus master repeats these
+three steps repeatedly: 1. establish a connection to a slave node;
+2. communicate with it; 3. terminate the connection.  In a daisy-chain
+topology, step 1 could be as simple as sending a time-to-live count
+byte, or even an unary-encode count, which gets decremented on its
+path through the chain; intermediate nodes would change to a
+“passthrough” state and forward the data, bit by bit or byte by byte.
+Steps 2 and 3 could then be distinguished using, for example, HDLC
+bit-stuffing, constant-overhead byte stuffing, or SLIP framing.
+
+Hmm, I guess that isn’t very different from the previous approach,
+actually, except that in this approach, I was thinking not to forward
+packets that didn’t need to be sent on further.  Instead, the slave
+addressed would simply send reply data back to the master.  It would
+be more like a traditional serial connection than a packet-switched
+network, or SPI, or the ISA bus.
+
+You could also have a special broadcast address for addressing all
+slave nodes at once, or within network latency anyway; and barrier
+synchronization of the master waiting on all slaves could be achieved
+by yet another kind of packet which a slave only passes to its
+successor if it is in “waiting” state.
+
+At 1Mbps, which should be easy to reach, and one byte of buffer per
+node, the latency of a 256-node daisy chain would be 2048 bits: 2
+milliseconds.  This might be too much latency to replace Fabnet.
+10Mbps should be electrically easy to reach but might be a larger
+computational load.
+
+If the data is differentially encoded on a single twisted pair — as in
+RS-422 or RS-485 — a dc bias on this pair can be used to provide power
+from one board to another.  This is more suitable for board-level
+connections than chip-level connections.  As I’ve argued previously in
+file `current-source-grid`, a constant-current supply meshes nicely
+with daisy-chaining boards together, and allows the use of thinner
+wires.  Consider using 24AWG copper phone-line wire, as I suggested
+there, 510μm in diameter, 1.8 g/m, 84mΩ/m, with a constant-current
+supply running up to 48V at the 3.5 A maximum for that kind of wire.
+This gives you a maximum of 168 W for the overall system, although of
+course anything that needs more power than that could use a separate
+power supply.
+
+This allows you to do both power and data on just two wires from each
+board to the next, but the final board needs a final pair of wires to
+be brought back around to the master to complete the circuit.  So each
+board needs four terminals in the end.  You could reduce the number of
+cables by 1, and potentially isolate and partly tolerate connection
+errors, by using a four-wire cable from each node to the next, two of
+which are merely the return path and are wired straight through from
+the downstream socket to the upstream socket.
+
+Differential bus connections like the CAN bus require only two
+connections per board, but can’t also supply power at the same time.
+So CAN bus boards end up requiring at least four terminals, too.
+
+### RS-485 ###
+
+RS-485 is the basis for the Fabnet bus used in Peek’s dissertation.
+It’s a multidrop version of RS-422, which is a differential version of
+RS-232.  Because they use terminating resistors and balanced
+transmission lines, RS-422 and RS-485 can reach data rates of tens of
+megabaud over short distances.  RS-485 can be used either in a
+two-wire “party line” mode or a four-wire “master-slave” mode, but I
+think neither version has an arbitration algorithm for when multiple
+devices attempt to transmit at the same time.
+
+### USB ###

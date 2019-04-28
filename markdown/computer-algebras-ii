@@ -1,0 +1,450 @@
+Typical computers support three algebras directly: GF(2ⁿ) (integer
+math), GF(2)ⁿ (bitwise operations), and floating-point math, which is
+its own weird thing.  Combining operations from more than one of these
+algebras often gives surprisingly fast iteration-free code to solve
+problems that would seem to require iteration, like clearing the
+rightmost bit set in a word: `x & x - 1`.  However, other operations
+that aren’t inherently computationally expensive are still expensive
+with these operations — the classic example is the fixed bit
+permutation at the input and output of DES, which is frequently
+speculated to be nothing more than an attempt to artificially slow
+down software implementations.
+
+With the advent of the dark-silicon age, where we can fabricate far
+more transistors on a chip than we can afford to remove the heat from
+at reasonable clock speeds, it seems that adding new instructions that
+are less mainstream in their applications should be worthwhile.  So
+far, this has mostly taken the form of instructions to implement
+particular cryptographic algorithms (like AES-NI) and
+multimedia-oriented and 3-D-oriented instructions like those in
+3DNow!, MMX, various versions of SSE, AltiVec, and modern GPUs.  These
+have the advantage of adding various kinds of vector algebras.
+
+(SSE 4.2 also added a CRC32 instruction.)
+
+Unfortunately, the available instructions in the multimedia and 3-D
+sets are generally fairly incoherent, making them awkward to program
+with.
+
+We could add more random instructions that compute functions like
+“⌈√(x³ - 50x + y)⌉ over the integers”, but this would be kind of a
+waste of time — they can already be evaluated on mainstream hardware
+without unreasonable overhead on top of their inherent computational
+cost; and they don’t compose in a useful way — which is to say, they
+don’t form an interesting algebra.  Or we could add an instruction
+that computes the derivative of a closed-form symbolic expression, but
+because the set of closed-form symbolic expressions is infinite, you
+can’t fit a symbolic expression into a fixed-size register — only
+*finite* algebras are of interest.
+
+So, what other finite algebras might it be advantageous to add
+hardware support for because mainstream hardware currently imposes
+punishing overhead on them?
+
+Things we already pretty much have
+----------------------------------
+
+We might consider lattices of finite set containment, but in fact the
+bitwise operations already give us that.  Many other interesting
+lattices are already provided by the vector-math stuff we added for
+3-D rendering.
+
+Similarly, both signed and unsigned integer math are already
+reasonably well supported by the GF(2ⁿ) operations thath have been in
+CPUs for decades.
+
+Bitwise rotation instructions have been totally mainstream for decades
+(since at least the 4004); I was always mystified by these, but it
+turns out they’re necessary for multi-precision bit-shift operations,
+and they’re also handy for individually testing bits that you’re
+shifting out of numbers.
+
+We also got saturating arithmetic as part of the whole multimedia and
+vector instruction shit sandwich.
+
+Linear feedback shift registers seem like they would be a pain, since
+in theory the next bit to shift into the register is the XOR of the
+tapped bits from the register.  But in fact you can also implement an
+LFSR by shifting a bit *out* of the register and using it to
+conditionally XOR *all* of the tapped bits *into* the register.
+
+Shuffling, permutation, symmetric groups, and substitution ciphers
+------------------------------------------------------------------
+
+Much of this section concerns, in one or another sense, the symmetric
+group on some small number of elements, typically somewhere between 16
+and 256 elements.  This may seem like a strangely arbitrary choice,
+but in fact the symmetric group on N elements is in some sense the
+canonical group on N elements — every other group on N elements is a
+subgroup of it!  So, in a sense, operations that can handle arbitrary
+symmetric groups can handle arbitrary groups.
+
+Computers are, at their core, code machines; they operate on arbitrary
+information enciphered into a representation they can deal with.
+Classical (pre-computer) ciphers were broadly classified into
+substitution and transposition ciphers.  In substitution ciphers, the
+pieces of the plaintext tell where to put pieces of the key schedule
+to form the ciphertext; in transposition ciphers, the pieces of the
+key schedule where to put pieces of the plaintext to form the
+ciphertext.  These are in a sense the same operation, and it is
+somewhat surprising that they are so poorly supported in modern
+hardware.  Perhaps this is accounted for by the fact that they are
+very well supported indeed by RAM (and the 8086 has an XLAT
+instruction that uses RAM for this in 11 clock cycles); it’s just that
+RAM is falling progressively further and further behind the
+capabilities of CPUs.
+
+[Knuth’s MMIX has][0] instructions called MOR and MXOR, which “regard
+the 8 bytes of a register as a 8×8-Matrix and compute the result as a
+matrix multiplication”, or “set eacy byte of $X by looking at the
+corresponding byte of $Z and using its bits to select bytes of $Y”
+(Knuth’s Fascicle 1).  In effect, each bit specifies whether or not to
+include one of the 8 input bytes in the computation of one of the 8
+output bytes.  If only one bit is set in each byte of the second
+argument, the output is just a rearrangement or shuffle of the input
+bytes; but, by setting more bits, we can activate the OR or XOR
+mentioned in the name.
+
+Being generalized matrix multiplications using associative operators,
+these operations are of course associative.  I know of no manufactured
+CPU that implements them, but something similar is commonplace in FPGA
+routing — the bits in $Z amount to a crossbar switch.
+
+[As Mytkowicz, Musuvathi, and Schulte showed in their 2014 paper][2],
+the shuffle instructions such as PSHUFB in SSE3 and SSE4.2 can be used
+to accelerate and parallelize finite-state-machine execution.  [The
+PSHUFB instruction][1] (`_mm_shuffle_epi8`) and its variant VPSHUFB is
+something like a cut-down MOR, using indices encoded as binary
+integers instead of bit vectors, thus offering no possibility of
+combining multiple input bytes into one output byte, but it can
+operate on 128-bit and 256-bit registers as well as 64-bit ones.
+Still, because it applies a permutation to the input (which may be a
+permutation) it’s associative too, which is how Mytkowicz et al. used
+it to accelerate finite-state machines.
+
+[0]: http://mmix.cs.hm.edu/doc/instructions-en.html
+[1]: http://www.felixcloutier.com/x86/PSHUFB.html
+[2]: https://pdfs.semanticscholar.org/8052/7e7595530951081494d1b98f3f13da3033a2.pdf
+
+(More recent versions of SSE include PSHUFW and PSHUFD versions, which
+shuffle wider chunks around.)
+
+If what you wanted was specifically to compose permutations like that,
+you’d be faced with a couple of problems:
+
+1. Even a 256-bit VPSHUFB wastes 3 bits out of every index, in the
+   sense that the maximum valid byte index is 31, so only the low 5
+   bits of the index are used.  If you were to cut the indices to 6
+   bits, you could fit 42 of them into a 256-bit register; if you
+   could somehow use arithmetic coding, you could get the number a
+   little higher still.
+
+2. There are times when you would like to compose permutations on sets
+   of more than 32 or 42 elements, and it isn’t immediately obvious
+   how to efficiently decompose such permutations on larger sets into
+   permutations on smaller sets, although related questions have been
+   explored in some depth in the context of building circuit-switched
+   telephone systems out of crossbar switches.
+
+Another issue is that there are a number of kinds of bit permutation
+that byte-shuffling (whether 8-bit or SIXBIT) doesn’t help you with.
+[Massalin famously called for a perfect-bitwise-shuffle operation in
+her dissertation][3], which is still not available in current
+hardware.
+
+[3]: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.29.4871
+
+So here are a couple of new shuffling designs that might be worth
+exploring:
+
+1. A 64-bit value v is considered to consist of 16 4-bit nybbles v[0]
+   through v[15].  xbar(a, b)[i] = a[b[i]], thus providing the same
+   permutation-composition power as a 128-bit PSHUFB in half the bits.
+   Additional nybble-perfect-shuffle operations “hi” and “lo” provide
+   a way to combine nybbles from different registers without requiring
+   fundamental operations of greater than binary arity: lo(a, b)[i] is
+   a[(i-1)/2] when i is odd but b[i/2] when i is even, while
+   hi(a, b)[i] is a[8 + (i-1)/2] when i is odd but b[8 + i/2] when i
+   is even.
+
+   These nybble-perfect-shuffle operations make it straightforward to
+   use this 16-nybble-xbar instruction as a 16-byte xbar, a 16-wyde
+   xbar, etc.; and they make it relatively straightforward to leverage
+   them into computing permutations of larger groups of nybbles.
+
+2. The N-bit value mux(x, y, z) is computed from three N-bit values x,
+   y, and z as follows.  The bit mux(x, y, z)[i] is x[i] if z[i] is 1,
+   otherwise y[i].  The N-bit value shuf(a, b) is computed from an
+   N-bit value a and an N/2-bit value b as mux(a[0:N/2], a[N/2:N], b)
+   || mux(a[0:N/2], a[N/2:N], ¬b) where `||` is string concatenation
+   and ¬ is bitwise negation.  The N-bit value 2shuf(a, b) is computed
+   from two N-bit values a and b as shuf(shuf(a, b[0:N/2]), b[N/2:N]).
+   Arguments from sorting networks suggest that it’s possible to
+   perform any permutation of N bits by providing the appropriate `b`
+   values to (lg N)(lg N + 1)/4 2shuf operations; when N is 128, for
+   example, 14 2shuf operations suffice, and when N is 1024, 28 2shuf
+   operations suffice.  Arguments from `mux(x, y, z) = x & z | y & ~z`
+   suggest that you can do this on existing hardware and don’t need
+   new hardware.  XXX no this is totally wrong because the bits aren’t
+   being perfect-shuffled!  I want a perfect shuffle!  rewrite
+
+3. MNAND or MNOR, which are analogous to the MOR and MXOR
+   instructions, but permit specifications of a large class of
+   small parallel computations as a fixed sequence of $Z values.
+
+Lerp
+----
+
+As Darius Bacon pointed out, you can think of linear interpolation as
+being a sort of generalization of C’s ternary operator.
+
+GPUs automatically provide linear interpolation between texels.
+Iterating linear interpolation provides Bézier curves.  Alpha-blending
+linearly interpolates between pixel values.  The usual way to do
+linear interpolation is with two separate multiplications and a
+subtraction:
+
+    x := 1.0 - y;
+    z := y · a;
+    z += x · b;
+
+However, this uses slightly more than twice as many bit operations as
+necessary; you can adapt the standard binary long multiplication
+algorithm to lerp instead.  The standard algorithm to add the product
+y · b to z, consuming both, is:
+
+1. Go to step 4.
+2. If y is odd (that is to say, if `y & 1` is nonzero), z += b.
+3. y ← ⌊y/2⌋; concurrently, b ← b · 2.
+4. If y is nonzero, go to step 2.
+
+While implementations of multiplication on transistor-starved hardware
+of the distant past often used this algorithm literally, taking more
+time to multiply by a larger multiplicand or one with more 1
+bits — the 8086 would take anywhere from 128 to 154 clock cycles for a
+16×16-bit multiply, while the 80486 would take 13 to 26 — modern
+hardware instead unrolls the loop into a cascade of carry-save adders.
+To multiply two 16-bit integers, for example, it has 256 carry-save
+adders.  This means the loop gets rewritten as follows for a 16-bit
+multiply:
+
+Repeat 16 times:
+
+1. If y is odd, z += b.
+2. y ← ⌊y/2⌋; b ← b · 2.
+
+The modification to make this algorithm interpolate linearly between a
+and b is very simple:
+
+Repeat 16 times:
+
+1. z += (b if y is odd else a).
+2. y ← ⌊y/2⌋; b ← b · 2; a ← a · 2.
+
+This is easiest to understand if we think of a, b, and y as initially
+representing 16-bit fractions between 0 and 1, with 1 being
+represented by 16 1 bits, and the 32-bit result as likewise
+representing a fraction between 0 and 1, but with 1 being represented
+by 15 1 bits followed by 6 0 bits followed by as 1, which is
+admittedly a somewhat awkward representation.  You can restore it to a
+proper 16-bit form, if lerping is what you want, by taking the
+leftmost 16 bits and adding their most significant bit to their least
+significant bit.
+
+So, for example, the 13-instruction multiplication code example on
+p.54 of the 8080 Programmer’s Manual would become 15 instructions, and
+would execute 11 or 12 instructions per iteration instead of 10 or 11.
+
+(Most current hardware multipliers reportedly use Booth’s
+multiplication algorithm, which is not quite as easy to adapt.)
+
+Of course, you can replace “16” and “32” in the above with “N” and “2N”.
+
+Decimal arithmetic
+------------------
+
+In the 1950s and into the 1960s, business computers invariably used
+(binary-coded) decimal arithmetic, thus avoiding the need to
+laboriously convert numbers from binary into decimal for output using
+a long, slow series of divisions by 10.  The IBM Type 650 was a
+typical example of this class; a random memory access on it took
+2.5 ms, and it typically ran about 1000 instructions per second, but
+needed 16.9 ms for a division, so converting a single six-digit number
+from binary to decimal for output would have required a full tenth of
+a second — much longer than was required to punch it into a card.
+
+As computers got faster, conversion to decimal ceased to be the
+computational bottleneck, and IBM moved its decimal-computer customers
+over to the binary System/360, but included instructions in the 360
+instruction set for operating on binary-coded decimal numbers as well,
+stuffed two digits per byte, but only in memory (not in registers).
+
+The primary instruction set we use today, AMD64, is derived ultimately
+from the instruction set of a 1971 Japanese pocket calculator, whose
+4004 CPU was developed by Intel.  The 4004 had a DAA instruction,
+“Decimal Adjust Accumulator”, used to convert the result of a 4-bit
+binary arithmetic operation into a 4-bit BCD result; [Intel’s manual
+explains][4]:
+
+> The accumulator is incremented by 6 if either the carry/link is 1 or
+> if the accumulator content is greater than 9.  The carry/link is set
+> to 1 if the result generates a carry, otherwise it is unaffected.
+
+[4]: http://www.intel.com/Assets/PDF/Manual/msc4.pdf
+
+The history of this instruction is as follows:
+
+* 1971: DAA is introduced with the opcode FB₁₆ in the 4004, which,
+  though dozens of times faster than the IBM 650, still would have
+  suffered performance problems from having to do a series of
+  divisions in order to update the calculator display.
+* 1972: dropped in the 8008, which was a more powerful follow-on to
+  the 4004 but with fatal flaws in its instruction set design.  The
+  8008, with its 8 8-bit registers, has its opcodes divided into octal
+  fields.  The opcode space previously occupied by DAA and many other
+  4004 instructions, `37*₈`, is now dedicated to instructions that store
+  registers into memory.  All eight opcodes of `0*7₈`, one of which will
+  be DAA on the 8080, are RET.
+* 1974: DAA is reintroduced in an 8-bit version in the 8080, with the
+  opcode 27₁₆ (047₈), which had the same registers as the 8008 but was
+  an actually usable CPU.  It didn’t have multiply and divide
+  instructions, but its stack was in RAM.  Its opcodes are divided
+  into the same bitfields as the 8008’s.  Like the 8008, it has 8
+  opcodes dedicated to subroutine returns, but now they’re `3*0₈` and
+  are different conditional returns; maybe that was planned for the
+  8008 but had to be cut.  Unconditional RET is a ninth return
+  instruction, 311₈.
+* 1978: renamed “decimal adjust for addition” in the 8086, and
+  accompanied by DAS, AAA, AAD, and AAM instructions that do related
+  things — the AAD and AAM instructions were added to enable decimal
+  arithmetic with the new multiply and divide instructions.  The 8086
+  had 16-bit registers instead of the 8-bit registers on the 8080, but
+  DAA and friends still only work on 8 or even 4 bits of data.  I’m
+  not sure what to make of this — they added four new instructions to
+  support decimal arithmetic, but then didn’t bother to take advantage
+  of the double-sized accumulator register?  The 8086 isn’t
+  binary-compatible with the 8080, but DAA retains the same opcode,
+  27₁₆.  There are four RETs: C2₁₆, C3₁₆, CA₁₆, and CB₁₆, none of
+  which is the 311₈ from the 8080, which is unassigned on the 8086;
+  it’s later reassigned to the fairly useless LEAVE on the 80188 and
+  80186 in 1982.
+* 1985: the entire group of instructions is preserved unchanged in the
+  i386, which expanded the registers to 32 bits.  At this point it’s
+  clearly only being preserved for backwards-compatibility — doing
+  multi-precision arithmetic with it involves using almost an order of
+  magnitude more instructions than doing the arithmetic in binary.
+  This is the first of these updates that’s binary-backward-
+  compatible — the 8086 was more or less compatible with the 8080 at
+  the assembly level, but you couldn’t run unmodified 8080 binaries on
+  it.  The i386 has a variety of processor modes to enable this
+  backward compatibility.
+* 2003: AMD introduces the 64-bit Opteron, which expands the registers
+  to 64 bits, and adds a mode bit so it can continue executing
+  unmodified 32-bit code.  In 32-bit mode, DAA and friends work as
+  always; in 64-bit mode, they generate an invalid-opcode exception.
+  Intel was trying to escape from backward compatibility with such
+  nonsense with the Itanium, playfully dubbed “Itanic”, because of how
+  it sank.  Intel followed AMD’s lead in 2004.
+
+So, today, if you have some decimal numbers, such as “321.23”,
+“289.528”, “9076”, and “8”, and you want to do some arithmetic on them
+on a computer, you have a few different options.  You can go through a
+series of multiplications to convert them to binary floating-point and
+then do arithmetic on them in binary, accepting the inevitable
+rounding errors on numbers like “0.1”; you can pick a prescale, like
+100, and convert them to binary integers instead (for example, "8"
+becomes 800, and "321.23" becomes 32123) and then do arithmetic on
+those; or you can use a software implementation of decimal math like
+the Python `decimal` module.
+
+(The computationally expensive part, actually, is not converting from
+decimal to binary on binary hardware; that’s only a series of
+multiplications, which are fast.  It’s converting back the other way,
+which is a series of divisions, which are slow.
+
+John Cowan quoted Wikipedia:
+
+> IBM POWER6 includes DFP in hardware, as does the IBM System z9.[1]
+> SilMinds offers SilAx; a configurable vector DFP coprocessor.[2]
+
+b484dfaa84a14c3b366574f300d21d974a61c348e42376f0be9bd0a64479e095  -
+is the sha256 of this line:
+Author: Kragen Javier Sitaker.  Salt: "Ez)g\['7Hbvy
+
+Polynomials over GF(2)ⁿ
+-----------------------
+
+Computing properties of LFSRs and CRCs require doing computations with
+polynomials over GF(2)ⁿ.  Addition and subtraction of these
+polynomials are just XOR, but multiplication and division are more
+complicated operations.
+
+SSE4.2 added a CRC32 instruction which performs an XOR and a
+polynomial division by the polynomial 11EDC6F41₁₆, the CRC32C
+polynomial; it runs a bit over twice as fast as a software
+implementation, which makes me think that hopefully better alternative
+uses for the silicon are available.  As far as I can tell, though, you
+can’t use the SSE4.2 instruction to, for example, do Rabin-Karp string
+search or rsync sliding-window duplicate probing.
+
+Arithmetic Coding
+-----------------
+
+???
+
+Cellular Automata
+-----------------
+
+The Cytocomputer was some custom silicon designed in the 1970s at ERIM
+for some machine-vision applications; essentially it was a pipelined
+two-dimensional cellular automaton which processed one pixel (or cell)
+each clock cycle, with one line plus two pixels of latency per
+pipeline stage, using FIFO buffers.  Each generation of the cellular
+automaton was run on a separate hardware stage of the pipeline, which
+could therefore easily be programmed for a different transition rule.
+Typical rules did things like dilation, erosion, and edge detection.
+
+Cellular automata, especially those with a small number of states, are
+just about the worst possible case for per-instruction overhead.
+
+XXX...
+
+Lattices
+--------
+
+XXX
+
+Complex numbers
+---------------
+
+Base -1+i, “proposed by S. Khmelnik in 1964 and Walter F. Penney in
+1965,” allows us to represent the Gaussian integers as finite
+bitstrings without needing sign bits.  The addition and multiplication
+operations on these numbers form a commutative ring, indeed, a
+Euclidean domain, so even division can be sensibly defined.  I am not
+sure if there is a way to preserve these properties with a finite bit
+length, the way ordinary unsigned binary arithmetic does with GF(2ⁿ).
+The fourth power of the base is real ((-1+i)⁴ = -4) and so, in the
+complex plane, bit shifts by multiples of four amount to scaling a 2-D
+plane by a power of 4 with some number of half-turns.
+
+Complex numbers can be used to represent geometrical points,
+translation (by addition), and rotation with scaling (by
+multiplication).
+
+So it might be worthwhile to add hardware to implement the relevant
+addition and multiplication algorithms for base -1+i.
+
+p-adic numbers
+--------------
+
+p-adic numbers (for some prime p) form a field.  This gives Hehner and
+Horspool’s “quote notation” for finitely representing rational numbers
+with simple arithmetic algorithms, although that notation is not now
+considered practical due to exponential size explosions on some common
+cases.
+
+Other rings
+-----------
+
+XXX

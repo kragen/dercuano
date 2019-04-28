@@ -1,0 +1,146 @@
+(See also file `graph-construction`.)
+
+I was thinking there must be a way to write down circuit diagrams in
+an expression-like textual string in a compact way.  This ["example
+circuits and netlists"][0] page gives the following example netlist
+for SPICE:
+
+    Multiple dc sources
+    v1 1 0 dc 24
+    v2 3 0 dc 15
+    r1 1 2 10k
+    r2 2 3 8.1k
+    r3 2 0 4.7k
+    .end
+
+[0]: http://www.allaboutcircuits.com/textbook/reference/chpt-7/example-circuits-and-netlists/
+
+That defines two voltage sources, three resistors, and four nets
+(nodes).  But it’s a purely series-parallel circuit.  If we use | for
+parallel composition, mere concatenation for series, ' for inversion,
+and [] for grouping, we could write it as `V 24 R 10k [R 4.7k | R 8.1k
+[V 15]']`, which I think would be a huge improvement.  Better still,
+without the component values, that's just `VR[R|RV']`.
+
+You’d still need some way to handle circuits that aren’t purely
+series-parallel, that aren’t circuits, or that contain
+non-two-terminal elements.  For example, further down, we have this
+bridge-rectifier circuit:
+
+    fullwave bridge rectifier
+    v1 1 0 sin(0 15 60 0 0)
+    rload 1 0 10k
+    d1 1 2 mod1
+    d2 0 2 mod1
+    d3 3 1 mod1
+    d4 3 0 mod1
+    .model mod1 d
+    .tran .5m 25m
+    .plot tran v(1,0) v(2,3) 
+    .end
+
+That’s not series-parallel.  But you could imagine defining a
+particular two-terminal chunk of it that occurs in more than one path
+through the circuit as `rload = R 10k; V ac 15 60 [D rload D | D'
+rload D']`.
+
+Alternatively you could do what we do in programming languages with
+gotos, where the named entities are not subgraphs we wish to traverse
+and return from (like functions) but labels for points in the
+control-flow graph.  Suppose we mark them with an `@` suffix to
+distinguish them.  Then we might write that circuit as `ra@ R 10k rb@;
+V ac 15 60 [D ra@ D' | D' rb@ D]`, which is slightly shorter but maybe
+less clear.  It’s not quite clear what to do when you want a branch to
+*end* in such a label rather than to merely include it.  This does,
+however, provide a more reasonable way to handle three-terminal
+elements.
+
+In both of these cases, the stuff before a semicolon is special in
+that it’s in some sense mere definitions; it's what’s after the last
+semicolon that gives the circuit.
+
+Right now I’m looking at a diagram of an energy-harvesting circuit in
+a 2003 paper which could be written as follows:
+
+    q1@ [I ac | C] q2@; [D' q1@ D' | D' q2@ D' | C] S [D' | L [ C | [V'|R] R]]
+
+which, as you can plainly see, is a capacitive (piezoelectric) current
+source feeding into a bridge rectifier powering a buck converter to
+charge a battery, with the buck converter controller being represented
+by a plain switch.
+
+Without spaces, that would be the rather awful
+`q1@[Iac|C]q2@;[D'q1@D'|D'q2@D'|C]S[D'|L[C|[V'|R]R]]`.
+
+It would be very nice to be able to render such expressions into
+schematics (and SPICE netlists) automatically.
+
+Stack machines
+--------------
+
+An alternative approach would be to add circuit elements using
+stack-machine operations.  In this approach, `R` is a stack operation
+which takes a node off the operand stack, attaches a resistor to it
+(of a specified value, if one is present), and returns a newly created
+node at the other end of the resistor.  `D` and `D'` are stack
+operations which attach diodes in opposite directions.
+
+Three-terminal devices fit comfortably — although there are more
+potential ways to define them, as their terminals could conceivably be
+assigned to inputs and outputs in 18 different fashions.  The most
+general form is to merely push all of their terminals onto the stack
+as fresh nodes; given that and some stack manipulation operations, you
+can define the other 17 fashions in those terms.
+
+How can we hook up circuit elements in parallel?  We need to save the
+beginning of the parallel section on the stack with `[`, save the end
+of the first branch with `|` and return to the beginning, and then
+connect the two ends with `]` when we reach them.  (Note that this
+implies that parallelism is of strictly two branches.)  This suggests
+that `[` is just DUP and `|` is just SWAP, while `]` is a
+graph-construction operation that shorts two nodes together and then
+drops one of them.
+
+In this interpretation, then, non-series-parallel circuits are merely
+circuits that don’t respect the stack discipline on node access; they
+could be defined like Forth constants or PostScript variables, and
+whenever invoked, they short the node on top of the stack to their
+node (and leave it on the stack).  Perhaps rather than `80 CONSTANT
+WIDTH` we should write something like `80 ]: WIDTH`, since if we’re
+defining a node, we probably started by duplicating a node with `[`,
+and it’s nice if the parens line up.
+
+So then what does this previous circuit look like?
+
+    q1@ [I ac | C] q2@; [D' q1@ D' | D' q2@ D' | C] S [D' | L [ C | [V'|R] R]]
+
+It becomes the following:
+
+    [ D' [ [ ac I | C ] ]: q | [ D' q D' | C ] ] S [ D' | L [ C | [ V' | R] R ] ]
+
+However, in this version, we have a way to handle the special case of
+the implicit circuit around everything: an extra [ at the beginning
+saves the starting point, and an extra ] at the end unifies them.  So
+this becomes:
+
+    [ [ D' [ [ ac I | C ] ]: q D' | [ D' q D' | C ] ] S [ D' | L [ C | [ V' | R] R ] ] ]
+
+Or, if we use a more sophisticated tokenizer than Forth’s:
+
+    [[D' [[ac I|C]]: q D' | [D' q D' | C]] S [D' | L [C | [V' | R] R]]]
+
+Or, if we use more fashionable punctuation, maybe
+
+    {{~d {{ac i, c}}=q ~d, {~d q ~d, c}} s {~d, l {c, {~v, r} r}}}
+
+I’m not sure if this is an improvement in readability over the
+previous expression, but the semantics are a lot less muddy!  It lacks
+the feature the other version had, though, where reversing the
+direction of a circuit element was a general-purpose feature.
+
+This version is strongly reminiscent of Binate, though, with its
+concatenation-for-series-and-comma-for-parallel, and I think it’s
+probably possible to take the analogy further to the possible benefit
+of one or the other language.  In particular, Binate’s approach to
+“named terminals” is more readable, and Binate does handle converse
+orthogonally, but this thing's approach to “named labels” is cleaner.

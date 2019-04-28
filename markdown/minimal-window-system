@@ -1,0 +1,241 @@
+A minimal window system
+=======================
+
+See also file `window-systems`.
+
+For whatever reason, windowing systems are de rigueur for personal
+computing systems.  What’s the smallest one you could build?
+Computers are fast enough now, since about 2000, to redraw the whole
+screen every frame, so there’s no need to faff about with hacks to
+avoid redrawing parts of the screen.  We just have to keep a cap on
+how many times per frame we draw each pixel, on average.
+
+A pull shared-memory windowing system
+-------------------------------------
+
+Each application shares a memory segment with the window system.  The
+window system has a list of windows, which it can reorder, each with
+four numbers: (dx, dy) for the window origin and (sx, sy) for the
+window width and height.  Each frame, the window system composites the
+application windows together into the framebuffer, using the painter’s
+algorithm.  This involves copying rows of pixels from the shared
+memory segments into the framebuffer, some of which will be
+overwritten later with other pixels.  Each application also has an
+input queue for keyboard, mouse, and frame events.  Keyboard events
+always go to the topmost window; mouse events go to the topmost window
+that contains the mouse, except that the mouse-focused window stays
+fixed while the mouse moves with a button held down.
+
+Frame events indicate the completion of a frame, telling the
+application that it is now free to scribble over the window buffer
+used in that frame.  Atomic pointer writes allow the application to
+update its window to a different framebuffer (in the same
+shared-memory segment) for resizing or double-buffering.
+
+Two possible worthwhile enhancements: support (premultiplied) alpha;
+don’t draw windows that are invisible because they are completely off
+the screen or completely covered by another window, and (combined with
+that optimization) divide the screen into 32×32 pixel “subscreens” or
+tiles that are drawn independently.  The first enhancement gives you
+not only window transparency but also a crude approximation of shaped
+windows; the second should keep the compositing overdraw to a minimum
+under most circumstances.
+
+A push tile-stream windowing system
+-----------------------------------
+
+Each application sends the window system a sequence of commands, which
+can include requests to position or size its window or tiles of pixels
+to draw in it.  The window manager sends back a sequence of events.
+
+If the IPC mechanism supports transferring ownership of blocks of
+memory (or, sort of equivalently, immutable data) then the tiles need
+not be copied between memory spaces.  If they are, say, 32×32 tiles of
+32-bit pixels (4096 bytes each), then a 3840×1024 screen would be
+120×32 such tiles, 3840 of them in all.  If the drawing command itself
+is an (x, y, w, h, framenumber) tuple with 16-bit fields, the 3840
+tiles work out to 38400 bytes of messages, while the pixel data is a
+bit over 15 megabytes, 409.6 times larger.  Sending 15 megabytes in
+3840 write() calls on Linux on my laptop would work out to about
+300ns · 3840 = 1152μs for the calls plus 171ps · 15728640 = 2689μs for
+a total of 3.8 milliseconds — a somewhat excessive amount of time,
+especially when you consider that the window system needs to read all
+those bytes, too, taking roughly as long.
+
+A simple test program on Linux is able to create 65000 4096-byte
+memory mappings for a 4096-byte file in 290ms using mmap(), or about
+4.5 μs per mapping.  (It fails when it attempts to create more than
+that.)  This means that mmap() is actually a bit slower than copying
+for such a small mapping, but it doesn’t get any slower when the file
+goes up to 8 megabytes.  A different operating system might make
+somewhat different performance tradeoffs, but there’s no strong reason
+to suspect that Linux’s implementation is profoundly suboptimal.
+
+There’s the question of whether the tiles should be fixed-size and
+whether they should be required to be pixel-aligned on a grid.  If we
+take as a priority that the window system should be efficiently
+nestable, the answers are no — we want intermediate window servers to
+be able to pass along drawing commands as they arrive, but they may
+not draw a full tile, and they may be offset so that tiles that are
+pixel-aligned in the window aren’t pixel-aligned on the screen.
+
+This architecture is not nearly as amenable to alpha-blending.
+
+Performance thoughts
+--------------------
+
+Consider the tiled pull design on a 128×32-tile four-mebipixel screen
+with an average of two drawable windows per tile — some tiles have
+only one, while other tiles have window overlaps and translucent
+overlays.  It needs to read 8 mebipixels (32 mebibytes) from window
+buffers and write them into the 4-mebipixel (16 mebibytes) output
+image, but the tiles are 4096 bytes and thus fit in cache, so this
+will probably only amount to 16 MiB of write traffic to main memory,
+for a total of 48 MiB.
+
+My laptop can manage about 2 GB/s of large memcpy traffic on one core
+and about 4 GB/s across all four cores.  At 60fps that’s a budget of
+67 MB of memcpy traffic per frame — this is cutting it pretty close,
+because it means 75% of the CPU’s RAM bandwidth would be devoted to
+just filling the screen.  It also includes an “Intel HD graphics”
+engine with 16 execution units, which you could imagine might be
+capable of blitting quite a bit faster.  [Wikipedia confirms][0] that
+the GPU has 25.6 GB/s of memory bandwidth.
+
+[0]: https://en.wikipedia.org/wiki/List_of_Intel_graphics_processing_units#Eighth_generation
+
+This approach requires only some 8192 blit commands per frame
+rendered, leaving about 2 μs to process each one.  Even CPython
+function calls would be fast enough, as they take only about 200 ns on
+one core.  However, if the commands a CPython program was sending were
+one level lower — individual scan line segments — there would be
+roughly 32 times as many comands, and CPython performance would be
+inadequate.
+
+As it happens, Numpy is capable of doing this kind of thing, because
+it has mutable multidimensional arrays.  A quick test finds that
+copying 128 MB of RAM via numpy takes 64 ms, which works out to 2
+gigabytes per second.  However, doing a million small blit operations
+in this way took 5.4 μs per blit, which is too slow by more than a
+factor of 2.
+
+    def draw(n):
+     for i in range(n):
+      j = (i % 200) * 5
+      fb[j:j+5, 0:8] = fb[:5, :8]
+
+Factoring out the source image, as if that were realistic, got it down
+to 3.9–4.0 μs.
+
+    def draw(n):
+        src = fb[:5, :8]
+        for i in range(n):
+            j = (i % 200) * 5
+            fb[j:j+5, 0:8] = src
+
+So I could maybe make it work, barely, by taking advantage of
+multicore, or with a smaller screen, like 1Mpix, or like 30fps.  Or by
+giving up on the small-subscreen approach and doing more precise
+occlusion calculations to do bigger blits and eliminate overdraw.  (My
+laptop is only 1920×1080.)
+
+If we have 3ms to draw the screen with an overdraw factor of, say, 2
+due to alpha, then our 2 GB/s gives us 6 MB.
+
+Vectorizing precise rectangular occlusion calculations
+------------------------------------------------------
+
+For more precise rectangular occlusion calculations, we could imagine
+a scan line as a sequence of (pixelcount, sourcewindow) pairs, and a
+screen as a sequence of (linecount, scanline) pairs.  To compute a
+scan line, we can sort the window vertical edges (dx and dx+sx) and
+walk from left to right across the scan line, maintaining a Z-ordered
+heap of windows under the current pixel position, yielding spans when
+the topmost window changes.  A similar calculation for window
+horizontal edges yields spans of identical scan lines, although it may
+not be a priori clear which scan lines are going to be identical; it
+might be better to use an identical-span-merging procedure on the
+sequence of generated spans, both horizontally and vertically:
+
+    def coalesce(spans, reducer=operator.add):
+        c = None    # Current span
+        for k, v in spans:
+            if c is None:
+                c = k, v
+                continue
+
+            pk, pv = c
+            if k == pk:
+                c = k, reducer(v, pv)
+            else:
+                yield c
+                c = k, v
+
+        if c is not None:
+            yield c
+
+This constant-space algorithm is a generalization of run-length
+encoding, `uniq`, and `uniq -c`, and is actually the reduce phase of
+map-reduce, assuming the sorting in between the map and reduce is
+already taken care of.  (God damn it, I’m going to end up programming
+in Rust after all, aren’t I?)  For simple data, like
+`list(zip(floor(arange(128)/10), ones(128)))`, it takes about 5μs +
+750 ns/item.
+
+To make this work with some windows having alpha, for each span, we
+need to store either the whole window stack or enough of the layers on
+top to reach opacity, rather than just the topmost window.  If there
+is no alpha and everything is opaque, it’s overdraw-free.
+
+The whole computation doesn’t quite fit into the map-reduce mold
+because, although the windows map to pairs of edges, there’s a
+computation in between to find the differences of the sorted list.
+
+There’s a way to express this algorithm, for the addition case, in
+three lines of Numpy, but I hesitate to describe it as
+“straightforward” because I keep putting bugs in it when I implement
+it:
+
+    def coalesce(ks, vs):
+        last = concatenate((ks[1:] != ks[:-1], [True]))
+        v = cumsum(vs).compress(last)
+        return ks.compress(last), concatenate(([v[0]], diff(v)))
+
+In APL, given the inputs in k and v, I think that would be something
+like this:
+
+    (L/k) ,[1] w[0],(1↓w)-⁻1↓w←(L←((1↓k)≠⁻1↓k),1)/+\v
+
+except that that doesn’t handle cases where k and v have different
+data types, and also I haven’t tested it because LinuxMint doesn’t
+come with APL.
+
+For largish arrays (1e8 trivial items) on my laptop this takes 11 ns
+per item, about a 20th of a 200-ns Python function call; for a
+256-item array, it takes 75 μs (290 ns/item); for a 512-item array, it
+takes 80 μs (160 ns/item, or about 20 ns per additional item), while
+for a 65536-item array, it takes 805 μs (12 ns/item).  This suggests
+some slight nonlinearity and a rather hefty Numpy overhead of about
+70 μs (about 350 Python function calls) per call.  This makes it
+faster than the longer generator version above for more than about 90
+items, but potentially an order of magnitude slower for small cases.
+
+A more assembly-style imperative Numpy implementation might do a
+better job by reducing memory allocations.  For example:
+
+    def coalesm(ks, vs):
+        last = ones(len(ks), dtype=dtype('bool'))
+        not_equal(ks[1:], ks[:-1], last[:-1])
+        v = cumsum(vs).compress(last)
+        result_v = zeros(len(v), dtype=v.dtype)
+        result_v[0] = v[0]
+        result_v[1:] = v[1:]
+        result_v[1:] -= v[:-1]
+        return ks.compress(last), result_v
+
+This is somewhat faster on large data sets — the earlier version takes
+about 19 ns per item to count the duplicates in
+`floor(arange(1e8)**.1)`, while this version takes about 11 ns.  Both
+take 11 ns per item for trivial int arrays.  It is, if anything, about
+a microsecond *slower* for small problems, as you would probably
+expect.

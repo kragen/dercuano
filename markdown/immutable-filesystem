@@ -1,0 +1,409 @@
+Git provides a sort of immutable Merkle-graph filesystem which saves
+all previous versions of all files; every version of every file
+(“blob”) is identified with its SHA-1 hash.  It’s hierarchically
+structured, with a similar property for subdirectories (“trees”): iff
+two subdirectories, or two versions of the same subdirectory, are
+recursively identical, their hashes will match.  This is true across
+time and across hosts.
+
+You could imagine a variety of functionality based on a filesystem
+with such an interface.  Git provides some of it: for example, it
+eagerly eliminates duplicate files, so that storing a hundred
+identical versions of a subdirectory tree in Git costs no more than
+storing a single one, and storing a hundred nearly-identical versions
+costs only slightly more.  (Storing a hundred nearly-identical
+versions of a file is optimized using a different, heuristic,
+mechanism).  It provides rapid access to previous snapshots of the
+filesystem (though, unfortunately, usually through a stateful
+interface.)  It provides relatively efficient synchronization of Git
+repositories over the network, using the hashes to identify which data
+needs to be transferred, and what data the receiver already possesses
+and can thus use to compress the data being sent.
+
+Possible uses
+-------------
+
+But in addition to duplicate-elimination, historical snapshot access,
+and efficient network synchronization, such an interface can be used
+for a variety of other purposes, including consistent-snapshot backup,
+software downgrade, lazy file reading, userland hashing, polling for
+generalized change notification, build systems, and maybe even
+transactional filesystem updates.
+
+### Consistent-snapshot backup ###
+
+Consider backing up a database server, for example.  Database servers
+are designed so that, if the power fails, after a reboot, they will
+not have lost any data — under some reasonable assumptions about write
+ordering which are sometimes violated by actual disks, resulting in
+permanent data loss.  So you would think that backing up the files or
+raw disk partitions they store their data in (sometimes called
+“tablespaces”) would enable you to recover to the point in time when
+the backup was taken.
+
+Unfortunately, backups are not taken at a point in time; it takes a
+certain amount of time for the backup process to read from one end of
+the tablespace to the other, during which time the database server may
+be writing data.  So the data at the end of the tablespace will be of
+a more recent vintage than the data at the beginning, producing
+inconsistencies.  This can result in useless backups, a fact
+discovered by many novice database administrators, to their dismay,
+only after a data-loss disaster.
+
+(SQLite and Berkeley DB have instructions in their documentation
+providing an order in which active database files can be backed up
+safely, but for many databases no such order exists.)
+
+One of NetApp’s selling points in 1996 — at the point that their
+entire website still had a bright yellow background — was that you
+could take backups of databases.  You put the tablespaces on one of
+their fileservers (then marketed as “FAServers”, now “filers”) and,
+instead of backing up the live database, you make the fileserver take
+a snapshot and then do the backup from the snapshot, not from the
+constantly-mutating firesystem.
+
+Such a backup from a consistent snapshot would be a useful application
+of any snapshot-capable filesystem.  If you can take the snapshot of
+the underlying block device rather than the filesystem, for example
+using AWS EBS’s snapshot tools, that may work as well, but it’s
+vulnerable to a certain very common class of filesystem implementation
+bugs — it’s similar to recovering the filesystem after a system crash,
+and if the filesystem doesn’t actually provide the sequencing
+guarantees it claims to provide, the tablespace could be inconsistent
+anyway.  Also, successfully mounting the snapshot of the live filesystem
+often  requires the ability to modify it to correct inconsistencies in the
+filesystem itself (e.g., replaying filesystem journals) which requires
+copy-on-write functionality if it is to both be fast and not violate
+the integrity of the snapshot.
+
+Git doesn’t provide this functionality because it doesn’t offer an API
+that any database servers use to store their data.
+
+### Software downgrade ###
+
+Upgrading software is a constant necessity, both due to the insane
+epidemic of software security holes and to provide new functionality
+users want.  But upgrading a system you depend on is always somewhat
+risky: the upgrade may break it, in subtle or obvious ways.  Being
+able to reset the whole filesystem to a previous snapshot can reduce
+this risk greatly, as it does on AWS EBS, and I think this
+functionality can be provided more cheaply at the filesystem level
+than the block device level.
+
+### Lazy file reading ###
+
+When I open a large file in Emacs, it copies the entire thing into
+virtual memory — it doesn’t necessarily
+have to fit into RAM, but at least into swap by
+way of RAM.  This is necessary because, while I’m editing the file,
+something else may be modifying the file while Emacs has it open, and
+in such a case, Emacs wants to be able to detect the conflict and
+offer options for resolving it.  If it only read the file into memory
+lazily, as parts of it were requested, it could not do this.  Even if
+I’m just scrolling through the file, you could imagine a modification
+in the middle of the file that results in “torn reads” — where one
+data block is from before the modification, while the following data
+block is from after it, and their juxtaposition results in
+inconsistent results.
+
+It is for this same reason that incorrectly upgrading active shared
+libraries — which are memory-mapped by ld.so — can result in core
+dumps.
+
+If Emacs could, instead, open a *current snapshot* of the file,
+trusting the filesystem to not permit modification of any of the data
+in the snapshot instead of eagerly making a copy of the whole thing,
+it could open files of any size instantaneously.
+
+As described in “Proposal for the Implementation by Xanadu Operating
+Company of a Full-scale Semi-distributed Multi-user Hypertext System”,
+1984-04-25:
+
+> Separate processes which request the retrieval of the same orgl at
+> the same time are each given different berts which reter to the
+> orgl.  Associated with each orgl is a count of the number of berts
+> which currently refer to it.  If one of these processes then makes
+> an edit change to the orgl, a new orgl will be created.  The
+> process’s bert will be made to refer to the new orgl and the old
+> orgl’s reference count will be decremented.  By this means, the
+> other processes will not “see” the change, and their berts will
+> still refer to the same V to I mapping as previously.  Any
+> information about the orgl’s state which the other processes might
+> have been keeping externally will not be invalidated by the one
+> process’s edit operation.
+
+Also, Emacs depends on filesystem metadata modification to know if
+modifications have happened since it read the file; this is not
+entirely reliable, particularly on filesystems whose modification time
+granularity is 1000 or 2000 milliseconds.  Checking a
+filesystem-maintained hash of the file would be considerably
+safer.
+
+### Userland hashing ###
+
+If you want to know if any of the files installed by any of your
+Debian packages have changed, you can run the `debsums` command to
+compute secure hashes of them, comparing them against the hashes in
+the original packages.  Unfortunately, this is slow, because it has to
+read all the file data.  If the filesystem provided a trustworthy
+hash — in 2019, maybe we’d choose SHA-256 rather than SHA-1, among
+other things to preserve a 2¹²⁸ security factor even in a postquantum
+future — this would be instantaneous, as long as the filesystem’s
+hashes themselves were not out of date.
+
+Additionally, though, if you wanted to maintain a list of the hashes
+of some files using some other algorithm (for example, BLAKE2B), you
+could associate them with the filesystem’s file hashes rather than
+merely with filenames.  When a file's filesystem hash changed, you
+would know that you needed to recompute its BLAKE2B hash.  This is in a
+sense a special case of the “build systems” item below.
+
+Alternatively, the filesystem itself could maintain potentially more
+than one hash for each file.
+
+### Polling for generalized change notification, like inotify ###
+
+The inotify API in Linux allows a running process to be woken up
+asynchronously when a file is changed or when any file in a directory
+is modified; for example, `tail -f` uses this to display new lines
+appended to a logfile immediately, rather than polling once per
+second, and GUI file managers use inotify to keep their windows
+up-to-date with the filesystem — so that newly created files are
+displayed, files whose contents have changed get updated, and deleted
+files disappear.  The only way to do this with the standard Unix API
+is to poll periodically, wasting energy in the case where nothing has
+changed, and still delaying change propagation by up to the polling
+period.
+
+However, inotify is still somewhat limited.  It only applies at a
+per-directory level, so starting to watch for changes throughout an
+entire subtree of the filesystem requires a recursive traversal of the
+subtree with a couple of system calls per directory.  And it has no
+way to determine whether changes happened when the process wasn’t
+running — the GUI file manager has no way to cache its display in case
+it’s restarted without a directory having been changed, but must
+laboriously re-examine the same data it examined on the previous
+execution.
+
+By contrast, if there were a hash for the directory subtree and for
+each file within it, the file manager could validate its cached
+display against these hashes when it’s restarted.  And a filesystem
+watcher doesn’t need to recurse through the entire tree to set up
+notifications — although it may need to recurse to track down the
+source of a notification.
+
+### Build systems ###
+
+The `make` system does several things, but one big one is caching of
+previously-executed computations.  Supposing that your compiler is
+deterministic (a difficult problem in modern systems, though one being
+tackled by Debian’s Reproducible Builds project and by Nix and Guix),
+it will always produce the same output files given the same input
+files and options.  `make` relies on filesystem timestamps for this,
+but a more reliable approach would use secure hashes of the file
+inputs instead, or other handles to immutable versions of the files.
+(And a filesystem that records the files accessed by a build step, by
+interposing a check on open() and similar system calls, can provide a
+more reliable dependency set, not depending on compilers and Makefile
+authors to specify the dependency set.)
+
+Compilation steps can also potentially depend on the contents of
+directories, and this introduces a potential problem.  For example, I
+just ran a compilation command with GCC which did, among other things,
+the following sequence of system calls, with others interspersed:
+
+    [pid 25870] open("../yeso/time.h", O_RDONLY|O_NOCTTY) = -1 ENOENT (No such file or directory)
+    [pid 25870] open("/usr/lib/gcc/x86_64-linux-gnu/5/include/time.h", O_RDONLY|O_NOCTTY) = -1 ENOENT (No such file or directory)
+    [pid 25870] open("/usr/local/include/time.h", O_RDONLY|O_NOCTTY) = -1 ENOENT (No such file or directory)
+    [pid 25870] open("/usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/time.h", O_RDONLY|O_NOCTTY) = -1 ENOENT (No such file or directory)
+    [pid 25870] open("/usr/include/x86_64-linux-gnu/time.h", O_RDONLY|O_NOCTTY) = -1 ENOENT (No such file or directory)
+    [pid 25870] open("/usr/include/time.h", O_RDONLY|O_NOCTTY) = 4
+    [pid 25870] fstat(4, {st_mode=S_IFREG|0644, st_size=13543, ...}) = 0
+    [pid 25870] read(4, "/* Copyright (C) 1991-2016 Free "..., 13543) = 13543
+
+An interposition-based system that concluded that this compilation
+step depended on the contents and filesystem metadata of
+`/usr/include/time.h` would be correct, but it *also* depends on the
+*nonexistence* of `/usr/local/include/time.h`, among other things.  If
+GCC had found `/usr/local/include/time.h`, it wouldn’t have continued
+on to read `/usr/include/time.h`.
+
+But it would be very unfortunate for the build step to be re-executed
+because the contents of `/usr/local/include` had changed, or worse,
+because `/usr/local`, `/usr`, or `/` had a change somewhere beneath
+them.
+
+Fortunately, GCC didn’t call `getdents()` (at least in this case), so
+we can automatically define the dependency more narrowly to *just* the
+files it specifically probed for — the rest of the directory’s
+contents were not relevant.
+
+Other systems whose results we might want to cache, such as the
+`updatedb` part of `locate`, might indeed walk an entire filesystem
+tree using `getdents()`.  Such systems would need a bit more surgery
+to make their results usefully cacheable — they would need to somehow
+split it into separable transactions per subdirectory tree.
+
+### Transactional filesystem updates ###
+
+ACID transactions are contagious; like other acids, they tend to
+splash on unexpected things and produce unexpected results on them.
+If your filesystem can provide ACID transaction updates, then you can
+expand the scope of whatever transactions you’re doing in your program
+to include the filesystem.  Some form of this is necessary if you want
+your transactions to be actually durable, rather than just “ACI”,
+longing after the D.  Providing processes in other transactions with a
+view of all the files as they were before your transaction began to
+modify them is very similar to simply providing them with snapshots
+from before the transaction, but it requires at least some kind of
+atomic validate-and-commit operation.  If you’re going to participate
+in two-phase commit at that level, it further requires the ability to
+lock the validation in place while you’re waiting for other
+participants in the transaction, which means potentially denying other
+writers to the filesystem.
+
+Accessing the same mutable data within transactions and also outside
+of transactions has some pitfalls!  Beware!
+
+Implementation issues
+---------------------
+
+Given the above list of benefits, what problems do we need to solve to
+implement the system?  We need to decide on the granularity of
+hashing, deal with the possibility of hash inconsistency, and figure
+out what to do about hashes being broken, foreign filesystems, and
+space exhaustion.
+
+### Granularity and splitting ###
+
+As explained in more detail below, on Flash, unchanged data is necessarily copied
+from one place to another periodically, offering the opportunity to
+hash it, but maybe not an entire file at a time.  Also, processes like
+database servers expect to be able to efficiently write individual
+sectors, or at least tracks (≈100 KiB), of a potentially much larger
+file; such an operation shouldn’t have to reread the entire file to
+compute the new hash.  So probably you want to hash data in chunks
+close to the size of a disk block, in the range of 512–262144 bytes,
+and build some kind of Merkle tree from that for larger files.
+BitTorrent does this, for example, hashing each “piece” of a torrent
+separately; the `btih:` schema in Magnet links then uses the hash of
+the torrent file as a whole.
+
+For text files and other files in which blocks of data might move
+around, it’s desirable to be able to draw the boundaries of the Merkle
+tree nodes in a way that can recognize a mostly-unchanged file, even
+if something has been inserted or deleted.  Silentbicycle’s “jumprope”
+data structure used in his “Tangram” filesystem and the splitting
+system used by Avery Pennarun’s “bupsplit” system are two variants on
+this theme.
+
+### How can the filesystem's internal hashes get out of date? ###
+
+The filesystem’s hashes can get out of date via bit-flip errors on the
+disk, via modifications of the disk’s data that don’t go through the
+filesystem (for example, if you edit the disk with a hex editor), or
+via bugs in the filesystem, so they need to be checked, as `git fsck`
+does.
+
+If the filesystem is running on raw Flash that suffers from read
+disturb, all data needs to be copied to new Flash blocks periodically;
+this affords an opportunity to check its hashes in the process.  For
+this to work, the data probably needs to be hashed at a finer
+granularity than an arbitrarily-large file.  Similarly, on Flash, live
+blocks periodically need to be copied from mostly-empty pages into new
+pages so that the old pages can be erased, affording a similar
+opportunity.
+
+### Cryptographic agility ###
+
+In retrospect, it looks like baking SHA-1 into every persistent
+structure in the Git universe may have been a bad idea — SHA-1 is too
+short to resist well-resourced attacks with Grover’s algorithm, if
+that becomes feasible, and it has shown some worrisome signs of
+weakness in the last couple of decades, with some theoretical
+collision attacks published.
+
+For most of the applications cited above, user processes don’t need to
+access the actual hash values used to index the on-disk data; they can
+manipulate them through opaque handles like file descriptors,
+referring either to specific versions of files or to the
+time-dependent value of “the current state of such-and-such a
+filesystem entity” (from which the current version can be
+obtained) — although equality comparison must also be provided.
+Duplicate-data elimination, previous-snapshot access,
+consistent-snapshot backup, lazy file reading, and run-time polling
+for change notification could work with such opaque identifiers.
+However, you need some kind of stable serialization of these snapshot
+identifiers for software downgrade, change notification across process
+restarts, and build systems (across process restarts); for efficient
+network synchronization and userland hash verification, you
+additionally need to be able to get the results of a *specific* hash
+algorithm, because if your filesystem is giving you SHA-1 hashes and
+the server has upgraded to BLAKE2B, or your filesystem has upgraded to
+SHA-256 hashes but your package manager only uses SHA-1, you’re in
+trouble.
+
+There are a couple of ways to handle this.  You could have the
+filesystem internally compute a non-constant set of hashes — perhaps
+the old version of a file has a SHA-1 Merkle tree hash with a
+blocksize of 8192, while the new version uses a blocksize of 131072,
+so that if you want to compare them you need to ask the filesystem to
+compute the other hash for one of the two, which it will store
+thereafter.
+
+Alternatively, you could fix the algorithm for a given filesystem, and
+allow userland processes to use the usual caching approaches to
+compute hashes using their favored algorithms when they need them,
+indexing them to individual snapshots if desired.
+
+### Compatibility with foreign on-disk filesystems ###
+
+Suppose your operating system provides such an interface as its native
+filesystem interface.  What happens when you plug in your USB pendrive
+with a VFAT firesystem on it?  VFAT doesn’t give you an efficient way
+to get the hash of a single file, much less an entire subdirectory
+tree.
+
+I think the key is to use the previously described
+opaque-version-identifier interface as long as possible; as long as no
+userland process requests a serialized hash for a filesystem node, you
+can postpone hashing the file.  You can still provide access to
+snapshots of old versions of the filesystem by buffering the old
+versions of modified filesystem pages in RAM, as long as some snapshot
+refers to them.  And, once a hash is requested, the OS can retain the
+hash in RAM as long as the firesystem is mounted.
+
+There may be some filesystems — btrfs, perhaps, or ZFS — which provide
+a reliable way to determine whether a file has been modified since the
+last time the filesystem was mounted.  They might have some kind of
+generation count or journal timestamp when the file was last modified.
+On such foreign systems, you could either use journal-timestamp/inode
+pairs (or whatever version identifier you end up using) in place of
+hashes, or you could store a lazily-populated mapping from foreign
+version identifiers to secure hashes.
+
+### Space exhaustion ###
+
+A serious problem with any kind of lazy copy-on-write system — whether
+Linux’s memory-page allocation, NetApp’s WAFL block allocation, Flash
+FTLs, or a log-structured filesystem — is that space usage is somewhat
+unpredictable and difficult to attribute to a single cause.
+Consequently, it becomes exhausted unpredictably, and then it isn’t
+entirely clear how to respond.  With the foreign-filesystem interface
+described in the previous section, the problem is potentially
+exacerbated by having to buffer old versions of filesystem data in
+RAM, and RAM may be much smaller than the filesystem.
+
+This is particularly a problem when it comes to database transaction
+durability.  A database executing a two-phase commit must check for
+all possible errors, especially including errors of disk-space
+exhaustion, during the PREPARE phase; once the transaction enters the
+COMMIT phase, it is too late to rollback the transaction because of
+being out of space.  For this particular case, we can use a call to
+preallocate some space that we may want to write to later on,
+producing a conservative (pessimistic) failure indication if there may
+not be space available.  If the filesystem can then optimize the
+actual data by, for example, noting that the disk block written is the
+same as some other disk block, so much the better — such a situation
+could snatch victory from the jaws of defeat, but never defeat from
+the jaws of victory.

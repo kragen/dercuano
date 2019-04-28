@@ -1,0 +1,406 @@
+Jef Raskin invented the word “quasimode” to describe the user
+interface technique of setting a mode only as long as a certain key is
+held down, like Shift, Control, or ⌘.  Quasimodes can multiply the
+expressivity of user interfaces without the usability problems created
+by full-blown input modes like Caps Lock or Vim’s command mode.
+
+I’m going to focus here on text editors, which (for better or worse)
+are the predominant medium for human expression through computers in
+2018, whether you’re typing a WhatsApp message, a Tweet, a Facebook
+status, a spreadsheet formula, or a YouTube comment.  And I’m largely
+focusing on environments for computer programming, because those are
+the most expressive text editing environments.
+
+Modes
+-----
+
+Modes are a usability problem for a couple of reasons.  First, because
+of “mode errors”: if the consequences of an action such as pressing
+the “B” key depends on what mode you’re in, and you don’t know what
+mode you’re in, you don’t know what will happen when you take the
+action.  (The classic example is when you can’t figure out how to log
+in because your Caps Lock key is on when you’re typing your password).
+Second, because of the “gulf of execution” — even if you know that the
+“B” key can cause the consequences you want in some mode, it can be
+hard to figure out how to get into that mode.
+
+Emacs is mostly modeless in the sense that the same keys usually do
+the same thing; its “editing modes” usually have more effect on things
+like syntax highlighting and where the tab stops are than on what will
+happen if you press the “b” key, although there are exceptions.  Vim,
+on the other hand, has a “normal mode” for most editing commands and
+“insert mode” and “replace mode” for actually writing stuff.
+
+Quasimodes in common practice
+-----------------------------
+
+Emacs uses quasimodes in its user interface to the extent that was
+possible with the “space cadet” keyboards that were common at MIT when
+it was designed in the 1970s and 1980s, which is to say that it uses
+“key chords”.  The “B” key, for example, inserts “b”, except that if
+Shift is held, it inserts “B”; if Control is held, it moves to the
+left by one character; if Alt (“Meta”) is held, it moves left by one
+word; if both Control and Alt are held, it moves left by one
+parenthesized expression; and if Shift is also held while using
+control-B (“C-b”), alt-B (“M-b”), or control-alt-B (“C-M-b”), the
+cursor movement creates or extends a text selection (“region”).  So
+the “B” key can invoke eight different functions modelessly — or,
+let’s say, quasimodally.  But some of those functions require holding
+down as many as four keys at a time.  This is commonly held to make
+Emacs a risk factor for repetitive stress injuries, although I don’t
+know of any rigorous studies demonstrating this.
+
+Space-cadet keyboards did not send any data when these quasimode or
+“modifier” keys (Control, Meta, Shift, and also Hyper and Super) were
+pressed and released by themselves, nor when a modifier was released
+after pressing some modified keys.  Neither did ASCII terminals of the
+1970s and 1980s, and neither do ASCII terminal emulators today in
+2018, 45 years later.  Consequently, any editors that aspire to being
+used through such things are unable to take actions when a modifier
+key is initially pressed or when it is released, nor can they
+distinguish between, for example, holding Control and typing “XB” and
+separately typing control-X and then control-S, releasing Control in
+between.  (Also, in ASCII terminals, the Control key collapses many
+characters together, typically three, so control-shift-b will do the
+same thing as control-b, and control-@ does the same thing as
+control-space, so keys distinguished only by such distinctions are
+typically assigned to less important commands.)
+
+This means that some of the user-interface conveniences
+personal-computer users got used to during the 1980s are impossible to
+implement in this environment.  For example, some MS-DOS programs
+display an on-screen menu listing the functions available on the
+various function keys, and the menu changes when Control, Alt, or both
+Control and Alt are pressed, displaying the function that will
+actually be invoked if you press, say, F8.  Likewise, the Macintosh
+Key Caps applet displays a picture of the keyboard labeled with the
+characters that will be produced if you press a given key; the labels
+change if you press Shift or Option.  And the task-switching key
+sequence in Microsoft Windows, introduced I think in Windows 95,
+cycles through the most-recently-used windows as long as you hold Alt
+and press Tab repeatedly; no window is activated until you release the
+Alt key.
+
+The limits of key chording
+--------------------------
+
+Emacs and Vim both have a large number of commands.  The Emacs I’m
+typing this in is currently configured with 14165 different commands,
+which is too many to assign to key chords on the keyboard — even if
+you have four modifier keys, so that each non-modifier key had 16
+different chords, a 105-key keyboard would only have 1616 distinct
+chords in this way.  Also, since the editor can’t provide any visual
+feedback related to modifier keys that are currently held down, the
+memory load would be quite heavy.  So, instead, they use three
+alternative approaches: prefix keys, a command line, and command mode.
+
+Prefix keys
+-----------
+
+Prefix keys are sort of like modes that only last for a single
+keystroke.  For example, in Emacs, as I said, control-B moves left by
+one character, and B by itself inserts “b”.  But control-X control-B
+opens up a window listing all the things that are open in Emacs, and
+control-X B prompts you for the name of the thing you would like to
+switch to.  In effect, control-X puts Emacs into a mode which changes
+the effect of the next keystroke.  Analogously, in Vim, typing “?” (as
+shift-/ on Qwerty keyboards) does a search backwards, but “g?”
+decrypts the current selection with the rot13 cipher.  The “g” key
+puts Vim into a mode which changes the meaning of the next keystroke.
+
+GNOME and Microsoft Windows applications can typically be
+keyboard-operated by using the Alt key and a letter to select a
+pull-down menu, then further letters or arrow keys to select submenus
+or menu commands.  This is also an implementation of prefix keys.  It
+shows how modes can actually be more usable than having hundreds of
+commands on modified keys: it’s feasible to display breadcrumbs and
+guidance.
+
+However, prefix keys still cause mode errors, which are still
+frustrating, and even in the best cases, they don’t help to reduce the
+gulf of execution much.  Among the key sequences currently defined in
+my Emacs are things like control-X 8 / A (which inserts the letter
+“Å”), control-X control-K B (which binds the last-defined keyboard
+macro to a key or key sequence), control-X Enter shift-F (which
+changes the character encoding used for the filename of the currently
+open file), and over a thousand others, most of which I’ve never heard
+of even though I’ve been using Emacs almost daily for a quarter
+century.  It can be hard to find out that these even exist, even
+though Emacs has an active community, comprehensive documentation, and
+many ways to explore and query.
+
+Command lines
+-------------
+
+In Vim, you invoke the command line by typing “:”; Emacs has several
+command lines, including the Lisp command line invoked by alt-:, the
+editor-command selector invoked by alt-X, and the shell command line
+invoked by the command “shell”.  In Firefox and other web browsers,
+you type control-L or ⌘L to edit the URL, and in Gnumeric or Excel,
+you can invoke the command line with the F2 key or “=”.
+
+The command line is sort of a mode, but the B key generally causes a
+“b” to appear on the screen, just like in normal life, and the normal
+editing commands do normal editing things; the difference is that what
+you’re editing is a command which will eventually be executed, usually
+when you hit Enter.  Command lines can still cause mode errors where
+you want to be typing stuff into a document and you end up typing
+commands instead, but generally they support more usability features
+than prefix keys.
+
+The “alt-:” command line in Emacs is for evaluating Lisp expressions,
+which can invoke editor commands, define new functions, or do useful
+computations.  For example, I recently evaluated “(* 16 101)”, the
+product of 16 and 101, to see how many commands a 105-key keyboard
+with four modifier keys could invoke.  Earlier I evaluated “(+ (* 9
+.40) (* 4 .59))”, which calculated the BOM cost of a possible circuit
+design that used 9 chips that cost 40¢ and 4 chips that cost 59¢.
+
+Emacs also supports a different way of evaluating Lisp expressions.
+Its `*scratch*` buffer is by default in an editing mode called
+“lisp-interaction-mode” in which the key chord control-J scans
+backwards from the cursor for a complete Lisp expression, evaluates
+it, and inserts the results into the buffer on a new line.  So,
+instead of typing `alt-: (* 16 101) Enter`, you can switch to
+`*scratch*` and type `(* 16 101) control-J`, with the following
+result:
+
+    (* 16 101)
+    1616
+
+In “lisp-interaction-mode”, control-J is bound to the command
+“eval-print-last-sexp”, which does what I explained above.  Also, by
+default, throughout Emacs, control-X control-E is bound to
+“eval-last-sexp”, which does the same thing except that it doesn’t
+insert the result into the buffer.  This is especially useful when you
+are programming in Emacs Lisp, because it allows you to point at
+pieces of your code and instantly run them to see if they do what you
+think they should.
+
+This is a more modeless way of providing a command line; it was
+pioneered in Smalltalk, where “Do it!” and “Print it!” are commands
+available on key chords and on menus in every text editing window, and
+have been since the 1970s.  These work on either the current selection
+or, if none, the current line, treating it as a Smalltalk sentence and
+inserting the result as a new selection.  This is a little bit
+clumsier than the Lisp approach because Smalltalk sentences are not
+self-delimiting, but you also don’t need it as often — my most common
+use of this facility in Emacs is to recompile a function I just edited
+so I can try it out, and Smalltalk has an even smoother way to do
+that.
+
+However, in a sense precisely because it is more modeless, this
+approach to providing a command line has suboptimal usability.  If I
+type `(* 16 101) control-X control-E` in this document, it isn’t until
+the last chord that Emacs knows that `(* 16 101)` is intended as Lisp
+code.  If I accidentally type `(*16 101)`, Emacs doesn’t know to
+highlight `*16` as an undefined function until then.  If I start
+typing `(backw` in this buffer and ask for completions of the
+partially-typed function name, Emacs doesn’t know I’m intending to
+type Emacs Lisp and so can’t complete that to `backward-` and list the
+18 functions whose name starts with that.  By contrast, in the alt-:
+command line, it can and does.
+
+The alt-X command line in Emacs just allows you to select among the
+14165 already-defined commands I mentioned earlier; if you select a
+command that needs arguments, it either obtains them from context
+(such as from the current selection) or prompts you for them
+afterwards (yet another mode).
+
+The alt-X equivalent in Oberon is modeless; it works like the
+Smalltalk “Do it!” or Emacs `lisp-interaction-mode` — if you click a
+certain mouse button, it looks for a command name in the text around
+the point where you clicked, and if it names a procedure, it calls
+that procedure with no arguments.  I think `File.save` is one example,
+although I don’t have my Oberon book here.  The command is not
+permitted to prompt the user and await input, because Oberon is a
+single-threaded event-driven system, but it can do things like open a
+new window for further interaction and put more command texts into
+that window, or some other window.
+
+Repetition and adjustment
+-------------------------
+
+If I want to type a line of asterisks on this Qwerty keyboard, it’s
+pretty easy; I put my left pinky on a Shift key and bang on the 8 key
+with my right middle finger until I have the right number of
+asterisks, possibly adjusting at the end with a few backspaces if I
+overshot.  By contrast, if I want a line of alternating periods and
+colons, it’s a real pain to type by hand; I need to use my right ring
+finger on the period key and coordinate my two pinkies on the
+semicolon and Shift keys to get the colon.  Repeating a single key is
+much, much easier than repeating a two-key sequence, and repeating a
+sequence of a chord and a key is even harder.
+
+Now, Emacs has a keyboard macro facility.  Keyboard macros are good
+for repeating something a number of times.  I can type “F3 .: F4”,
+with the F3 and F4 keys, to define a keyboard macro that inserts “.:”.
+The traditional key sequence to run the macro is control-X E, and it
+takes a count, so if I want a line of 20 of them, I can type
+“control-U 20 control-X E” and then add a trailing period:
+
+    .:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.
+
+The trouble is that it’s usually a real pain to figure out what 20
+should be until you see it.  (Why am I counting things when I have a
+computer to count things for me?)
+
+Vim, and vi, were better at this; you could type “a.: Esc .....”, and
+each “.” you typed would append another “.:”.  You could also type
+“a.: Esc 20.” or even “20a.: Esc” if you knew the count.
+
+Emacs’s “indent-rigidly” command had the same problem; you had to
+figure out how many spaces you wanted to indent by ahead of time, say
+by multiplying 3 by 4 in your head, and type “control-U 12 control-X
+Tab”.  Worse still was “undo”, which used to be just “control-X U”,
+and which you almost always want to repeat a difficult-to-calculate
+number of times.
+
+Modern Emacs has a feature called “transient modes” or “transient
+maps” which temporarily change the meanings of only a few keys — like
+prefix keys, but leaving most of the key functions undisturbed.  In
+particular, now you can type “control-X E E E” to repeat the macro
+three times: “.:.:.:”.  (Also, you can type F4 to repeat a macro, and
+control-/ or control-_ to undo.)  What they did with indent-rigidly is
+more interesting: now, if you just type control-X Tab without giving a
+count first, the right and left arrows indent and outdent the selected
+region by one space, or by a whole tab stop if you use shift.  Because
+this mode only alters the meanings of a few keys, it rarely causes
+mode errors, but they do happen occasionally.
+
+The interesting thing here is that these are ways of interactively and
+almost continuously varying a parameter in either direction while
+observing the results, much like Bret Victor’s “Kill Math” proposal
+(and some of his other ideas).
+
+WordStar’s late-1970s approach to this problem, by the way, was
+interestingly different: you would ask it to start repeating a
+command, which it would do at a rate you could vary interactively with
+the keys 0 to 9, with a key to stop it — much like the autoscroll
+feature on some web sites.  I suspect that this was not a viable
+approach on the timesharing machines where Emacs and vi were born
+because of the unpredictability of their response times and the high
+costs of context switches and terminal-screen repaints.
+
+The Cat, LEAP and THE
+---------------------
+
+The Canon Cat was a text-based personal computer whose user interface
+Jef Raskin designed after being pushed out of the Macintosh project at
+Apple.  Among its daring user-interface innovations was that, not only
+did it have no mouse, it also had no vertical arrow keys.  Instead, it
+had two “LEAP” keys, one for moving forward and one for moving
+backward, which were quasimodal, like modifier keys, but for
+incremental text search, like Emacs’s control-S and control-R
+commands.  Like Emacs’s control-R, when the search terminated, you
+would be left at the beginning of the search hit, but unlike Emacs,
+the search terminated when you released the LEAP key, making LEAP both
+faster to invoke and less error-prone — because it wasn’t a mode.
+
+Raskin claimed that experiments showed that it was substantially
+faster for navigating text than a mouse.
+
+Canon mass-produced the Cat and sold a number of them, but it was
+pretty much a failure in the market.  In later years, Raskin was
+working on an extended reimplementation of the concept as free
+software, called “The Humane Environment” or “THE”, before being
+struck down with a few weeks’ worth of warning by pancreatic cancer.
+THE never gained significant adoption and has largely been forgotten.
+
+Thoughts about modifier keys for quasimodes
+-------------------------------------------
+
+So, that’s the historical background.  Here’s some wild speculation
+about how to apply it.
+
+You can quite reasonably substitute quasimodes for the search modes
+used by Emacs and Vim; you could maybe control-F (for PARC bindings;
+control-S for Emacs bindings) to start a search, which would continue
+only as long as you held the control key.  You wouldn’t be able to
+disambiguate searching for control characters without some kind of
+additional escaping, but for the common cases of searching for Enter
+and Esc, both Vim and Emacs already need the additional escape
+sequence (control-V and control-Q respectively, or control-J to search
+for Enter in Emacs), so this would actually be an improvement.  I’m
+not sure what to do for next and previous match other than arrow keys;
+maybe alt-K and alt-J.
+
+For calculations — the thing I most use Emacs M-: for — an RPN
+calculator quasimode would be quite handy.  You could type control-=
+to launch it, and it would persist as long as you held the Control
+key, fading away when released.  Numbers would be pushed on the stack,
+separated by spaces; `*+-/^` would do their usual things, but `%`
+would do divmod; `,` could perform vector concatenation; `dxr` would
+dup, swap, and rotate; backspace would delete; `pqtscale` would
+compute π, square roots, tangents, sines, cosines, arctangents,
+logarithms, and exponentials; `i` would generate sequences; and `(`
+and `)` would respectively take numbers from the document you were
+editing and put numbers into it.  So to double a number you would type
+`control-= (2*)`, although it might be snatched from somewhere other
+than where you were.  The stack would remain persistent between
+invocations, and values on the stack would retain their provenance,
+operations being reversible with `z`.  Vectors would be graphed by
+default, toggled with `g`.  This would be substantially more
+convenient than the nonsense I’m using now with alt-: and running
+`units` in a shell.
+
+More ideal still would be the ability to edit input values after the
+fact and watch the changes propagate, like in a spreadsheet.  And it
+would be nice to have access to more mathematical functions than there
+are letters, and to be able to search for them.
+
+Of course, substituting a quasimode for the Emacs alt-X named-command
+invocation is straightforward; control-X would show you the available
+commands matching your search (and some kind of visualization of their
+results) and you could invoke one with Enter.
+
+The Tab key is pretty much off limits for these things because both of
+my Control keys are on my left pinky.
+
+Substituting a quasimode for the indentation stuff is also super easy;
+I’m currently using control-< and control-> for this, though control-H
+and control-L would work if I weren’t using Emacs standard
+keybindings.  Mouse movement might be best for providing the input for
+things like this, and also maybe navigating through undo history.
+
+Some kind of thing that would insert a “form” into your current
+document, with like fields and stuff, would be super handy.
+Especially if you could like search through a list of currently
+defined forms and maybe fill in some fields with default values and
+already existing context data, and maybe have a command button or two
+to take actions that had side effects, and if the fields could
+recompute automatically and maybe satisfy constraints.  And also if
+this was a generalization that included mathematical relationships
+(cylinder volume is 2πrl, surface is 4πr + 2πrl, from which you can
+deduce any two of those variables from the other two) and values in
+mutable tables that you could assert and retract from.  Maybe this is
+a different idea that doesn’t really have to do with quasimodes at
+all.
+
+Window switching, task switching, and so on is probably the most
+common fully-quasimodal keyboard interaction technique in use today,
+via the Microsoft Windows alt-Tab keybinding that has been widely
+adopted since then.  The standard approach is to cycle through a
+least-recently-used list of windows, displaying thumbnails; the
+iswitchb-mode and ido-mode alternatives to this in Emacs are modal
+rather than quasimodal, but also winnow the list according to a search
+string as you type it.  Now that I've been using iswitchb-mode for ten
+years (I’m trying ido-mode) this winnowing seems like the obviously
+right thing.  But it would be better if it were quasimodal.
+
+Similarly, term lookup (whether library functions, dictionary words,
+or Wikipedia articles) is a possible useful quasimode.
+
+Multiple-cursor editing, as implemented in Sublime and IDEA, is
+arguably a “mode,” but it may be difficult to make it a quasimode;
+it’s sort of an alternative to keyboard macros, which means that you
+need to be able to use all the usual editing commands.
+
+Mice, multitouch and quasimodes
+-------------------------------
+
+I've focused on keyboard interfaces, but of course mouse drags and
+touchmoves are even more common interactions than switching windows
+with the mouse, and they’re quasimodal.  But I think quasimodes are
+even more promising for multitouch interaction than for keyboard
+interaction.

@@ -1,0 +1,71 @@
+Suppose we wanted to design a simple unidirectional byte-stream
+protocol for efficiently drawing pixel graphics on a relatively
+unadorned framebuffer — maybe in an alternate history world where
+textual communications protocols evolved from gradual digitalization
+of TV rather than gradual multimediation of text.
+
+For additional enjoyment, we could imagine that this happened in a
+world where Japan wasn’t devastated by WWII, and so the raster lines
+run from top to bottom, then right to left, with both coordinates
+running in the opposite direction from the Cartesian convention.
+
+The GIF89a extensions for animation are a somewhat promising
+direction: they allow you to update part of the display after a time
+delay.  Because GIF is LZW-compressed, you get a fair bit of
+compression and a little bit of abstraction for a tiny amount of
+hardware; it takes very few bytes to redraw something you already
+drew.
+
+Suppose we go a bit further in that direction.  We have, say, a 16-bit
+color framebuffer, and normally we just stream 16-bit pixels into it
+in raster order.  If we have a 128×128 framebuffer, which is an
+acceptable size, we have 16384 pixels, 32768 bytes of data; if we want
+to be able to repaint that completely 5 times per second, we need
+163 840 bytes per second, which is 655 360 bits per second.  This is
+a fairly easy data rate at the electronic level.
+
+For faster updates, we can add escape sequences!  In particular, let’s
+consider four additions:
+
+window(x, y, width, height): subsequent data updates the specified
+area of the framebuffer.  This allows you to update part of the
+display more frequently, while updating other parts less frequently.
+
+scroll(x, y): the next screen repaint starts from position (x, y) in
+the framebuffer, with wraparound for subsequent rasters if it runs off
+the edge of the framebuffer.
+
+font(x, y, tilewidth, tileheight): subsequent data bytes are
+interpreted as byte indices into a 16×16 “font” located at (x, y) in
+the framebuffer, with tiles of tilewidth×tileheight.  So, for each
+data byte, the current position is incremented by tileheight or, if it
+has exceeded the current window, set back to the top of the window and
+incremented by tilewidth.
+
+nofont(): subsequent data bytes are again interpreted as raw pixel
+data.
+
+You could imagine a couple of other escape sequences to support sprite
+compositing.
+
+Now let’s suppose that the actual framebuffer is not 128×128 but
+256×256, but only 128×128 of it is normally visible; we can assign
+some fraction of it to ROM fonts, such as half.  We can still encode
+all our pixel coordinates as bytes, but now we can use the scroll()
+sequence both for smooth pixel scrolling and for double-buffering.
+
+This requires 128×256×2 = 65536 bytes of framebuffer.  In our
+universe, the CGA shipped in 1981 with 640×200 bits = 128000 bits =
+16000 bytes of framebuffer.  So building a “terminal” to interpret
+such a command set only became practical two Moore’s Law iterations
+later, in 1984, about eight years after the US$1195 ADM-3A started
+supporting cursor control in 1976, and 20 years after ASCII printing
+terminals were already in widespread use as computer output devices.
+So, as an alternate history encoding, this fails.
+
+128×128 is enough space to display 32 columns of 21 characters each in
+6×4 size, but I’m not sure you can get readable katakana at that size.
+(Roman letters are already a bit of a stretch.)  6×6 squares, 21
+columns of 21 characters, should be easy.
+
+See also file `window-systems`.

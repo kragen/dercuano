@@ -6,13 +6,12 @@ Next up:
 - maybe reify categories as a class?
 - add author name to pages
 - add an introductory paragraph to the index page
-- improve the fucking CSS, Jesus.  Copy Medium or whatever.
-- 22 more notes: wercam-nonscriptable-windows, circuit-notation, stack-stack, deep-freeze, bubbleos, etc.
 - a more convenient way to query the triple store
 - maybe some metadata about word counts and time spans and unfinished
   status?
-- maybe don’t link to categories that contain only one note?
 - maybe list categories on the link to the note?
+- maybe count notes in the category title?
+- add 44 more notes
 
 """
 from __future__ import print_function
@@ -64,7 +63,7 @@ class Bundle:
     def note(self, notename):
         dirname = self.filename('markdown')
         source_file = os.path.join(dirname, notename)
-        if not os.path.exists(source_file):
+        if '/' in notename or '\0' in notename or not os.path.exists(source_file):
             raise KeyError(notename)
         return Note(self, notename, source_file)
 
@@ -339,7 +338,7 @@ def note_html(bundle, note_title, body, footers):
                     script(src="../liabilities/addtoc.js"),
                     footers))
 
-ad_hoc_link_re = re.compile(r'(?:file\s+)?<code>(.*?)</code>')
+ad_hoc_link_re = re.compile(r'(?:[fF]ile\s+)?<code>(.*?)</code>')
 def replace_links(html, bundle):
     def repl(mo):
         try:

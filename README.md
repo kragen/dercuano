@@ -15,15 +15,17 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this piece of shit for 13½ hours.  I have about
+I’ve been hacking on this piece of shit for 14½ hours.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
-compressed.  So far I have stuck 22 of them in, totaling 244K and
-95,000 words.  So I
-am about six doublings away from finishing the job;
-the last doubling, adding 11 documents, took three hours;
+compressed.  So far I have stuck 44 of them in, totaling 350K and
+140,000 words.  So I
+am about five doublings away from finishing the job;
+the last doubling, adding 21 documents, took six hours,
+though only the last hour was adding documents;
+the previous one, adding 11 documents, took three hours;
 the doubling (well, near tripling) before that
 took an hour, and the doubling before that took half an hour.
-Unfortunately at this point it’s taking two entire seconds to rebuild
+Unfortunately at this point it’s taking five entire seconds to rebuild
 the HTML tree from scratch.  The
 notes are currently only a bit easier to read in this form than as plain
 text files, due to the lack of CSS and date/time metadata.
@@ -46,4 +48,4 @@ Time log
 2019-04-26 21:41 to 02:25 (4½ hours): initial version: 11 notes, tables of contents, HTML generation  
 2019-04-27 10:38 to 14:30 (4 hours): get titles from Markdown, add links between notes, add CSS, clean up categorization, add 11 more notes  
 2019-04-27 16:28 to 21:34 (5 hours): fix CSS to be pretty nice instead of outstandingly shitty; test on Android; push to Gitlab
-
+2019-04-28 01:16 to 02:30 (1 hour): add 21 more notes, bringing the total to 44

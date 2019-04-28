@@ -1,0 +1,55 @@
+I want to explore how to do text layout and rendering at 100fps on one
+core, in particular for a kind of greenfield computing system.  A few
+different obstacles present themselves:
+
+- I probably need to hack up something involving SDL in C or something
+  similar in order to see if I’ve succeeded.
+- I don’t know what text layout is.  Are we talking about displaying
+  one line on top of another?  Word wrap?  TeX-style hboxes, vboxes,
+  and stretchy glue?  Tk-style packing on different sides of nested
+  boxes?  The CSS box model?  Arbitrary Linogram-style linear
+  constraint systems?  Arbitrary constraint or optimization systems?
+- How much do I need to lay out other than the stuff that appears on
+  the screen?  If I can get away with only doing layout for what I am
+  actually rendering, then the 100fps constraint is not nearly as
+  difficult as if I need to do layout for a bunch of earlier and later
+  text as well in order to figure out how wide my column is and where
+  to start.
+- What font do I use?  Font and text rendering might take a
+  significant amount of computation time.
+
+I've done a couple of things like this in the past.
+<http://canonical.org/~kragen/sw/dofonts> and
+<http://canonical.org/~kragen/sw/dofonts-1k> are fixed-width font
+renderers in JS, the second in under 1 kilobyte of DHTML, including
+the font.
+<http://canonical.org/~kragen/sw/netbook-misc-devel/propfontrender.py>
+is a proportional pixel-font renderer in Python.  It’s about 4
+kilobytes of Python.  All three have their own fonts and do letter
+wrap but not word wrap.
+<http://canonical.org/~kragen/sw/inexorable-misc/wordwrap.py> is a
+word-wrap algorithm in 16 lines of Python.
+<http://canonical.org/~kragen/sw/netbook-misc-devel/telegram.py> has a
+couple of different word-wrap algorithms, one of which is 12 lines.  I
+haven’t done much in the way of boxes-and-glue layout.
+
+There are a few different first things I could do on this.  I could
+hack together a thing with C and SDL that generates bitmaps (without
+text in them) and puts them on the screen.  I could hack together a
+thing in Python or JS that lays out boxes with some kind of
+boxes-and-glue model.  I could write a thing in Python or JS that
+converts a boxes-and-glue spec into a sparse matrix of linear
+constraints, and use (or write) a solver for it.
+
+A fun example to try doing layout on would be some equations and
+program code.
+
+Ultimately the objective is to run a thing in C that I can benchmark
+to see how far I am from 100fps and what the critical path is.
+
+Okay, now I am rendering 12 megabytes per second of input text (250
+megapixels of output) on my netbook, which would be 120 kilobytes of
+text or 2.5 megapixels at 100fps.  On my laptop I can do 70 megabytes
+per second of input text on one core.  This is with the code in
+<http://canonical.org/~kragen/sw/dev3/propfont.c>.  This is still far
+from memcpy-limited, so I can probably do better.

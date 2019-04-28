@@ -1,0 +1,81 @@
+(See also files `graph-construction` and `circuit-notation`.)
+
+I was reading about Ekawahyu Susilo’s “SnapBloks” modular circuit
+design kit, each of which has an STM32 microcontroller inside, and I
+had an idea.
+
+Stack machine instruction sequences are nice and flat, even as they
+express nested expression trees.  Even three or four levels of stack
+are adequate for fairly complicated trees.
+
+What about physical circuit building blocks you can plug together into
+a linear sequence?  Things much more primitive than an entire
+microcontroller.  Like resistors.  Maybe you could have, say, nine
+wires, representing a stack of seven signals plus two power rails;
+simple passive wiring components would be adequate for DUP, SWAP,
+DROP, ROT, pushing Vcc and GND onto the stack, and shorting the two
+top stack-input lines together; two-terminal components like diodes
+and capacitors would be packaged to connect between the “input” and
+“output” on the top-of-stack line, running everything else straight
+through; logic gates and transistors and the like would fit into the
+scheme reasonably easily.  Physical distances between components could
+be fairly short if each layer in the stack were only, say, 1 mm thick.
+
+A Forth-style two-stack version with enough wires would be adequate
+for any series-parallel circuit, I think, as well as many that aren’t.
+
+If you could change the orientation of processing modules in the
+stack, you might be able to get some extra expressiveness.  Diodes, of
+course, could be turned around, but perhaps you could flip things
+around to select which of two stacks you were operating on.
+
+A “vectorized” version in which each signal line was replaced by, say,
+a four-wire bus, would be no less expressive (you could always ignore
+the extra wires, though driving them would consume power) and more
+expressive for some uses.  You’d want some extra “permuting” and
+“reducing” kinds of operations to interconnect the bitplanes.
+
+If you had eight “stack items” of four wires each, plus power and
+ground, you’d have 34 lines.  If the spacing was the standard 1.27 mm
+SOIC pin spacing with a 6×6 square matrix, the whole module size would
+be 6.35 mm square plus the width of a pin — say, 7 mm × 7 mm.  This is
+a practical size to recognize by eye and manipulate by hand.  An
+assembled circuit containing 50 elements and 50 passive “stack
+operations” might then be 7 mm × 7 mm × 100 mm (and cost about US$50
+in parts, plus maybe another US$1000 in modules that were sitting
+around that you didn’t use).  A huge variety of circuits can fit
+within these constraints, especially when the available components
+include things like programmable microcontrollers.
+
+About orientations: a square pin array like that could be oriented in
+eight orientations (four in-plane rotations and two flips), while the
+slightly denser hexagonal packing would have twelve possible
+rotations.  Getting these rotations to do something useful would be an
+interesting challenge, the alternative being to add a forcing function
+to reduce the possible number of rotations.
+
+By way of size comparison, a AA battery is 14 mm × 14 mm × 50 mm.  In
+that size, you could fit four separate such stacks of 50 items,
+totaling 200 modules and about 100 electrical component modules
+(i.e. not just passive wiring).  So this seems like it might be a very
+reasonable alternative to breadboarding.
+
+If the hypothetical 34 lines were distributed around the edges of the
+board at the same 1.27 mm spacing, you’d need 43.18 mm circumference,
+13.74 mm diameter, the same as a AA battery.  This could conceivably
+enable a larger number of possible rotations, but you’d have to figure
+out how to hook up the power rails, maybe with coaxial pins in the
+center of the board.
+
+Is 1 mm a reasonable thickness?  Common 0805 surface-mount resistors
+are 2 mm × 1.2 mm × 0.45 mm.  A TQFP is nominally 1.0 mm, not counting
+the leads bending down below the body; an MLF is also nominally
+1.0 mm.  Standard PCB thicknesses (including 4-layer and 6-layer PCBs)
+are 0.031" and 0.062", apparently without regard to the number of
+copper layers, which work out to 0.79 mm and 1.57 mm.  So 1 mm is
+maybe a bit low, but 3 mm should be doable.  (Of course, not all the
+modules have to have the same thickness.)
+
+I don’t know what kind of connectors the boards would have to use
+between them.  I assume zebra strip would have unacceptably high
+resistivity for many uses.

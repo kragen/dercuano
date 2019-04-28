@@ -1,0 +1,70 @@
+I’ve just read through a bunch of the CoAP RFCs (RFC 7252, say), and
+although it sounds like a workable protocol (and I know people are
+using it), it seems pretty suboptimal.
+
+I may be coming at this from a kind of bad position given that I’ve
+written an HTTP server that’s under 2K of code (albeit on top of
+Linux’s TCP/IP stack), so I’m maybe a bit unsympathetic to arguments
+claiming that a more constrained protocol is needed for more
+constrained devices.
+
+You’re going to use X.509 certificates on devices with 10 kilobytes of
+RAM?  You’re mandating the secp256r1 curve?  You’re mandating AES?
+That’s feasible, but AES is bigger than my entire web server, and
+let’s hope none of your devices are unconstrained enough to have cache
+timing attacks on the S-boxes.
+
+You have ETags, great — but If-None-Match can’t accept one, so there’s
+no way to revalidate your ETag-indexed cache with a conditional GET?
+No, wait, you just send an ETag option in your request, and it works
+like If-None-Match with an ETag does in HTTP.
+
+The minimal CoAP packet size is pretty great, though.
+
+Every path segment of up to 13 bytes needs only a single option-header
+byte with a 0 option-delta nybble, except for the first one, which
+will have an option-delta nybble of 11.  That’s pretty reasonable.
+And they’re guaranteed to occur together in sequence.  So actually you
+can get things pretty compact; here’s a 16-byte request:
+
+    >>> m = aiocoap.Message(code=aiocoap.GET, mtype=aiocoap.CON, mid=1234)
+    >>> m.opt.uri_path = ('temperature',)
+    >>> m.encode()
+    b'@\x01\x04\xd2\xbbtemperature'
+    >>> len(_)
+    16
+
+`\xbb` there is the pair of “11” nybbles, one of which is the length
+of “temperature”.  And the rest of the packet is just the four-byte
+header, whose first byte encodes version 1, type 0 (CONfirmable), and
+0 bytes of token length TKL, and whose second byte is GET (0.01); the
+request for CONfirmation, and the message id (0x04d2).  This packet
+(with a different message ID) is the first example in Appendix A.
+
+Here’s an encoding of `GET /~kragen/sw/dev3/zmqhello.c`:
+
+    >>> m.opt.uri_path = ('~kragen', 'sw', 'dev3', 'zmqhello.c')
+    >>> m.encode()
+    b'@\x01}4\xb7~kragen\x02sw\x04dev3\nzmqhello.c'
+    >>> len(_)
+    31
+
+I mean, that’s not too bad, is it?  31 bytes.
+
+There are no byte-ranges.  So you can’t use it for partial retrieval.
+But that’s probably just as well.
+
+All the multicast stuff seems kind of poorly thought out, as well as
+all the security stuff.  The “resource discovery” stuff makes it sound
+like they didn’t really understand REST, but its
+application/link-format content-type is the only format that has a
+content-format number assigned that can reasonably contain links
+(assuming we discount XML XLink).
+
+Allowing content-type sniffing even in the presence of an explicit
+content-format is a terrible idea.
+
+I suspect that the duplicate-transaction problems that RFC 1644 T/TCP
+had due to lacking the three-way handshake may also afflict CoAP,
+although of course REST cuts down tremendously on such problems.
+

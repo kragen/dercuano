@@ -1,0 +1,101 @@
+(See also file `window-systems`.)
+
+I was thinking a lot about RESTish ways of doing stuff with caches and
+whatnot, and I was thinking that maybe you could do a desktop
+environment consisting of background images, alpha blending, text,
+text layout, windows, currying, and fonts, using redirects and caches.
+
+The main idea is that, each frame (60 times a second), the window
+system virtually sends many requests (see file `coap-thoughts`) to the
+root window, one for each 16×16 pixel tile (see file
+`caching-screen-contents`).  This works out to 120×68 tiles on my
+1920×1080 screen, or 8160 requests, for a total of 490,000 requests
+per second.  The root window largely sends back temporary redirects:
+for subwindows they are redirects to requests for those subwindows,
+for background images they are redirects to those background images,
+and for text layouts they are redirects to those text layouts.  In
+cases where more than one kind of thing participates in the tile, the
+window sends out the requests and takes responsibility for compositing
+them.
+
+This is a rather large number of requests; 0MQ on my laptop with one
+single-threaded PUSH process and one single-threaded PULL process can
+only handle about 2.5 million (empty) messages per second.  But the
+idea is that, almost all of the time, those messages aren’t being sent
+at all; they’re satisfied from a local cache.
+
+There isn’t a single unified cache, but rather a somewhat distributed
+caching system, using an asynchronous cache invalidation protocol.
+Each potentially cached request carries with it an identifier for the
+cache invalidation endpoint; a stateless responder can merely forward
+this identifier on to the resources it’s fetching to compute the
+response, while a stateful one should generally store it for cache
+invalidation purposes.
+
+A window with text in it can query the text layout to find out where
+to put the text (and which text is visible) and query the font to get
+the individual glyphs to display, then compositing them onto the
+background in the appropriate places.
+
+The distributed nature of the caching system allows the display to
+apply an outdated-is-okay policy of using cached window contents if it
+hasn’t received an up-to-date response by frame render time, or
+perhaps graying them out a bit or something, without globally applying
+such an outdated-is-okay policy or having a switch in the protocol for
+it or something, or having the cache first send an outdated response
+and then the real response, or whatever.  Also, the display server can
+use a specialized cache structure — for example, instead of caching
+separate responses to the different tile requests, it can cache a
+single screen bitmap and maintain a tile validity bitmap (of only 8160
+bits), and maybe even use a specialized invalidation handling policy
+of requesting tiles early.  Downsides include cache duplication (many
+windows requesting the same glyph will cache it many times) and
+inability to globally optimize cache usage to minimize CPU time or
+improve responsiveness.
+
+A cached redirected response can be invalidated because any of the
+resources in the redirect chain was invalidated, including the final
+response.  Using a redirect rather than just proxying the request
+allows the (potentially large) response to avoid an extra copy, or
+potentially many extra copies.
+
+Currying a resource-with-arguments to be just like a normal resource
+allows requests and cache keys to stay small.
+
+The requests and responses can be pipelined between a relatively small
+number of processes to amortize system call overhead over large
+numbers of small messages.  Given potentially many outstanding
+requests, it may be reasonable to process them (on a given core) in an
+order determined by which piece of code is responsible for processing
+them.
+
+I don’t know, this seems like it might be a bit of mental masturbation
+in the sense that we already have working ways to build window
+systems.  The main problem they have is that the window systems (and
+our operating systems) do a shitty job of guaranteeing responsivity to
+the user, and probably the way to solve that problem has more to do
+with avoiding swapping, prioritizing real-time interaction (like
+providing feedback to clicks and typing) over background tasks (like
+font rendering and relayouts), and having the whole user interface
+written in a way that guarantees finite and deterministic memory usage
+and CPU time — static allocation of memory and CPU time rather than
+dynamic, really.  There are only so many pixels on the display, after
+all, and on a 60Hz video card you can’t update them any sooner than
+16⅔ ms in the worst case.  That gives you 8.04 ns to decide what color
+to make each pixel.  Not a lot of time to copy pixels around in
+messages!
+
+I think there is something interesting in the idea of caching
+redirects to curried functions, though — maybe applicable in systems
+that don’t involve IPC, too.  If you can delegate a particular call to
+a chain of particular other functions (perhaps with added arguments)
+and cache that delegation in a way that doesn’t involve running
+through the whole chain of functions again because the last function
+in the chain has an input change, then you can do efficient OO method
+dispatch in just that way, as well as things like delegating painting
+a particular part of a window to a particular widget.  Maybe you could
+handle it like backtracking: save a series of backtrack points, and
+handle invalidation notifications by resetting the backtrack state for
+that cache entry to point to one of those earlier backtrack points,
+which could literally be an address to jump to in a piece of code.
+Maybe?

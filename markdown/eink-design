@@ -1,0 +1,432 @@
+Text editor design for e-ink displays
+=====================================
+
+NinjaTrappeur built the [Ultimate Writer][0], a cypress TV typewriter
+for undistracted writing, and reports that writing in it is tolerable
+despite the e-ink display’s 3-second update delay, but editing is
+intolerable.
+
+[0]: https://alternativebit.fr/posts/ultimate-writer/
+
+If you want to design a text editor for low-power e-ink displays, you
+probably want to minimize the number of pixels you update per
+character (and especially minimize full-screen refreshes) and also
+avoid unexpected full-screen refreshes.  That’s because full screen
+updates take longer than partial screen updates and because they use a
+lot more energy.
+
+This means that running vi or even ed on a standard terminal emulator
+is not going to work very well.  Scrolling the whole screen up every
+time you want to display a new line at the bottom involves a waste of
+time and energy.
+
+Variations of scrolling
+-----------------------
+
+You can get a substantial improvement over scrolling, without changing
+the underlying typewriter model of ed/ex, in at least a couple of
+ways: the ntalk/Tek4014 approach and the Emacs approach.
+
+In ntalk, when your typing reached the bottom of your text window, you
+would wrap back around to the top, which would erase a couple of lines
+there.  Erasing then proceeded one line at a time, always leaving a
+blank line below the text you were currently typing and above the
+oldest surviving text.  No text ever moved; it remained until it was
+erased.  This was a good match for the capabilities of “intelligent”
+terminals like the ADM3A which could put text anywhere on the screen
+but had no way of moving it once it was there.
+
+The Tektronix 4014 did something similar, except that it had two
+columns (the screen was wide enough that typical lines of text fit
+into a single column) and couldn’t do partial display erases — its
+“direct-view bistable storage tube” could only be erased all at once,
+although it permitted incremental drawing.  So if you wrapped around
+to the first column again, you usually needed to request a screen
+erase in order to see more text.
+
+In Emacs, when you reach the bottom of a window and try to go further
+down, it scrolls — but not by a single line.  Instead, it scrolls by a
+whole half screenful.  This is more expensive than the ntalk approach,
+and it does involve a full screen refresh (slow on either e-ink or the
+serial lines common when GNU Emacs was being designed), but it’s a
+reasonable balance of efficiency and hysteresis:
+
+1. If you’re typing lines one after another in this system, each line
+   gets displayed twice: once when you initially type it, and a second
+   time when it scrolls up by half a screenful.  After a second
+   scrolling event, it’s no longer visible.  This thus implies a
+   multiplier of 2× over the minimal possible expense of displaying
+   and erasing the line once, as in the ntalk approach.  This compares
+   to 30× for the standard line-by-line approach, if the display is 30
+   lines high.
+
+2. If you’re moving down, and then you decide to move back up, this
+   does not require scrolling, unless you move up by an entire
+   half-window-height.  The maximum possible distance over which you
+   could avoid scrolling would be a whole window height, which is what
+   the usual scrolling algorithm provides.
+
+So, the Emacs approach provides half the hysteresis of the best
+possible hysteresis, and half the efficiency of the best possible
+efficiency.
+
+However, the problem with editing doesn’t end with an efficient
+simulation of a teletype.
+
+Editing and repainting
+----------------------
+
+Screen editors like vim and Emacs display a window onto the document
+you’re editing on your display and keep it constantly updated; the
+slogan at the time was “WYSIWYG”, “what you see is what you get”.
+(Later that slogan was repurposed to distinguish editors that did
+on-screen justification and multiple fonts, rather than displaying raw
+markup.)  For changes that amount to adding or removing text at the
+beginning or end of the document, or overwriting text in the middle,
+the only required repainting of existing text consists of scrolling,
+which can be minimized as described above.  But most changes in screen
+editors consist of inserting or deleting text in the middle of a
+document.  In the WYSIWYG paradigm, this requires repainting a lot of
+existing text either after every new line or even after every
+keystroke, which is a major cost on these displays.
+
+The pre-WYSIWYG editor paradigm was the “line editor” paradigm,
+exemplified by ed, ex, or EDLIN.  Line editors are designed for
+teletypes: you type lines of commands at them, and they “print” lines
+of results back at you, always adding lines at the bottom.  You could
+clearly use this approach with one of the “variations of scrolling”
+mentioned above.
+
+However, it won’t be very efficient, because sooner or later you’ll
+want to see if you modified the text the way you intended.  And the
+only way the line-editor paradigm has to show it to you is for you to
+“print out” some lines, including both modified and unmodified text.
+So you may end up redisplaying the same unmodified text several times
+within the same screenful of typeout, which is an inefficient use of
+e-ink, and furthermore of screen real estate, unless the edit history
+was really what you wanted to focus on, as opposed to the end result.
+
+Here’s a short example ex session, although it’s using the somewhat
+ersatz implementation of ex included in vim.  Note the abundance of
+redundant text repaints:
+
+    $ ex eink-design
+    "eink-design" [noeol] 108L, 5582C
+    Entering Ex mode.  Type "visual" to go to Normal mode.
+    :/efficient
+    However, the problem with editing doesn’t end with an efficient
+    :n
+    E163: There is only one file to edit
+    :/
+    However, it won’t be very efficient, because sooner or later you’ll
+    :5p
+
+    :/However, it
+    However, it won’t be very efficient, because sooner or later you’ll
+    :.,+5p
+    However, it won’t be very efficient, because sooner or later you’ll
+    want to see if you modified the text the way you intended.  And the
+    only way the line-editor paradigm has to show it to you is for you to
+    “print out” some lines, including both modified and unmodified text.
+    So you may end up redisplaying the same unmodified text several times
+    within the same screenful of typeout, which is an inefficient use of
+    :
+    e-ink, and furthermore of screen real estate, unless the edit history
+    :
+    was really what you wanted to focus on, as opposed to the end result.
+    :
+
+    :
+    vi, as opposed to vim, was largely written on an ADM-3A, which didn’t
+    :
+    have any capability of moving around text that was already on the
+    :
+    display; the best you could do was to 
+    :
+    E501: At end-of-file
+    :a
+    .
+    :p
+    display; the best you could do was to 
+    :s/$/ redraw it in a new place./
+    display; the best you could do was to  redraw it in a new place.
+    :s/  / /
+    display; the best you could do was to redraw it in a new place.
+    :a
+    Perhaps as a result, in vi, when you use the “c” change command,
+    which deletes a specified span of text and puts you in insert
+    mode to type new text to replace it with, vi doesn’t delete the
+    text on the display, shifting the following text to the left.
+    Instead, it marks the end of the deleted text with a `$`, and
+    no text moves unless you insert more text than was deleted.
+    .
+    :.-10,$p
+    was really what you wanted to focus on, as opposed to the end result.
+
+    vi, as opposed to vim, was largely written on an ADM-3A, which didn’t
+    have any capability of moving around text that was already on the
+    display; the best you could do was to redraw it in a new place.
+    Perhaps as a result, in vi, when you use the “c” change command,
+    which deletes a specified span of text and puts you in insert
+    mode to type new text to replace it with, vi doesn’t delete the
+    text on the display, shifting the following text to the left.
+    Instead, it marks the end of the deleted text with a `$`, and
+    no text moves unless you insert more text than was deleted.
+    :wq
+    wq
+    "eink-design" 114L, 5987C written
+
+Blanks and strikethrough
+------------------------
+
+vi, as opposed to vim, was largely written on an ADM-3A, which didn’t
+have any capability of moving around text that was already on the
+display; the best you could do was to redraw it in a new place.
+Perhaps as a result, in vi, when you use the “c” change command, which
+deletes a specified span of text and puts you in insert mode to type
+new text to replace it with, vi doesn’t delete the text on the
+display, shifting the following text to the left.  Instead, it marks
+the end of the deleted text with a `$`, and no text moves unless you
+insert more text than was deleted.  It doesn’t even remove the deleted
+text from the screen until you leave insert mode.  This reduces
+repaint traffic considerably on terminals like the ADM-3A.
+
+On an e-ink display, something like vi’s approach here might be
+useful, but we could carry it further.  For example, if you start
+inserting into the middle of a line, we could open up a big blank for
+you to type in, maybe half the length of the line.  It might look like
+this, using | for the cursor (which wouldn’t really take up space) and
+displaying successive screen states on successive lines:
+
+    On an e-ink display, something like| might be
+    On an e-ink display, something like |_______________________________________ might be
+    On an e-ink display, something like vi’s ap|________________________________ might be
+    On an e-ink display, something like vi’s approach h|________________________ might be
+    On an e-ink display, something like vi’s approach here|_____________________ might be
+    On an e-ink display, something like vi’s approach here______________________ mi|ght be    
+
+This way, there’s a single erase and repaint of “might be” at the
+beginning of the process, and perhaps another one later if you type
+enough into the blank, followed by a final one when the system decides
+you’re done editing there, perhaps because you moved to a different
+line, or started inserting text somewhere else:
+
+    On an e-ink display, something like vi’s approach here might be
+
+For deletion rather than insertion, you could use strikethrough
+analogously to avoid moving other text around, as Microsoft Word does
+in Track Changes mode.  If the text previously read “something like
+this might be”, and the user deleted "this", it might display at that
+point as follows:
+
+    On an e-ink display, something like t̶h̶i̶s̶| might be
+
+The horizontal insertion space may not be adequate once text has to
+move vertically as well as horizontally to accommodate your edit.  In
+that case, you might want to do something analogous vertically: open
+up half a screenful of blank space in order to insert new text into,
+expanding it a half-screenful at a time.  You’d probably want to mark
+it somehow to indicate that it “wasn’t real”.
+
+This scheme is fairly close to the buffer-gap scheme Emacs uses
+internally to represent its text buffers.  In order to avoid having to
+move text around in RAM after every character inserted, it maintains a
+gap after the last character inserted; whenever a character is
+inserted somewhere else, it moves the gap by copying text as necessary
+from one end of it to the other.  It normally maintains only a single
+gap, and it can be arbitrarily large, since it doesn’t need to worry
+about keeping the two ends of the gap close enough together that you
+can see them at the same time.
+
+Double-spaced text
+------------------
+
+A disadvantage of all of the above approaches is that *any* text
+insertion in the middle will involve *some* repainting of text in
+order to open up a space for it.  The traditional typewriter-era
+approach to this problem was to type the manuscript originally
+“double-spaced”, with a blank line in between each pair of lines of
+text, in order to allow sufficient space for markup to include text to
+be added.  With this approach, the above-explained edit would
+start looking like the following:
+
+    text from the screen until you leave insert mode.  This reduces
+
+    repaint traffic considerably on terminals like the ADM-3A.
+
+
+
+    On an e-ink display, something like might be
+
+    useful, but we could carry it further.  For example, if you start
+
+And the insertion might leave it looking like the following, with a
+caret positioned below the insertion point and the inserted text
+above:
+
+    text from the screen until you leave insert mode.  This reduces
+
+    repaint traffic considerably on terminals like the ADM-3A.
+
+
+                                        vi’s approach here   
+    On an e-ink display, something like might be
+                                       ^
+    useful, but we could carry it further.  For example, if you start
+
+This approach avoids any need to redisplay existing text to
+accommodate small insertions.
+
+Another approach along the same lines would be to pop up a speech
+balloon or something over the existing text to contain the edit,
+although this obscures some of the existing text.  For example:
+
+    text from the screen until you leave insert mode.  This reduces
+    repaint traffic considerably on termi̲n̲a̲l̲s̲_l̲i̲k̲e̲_t̲h̲e̲_A̲D̲M̲-̲3̲A̲̲.̲_____
+                                       |vi̲’̲s̲_̲a̲p̲p̲r̲o̲a̲c̲h̲_̲h̲e̲r̲e|________|   
+    On an e-ink display, something like|/ight be
+    useful, but we could carry it further.  For example, if you start
+
+For grayscale displays, it might help to make the popup balloon
+translucent, display the text within in a larger size, and filter the
+text to soften its edges, all with the intent of leaving the obscured
+text readable.
+
+Cursor display and movement
+---------------------------
+
+A separate problem is that the long display latency makes it hard to
+tell what your cursor is pointing at when you’re moving it around in
+text.  This is a problem I have a lot of experience with in vi, which
+I used to use routinely over modem connections with tens of seconds of
+latency, and I still use routinely over Tor connections with seconds
+of latency.  vi was originally developed under conditions that often
+included seconds of latency due to not only modem bandwidth but also
+host machine load, and its command set copes well with this situation.
+
+The basic problem is that, under these conditions, you can’t position
+the cursor effectively using arrow keys (or vi’s hjkl), and you can’t
+delete text with the backspace key, especially if you’re using key
+repeat (“Typematic”, to use IBM’s trademark), because those depend on
+closed-loop control.  The long and unpredictable latency in the
+feedback control loop between your fingers and your eyes means that
+you face a painful tradeoff between long settling times and overshoot:
+if the cursor hasn’t reached the desired point and you press the arrow
+key one more time, you may have caused it to move past the desired
+point if you didn’t wait long enough.
+
+The solution is to use movement commands that are *convergent* and at
+a sufficiently *high level* to not depend on tight closed-loop
+control.  “Convergent” means that commands cause similar editor states
+to converge to a single editor state, so initial divergences between
+the editor state and the user’s belief about it, due to the latency,
+will not compound over time.  So, for example, the `{` command moves
+back by a paragraph.  If you believe you’re on the third line of the
+paragraph, but you’re actually on the line below the paragraph, it
+will still take you to the same point before the beginning of the
+paragraph, eliminating your error.  The Vim command `ci(` similarly
+replaces the entire contents of the `()` parentheses you are within
+with whatever you type next; it doesn’t matter if those parentheses
+contained 20 or 25 characters, or whether you were on the first or
+tenth character of the parenthesized expression, the same text gets
+replaced either way.  At a more trivial level, the 
+
+These commands, unfortunately, impose a substantial cognitive load and
+a great deal of practice to use effectively.  Jef Raskin’s design of
+“LEAP”, a single quasimodal movement command, enjoys the advantages of
+being strongly convergent and fairly high level, but with a much lower
+cognitive load.
+
+> Briefly, LEAP is similar to the incremental-search found in Emacs
+> and Vim; Raskin’s Canon Cat keyboard has two LEAP keys to be pressed
+> with the thumbs, one on the left for searching backwards and one on
+> the right for searching forwards, which initiate the search when the
+> user begins pressing them and terminate it when the user releases
+> them.  In either case, the user is left at the beginning of the
+> matched text, rather than the end, so there is no penalty for typing
+> more characters than needed, and no special provision is needed for
+> special characters such as newlines.
+> 
+> Raskin claimed that in user tests LEAP was substantially faster than
+> using a mouse to navigate text.  I haven’t done the rigorous tests
+> he claims to, but from my experience, this claim seems plausible to
+> me.
+> 
+> The Cat had no ↑↓ keys, just ←→ “creep” keys and the LEAP keys, the
+> idea being that if the user was moving far enough to need ↑↓, they’d
+> be faster if they didn’t have the cognitive load of making a
+> decision between arrow keys and LEAP.
+
+E-ink latency is long, but it’s shorter than the kinds of latency vi
+can cope with.  I think LEAP might be a good way to position a cursor
+quickly on an e-ink display without needing to see the cursor in order
+to know precisely where it was.
+
+Deletion is more problematic, since LEAPing from one end to the other
+of the text to delete is usually going to be far too much overhead.
+
+I routinely use ^W in terminals and vim, and Alt-⇐ or Ctrl-⇐ in Emacs,
+to delete the entire previous word; this is generally much more
+efficient than deleting just the incorrect letters and retyping them,
+and often more efficient than going back a word or two to insert a
+corrected word.  It’s often easier just to retype the last few words.
+
+Explicit screen refreshes
+-------------------------
+
+When I first used AutoCAD (2.14K+ADE), it was on an IBM PC-XT.  The XT
+was capable of executing about 250,000 16-bit instructions per second,
+with a 320×200 CGA graphics display and an 80×25 MDA text display side
+by side.  Redrawing the entire contents of the CGA monitor from the
+in-memory CAD drawing typically required a second or two.  Therefore,
+it was undesirable to perform a redraw after every mouse movement, or
+even after every new line or arc added to or removed from the drawing.
+Consequently, AutoCAD on this platform would update the display with
+an approximation of the change; rubberband lines and arcs for the
+mouse were drawn with XOR so they could be quickly erased, newly drawn
+lines would overwrite whatever other lines were on the display (even
+if they were in a layer below them), and deletion of lines and arcs
+was reflected by drawing them in the background color, leaving visible
+holes at any intersection.  These operations could be done many times
+per second, permitting a real-time interactive feel.
+
+(A more difficult problem was choosing points on the screen with the
+mouse, since the display resolution was insufficient to make anything
+other than very crude drawings by eye.  Typically I would specify INT
+or TAN or whatever on the keyboard, and then point with the mouse to
+indicate the intersection of which things, or tangent to which arc; or
+I would directly enter relative coordinates in polar or rectangular
+form.)
+
+When the damage to the drawing on the screen made it sufficiently
+difficult to see what was going on, you would issue the REDRAW command
+from the keyboard, which has the merit of being possible to type
+without removing your right hand from the mouse.  There were other
+operations that also required a redraw, notably zooming and panning
+the drawing.
+
+(This kind of pragmatic and very clever compromise was what made it
+possible for Autodesk to sell a usable CAD system in the early 1980s
+on hardware costing a tenth of what existing CAD systems cost.)
+
+Since a screen refresh on the Ultimate Writer takes some 3000
+milliseconds, it’s in the same ballpark as this PC-XT with AutoCAD, so
+it might be worth using a similar approach to screen updating: do a
+full-screen refresh only when the user requests it explicitly, or when
+you’re displaying most of a screenful of new information.
+
+Several of the choices suggested above include a non-WYSIWYG display
+of edits: line-mode editing, strikethrough, speech balloons,
+double-spaced interlineal markup, large insertion blanks, and so on.
+The idea is that these reduce the visual feedback latency from the
+3000 milliseconds NinjaTrappeur is suffering now [to a mere 600 or
+so][1], so that you can reasonably do edits.  But it should be easy
+for the user to request a WYSIWYG redisplay whenever they want to see
+the final result of the edit and are willing to wait the requisite
+seconds.
+
+[1]: https://danluu.com/input-lag/
+
+<link rel="stylesheet" href="http://canonical.org/~kragen/style.css" />
+
+<script src="//canonical.org/~kragen/sw/addtoc.js"></script>
