@@ -15,7 +15,7 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this piece of shit for seven and a half hours.  I have about
+I’ve been hacking on this piece of shit for 13½ hours.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
 compressed.  So far I have stuck 22 of them in, totaling 244K and
 95,000 words.  So I
@@ -45,5 +45,5 @@ Time log
 
 2019-04-26 21:41 to 02:25 (4½ hours): initial version: 11 notes, tables of contents, HTML generation  
 2019-04-27 10:38 to 14:30 (4 hours): get titles from Markdown, add links between notes, add CSS, clean up categorization, add 11 more notes  
-2019-04-27 16:28 to ???: fix CSS to be pretty nice instead of outstandingly shitty
+2019-04-27 16:28 to 21:34 (5 hours): fix CSS to be pretty nice instead of outstandingly shitty; test on Android; push to Gitlab
 
