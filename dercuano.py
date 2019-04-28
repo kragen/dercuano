@@ -35,6 +35,7 @@ class Bundle:
         self._triples = list(load_triples(self.filename('triples')))
         self.output_dir = 'dercuano-' + self.get_version()
         self.cached_titles = {}
+        self.note_list = list(self._notes())
 
     def __repr__(self):
         return 'Bundle(%r)' % self.dirname
@@ -54,6 +55,9 @@ class Bundle:
         return 'Dercuano'
 
     def notes(self):
+        return self.note_list
+
+    def _notes(self):
         dirname = self.filename('markdown')
         for notename in sorted(os.listdir(dirname)):
             if notename.endswith('~') or notename[0] in '.#':
@@ -171,6 +175,7 @@ class Note:
         self.bundle = bundle
         self.notename = notename
         self.source_file = source_file
+        self.category_set = self._categories()
 
     def __repr__(self):
         return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
@@ -212,6 +217,9 @@ class Note:
                          if categories else [])
 
     def categories(self):
+        return self.category_set
+
+    def _categories(self):
         return set(obj for subj, verb, obj in self.bundle.triples()
                    if subj == self.notename and verb == 'concerns')
 
