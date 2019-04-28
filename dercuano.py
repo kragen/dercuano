@@ -246,7 +246,7 @@ def vomit_html(output_filename, html_contents):
         html_contents = html_contents.encode('utf-8')
 
     with open(output_filename + '.tmp', 'w') as f:
-        f.write(html_contents)
+        f.write(b'<!DOCTYPE html>\n' + html_contents)
 
     os.rename(output_filename + '.tmp', output_filename)
 
@@ -354,4 +354,6 @@ def head_stuff(level=1):
     stylesheet = '../' * level + 'liabilities/style.css'
     return [tag('meta')(charset="utf-8"),
             tag('link')(rel='stylesheet', href=stylesheet),
+            tag('meta')(name="viewport",
+                        content="width=device-width, initial-scale=1.0"),
     ]
