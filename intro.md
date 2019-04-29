@@ -1,8 +1,8 @@
 Disclaimer, preface, and warning
 --------------------------------
 
-Dercuano is a self-contained downloadable package containing a large
-notebook of notes I’ve made over the last few years.  Mostly, I made
+Dercuano is a self-contained downloadable HTML tarball containing a
+book’s worth of disorganized notes I’ve made over the last few years.  Mostly, I made
 these notes for myself, though with the intention of someday getting
 most of them into shape for publication, but lacking the discipline of
 regular publication, that’s probably not going to happen.  It may not

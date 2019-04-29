@@ -3,7 +3,6 @@
 
 Next up:
 
-- get dates from Git
 - maybe reify categories as a class?
 - add author name to pages
 - a more convenient way to query the triple store
@@ -197,8 +196,29 @@ class Note:
     def link_ley(self, level=1):
         return a(self.title(), href=("../" * level + self.localpart()))
 
+    def date_string(self):
+        written = updated = None
+        for subj, verb, obj in self.bundle.triples():
+            if subj != self.notename:
+                continue
+            if verb == 'written':
+                written = obj
+            elif verb == 'updated':
+                updated = obj
+
+        if written is None and updated is None:
+            return ''
+
+        date = written or updated
+        if written != updated and updated is not None:
+            date += ' (updated ' + updated + ')'
+
+        return date
+
     def extra_ley(self):
-        return [' (', str(self.word_count()), ' words)']
+        date = self.date_string()
+        return [' ', date, ' ' if date else '',
+                '(', str(self.word_count()), ' words)']
 
     def word_count(self):
         if self._word_count is None:
@@ -233,7 +253,7 @@ class Note:
         categories = sorted(self.categories(),
                             key=self.bundle.category_size,
                             reverse=True)
-        return note_html(self.bundle, self.title(), self.flavor()(body),
+        html = note_html(self.bundle, self.title(), self.flavor()(body),
                          div(h2('Topics'),
                              ul([li(self.bundle.category_link(category),
                                     " (%d notes)" % self.bundle.category_size(category),
@@ -242,6 +262,9 @@ class Note:
                                  else li(self.bundle.category_title(category))
                                  for category in categories]))
                          if categories else [])
+
+        date = ley(div(self.date_string(), **{'class': "metadata"}))
+        return html.replace('</h1>', '</h1>' + date)
 
     def categories(self):
         return self.category_set

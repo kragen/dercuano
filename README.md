@@ -15,7 +15,7 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this thing for 20 hours,
+I’ve been hacking on this thing for 20½ hours,
 which means that at this point it’s gone from an “afternoon hack”
 to a “weekend hack”, and now it’s looking kind of okay actually.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
@@ -53,4 +53,5 @@ Time log
 2019-04-27 16:28 to 21:34 (5 hours): fix CSS to be pretty nice instead of outstandingly shitty; test on Android; push to Gitlab  
 2019-04-28 01:16 to 02:30 (1 hour): add 21 more notes, bringing the total to 44  
 2019-04-28 13:27 to 16:24 (3 hours): add 46 more notes, bringing the total to 90  
-2019-04-28 17:25 to 19:55 (2½ hours): tweak CSS some more, add introduction to main page, add note counts and word counts
+2019-04-28 17:25 to 19:55 (2½ hours): tweak CSS some more, add introduction to main page, add note counts and word counts  
+2019-04-28 22:13 to 22:45 (½ hour): add start and end dates to notes  
