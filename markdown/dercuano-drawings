@@ -1,0 +1,230 @@
+At this point I’ve imported 90 notes into Dercuano, and the lack of
+images of any kind is sort of annoying.  My actual, paper notebooks
+have a little line-drawing “icon” for each note, maybe 10 millimeters
+square, but often some kind of graphic would help a lot both with
+visual appeal and with comprehensibility.  But my total byte budget of
+some 5MB makes this challenging.
+
+Example uses
+------------
+
+To take a few of the notes I currently have in Dercuano at random:
+
+File `deep-freeze` could benefit from diagrams of one or more of the
+following: 11 tonnes of foods including soybeans; a cutaway freezer
+with labels for insulation, refrigeration, and passive thermal
+storage; freezers of different sizes, with different amounts of
+surface area per unit volume, including a cubic-meter sphere and a
+thousand-cubic-meter sphere; food stored at the bottom of a 30-meter
+well; mounds of sand and locally excavated earth; a heat–temperature
+curve for water, including enthalpy of fusion and vaporization; plots
+of heat loss versus surface area and insulation thickness; etc.  It
+would also benefit, I think, from a goofy line drawing of a freezer
+with a smiley face on it.  A three-dimensional rotating rendering of a
+freezer would maybe be a plus, too; and a model whose parameters you
+could adjust interactively and see the relationships between the other
+parameters in the neighborhood would be awesome.
+
+File `dehydrating-processes` could benefit from sketches of user
+interfaces; from diagrams of the interaction sequences and data flows
+being discussed, of FlatBuffers or binary array state, and of the
+timing of sequences; and from illustrations of punched cards and
+perhaps a dehydrated window or something.
+
+File `executable-scholarship` could benefit from a timeline, at least.
+
+File `flux-deposition` could benefit from an illustration/diagram of
+the binder/powder-bed/tray setup, and maybe of some grains being
+fluxed — generally mechanical things like this really need diagrams;
+maybe also a temperature scale showing where different mixes sinter
+and/or melt would be helpful.
+
+File `imgui-programming-language` would benefit a lot from some
+sketches of the UI components being programmed, and maybe also some
+diagrams of activation records allocated on the stack and of
+Golang-style interfaces.
+
+File `transactional-event-handlers` would benefit from some timing
+diagrams showing priority problems, concurrent transactions,
+transaction conflicts with pessimistic and optimistic synchronization,
+and deadlock.
+
+Possible tools
+--------------
+
+### No photos ###
+
+A thing I’ve done in the past is to draw diagrams on paper and
+photograph them.  This allows for pleasingly direct feedback during
+the drawing process, but even with aggressive compression, the
+resulting image files are dozens of kilobytes each.
+
+### No bloated SVGs ###
+
+It’s important that whatever I choose be compact, because Dercuano
+needs to remain easily downloadable in full.
+
+The Web standard format for line drawings is SVG — even hand computers
+running iOS support it now.  SVG is super cool; it supports
+alpha-blending, Bézier curves, gradients, arbitrary affine transforms,
+and text.  You can do a lot in very few bytes of SVG, and it’s a lot
+more readable and debuggable than PostScript, my pre-SVG favorite.
+The standard example is probably something like this 78-byte triangle:
+<svg width="30" height="40">
+<path d="M 10,10 L 20,20 10,30" fill="red"/>
+</svg>
+
+    <svg width="30" height="40"><path d="M 10,10 L 20,20 10,30"
+        fill="red"/></svg>
+
+However, the standard tools for generating SVGs produce data that
+looks more like this:
+
+    <path d="M 21.789062 16.140625 L 20.332031 15.941406
+             L 20.335938 15.742188 L 20.371094 15.53125
+             L 20.453125…
+
+That’s eight significant figures on every coordinate, absolute
+coordinates everywhere instead of relative, and using diagonal lines
+instead of H horizontal or V vertical lines even when the relevant
+coordinate difference is in the fifth significant figure, and also
+using unnecessary spaces.  The extra significant figures are
+essentially random, so gzip isn’t going to be able to compress them,
+except by noting that, being digits, they only need four bits each.
+
+The problem with this kind of thing is that, even when it’s
+hand-drawn, it mixes the actual desired signal with a lot of random
+noise which is hopefully imperceptible but still incompressible.  The
+mouse produces, say, 100 positions per second, each with three
+significant figures in each of X and Y, though the number is smaller
+with relative positions.  Crudely, that’s 6400 bits of data per
+second, 800 bytes per second, after compression, that can be added to
+the Dercuano download package.
+
+I launched Inkscape, plugged in a mouse, and drew with the pencil tool
+for a while.  Running Inkscape for 110 seconds, I produced a
+54-kilobyte SVG that compresses to 15.6 kilobytes; most of it looks
+like this (line breaks added for clarity):
+
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#000000;
+              stroke-width:1px;stroke-linecap:butt;
+              stroke-linejoin:miter;stroke-opacity:1"
+       d="m 94.285714,946.64792 c 7.539686,-3.23129 21.663356,-10.54083
+            31.428576,-11.42857 15.99002,-1.45364 19.9212,2.36631
+            34.28571,-2.85715 6.00412,-2.18331 11.32674,-5.92773…
+
+That is, Inkscape has converted my three-significant-figure mouse
+coordinates into coordinates with seven to nine significant figures.
+Just in case.  How helpful.
+
+The trouble with this is that 15.6 compressed kilobytes per 110
+seconds is 1.1 kilobit per second, and the entire five-megabyte target
+size for Dercuano — containing many years of notes — would be
+completely filled with SVG in less than ten hours of drawing time.
+I’ve already spent over 20 hours just getting the first 600 kilobytes
+of Dercuano to work so far.
+
+The basic reason many years of notes fit into five megabytes is that I
+can only type about 90 words per minute, which is 72 bits per second
+uncompressed, 24 bits per second compressed — a bit rate 45 times
+lower.  And then I spend time revising the notes, which often makes
+them better without making them larger, though as anyone can see, I
+don’t revise my notes nearly enough.
+
+### TikZ won’t fit ###
+
+One of the SVGs I excerpted above is a sort of graphic of a
+comic-book-style explosion or impact, but with a gradient.  I
+generated it with the TikZ graphics system for T<sub>E</sub>X from the
+following input:
+
+    \documentclass{standalone}
+    \usepackage{tikz}
+    \begin{document}
+    \tikz\shade[inner color=yellow,outer color=red](1ex,0)
+        \foreach\t in{4, 8, ..., 360}
+            {-- (\t:{.1+Mod((\t/17)^3, 57)/100})};
+    \end{document}
+
+This uses (θ ÷ 17)³ % 57 (composed with an affine function) to
+generate a “random” radius for each of 90 different angles to generate
+a jagged outer polygon, then fills it with a gradient.  This is not
+something you can do in SVG, although you can do it in something else
+(like TikZ or JS) and generate SVG programmatically.  And TikZ comes
+with a massive built-in library of things like arrowheads, directed
+graph layout algorithms, tree layout, plotting math functions,
+calendars, finite state machines, ERDs, Petri Nets, and so on.  The
+sections of the TikZ manual about arrowheads (and arrow tails, etc.)
+total about 10 pages.  It’s a bit overwhelming, honestly.
+
+Unfortunately, I can’t use TikZ directly in Dercuano, because that
+would involve embedding not only the 5 megabytes of TikZ, but also the
+rest of T<sub>E</sub>X and L<sup>A</sup>T<sub>E</sub>X that it depends
+on to run, in some kind of browser-executable form, probably compiled
+with Emscripten.  And, while that’s probably a feasible thing to do,
+I’m pretty sure would blow my space budget for Dercuano.
+
+I could draw (“write”?) graphics in TikZ and generate SVGs from them,
+but that just puts us back at square one: the SVGs are bloated, and
+I’d blow my space budget even faster that way.
+
+TikZ has another problem, too: it’s purely intended for static
+graphics.  But in Dercuano much of the time a dynamic,
+interactively-responsive graphic would be better, and only marginally
+harder to write.
+
+### d3 may be a good option ###
+
+d3.js is a JS library for dynamic data-driven graphics which generates
+SVG at runtime using the DOM.  One of the minified copies of d3.js I
+have here is 151 kilobytes, and it gzips to 53 kilobytes.  Another,
+non-minified copy I have is d3 v3, and it’s 315kB, gzipping to 68kB.
+It’s pretty easy to use, and in particular it’s pretty easy to get
+really nice graphical output from, and it’s amazing at interactivity.
+On the downside, the JS code to use it is usually pretty verbose, and
+it’s not well suited for the kinds of sketching and illustration I
+earlier said were most important, although it’s probably fine for
+timelines.
+
+### Some kind of restricted-bandwidth WYSIWYG drawing program ###
+
+For some things, though, the closer to paper, the better.  I just
+don’t want to pay half a megabyte per hour for the privilege of
+faithfully recording the shaking of my hands as I sketch; shaky lines
+can be good but we might as well produce the shakiness from a
+highly-compressible random number generator.  One possibility here
+would be drawing with a line that thrashes around near the mouse,
+starting at low-entropy points in whatever encoding I end up with, and
+gradually moving to higher-entropy points.  Or maybe you stroke the
+mouse along a line multiple times to coax it into the shape you want.
+Maybe snap to a grid that gets finer if you zoom in: then you’d need
+to zoom in.  Or maybe you need to click to nail down a spline point,
+and there’s a snap grid that is finer for smaller displacements.
+
+Another possibility would be something that encourages drawings to be
+highly factored, perhaps by having clumsy graphical primitives (though
+primitives that compose flexibly, e.g., adopting the line width and
+color from their use context) and really low reuse overhead.
+
+A third possibility, and this is kind of cheating in a way, is just to
+use a textual language to describe the graphics, but shorten the
+feedback cycle as much as possible so that you can vary things
+interactively to see the results on the screen.  To the extent that
+you can map backwards from the screen image to the textual source
+code, you may be able to alter the textual source code by direct
+manipulation of the screen image.
+
+Ivan Sutherland’s SKETCHPAD was a visual programming language for
+interactively constructing a set of graphical objects and constraints
+for them to fulfill, progressively approaching fulfillment, and
+visualizing the results.
+
+The problem with these approaches is that in some sense you’re
+deliberately impeding the drawing process, which you would think would
+make it clumsier.  But maybe that clumsiness can be minimized or even
+reversed — the bandwidth from my brain to the mouse is definitely not
+1100 bits per second and may not even be the 24 bits per second I get
+on the keyboard.  If the drawing program can somehow filter out the
+other 1000+ bits per second of pure noise, it might actually make it
+*easier* to draw things rather than harder.

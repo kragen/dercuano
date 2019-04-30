@@ -14,6 +14,8 @@ Next up:
 - add "INCOMPLETE UNVERIFIED DRAFT" to everything, and maybe
   SPECULATIVE to some things too
 - add 90 more notes
+- add Mathjax?  That’s not possible, is it?  Maybe it is, but the
+  package is 33MB.
 
 """
 from __future__ import print_function
