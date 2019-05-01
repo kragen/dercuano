@@ -1,0 +1,438 @@
+I’d like to know what you think about this draft.  It should take
+about ten or twenty minutes to read.
+
+* * *
+
+In the spirit of Hamming’s admonition to look for attacks on the most
+important problems in your field, I propose a project.
+
+I’ve been thinking about a kind of Unixy system for distributed,
+high-performance, fault-tolerant, incremental, reproducible computing,
+scalable to exabyte datasets.  It consists of a transactional
+deterministic virtual machine, a content-addressed blob store, and a
+cache management system.
+
+Tentatively I’ve been calling it Kogluktualuk.
+
+Overview
+--------
+
+The basic idea is to generalize build systems like the NixOS build
+system or apenwarr/Bernstein `redo` to use them for general-purpose
+computing; given some kind of specification of a deterministic
+computation that includes all of its input data, you can re-execute
+the transaction later on and get bit-identical results, as long as you
+either have stored or can recompute all of that input data.
+
+(I say “transaction”, despite the false implication that there is an
+underlying mutable data store being mutated by the transactions.
+Kogluktualuk transactions do not mutate state, and they do not have
+any access to mutable state; they merely generate output from input.)
+
+For example, if “5B2uheZVEd5u61Nc5” is the secure hash of some
+specification of a deterministic transaction — maybe a command line
+like
+
+    in_namespace "4dkcSzVpvmtcgCcUo" do /bin/sort /data/july-trades
+
+then perhaps execute("5B2uheZVEd5u61Nc5") will produce an output
+dataset with the hash “5GWFsognLrfv9tqin”; and if so, then it will
+*always* produce “5GWFsognLrfv9tqin”, and never some other output
+dataset.
+
+If each blob of input data is specified either by a secure hash, or by
+a secure hash of a script (and input data) that tells how to compute
+it, you can be sure that it will be bit-identical if you re-execute
+the transaction, and so the output data can be cached.  This means
+that if the same computed data is required twice, it can be
+opportunistically cached, and it’s safe to store the cache on
+inexpensive, unreliable storage; and it is possible to detect and
+correct incorrect transactions by reproducing the transaction, for
+example on a different machine.
+
+Running a transaction that has more than one input blob that is
+identified by the transaction to produce it (rather than directly by
+its content hash) offers opportunities for deterministic concurrency
+and distribution.
+
+For example, in the above transaction, perhaps the namespace
+“4dkcSzVpvmtcgCcUo” includes input specifications something like the
+following:
+
+    /data/july-trades blob 3yCXJMme1nn3mthVP
+    /bin/sort         do /bin/ejs /src/sort.js
+    /bin/ejs          do /bin/jsinterp /src/ejs.js /src/ejs.js
+    /bin/jsinterp     do /bin/cc /src/jsinterp.c
+    /bin/cc           do /bin/slowcc /src/cc.c
+    /bin/slowcc       do /bin/as /src/slowcc.s
+    /bin/as           blob 2r3g5UzEREHrbCyeg
+
+This allows the fetching of `/data/july-trades` from a remote blob
+store to happen in parallel with, if necessary, the recompilation of
+/bin/sort.  Normally, of course, there will be a cached version of
+/bin/sort; it won’t be necessary to bootstrap the entire universe from
+source code to sort a data blob.
+
+Also, though, if /data/july-trades is large, /bin/sort can split it
+into a number of smaller blobs, then map a name to the sorted version
+of each smaller blob:
+
+    /tmp/xaa.sorted  do /bin/sort /tmp/xaa
+    /tmp/xab.sorted  do /bin/sort /tmp/xab
+    /tmp/xac.sorted  do /bin/sort /tmp/xac
+
+Then, it can merge those sorted chunk blobs to generate its output
+blob.  These separate sorting operations can run in parallel, and
+potentially on different machines, in isolated namespaces of their
+own; this introduces no nondeterminism into the computation of the
+transaction, because accessing the sorted smaller blob invisibly
+blocks until it is complete.  (Or, at least, enough of it is available
+to satisfy the read request.)
+
+Once the transaction is complete, the entire modified namespace can
+evaporate, leaving only a precipitated output blob.
+
+It’s desirable both to generate the dependency graphs of the
+computation dynamically, as in the above example, and to statically
+audit that all necessary data for a transaction is present.  We can
+obtain both of these properties at once with this filesystem-like
+level of indirection; processes running inside of a computation are
+not permitted to request arbitrary hashes — only those hashes
+statically mapped into their filesystem namespace at startup.
+
+The cache management system is responsible for deciding which
+deterministically computed output blobs to retain in the
+content-addressed blob store.  Doing this optimally is of course
+impossible, but doing it adequately should be feasible, since it can
+see the structure of the global transaction graph and how long each
+transaction took.
+
+Performance
+-----------
+
+The grain size of the separate nodes in this computational graph can
+be quite small before it starts to cost significant efficiency,
+perhaps 128 kibibytes and a few million instructions, particularly
+with efficient fork(), reasonably simple virtual memory mappings,
+and/or compiler-enforced security.
+
+The VM code (for example, the blob of /bin/sort) produced by the
+various compilers can be AOT-compiled to native code for particular
+platforms, and perhaps this can also be stored in the cache.  Under
+some circumstances it might make sense to recompile this native code
+with greater optimization over time.
+
+Incrementality
+--------------
+
+I said that Kogluktualuk is “incremental”.  The way to get an
+incremental recomputation is to generate a new namespace that shares
+most of its mappings with an existing namespace, and then run a
+transaction in the new namespace that has previously run in the old
+namespace; if the computation decomposes into many subtransactions as
+suggested above, then only the subtransactions whose input data has
+changed will need to be rerun.
+
+In the case of the sort example above, unfortunately, that includes
+the entire merge phase, a problem which could be reduced by passing a
+partitioning of the keyspace to the smaller-blob-sorting
+subtransactions, which could then produce as output not a single blob
+but a large number of blobs, one for each partition of the keyspace.
+Then you could split the merge phase into many independent merge
+transactions, perhaps only some of which would need to be rerun.
+
+Dynamic dependency information
+------------------------------
+
+Getting this kind of incrementality conveniently requires extracting
+dynamic dependency information from the transactions as they run, like
+the Vesta SCM, Composable Memory Transactions, a serializable SQL
+transaction, or `redo`; the static dependency information is
+potentially very imprecise.
+
+For example, perhaps the sort transaction above didn’t happen to
+access /bin/grep, even though perhaps it is mapped; it would be useful
+if that allowed us to keep using the cached output of the sort
+transaction, even in a new namespace with a new mapping for /bin/grep.
+
+Similarly, in the independent-merge-phase example above, it would be
+convenient if we could use the dynamic behavior of the merge phase to
+determine which partitions each merge transaction depended on.
+Perhaps this one:
+
+    /output/sorted.ZION-ZNGA  do /bin/merge /tmp/*.sorted.ZION-ZNGA
+
+didn’t happen to access /tmp/xac.sorted.XOOM-Z, even though it was
+mapped into its namespace; therefore a re-execution with a different
+/tmp/xax.sorted.XOOM-Z shouldn’t have to re-execute the merge.
+
+At this point, we have reproduced the sort-by-MapReduce from the
+original MapReduce paper.
+
+How far can this approach go?  Can you run your windowing system in it?
+-----------------------------------------------------------------------
+
+It might be feasible to use this approach even down to the level of
+handling mouse events; maybe moving the mouse generates a new
+namespace which differs in that /dev/mouse now says “228,301\n”
+instead of “205,301\n”, and the resulting incremental recomputation is
+capable of reusing almost all of the previous computation of the
+screen image to display, writing an /output/framebuffer with the new
+screen contents, which might be identical except for a mouse pointer
+and some mouseover highlight colors.
+
+(You might want to write an /output/uistate that becomes the
+/input/uistate for the next UI transaction, too, and you might want to
+spawn the framebuffer update off in a subtransaction in case it isn’t
+needed.)
+
+I’m not sure taking it this far is a good idea, for a couple of
+reasons:
+
+- It seems important to be able to guarantee responsivity for the user
+  interface.  This seems incompatible with depending entirely on
+  nondeterministic caching for performance; if you decided to update
+  /src/cc.c with a better-optimizing version, it would be unpleasant
+  to have your next display frame delay three hours while the entire
+  system was potentially recompiled.
+
+- It seems important to be able to display the state of transactions
+  in progress in the user interface, which seems sort of incompatible
+  with the strong guarantee of determinism.  But maybe the
+  relationship between the user interface transaction and other
+  transactions can be special.
+
+- It seems like the user interface is a place where you need to be
+  able to put in new hashes in order to fetch them from the cache, but
+  we previously said that’s a thing transactions can’t do, because it
+  could allow them to depend on data that isn’t statically mapped into
+  their namespace.
+
+However, it seems like if you could make it work, you could get
+transparent persistence and migratability of your desktop environment,
+plus the ability to roll back to previous checkpoints.  You only need
+to make sure that all of your mouse movements and keystrokes and
+whatever other events can affect your UI (completion of other
+transactions, maybe, or the passage of time) are safely recorded,
+either that or /input/uistate.  Every point in time in your user
+interface has a hash, with which you can retrieve it and then explore
+other execution paths.
+
+Overall significance
+--------------------
+
+Kogluktualuk is a major advance in computing systems in terms of
+efficiency, simplicity, scientific reproducibility, digital
+preservation, practical software freedom, practical parallel
+computation, and security.
+
+Reproducibility is a crucial requirement for scientific work, and
+digital preservation is a crucial requirement for historical work.  It
+is often infeasible to determine what factors a computational result
+depends on.  Kogluktualuk computations are reproducible forever, as
+long as their source data is preserved, and it automatically
+determines what that data is, so that you can preserve it.
+
+For free software to be more than a theoretical construct, it needs to
+be possible in practice to recompile the software we are using.  This
+is often unnecessarily difficult in current practice.  Kogluktualuk,
+like Nix, automates this, so that you are guaranteed to be able to
+recompile anything you can run, except for a tiny bootstrap stub.
+
+It is often difficult in practice to take advantage of the available
+parallel computational resources, for reasons including the following:
+
+- heterogeneity,
+- host exposure to attacks by untrusted code,
+- private data exposure to untrusted hosts,
+- exposure to untrusted hosts introducing malicious data,
+- the increasing likelihood of hardware faults as scale increases,
+- the excessive performance overhead of systems like Hadoop, and
+- awkward programming interfaces and user interfaces.
+
+Kogluktualuk improves the situation as follows:
+
+- paper over heterogeneity with a uniform virtual machine at an
+  acceptable performance cost,
+- isolate untrusted code within sandboxes so it can’t attack the host,
+- have (I hope) very low performance overhead,
+- automatically detect and recover some some kinds of hardware faults,
+  and be configurable to detect and recover from all hardware faults,
+  at a heavy performance cost,
+- have the possibility of detecting and defeating malicious data
+  introduction attacks, and
+- have (I hope) convenient interfaces.
+
+However, it does not protect against the disclosure of private data to
+untrusted hosts.
+
+Occasionally free-software communities have been exposed to
+trojaned-binary attacks, including from SourceForge, in which the
+compiled binary has malicious code inserted into it that is not
+present in the source code.  The most extreme form of this attack,
+demonstrated by Ken Thompson and previously hypothesized during the
+Multics security audit, involves inserting self-reproducing backdoor
+code into the compiler binary, so that even recompiling the compiler
+from source will not solve the problem.  Currently, if any Debian
+Developer’s development machine is compromised, the attacker can
+nearly undetectably compromise binaries built on that machine by
+inserting malicious code into them, and they will later be distributed
+to all Debian users who install that package.
+
+The defense against these binary-poisoning attacks is reproducible
+builds, pioneered by the Tor project and now widely adopted, including
+by nearly all Debian packages.  Kogluktualuk makes all builds
+reproducible, and it can be used to automatically detect such attacks.
+
+In most existing computing systems, all computations have full access
+to read and write every file accessible by the user that launches
+them, as well as sending that data over the internet and manipulating
+and measuring the CPU load in order to communicate data through covert
+channels.  In Kogluktualuk, each computation only has access to the
+data it is explicitly provided, and almost no computations have access
+to the clock or to the ability to pause themselves at will.  This
+dramatically reduces users’ vulnerability to malicious code.
+
+Incrementalization of computation can often provide enormous
+performance increases, often three or more orders of magnitude; in the
+form of `make`, this was crucial, for example, to enabling the
+original development of UNIX in a high-level language on shared
+0.4-MIPS computers in the 1970s.  Current work in automatic
+incrementalization, under the name “self-adjusting computation”, is
+producing very promising results, but involves a slowdown of a factor
+of about five when the computation does not benefit from
+incrementality.  Kogluktualuk should provide most of the performance
+benefit of full incrementality with no detectable overhead in the
+non-incremental case.
+
+I’ve written before about the inefficiencies and bugs due to the
+numerous ad-hoc levels of caching in our existing computer systems.
+Kogluktualuk’s unified caching system obviates every level of caching
+of greater granularity than a few million instructions, and it has the
+necessary global information to optimize caching globally.  Even
+without any incrementality or parallelization benefit, this should
+produce better-performing computer systems, and they should be much
+simpler.
+
+Unresolved questions
+--------------------
+
+What does the user interface look like?
+
+How do we index the computation cache so that it depends only on the
+dynamic dependencies of a computation, yet is fast to retrieve from?
+Maybe it would be better to spawn subtransactions in a very restricted
+namespace with only the things they depend on, even if that requires
+duplicating the information of which things they depend on in their
+caller?
+
+What should the virtual machine look like?  In particular, how should
+it handle floating-point math, and should it be vector-oriented in
+order to get better performance from available GPU (SIMT) and SIMD
+(e.g. SSE) resources?
+
+How low can we get the overhead of forking off a subtransaction?  Am I
+being too optimistic to think that 128 kiB and a few million
+instructions is big enough to amortize that overhead into
+insignificance?  Or am I even being pessimistic?  Does it depend on
+whether the subtransaction is going to get run on a different cluster
+node?
+
+What about data that can potentially be computed in more than one way,
+depending on what data is available in cache?  For example, in an OLAP
+system, you might want to see total sales by region (4 rows); if you
+have an existing materialized view of total sales by region and
+product category (40 rows) or total sales by region and customer type
+(16 rows), you can calculate the desired result very quickly, much
+more quickly than if you have to trawl over the entire dataset of,
+say, 50,000,000 rows.  But maybe you only have one of those two views
+already computed, and it would be nice to use the one that is.  Is
+there a way to fit this into the Kogluktualuk paradigm?
+
+Guaranteeing responsiveness probably requires updating some cached
+items preemptively, rather than waiting for them to be needed.
+
+What’s the story on publicly-accessible caches?  If you choose to
+trust a publicly-accessible binary cache for your Nix packages, you
+can avoid having to recompile anything yourself.  But with
+Kogluktualuk, you might be at risk not only of getting malicious code
+from that cache, but also of sending that cache the hashes of private
+data in order to find out whether they are present there.  You could
+reduce this risk with something like Bloom filters or compressed
+Golomb rulers; is that enough, and if not, how can this risk be
+eliminated or made acceptable?
+
+Anytime algorithms, which can be stopped at any point when time is
+running out, are important for real-time computation, for example in
+robotics and in some user interfaces, because they can guarantee
+real-time responsiveness without the heavy restrictions that are
+needed to deterministically bound the halting time of an algorithm.
+Many mathematical optimization metaheuristics automatically produce
+anytime algorithms.  Can they be fit into Kogluktualuk’s framework?
+
+Truly random numbers are important for security.  Enormously many
+secret keys have been compromised by compromised sources of
+randomness, including the Debian OpenSSL debacle and the Dual EC DRBG
+backdoor.  One of the problems introduced by transparent
+checkpoint-and-restart systems like those in VirtualBox is that they
+can result in reuse of randomness, which can compromise that
+randomness.  (One-time pads and DSA have notoriously bad problems
+here, but RSA keys with common moduli, for example, have also been
+broken en masse.)  Kogluktualuk seems to allow checkpoint-and-restart
+functionality without this problem, because the granularity of the
+checkpoint is transactional, and you can probably avoid allowing the
+truly random data to escape a transaction.  Does that really work?
+
+What about resources like RAM?  What do you do if a transaction wants
+to allocate ten gigabytes of RAM?  Could that provide a covert
+signaling channel for exfiltrating private information to other
+transactions?  Is there a way to ensure that some (or most?)
+transactions are small and light enough to run on small embedded
+processors?
+
+Is there a way to get out of writing a compiler for a virtual machine
+instruction set, at least for prototyping Kogluktualuk?
+
+Should we store everything in the same blob store — non-derived and
+thus irreplaceable source data, transaction outputs, native code for a
+particular processor, the cache database?  Relatedly, how does
+Kogluktualuk relate to version control with Git?
+
+In the cluster case, is the blob store implemented as a DHT, or what?
+
+What interface does a transaction use to tell Kogluktualuk what its
+outputs are?
+
+Is it really practical to do pipelining by having a pipeline of
+transactions that each read from the previous transaction’s output,
+without having each one pause until the previous one is done?  Is
+there a way we can usually avoid storing the data that flowed through
+the pipeline?
+
+How do we modularize namespaces so that we can make a new namespace
+that differs from an existing one by changing one file (like
+/dev/mouse or /src/grep.c), without generating many megabytes of data
+traffic?
+
+What exactly are the algorithms the cache service uses to figure out
+what to evict from cache?
+
+In a cluster implementation of Kogluktualuk, how do we decide which
+transactions to run on which nodes?  Does the hierarchical transaction
+structure provide enough information about the communication patterns
+to do a good job of this?  If large blobs (like my example
+/data/july-trades above) are sharded across nodes, how much of that do
+we expose to the transactions running on top in order to allow them to
+optimally divide up their subtransactions, and how do those
+subtransactions end up on the best node — do we migrate or restart
+them on a new node if they start accessing large data blocks, or what?
+
+How do we deal with laggard nodes in a cluster implementation?
+
+How do you fit reactive computation into this framework, if at
+all — how do you do, for example, a chat system?  (Is there anything
+interesting in Urbit’s implementation of chat?)
+
+For things like what people use SPARK for, can we get adequate
+performance with, say, binary floating-point data in one column per
+file?  (Kogluktualuk is a lot like SPARK.)

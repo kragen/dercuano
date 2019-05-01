@@ -1,0 +1,442 @@
+I’ve been thinking for some years about building a personal computing
+environment up from zero: bootstrapping using an existing computer and
+existing fabrication technology, but quickly getting into
+self-sustaining technology, along the lines of the VPRI STEPS program
+or colorForth/GreenArrays, but also along the lines of Open Source
+Ecology.
+
+So what is needed to, say, send an instant message to someone?  What’s
+the smallest amount of code you could write to fully describe the
+design of this system?
+
+1. A **font** to display the message in.
+2. A **display** to show the font on, and whatever software is needed
+   to talk to it.
+3. A **keyboard** (or other input device, e.g. a touchscreen), and
+   whatever software is needed to talk to it.
+4. An **editor** that responds to the keystrokes by editing some text
+   that you can later send.
+5. A **network interface** to connect to the internet, and whatever
+   software is needed to talk to it.
+6. Enough of **TCP/IP** to speak whatever messaging protocol you’re
+   using.
+7. A **user interface shell** to allow you to choose between doing
+   instant messaging and other things.
+8. A **CPU and RAM** to run all this software on.
+9. A **filesystem** to store your instant message logs, buddy list,
+   driver code, font, editor and other UI code, and so on in.
+10. A **durable storage device** to persist your filesystem to when
+    the machine is turned off.  This might be core, Flash, MRAM, disk,
+    cassette tape, barcodes, battery-backed SRAM, or cuneiform, but
+    you do need *something*.
+11. A **low-level programming language** with a compiler to write the
+    drivers in.  Ideally this language is powerful enough to write the
+    compiler in too, as well as the UI code, filesystem, and so on,
+    but there really aren’t any existing languages that are good at
+    this.  I think ML probably comes closest, but ML memory usage is
+    somewhat unpredictable (even if you use MLKit regions instead of a
+    garbage collector) which means that you can’t write code for which
+    failure is not an option in ML.
+12. The **IM client** itself.
+13. **Cryptography** to keep the IMs safe.
+14. Probably a **semiconductor fabrication system** to make the CPU
+    and RAM.
+15. Materials processing machines for **smelting, measuring, and
+    purifying** the materials needed for the CPU, RAM, keyboard,
+    display, and the materials processing machines themselves,
+    starting from raw materials.
+16. **Digging machines** for extracting the raw materials.
+17. **Fabrication robots** for making the display and keyboard and for
+    assembling the computers.
+18. **Energy-harvesting machinery** for deriving energy from the
+    environment to run all the other machinery.
+19. **Waste recycling systems** to keep the materials processing and
+    especially the semiconductor fabrication from poisoning people,
+    animals, and plants.
+
+Font
+----
+
+So far, despite various experiments, the simplest way I’ve found to
+design a readable font is as a fixed-width pixel grid.  Here’s a
+[minimal implementation](http://canonical.org/~kragen/sw/dofonts-1k.html)
+of ASCII text rendering with an included 4×6 font in 1K of DHTML,
+including the font itself as a PNG:
+
+    <body bgcolor="black" onload="r()">
+    <a href="http://canonical.org/~kragen/sw/dofonts.html">cf</a>
+    <img src="data:image/png;base64,
+    iVBORw0KGgoAAAANSUhEUgAAAEAAAAAkAQMAAAADwq7RAAAAAXNSR0IArs4c6QAAAAZQTFRFAAAA
+    ////pdmf3QAAAQxJREFUGNMtjlFqg0AYhIcQikhJryBFgoiHWGQR2QfJIaQPfegZRCQEkZxBZCny
+    I9sr+LBIkZBDBPFBQs7QNXTgh2Hg+2ewpZh7Ehtsf26S89XYmvHHbgu8ebVJLJPcDlyyGACDhwzg
+    ifpK4VTomjYnnoSY3LuOkLmQ4XvbIGFI7kF84U6Bpyxzqb7Oyi9dELUn6Z8J6rcbp+C8oKS2lFQS
+    PvX1qMTyT63Sw0I0VwzUCiK3qDFqobhZhrIRD1m4QNElQs4BzPyndmCZ4xReD+yHNOptoWG3tHRB
+    QsZ0kfQF4WX4CJW/yJV4Rf8kmfkRHzB8m9KJ16CLIBFEwJgLFa2lx2ovmsmYfMU2Fv4AgeVrl8Qw
+    sFoAAAAASUVORK5CYII=
+    " id="font" />
+    <canvas width="512" height="512" id="c"></canvas>
+    <script>
+    d = document
+    function r() {
+     t = d.body.innerHTML
+     x = 0
+     y = 0
+     for(i in t) {
+      c = t.charCodeAt(i)
+      if(32<=c && c<128) {
+       fi = c-32
+       d.getElementById('c').getContext('2d')
+       .drawImage(d.images[0],fi%16*4,~~(fi/16)*6,4,6,x,y,4,6)
+       x += 4
+      }
+
+      if(x>508 || c===10) {
+       x = 0
+       y += 6
+       if(y>=512) break
+      }
+     }
+    }
+    </script>
+
+Other experiments I’ve tried include Hershey-like line fonts,
+spline-based fonts, fonts scanned from paper, and so on, but I haven’t
+been able to get any of these implementations down to a kilobyte, or
+even nearly so.  You could maybe argue that I’m unreasonably
+leveraging bitblit and PNG-decompression here, but I don’t think those
+actually make a whole lot of difference.
+
+Display
+-------
+
+The current standard is an LED-backlit LCD with diffraction gratings
+to give color to RGB subpixels.  This may not be the least demanding
+possible way to display pictures under computer control; it seems
+likely that some kind of cathode-ray tube may be simpler to construct.
+
+### Spark gaps and spinning mirrors ###
+
+Perhaps the electronically-controlled display with the least stringent
+demands on metallurgy and the like would be a small array of tiny
+carbon arc lamps or spark plugs controlled at near-megahertz
+frequencies, viewed through a system of spinning mirrors like the ones
+used in supermarket barcode scanners in order to scan the image of the
+arc across your field of view, and color-filtered both to eliminate
+harmful ultraviolet light and to improve contrast.
+
+Suppose you use just an X-axis scanning mirror, with one spark gap per
+scan line, and you want minimally 200 scan lines (25 lines of readable
+8-scan-line text or 33 lines with the less-readable 4×6 font above).
+A 16-faceted mirror spinning on an air bearing at 32000 rpm, as
+Michelson used in his 1877–1931 experiments to measure the speed of
+light, scans at 8528 frames per second.  We only really need about 24
+frames per second to be readable, even though that’s kind of flickery,
+and you could do that with 1.5 revolutions per second of a 16-faceted
+mirror, 90 rpm.  This is an easily achievable rotational speed even if
+you’re turning the mirror by hand.
+
+Square pixels at 200 scan lines and a 4:3 aspect ratio would be 266
+pixels per line; 16:9 would be 355 pixels per line; a 5×8 font at the
+traditional 80 columns would require 400 pixels per line.  266 pixels
+in 1/24 of a second is 6384 pixels per second per spark gap, or 157μs
+of cool-down time; 400 pixels is 104μs (9600Hz).  Spark times like
+these are easily achievable.  Neon glow discharge lamps can easily
+reach this régime, and they last for decades of continuous use and
+don’t pollute the air, unlike carbon-air arcs.
+
+[Edgerton was achieving 500ns air-gap spark times in the
+1950s](https://en.wikipedia.org/wiki/Air-gap_flash) by using a thin
+layer of air as the plasma medium and cooling it with a quartz
+heatsink, but I think much higher speeds are achievable if the spark
+just needs to be *visible* rather than illuminating its surroundings
+brightly enough for photography.
+
+A 500ns spark could potentially paint 2 million pixels in a second, or
+33,333 pixels in the 16⅔ms of a 60fps frame, not quite enough for a
+text display by itself.  An array of 20 500ns spark gaps, assuming you
+could fire them all continuously, could thus give you a ⅔Mpix display
+at 60fps, nearly the 1024×768 that we’re used to.
+
+At the currently popular 16:9 aspect ratio, this would be about
+1075×620, so you’d need a vertical or Y scanning mirror that scanned
+at 31×60Hz, or 1860Hz.  If it had 16 facets, it would need to spin at
+116¼Hz, or 6975 rpm, which is totally feasible using gears and ball
+bearings (not even air bearings), but a little bit tricky.  Again,
+though, this is about four times slower than Michelson was spinning
+mirrors nearly a century ago.
+
+If, instead of scanning an entire column of 20 spark gaps across the
+visible area in 20-pixel-high bands, you divided the visible area into
+20 horizontal bands, each illuminated by a single spark gap, you could
+have 20 facets in your visual field at once.  This allows you to use
+more facets on your mirror and makes the scan lines more horizontal,
+but requires careful alignment of the mirror’s phase with your
+viewpoint.  It would, however, allow you to rotate your Y-scanning
+mirror at only 31×60Hz÷16÷20 = 5.8125Hz or 348¾rpm.
+
+### Vector displays ###
+
+The first graphical user interface was Sketchpad, implemented at the
+end of the 1950s by Ivan Sutherland on the TX-2 at Lincoln Lab.  The
+TX-2 had an attached CRT in which the CPU independently controlled the
+X and Y coordinates of the electron beam, so it could draw simple
+shapes on the screen at high resolution, even though it was only
+capable of drawing a few tens of thousands of points per second.  Such
+“vector displays” survived until the 1980s, and CAD systems of the
+1970s were built on “storage tubes” that could maintain the vector
+image, once drawn, for up to a few minutes, allowing very detailed
+line drawings.
+
+You could do the same thing with a single spark gap and two mirrors,
+but this requires controlling the mirrors independently and actively,
+not just scanning them at a constant speed like a raster display.  But
+it would permit a useful display from a single spark gap modulated
+even down at kilohertz speeds.
+
+### Coil-driven mirrors ###
+
+Laser shows scan lasers across the screen with mirrors controlled by
+galvanometers or “galvos”: electric coils that magnetically push
+against a spring to bring the mirror to the desired position.  Typical
+galvos are capable of “[20
+kpps](http://laserpointerforums.com/f47/question-about-galvo-speed-71998.html)”,
+twenty thousand points per second, although the definition of this is
+kind of dodgy.
+
+[The Harmonic Series](http://www.theharmonicseries.net/about.html) was
+a project by Brazilian artists Luisa Pereira and Manuela Donoso which
+substituted regular dynamic speakers (electric coils that magnetically
+push against a screen) for laser-show galvos, getting bandwidths of up
+to several kilohertz for displaying audio Lissajous patterns, just as
+Lissajous himself had done with the “Lissajous apparatus” of mirrors
+on tuning forks in 1857.
+
+You could imagine a resonant mirror scanning system that scans in a
+Lissajous pattern rather than the sawtooth pattern we’re used to from
+raster-scan devices; you get higher resolutions around the edges,
+lower resolutions in the center, and a less regular scanning pattern
+that the computer can compensate for.  However, I think the
+Pythagorean sum of the scanning frequencies still limits your
+resolution, equivalent to the scan frequency of the X-scanning mirror
+in a traditional raster setup.  So with the 20 500ns spark gaps at
+⅔Mpix at 60Hz described above, you could get by with oscillation
+frequencies possibly as low as 42Hz or so.
+
+### Lissajous rods ###
+
+A particularly simple way to achieve these Lissajous oscillations is
+by using a sprung mass that is sprung with two different spring
+constants in X and Y; for example, a thin rod, fixed at one end, with
+a rectangular cross-section.  (There is [a Lissajous Rods
+exhibit](https://www.exploratorium.edu/xref/exhibits/lissajous_rods.html)
+in the Exploratorium demonstrating this; the Lissajous patterns
+described in the air by the shiny ends of the rods are quite
+conspicuous.)
+
+### Other high-speed light sources: vacuum tubes, LEDs, and lasers ###
+
+All of the above describes different contortions to get around the
+possible slowness of a spark-gap light source, which is itself much
+faster than an incandescent light.  But even normal vacuum tubes can
+turn on and off in the submicrosecond regime; you could use a vacuum
+tube with a phosphor-coated anode to modulate light output with
+deep-submicrosecond times.  There are a number of electron-excited
+phosphors with single-digit nanosecond decay times, hundreds of times
+faster than an air-gap flash, including CdS:In and ZnO:Ga.
+
+(If you’re using a vector display to draw relatively static images, a
+long phosphorescence time might be an advantage rather than a
+disadvantage.)
+
+Vacuum tubes and exotic phosphors, though, may be hard to fabricate;
+and if you can fabricate them, it may be more practical to just
+fabricate a CRT rather than some kind of electromechanical display.
+
+Another possibility, since we’re already taking for granted
+semiconductor fabrication, is LEDs.  These are semiconductor diodes
+made of exotic large-bandgap semiconductors, and, [with carefully
+designed driver circuitry, even regular LEDs can have response times
+measured in single-digit
+nanoseconds](http://arxiv.org/pdf/1011.1954.pdf).  And LEDs are much,
+much more durable than spark gaps.  They were first reported in 1927,
+using point-contact diodes with low-purity silicon carbide, but [red
+LEDs were first published in
+1962](http://scitation.aip.org/content/aip/journal/apl/1/4/10.1063/1.1753706;jsessionid=17lre5cf2irrn.x-aip-live-02)
+in gallium arsenide phosphide; they became commercially available in
+quantity in 1968.  [Other red and green LED
+chemistries](https://en.wikipedia.org/wiki/Light-emitting_diode#Colors_and_materials)
+include AlGaAs, AlGaInP, and GaP; InGaN and GaN additionally provide
+green, blue, and violet LEDs, but these were not possible to
+manufacture until 1994, and the discovery won a Nobel Prize in
+physics.
+
+Once you, hypothetically, can make LEDs, making semiconductor lasers
+is relatively straightforward.  This has the advantage that you can
+scan them over a large surface using mirrors to produce a
+high-resolution projection display.
+
+Also, lasers in general have the ability to produce shorter light
+pulses than other light sources: once a population inversion forms,
+stimulated emission can deplete it, and so a wave packet generated by
+a mirrorless laser can be very short indeed, the so-called
+“femtosecond laser”, when the laser has a large tunable bandwidth.
+You should be able to trigger the generation of a pulse by dumping a
+bunch more energy into a barely-subcritical laser, which is more or
+less how erbium-doped fiber amplifiers work.  (This is my vague
+understanding of this shit; don’t bet on it.)  So it should be
+possible to
+
+One possible way to rapidly scan temporally-modulated LED light over
+an area would be to use a transparent Lissajous rod elastically
+vibrating; it could be made of, for example, polished glass or
+acrylic, using total internal reflection to guide the light to its
+vibrating tip.
+
+### High-speed light modulation: LCDs ###
+
+LCDs do not emit light, but they can [switch on and off in tens of
+nanoseconds](http://dspace.mit.edu/openaccess-disseminate/1721.1/58583)
+using current techniques.  I don’t know if LCDs are less demanding to
+fabricate than LEDs, but I suspect so, even though they were developed
+later.
+
+### Slow displays: in the limit you get a printer ###
+
+Above, I’ve mentioned the benefits of slowness a couple of times: if
+your image lasts a long time, you can use even very slow methods for
+producing it.  The Tektronix 4014 storage tube was one example: used
+for high-resolution CAD drawings despite being connected to the
+computer over a low-speed serial link.  But even a regular
+long-persistence phosphor would work reasonably well, without the
+storage-tube aspect; in fact, if you’re using mirrors to steer a beam
+of light rather than an electron beam, you could draw the image on a
+phosphor screen of, for example, copper-activated zinc sulfide, which
+is sphalerite/wurtzite, the main ore of zinc in nature.
+
+But you can go slower still.  A lot of Unix was developed on Teletypes
+running at 110 baud, which worked out to 11 characters per second; a
+4×6 dot-matrix printer at this speed needs to run its 6 hammers at
+44Hz, which is quite reasonable.  And if you go vector instead of
+raster, you get a pen plotter.
+
+Smelting, measuring, and purifying elements
+-------------------------------------------
+
+Both current and prehistoric metallurgy depends mostly on iron,
+aluminum, copper, zinc, tin, and lead; nuclear energy production
+depends on uranium or thorium.  Semiconductor fabrication also depends
+on silicon, plus trace amounts of dopants, such as boron and arsenic,
+as well as processing chemicals such as hydrofluoric acid and hydrogen
+peroxide.  Refractory materials are essential to many processes
+listed.
+
+Small amounts of iron, lead, and especially copper are found “native”
+on Earth, while aluminum, zinc, tin, and thorium are always found in
+compounds.  Nevertheless, for bootstrapping, it’s probably necessary
+to be able to refine these elements from soil.
+
+[Earth’s crust is about 28%
+silicon](https://en.wikipedia.org/wiki/Abundance_of_elements_in_Earth%27s_crust).,
+and it’s in almost all soils, so anywhere you go, you have silicon.
+Although you can smelt metallurgical-grade silicon from silica in an
+arc furnace with carbon at 1900°, smelting it for semiconductors is
+hell, since you need to get impurities down to <1ppb in order to
+control its semiconducting properties, using either CVD from
+trichlorosilane or repeated zone melting.  Even less-demanding
+photovoltaic silicon needs <1ppm impurities.
+
+Earth’s crust is about 8% aluminum, which, too, is everywhere; but
+it’s difficult to smelt because aluminum dioxide (sapphire) is so
+stable.  The Hall-Héroult process, orders of magnitude cheaper than
+the alternative smelting processes, revolutionized the production of
+aluminum.  This involves dissolving corundum (aluminum oxide) in
+cryolite (sodium aluminum fluoride) and calcium fluoride at 980° in
+order to be able to electrolyze it.
+
+Earth’s crust is about 5% iron.  People have been smelting iron from
+hematite and magnetite using charcoal in bloomery furnaces for
+millennia, but blast furnaces are much more efficient and produce much
+better iron.
+
+Earth’s crust is [about 60 ppm
+zinc](https://en.wikipedia.org/wiki/Zinc#Occurrence), mostly as
+sphalerite, which can be purified by froth flotation; roasting
+sphalerite in air at at least 690° produces SO₂ and ZnO, and the ZnO
+can be reduced to Zn either with C (which was done accidentally for
+centuries, producing Zn vapor) or by electrowinning from water-soluble
+ZnSO₄ (low-current-density process: 10% H₂SO₄, aluminum cathodes,
+275–325 A/m², 30–35°).  Historically this smelting was done in
+hermetic clay retorts to prevent the zinc vapor from escaping.
+
+Earth’s crust is [about 50 ppm
+copper](https://en.wikipedia.org/wiki/Copper#Occurrence).
+
+Earth’s crust is about 14 ppm lead.
+
+Earth’s crust is [about 6 ppm
+thorium](https://en.wikipedia.org/wiki/Occurrence_of_thorium), but you
+don’t need very much thorium, because burning thorium in a nuclear
+reactor produces about 79 TJ/kg of energy.
+
+Earth’s crust is [about 2 ppm
+tin](https://en.wikipedia.org/wiki/Tin#Occurrence), which makes it
+hard to extract.
+
+### Plasma pyrolysis and oxide distillation ###
+
+One possible answer to the problem of extracting various elements from
+the complex mix of mineral compounds in soil is, rather than using
+individual reactions customized for each separate ore, simply vaporize
+the whole shebang into a plasma, mix with oxygen, and then distill out
+the various oxides.  Even tungsten, tantalum, rhenium, and osmium boil
+below 6000°, and every other element below 5000°; everything melts far
+below this temperature, with tantalum hafnium carbide melting at
+3942°.
+
+So, if you can heat soil up to 6000°, you can probably get them to mix
+with a large volume of preheated oxygen and oxidize them fully.  You
+should be able to start the process with a plasma arc torch (regular
+plasma arc welding torches reach 28000°), then continue heating with
+inductively-coupled plasma heating.  Various companies are currently
+developing lower-temperature variants of this process under the name
+“plasma arc recycling” or “plasma gasification”; Westinghouse’s
+process runs at only 3000°.
+
+As an alternative to inductive heating of the plasma, you can
+illuminate it; well-ionized plasmas absorb light fairly well.
+Sunlight can be focused on the plasma using non-imaging optics, which
+have been demonstrated to reach 84000 suns, 59 megawatts per square
+meter.
+
+Another alternative means of heating the plasma after initial
+ionization might include mixing carbon or hydrogen fuel into the
+feedstock.  In theory, hydrogen ought to be able to raise the
+temperature by about 2800° in the limit of 100% hydrogen.
+
+The mix of oxygen and fairly inert simple elemental oxides coming out
+of the torch then needs to be distilled.  Each oxide has its own
+characteristic condensation temperature, so you should be able to
+condense thoria in one chamber, silicon dioxide in another, aluminum
+oxide in another, zinc oxide in a fourth, and so on.  You probably
+need to do this under low pressure to keep the plasma from cooling
+down too much before depositing its condensates.
+
+How much energy does this need? [Heat capacity of plasmas is
+complicated](http://www.ing.unibs.it/~beretta/www.JamesKeckCollectedWorks.org/JCKeck-papers/EisazadehFarMetghalchiKeck-JEnergyResTechnol-133-2011.pdf)
+but generally around 100 kJ/(kmol·K) in the temperature range we’re
+considering, so heating by 6000 K should require about 600MJ/kmol.  If
+we figure that the majority of the plasma is oxygen, then each mole is
+16 grams, so we need up to about 40MJ/kg to heat the plasma, some of
+which we may be able to recover as we cool it back down.
+
+Supposing we mix oxygen with the vaporized soil in a 4:1 ratio by
+mass, we’re spending 200 MJ per kg of soil, or 33 TJ per kg of
+thorium, assuming that our soil is only averagely rich in thorium.
+That’s less than half of the energy that thorium will produce in a
+reactor, which still leaves us precariously net positive, but suggests
+that some monazite deposits (about 10% thorium, i.e. 100 000 ppm, five
+orders of magnitude above average) would go a long way.  (It’s also
+possible that the modal thorium concentration is well below the mean,
+which would mean that most points on the globe had thorium
+concentrations too low for purification by this method to be a net
+energy producer.)

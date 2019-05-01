@@ -1,0 +1,484 @@
+My friend Nick and I were talking about a tool called the Tinkerer's
+Tricorder, which, if it existed, would tell you everything interesting
+about an electrical component as soon as you connected it across its
+terminals.  Inductance, capacitance, resistance, voltage, frequency,
+diode characteristics, resonant frequency, Q, and so on — all with no
+danger of damaging the device!
+
+Some of Nick's notes are at
+<http://dangerousprototypes.com/forum/viewtopic.php?f=19&t=5366&p=52238>.
+
+I had wasted some time earlier that same day trying to debug a circuit
+without any test equipment.  I ended up programming an Arduino to be a
+crude volt/ohmmeter.  Despite its imprecision and the need to use a
+laptop to see its readout, it had three big advantages over a standard
+multimeter:
+
+- It, or rather the laptop, recorded a series of measurements instead
+  of a single one, so I could see not just the current state but
+  recent states.
+
+- It measured both voltage and resistance without any need to switch
+  modes.
+
+- Most of all, it could be simply downloaded and installed on existing
+  hardware, without requiring any additional hardware — not so much as
+  a resistor soldered across a pair of pins!
+
+So I'd like a Downloadable Tinkerer's Tricorder — the closest possible
+approach to the Tinkerer's Tricorder on common hardware like an AVR
+microcontroller or an Arduino, without needing any nonstandard
+hardware — not even so much as a resistor or capacitor soldered across
+a couple of pins.  You just reprogram the flash, connect the device
+under test between two pins, and the AVR tells you what it is.  Maybe
+you go through some kind of calibration step if you want accurate
+results.
+
+Nick's project is far more capable, but I think its parts cost is
+comparable to the cost of a prebuilt LCR meter.
+
+How capable could a Downloadable Tinkerer's Tricorder be, struggling
+under the limits of common AVR hardware?
+
+What an AVR pin can do to the outside world
+-------------------------------------------
+
+Basically an AVR digital GPIO pin can be in one of four states: output
+high, output low, input high, and input low.  Although some exotic
+Arduinos have DACs, common Arduinos don't have anything but digital
+GPIO pins plus an ADC.  (This is deeply unfortunate, since the core of
+the AVRs' successive-approximation ADC is a DAC — but its output isn't
+routable to any pins!)
+
+Output high ties the pin to the 5V rail with relatively low impedance;
+it can source up to 40 milliamps, but if you connect the pin directly
+to ground, the chip doesn't blow up; it's internally limited to about
+40 milliamps.  This means that, at least at high currents, the
+internal output impedance is about 25Ω.  This is convenient for
+connecting AVRs to LEDs and speakers; it pretty much guarantees you
+won't blow up the AVR, the LED, or the speaker no matter how ignorant
+you are, unless you hook the LED up to your power supply instead of
+the AVR.
+
+Output low is similar, but ties the pin to the ground rail through the
+≈25Ω impedance.
+
+Input high ties the pin to the 5V rail via a pullup resistor, which is
+nominally 20-50kΩ on the ATMega328, which is not what you'd call a
+really fucking precise specification.
+
+Input low tristates the pin, i.e. sets it at the very high input
+impedance characteristic of CMOS inputs, around a megohm; the maximum
+rating from the datasheet is that these pins draw up to 10 μA.
+
+The pins are also diode-clamped to the power rails, which should
+protect them from voltage spikes if you're testing an inductor and
+slam a pin to input state.  The clamping diodes aren't well-specified
+in the datasheets, but various AVRFreaks threads claim that these
+diodes are equipped to handle only up to about 1.5mA before possibly
+going into latch-up and killing your chip.  The ATMega328P datasheet
+instead gives a spec for the voltage range: -0.5 V to VCC + 0.5V.
+
+The datasheet max specified I/O pin capacitance is 10 pF, although I
+suspect 1 pF is probably more typical.  I haven't measured.
+
+What an AVR can measure
+-----------------------
+
+The usual AVRs, including the ATMega328, have a 10-bit ADC with a
+sample-and-hold frontend, which measures relative to either the
+power-supply voltage (typically 5 volts), and an internal 1.0-1.2 volt
+analog bandgap reference voltage; the ADC is claimed to have a 38.5kHz
+input bandwidth, but people have reported success clocking it up to
+4MHz and still getting an Effective Number Of Bits around 5.
+
+Furthermore, the AVR can use its ADC to measure an internal
+temperature sensor, supposedly accurate to ±10°C.  This is important
+because it means that you can, in theory, compensate for thermal
+variation in things like pull-up resistor resistance.  (The two major
+factors of variation in the behavior of a given electronic device are
+supply voltage and temperature.  You can apparently measure the
+internal bandgap relative to the supply voltage, getting a value
+somewhere around 200, and thus measuring the reciprocal of the supply
+voltage, by setting ADMUX to 01x01110.)
+
+I'm assuming the internal voltage reference is usable without any
+external hardware, even a capacitor attached to the AREF pin, but I'm
+not sure.
+
+10 bits isn't much, but the device can measure time much more
+precisely.  The internal RC oscillator is nominally accurate to 10% (3
+bits), unless calibrated by the user, in which case it's accurate to
+within 1% (7 bits).  However, in the common case that the AVR uses an
+external quartz crystal, its timing accuracy depends on that crystal's
+accuracy, which is normally about 0.005% (15 bits).  Current normal
+Arduinos (Pro, Pro Mini, Uno) use a 16MHz Murata ceramic resonator
+that's accurate to 0.5% (8 bits), and older Arduinos (everything
+before Duemilanove, including Mini) use a quartz crystal.  The AVR
+microcontrollers currently used can run at 20MHz, but the Arduinos run
+them at 16MHz for compatibility with the 16MHz ATMega8 used in the
+first Arduino.
+
+(It appears that temperature and supply voltage are the major factors
+in the speed variation of these resonators, says [this guy who was
+tracking his against atomic clock broadcasts from WWVB][0] and [this
+guy who was measuring against GPS][1].  So maybe with the temperature
+and supply voltage sensors, you could reduce the errors.
+Temperature-controlled crystal oscillators can reach three orders of
+magnitude better than raw crystals, i.e. 0.05 ppm temperature
+stability (24 bits).)
+
+[0]: http://softsolder.com/2010/01/22/arduino-pro-ceramic-resonator-frequency-compensation/
+[1]: http://jorisvr.nl/arduino_frequency.html
+
+Low voltage isn't practical
+---------------------------
+
+Nick tells me ESR meters usually work at very low voltage to enable
+in-circuit component testing without activating any nearby transistors
+— under 0.1V.  I don't think that's practical for the Downloadable
+Tinkerer's Tricorder because the chips I want it to run on don't have
+controllable-voltage output pins.
+
+Avoiding damaging devices under test
+------------------------------------
+
+A tricky thing is that, when you hook up some unknown device to your
+AVR, the AVR doesn't have the opportunity to consult its datasheet
+before applying power to it in order to figure out what it is.  So it
+seems like a good idea to design the tricorder's strategy to minimize
+the risk of this.
+
+The first and most obvious kind of damage is overheating.  Too much
+voltage across almost any electrical device will cause it to generate
+more heat than it can dissipate until it gets really hot, hot enough
+to damage or destroy it.  Since we're talking about a max of 5V at
+40mA here, or 200mW, this is certainly a possible danger here; there
+are plenty of tiny resistors and things out there that can't dissipate
+200mW at any kind of reasonable temperature.  However, for macroscopic
+components, we can rely on their thermal mass to allow us to dissipate
+200mW for a short period of time — if we can manage to use a duty
+cycle of 5%, we should be able to use 5V with near impunity, at least
+on discrete components, since we'd dissipate an average of 10mW.
+
+Even the lowest-current-rated discrete diodes I could find on Digi-key
+were rated for 10mA average, so I think briefly passing 40mA through
+an unknown diode should be safe.
+
+Integrated circuits are more delicate when it comes to brief
+overheating; a presentation I dug up from Cypress on "electrical
+over-stress" mentions, among other things, "melted or vaporized bond
+wires", with horrifying photos.  Still, I don't think we're talking
+about 40mA there.
+
+MOS circuits in general can be destroyed by overvoltage, even very
+briefly: it punches holes in the "O" layer in between the "M" and "S"
+by means of avalanche breakdown, and those holes are permanent.
+However, I don't think there are any MOS devices out there that will
+be destroyed in this way by 5 volts, so I don't think this is a real
+danger.
+
+I seem to recall that semiconductor junctions can be damaged by high
+current density, even without high temperatures, but I can't find a
+citation for that now.
+
+Electrolytic capacitors in general can be damaged by reverse-biasing,
+sometimes exploding spectacularly.  The super-teensy tantalum
+capacitors are particularly famous for this.  I dug up a NASA paper on
+tantalum capacitor damage by reverse bias, and it seems like the
+damage takes place by means of a microamp (!!) or so of current.  But
+it doesn't seem to happen below about 3 volts, and at 3 volts, it
+takes several hundred seconds.  Even at 5 volts, it takes several tens
+of seconds.  I suspect that short exposures to reverse bias can be
+corrected by a similar and rapid exposure to forward bias, reforming
+the dielectric layer that may have been disrupted.
+
+Electrolytic capacitors, however, have the great advantage in this
+case that they have very high capacitance, 0.1μF or greater (typically
+100μF or greater), even when back-biased (until they start
+conducting).  If you're charging an 0.1μF capacitor through a 20kΩ
+pull-up resistor, your RC constant is 2ms.  This should give you
+plenty of time to determine that you have a lagging voltage waveform,
+and therefore a capacitor, and turn the current around before the
+voltage reaches 3V.
+
+Diodes in general will conduct if you put enough reverse voltage
+across them, either by avalanche breakdown or zener breakdown; diodes
+that are not designed for this will be destroyed.  LEDs tend to have
+fairly low reverse voltage limits, but Nick tells me they're still
+over 5V, so not to worry.  (I did find a Skyworks small-signal
+Schottky diode with a 1V maximum reverse voltage.  But I could only
+find three diodes that fragile in the entire Digi-Key catalog.)
+
+Measuring voltage
+-----------------
+
+So, the simplest thing to measure would seem to be a DC voltage
+applied to a pin, or across two pins.  The ADC can measure it
+directly, as long as it's positive.
+
+For 1.1 to 5V, ADC values of 205 or so to 1023 measure the voltage
+with 0.25% to 0.05% quantization error: 0.005 volts.  Of course, this
+is relative to the supply voltage, which probably isn't regulated to
+within even 0.25%; [Joris van Rantwijk found that a single GPIO pin
+dumping 30mA introduced a 1% error][1].
+
+For 0 to 1.1V, you can set the internal bandgap reference as the
+reference voltage, so as to measure with millivolt precision.
+However, the internal bandgap reference is specified to have ±10%
+error; presumably it's highly stable over time on a given chip, but
+varies from chip to chip.
+
+If you can connect the voltage source between two pins, instead of to
+a single pin (implying that the voltage doesn't share a common ground
+with the AVR), then you get a couple of additional benefits:
+
+- If you set pin A as low input and pin B as low output, then you'll
+  measure a positive voltage on pin A if the positive end of the
+  source is connected to pin A, and a zero voltage (and some heat
+  dissipation in the clamping diode) if the negative end of the source
+  is.  I think you can also measure a positive voltage on pin B in
+  that case, since whatever current is being sourced by the clamping
+  diode to ground on pin A is being sunk through the nonzero output
+  impedance on pin B.  But in that case, you can set pin A as low
+  output and pin B as low input, and you'll measure the positive
+  voltage on pin B.
+
+- This also means you can measure AC voltages, although only either
+  the upper or lower half of the waveform at any one time, by
+  switching back and forth.
+
+- For 3.9 to 5.0V, you can get higher precision measurement.  Suppose
+  WOLOG that you've measured that pin A is the more positive end of
+  the source.  Then you set pin B as low input and pin A as high
+  output.  Now pin B sees a voltage of (5.0 - DUT) volts, which it can
+  then measure with millivolt precision by using the internal bandgap
+  reference.  This trick is limited by the stability and precision of
+  your 5V reference, which, unfortunately, is probably worse than
+  0.25%.  (You can re-measure it to 0.25% against the internal bandgap
+  frequently, but you can't get the 0.02% precision this seems to
+  promise without a more precisely controlled reference voltage.)
+
+This range of tricks gives you variable voltage precision as follows:
+
+- -5.0 to -3.9 V: 1mV
+- -3.9 to -1.1 V: 5mV
+- -1.1 to 1.1 V: 1mV
+- 1.1 to 3.9 V: 5mV
+- 3.9 to 5.0 V: 1mV
+
+This gives you at least 0.25% precision for -5 to -2.2 volts, -1.1 to
+-0.4 volts, 0.4 to 1.1 volts, and 2.2 to 5 volts; at least 0.45%
+precision from -5 to -0.22 volts and 0.22 to 5 volts; and at least 10%
+precision from -5 to -0.01 volts and 0.01 to 5 volts.
+
+(As usual, linear analog-to-digital conversion is a bad deal here.  If
+we wanted 0.45% accuracy for anything up to 5 volts and had 10 bits to
+work with, a smooth exponential distribution of levels 5/1.0045**n for
+n up to 1024 would give us 0.45% accuracy down to 51 millivolts,
+rather than 220 millivolts; that is, 10 bits would cover an entire
+order of magnitude.)
+
+The four different ways to configure the two pins to measure a voltage
+between them (LI LO, LO LI, LI HO, HO LI) provide two different ways
+to measure any given voltage, to different precisions, while only
+allowing microamps of current to flow.  If these measurements
+disagree, then you know the device isn't actually connected across the
+terminals, or isn't a voltage source.  Since none of these
+configurations allow more than microamps of current to flow, none of
+them should be dangerous to electronic components that aren't
+generating voltage.
+
+> If the voltage source is just connected to pin A, then pin A might
+  read the same voltage in the LI LO and LI HO configurations (that
+  is, changing the state of pin B might not affect pin A much).  But
+  if pin A is floating, it's not a great idea to depend on it to do
+  much of anything; it might follow pin B through internal leakage or
+  capacitive coupling.  So you might try the HI LO and HI HO
+  configurations instead, just in case, but perhaps only briefly — the
+  pull-up resistor could source enough current to damage, say,
+  back-biased tantalum capacitors.
+
+If you know that you have a voltage source between your terminals, the
+next thing to do is presumably to evaluate how much current it can
+deliver, which you should maybe be able to do by setting both
+terminals to low output (LO LO).  In this voluptuous configuration,
+the negative terminal of the voltage source is forced below ground and
+fed current from the clamping diode, while the positive terminal feeds
+up to about 40mA of current to ground through its impedance.  You
+should see 0V on one terminal and a small voltage on the other, which
+voltage should increase (probably nonlinearly!) with the current being
+sucked from the voltage source.  If it can provide more than about
+40mA (AAA batteries can provide 500mA) you won't learn anything
+useful.
+
+LO LO should be safe for any component that isn't generating voltage
+itself, since it's just trying to put both of its terminals at the
+same voltage.
+
+The trouble with LO LO or HO HO with a voltage source is that you're
+almost certain to be overtaxing the poor little clamping diodes.  It
+might make more sense to use LO HO or HO LO, with the appropriate
+polarity to keep either of the terminals from going outside the power
+rails.
+
+Measuring resistance
+--------------------
+
+A resistor between the two terminals will tend to bring their voltage
+to equality in any of the five configurations suggested for measuring
+voltage sources in the previous section (LI LO, LO LI, LI HO, HO LI,
+LO LO).  In the first four configurations, the input pin will follow
+the voltage on the output pin, and quite quickly too — if you have a
+1pF pin capacitance and a 1MΩ resistor, your RC time constant is 1μs,
+16 clock cycles on the Arduino, far too fast to digitize the charging
+curve with a mere 35kHz ADC.  You might be able to beat that by doing
+a lot of transitions and digitizing one sample after each transition,
+at a variable delay, but you're going to be out of luck when you get
+to 10kΩ resistors, let alone 100Ω resistors.
+
+But if one pin is following the other like that, you can infer that
+there is perhaps a resistance connected between them, and try to run
+some current through it to see what happens.
+
+The first thing to try is presumably HI LO or LO HI, which forms a
+voltage divider between the pull-up resistor and the unknown
+resistance.  If you somehow knew the resistance of the pull-up
+resistor — more accurately than "20–50kΩ" — you could use this to
+calculate the unknown resistance with some precision.  Without that
+calibration, you're just ballparking it, although you can measure the
+ratios between resistances quite accurately.
+
+(In practice the pull-up isn't actually a linear resistance.)
+
+For the case where the pull-up resistance curve is known accurately —
+let's say 35kΩ — you have the following scale of measurements on the
+HI pin:
+
+- 4.995V (ADC=1022 when comparing against 5V reference): R/(R+35kΩ) =
+  1022/1023, so R = 36MΩ.
+- 5V (ADC=1023): R > 36MΩ.
+- 4.990V (ADC=1021): R = 18MΩ.  Clearly the error in this range is
+  enormous, but it would still be very useful to be able to tell the
+  difference between a 10MΩ resistor, a 1MΩ resistor, and a blown
+  resistor.  Unfortunately it's not clear that you actually get quite
+  that far out; we're talking about currents around a microamp, and
+  there could easily be microamp-range leakages floating around these
+  pins.
+- And so reciprocally down to, say, 2.5V (ADC=512), where R = 35kΩ,
+  and changes of one count actually do represent 0.2% changes in R.
+  Note that at this point we don't actually care what the reference
+  voltage is or how precisely we know it, because R/(R+35kΩ) is the
+  ratio of voltages, regardless of what the larger voltage actually
+  is.  We *do* care about the precise value of the resistor, but it's
+  not clear how we can find that.
+- So on down to 1.1V or so (ADC=225), where R = 9.86kΩ and each count
+  represents about 0.5% (so 0.25% error, ideally, but probably more
+  like 1%.)  At that point we can switch to the internal bandgap
+  reference and quadruple our resolution — but we're limited by the
+  limited precision of our measurement of the bandgap reference
+  relative to the total supply voltage, and now we *do* care about
+  what the supply voltage is.  Still, ideally, we can measure
+  resistances in this range with around 0.1% precision.
+- We hit ADC=225 and 0.5% precision again at 0.24 V, at which point R
+  = 1.76kΩ.
+- We hit ADC=20 and 5% precision at 21mV, R = 148Ω.
+- ADC=10 and 10% precision at 10.7mV, R = 75Ω.
+
+So far we've only been pushing about 140μA through the resistor.  This
+should be safe for almost anything (except, as mentioned earlier,
+electrolytic and especially tantalum capacitors over long periods of
+time.)  But if our device is behaving like a resistor — in particular,
+the measurement we get here is stable over long periods of time such
+as a millisecond or two, and consistent in both directions — it's
+almost certainly safe to put more current through it, at least for a
+while.  And we can get a more precise measurement that way if the
+resistance is lower than around 1-10kΩ.
+
+So if we switch to LO HO and HO LO mode, we're attempting to put a
+full 5V across the putative resistor.  Now we should be able to
+measure the voltage drop introduced by the pin driver (the sink) on
+the LO pin, and perhaps less precisely the voltage drop on the HO pin.
+
+These drivers are somewhat nonlinear — their voltage drop isn't purely
+proportional to the current — but treating one of them as having a
+resistance around 25Ω worked reasonably well for me in an experiment,
+over about the 50-500Ω range.  Experimentation is needed.
+
+This could involve pushing a full 40mA through the resistor,
+dissipating 200mW, so you probably want to do it on a low duty cycle.
+This will involve lots of opportunities to watch its impulse response,
+which could tell you if it has much inductance or capacitance.
+
+If you're switching from HO LO to LO LO, a capacitor should dump the
+positive charge it's accumulated back into the formerly-HO pin,
+keeping its measured voltage above zero for a bit due to the nonzero
+input impedance, while a resistor will stop carrying current as soon
+as you stop applying voltage.  An inductor, on the other hand, will
+continue carrying current in the same direction, dragging the
+formerly-HO pin's voltage below zero (unmeasurably, due to diode
+clamping) but continuing to dump charge into the still-LO pin, keeping
+its measured voltage above zero.
+
+That's not the only possible way you could turn the pins off to stop
+burning energy in the resistor.  In fact, of the 16 possible
+configurations of two pins, only LO HO and HO LO apply 5 volts at low
+impedance across the load; the other 14 are some variant of "off" or
+"gently pulled up", so any of them would work.  However, of those 14,
+only LO LO and HO HO provide low-impedance paths for current to
+continue flowing in the case of an inductor.  Suddenly increasing the
+impedance in a circuit with an inductor is a recipe for potentially
+damaging or possibly even painful voltage spikes; we can hope that the
+diode-clamped inputs are up to the stress, but it seems better to
+minimize the risk.
+
+Even assuming the behavior we observe is memoryless, the different
+voltages applied by HI LO and HO LO (in the case where current flows)
+can give us two points on the E-I curve of the device under test;
+LO HI and LO HO give us two more points, although perhaps less
+informative ones.  If those four points and the origin are collinear,
+we have a resistor, at least over the voltage range we're testing
+with.  Being able to tell if they're collinear, though, presupposes
+that we have a good map of the E-I curve of the pin drivers, since
+that's what we're supposedly inferring the I at high current from, and
+also a well-calibrated value of the pullup resistance!
+
+Reversing the bias will, among other things, distinguish a diode from
+a resistor, even if the exponential E-I curve doesn't — unless it's a
+zener diode with a low breakdown voltage.
+
+Measuring capacitance and inductance
+------------------------------------
+
+Capacitors can be delicate.  Inductors aren't, but chips are delicate
+when connected to inductors.  So this requires some care.
+
+When the external voltage drops you observe in HO LO or LO HO and LO
+LO modes aren't time-invariant, you know you have either a capacitor
+or an inductor; and when those voltage drops go up rather than down
+over time, you know you have a capacitor, so you should be careful.
+But "being careful" might mean avoiding HO LO and LO HO modes
+altogether XXX
+
+If you reverse the voltage, it should XXX
+
+Measuring diodes
+----------------
+
+XXX
+
+Zeners
+------
+
+XXX
+
+Related stuff
+-------------
+
+<http://xyphro.de/blog/index.php> homebrew smart tweezers
+
+<http://blog.iteadstudio.com/tag/lc-meter/> the Goliath Arduino-based LC meter.
+
+<http://hackaday.com/2011/07/24/using-an-arduino-to-measure-inductance/>
+<http://reibot.org/2011/07/19/measuring-inductance/> another
+L-measuring circuit.

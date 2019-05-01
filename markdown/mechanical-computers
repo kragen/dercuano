@@ -1,0 +1,470 @@
+So one of the reasons I'm excited about automated fabrication
+(e.g. Fab@Home, tabletop CNC mills, RepRap, inkjet-printing of
+circuits, fused deposition modeling) is that I expect it will make it
+possible to build computers with minimal capital.  It will be some
+time before those computers are as cheap or as fast as mass-produced
+microcontrollers, so they will start out as curiosities.  But how far
+away is the prospect of automatically building a working computer with
+minimal capital?  I think it's already possible.
+
+I'll start by considering mechanical computers with no sliding
+surfaces, using Merkle's [buckling logic][].  Organic semiconductors,
+nonlinear acoustic devices, fluidic logic, or something more exotic,
+might turn out to be the form that such computers eventually take; but
+I'm pretty sure Merkle's approach is workable.  So I'm going to
+consider that first.
+
+Unfortunately, I don't know shit about mechanical engineering.  If any
+actual mechanical engineer is annoyed at my ignorant speculations when
+they read this, I'd be delighted to hear about all the things I'm
+getting wrong.
+
+Carl Mikkelsen's Stewart Platform
+---------------------------------
+
+Back in 2000 and 2001, Carl Mikkelsen built a pretty crude “hexapod”
+or “Stewart Platform” with some Allthread; see his “Stewart Platform
+Project Notebook”.
+> http://www.foxkid.net/cgi-bin/notebook.pl?pdp=/var/www/html/&pagedir=cmm/platform&imagedir=/Processed/Carl%27s%20Projects&noframes=1
+
+Allthread isn't ideal because it uses a normal roughly triangular
+thread profile, which increases backlash, friction, and wear, and
+decreases efficiency, over Acme threads or square threads.  It has the
+great advantage that you can get it at any hardware store.
+
+He used 72-step-per-revolution (?) stepper motors and some stepper
+control circuitry.  On one page, he claimed 5-mil accuracy over a
+range of about 18" in X and Y, and on another page, he claims 2-mil
+accuracy in the “sweet spot”.
+
+For the second version of his machine, he switched to dual-ball-nut
+ballscrews in order to get much better accuracy, but that's getting
+outside of “minimal capital”, I think.
+
+From looking at photographs of the machine, it looks like the Z
+distance is considerably larger than the X and Y distance.
+
+How Many Voxels?
+----------------
+
+There have been a number of capable small CPUs over the years that
+contain on the order of 4000-8000 transistors, including the 6502 used
+in the Apple ][, the NES, and the Atari 2600 (4000 transistors, 8-bit
+ALU), Chuck Moore's MuP21 (6000 transistors, 21-bit ALU, including
+video coprocessor), Voyager 2's RCA 1802 (5000 transistors), CP/M
+machines' 8085 (6500 transistors) (the 8080 was smaller but needed
+more support circuitry), the Apollo Guidance Computer (4100 3-input
+RTL NOR gates, which I think is about 8200 transistors) and so on.
+The IBM 1401 was supposedly more complex:
+<http://ed-thelen.org/comp-hist/BRL64-i.html> says a minimal 1401
+system had 6 213 diodes and 4 315 transistors.  It ran at 86 957 Hz.
+(How big was the PDP-7 Unics was written on?)
+
+To run an interpreted programming language, you probably need at least
+32000 bits of memory, and twice that is better.
+
+So 64000 “logic elements”, each of which can be either a bit of memory
+or a gate, should more than suffice.  64000 is the cube of 40, so a
+40x40x40 cube of logic elements would be sufficient if you didn't need
+any space for signal routing.  In two-dimensional chips, I've heard
+it's typical to spend 90% of the area on routing; things are much
+closer together in three dimensions (64000 elements is about 250x250
+in 2D, so far-apart things in a device of that size need more than six
+times as much wire to connect them), so 10x routing overhead is quite
+a pessimistic assumption for 3-D; but if we accept it, then we need an
+86x86x86 cube.
+
+How big does each element need to be?  Presumably if we're fabricating
+it with the CandyFab 2000, it needs to be pretty gigantic.  (Sugar
+wouldn't bend enough, but maybe you could make it out of polyethylene
+pellets with the CandyFab.)  But if you are depositing tiny beads of
+molten ABS plastic with 2-mil precision, you could make it a lot
+smaller. You could probably get a working Merkle buckling-spring cell
+in something like 16x6x12 voxels:
+
+              Top View                  Side View              Side View
+    section 1  sec 2        1           section 1              section 2   voxels
+            |      |        |                                              1
+        ++++++++++ |  ++++++++++          ++++                             2
+        ++++++++++ |  ++++++++++            ++++                           3
+    **  ++++++++++ |  ++++++++++  **          ++++                         4
+    ******++++++++ |  ++++++++******            ++++                       5
+      ****************************            ********         ********    6
+          ********************                ********         ********    7
+            |   ++++++++    |                                    ++++      8
+            |   ++++++++    |                                  ++++        9
+            |   ++++++++    |                                ++++          A
+            |   ++++++++    |                              ++++            B
+    voxels: 5 6 7 8 9 A B C D E F 10      1 2 3 4 5 6
+
+If that were really the size you needed, at 2 mils, it would be 32 x
+12 x 24 mils, or about 0.8 mm x 0.3 mm x 0.6 mm, which altogether adds
+up to just over an eighth of a cubic millimeter --- 0.52 mm cubed.
+It's a total volume of 9216 voxels.
+
+You could probably do something a lot more ingenious and get an order
+of magnitude or two improvement.
+
+Which means that the total 86x86x86 cube, 6 billion voxels, would be
+45 mm on a side.
+
+Laser printing?
+---------------
+
+Suppose that instead of building your thing with a Stewart platform,
+you have a magical way of taking a ream of laser-printed paper,
+perfectly aligning it, and then making the paper disappear, letting
+the layers of toner come together without the interference of the
+paper, and somehow adhering them.  600dpi laser printers currently
+cost US$100 on NewEgg, and 1200dpi laser printers cost US$215, so
+let's figure 1200dpi, and figure that the layer of toner is also
+1/1200" thick.
+
+Our 6-billion-voxel cube is only 1803 voxels on a side, so it's about
+1.5 inches on a side.
+
+LUTs
+----
+
+### skip this part ###
+
+The elements in modern FPGAs (“field-programmable *gate* arrays”)
+mostly consist of lookup tables (“LUTs”) rather than actual gates in
+the array.  The idea is that basically you use your N bits of input to
+index into a little EEPROM and get M bits of output, which allows you
+to emulate any possible combinational circuit, and then you have
+routing resources to connect those outputs to the inputs of other
+cells.
+
+For automated fabrication to help much with building mechanical
+computers, compared to just carving them out of wood or steel or
+whatever with non-automated machine tools, it's going to have to
+reduce the number of separate pieces that you have to assemble
+manually when you're done.
+
+### mechanical realization of LUTs ###
+
+LUTs have a fairly straightforward low-parts-count mechanical
+realization.  If you have a probe positioned over a height field, then
+when you lower the probe onto the height field, the height at which it
+stops will be an arbitrary function of its X and Y coordinates.  This
+“lowering” step is similar to the step of squeezing the gate of a
+Merkle buckling-spring gate,
+or pushing a rod-logic rod
+to see where it stops.
+
+If you encoded one bit in X and one bit in Y, you can get an arbitrary
+two-input boolean function in Z, but Z's domain isn't limited to
+booleans.  Likewise, you could encode multiple bits in each of X and
+Y; you're limited largely by the aspect ratio of holes you can carve
+into your height field.  Originally I was thinking about tall towers
+sticking up and bending or breaking, but there's no reason they can't
+all be in separate holes.
+
+Jewelers' twist drill bits, which cut cylindrical holes, normally come
+in sizes 1 through 80 in the US.  According to Wikipedia, size 80 is
+0.343 mm in diameter, or 0.0135", about a 74th of an inch.  So you
+could probably drill a 32x32 matrix of these holes into a one-inch
+block of, say, aluminum.  Then you'd only need the positioning of the
+probe to be accurate to within about 0.007" to make sure that it went
+into a hole; if your machine drilling the depths, like the ghetto
+Stewart platform mentioned above, were only accurate to 0.002", you
+could use a 3x mechanical advantage between the probe and whatever
+input it was driving so that you would need a 1" x 1" x 0.5" cube of
+metal for this 32x32 array of holes.
+
+(It's probably best to translate the block itself in at least one of
+the three dimensions, rather than translating the probe in all three,
+in order to diminish the accumulated positional error.)
+
+XXX uhoh.  [“The Real Cost of
+Runout”](http://www.mmsonline.com/articles/070603.html) talks about
+reducing the cost of drilling 3mm-diameter holes from 80 cents to 27
+cents per hole by reducing runout on the drill press, or from 23 cents
+to 10 cents per hole when using high-speed steel instead of tungsten
+carbide --- and these numbers are just for the cost of the drill bits.
+But 1024 holes at 10 cents per hole is still US$102.40.  Do smaller
+holes cost less?
+
+XXX http://www.ukam.com/diamond_core_drills.html says they have
+diamond drills “from .001" to 48" (.0254mm to 1219mm) diameter.”
+Being able to drill holes of .001" diameter would mean being able to
+drill a 32×32 array of holes in 0.064" × 0.064".  On
+http://www.ukam.com/micro_core_drills.htm they actually only list
+drills down to 0.006", which they recommend using at 150 000 RPM, feed
+rate 0.010" per minute.
+
+### what the LUT is good for ###
+
+So that's a LUT with 10 bits of input and 5 bits of output (and thus
+5120 bits, or 640 8-bit bytes) realized in about a cubic inch.  That's
+enough to realize an arbitrary 32-state state machine with 5 bits of
+input at each step, or to perform 4-bit binary addition or subtraction
+with carry-in and carry-out and an extra input bit left over (say, to
+select between addition and subtraction), or to perform a selectable
+one of four arbitrary 5-bit combinational functions on two 4-bit
+inputs --- say, addition with carry out, AND, XOR, and something else.
+
+If you split it into two LUTs with ganged input --- that is, two
+probes --- then you get 9 bits of input and 10 bits of output.  A
+4x5-bit multiply needs only 9 bits of output.  You could do a 4x4-bit
+multiply in half the area and half the depth.
+
+All of these applications still work just as well
+if any or all of the quantities
+are encoded in some weird way
+such as a Gray code
+or an excess-N code.
+
+At some point 
+you have to encode the 32 slightly different linear displacements
+into five distinct bits.
+You can do this with a 32x5-hole LUT,
+with five probes sticking into it,
+and only two distinct hole depths.
+
+Decoding five bits
+encoded in five separate displacements
+into 32 levels of displacement
+in a small number of moving parts
+is maybe more difficult.
+
+The [ZPU project](http://opencores.org/projects.cgi/web/zpu/overview)
+on OpenCores
+is a 32-bit CPU;
+realized in a Xilinx FPGA of LUTs,
+it uses “442 LUT @ 95 MHz after P&R w/32 bit datapath Xilinx XC3S400”.
+I don’t remember offhand
+how big the XC3S400 LUTs are.
+
+### more about LUT designs ###
+
+#### shift registers ####
+
+You can make an 8-bit shift register
+out of two 4×4 → 4 bit LUTs
+and two 4-bit memory units
+if you are willing for it to always shift;
+each LUT
+given (a, b) computes (a << 1 & 15 | (b & 8) >> 3)
+which is written to its memory unit
+for the next cycle.
+
+The communication from the low nibble LUT
+to the high nibble
+must be intermediated through the memory;
+this allows both LUTs to transition at the same time
+and means that the bit being shifted into the high nibble
+is the old MSB of the low nibble,
+not the new one.
+Using (b & 8) >> 3
+means you don’t need to decode the LUT output.
+
+The table looks like this:
+
+    array([[ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15]])
+
+Clearly you can reduce this
+to a 4×1 → 4 bit LUT
+if you have a way to extract
+just one bit from the b input.
+For example,
+you could use a 4 → 1 bit LUT:
+0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1.
+You could perhaps integrate this into the memory
+from which it's being read.
+
+If you have a way to do that,
+you have space to include an opcode
+that tells the register what to do.
+For example,
+shift left, remain steady, shift right, or reset to 0.
+If you have a way to combine this opcode,
+the MSB of the less-significant nibble,
+and the LSB of the more-significant nibble
+into a single 4-bit input b = LSB | MSB << 1 | opcode << 2,
+your table can look like this instead.
+
+    >>> def shift(a, b):
+    ...     lsb, msb, opcode = b & 1, (b & 2) >> 1, b >> 2
+    ...     shift_left, nop, shift_right, reset = range(4)
+    ...     if opcode == shift_left:    return a << 1 & 15 | msb
+    ...     elif opcode == nop:         return a
+    ...     elif opcode == shift_right: return lsb << 3 | a >> 1
+    ...     elif opcode == reset:       return 0
+    ...
+    >>> Numeric.array([[shift(a, b) for a in range(16)] for b in range(16)])
+    array([[ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 0,  2,  4,  6,  8, 10, 12, 14,  0,  2,  4,  6,  8, 10, 12, 14],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 1,  3,  5,  7,  9, 11, 13, 15,  1,  3,  5,  7,  9, 11, 13, 15],
+           [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+           [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+           [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+           [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+           [ 0,  0,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  6,  6,  7,  7],
+           [ 8,  8,  9,  9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+           [ 0,  0,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  6,  6,  7,  7],
+           [ 8,  8,  9,  9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+           [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+           [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+           [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+           [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]])
+
+All of the above
+generalizes to N-bit shift registers.
+
+#### addition ####
+
+Parallel addition
+(the usual digital kind)
+with inputs and outputs as the usual kind of binary numbers
+(not carry-save addition)
+can’t be done totally in parallel;
+the carry from the least-significant bits
+must be ready before the most-significant bits
+can produce their final result.
+
+But still,
+with 4×3 → 4 LUTs
+we can do three bits at a time.
+We bring in the carry
+along with one of the inputs;
+the LUT looks like this:
+
+    >>> def add(a, b):
+    ...     carry_in, inb = (b & 8) >> 3, b & 7
+    ...     return a + inb + carry_in
+    ...
+    >>> Numeric.array([[add(a, b) for a in range(8)] for b in range(16)])
+    array([[ 0,  1,  2,  3,  4,  5,  6,  7],
+           [ 1,  2,  3,  4,  5,  6,  7,  8],
+           [ 2,  3,  4,  5,  6,  7,  8,  9],
+           [ 3,  4,  5,  6,  7,  8,  9, 10],
+           [ 4,  5,  6,  7,  8,  9, 10, 11],
+           [ 5,  6,  7,  8,  9, 10, 11, 12],
+           [ 6,  7,  8,  9, 10, 11, 12, 13],
+           [ 7,  8,  9, 10, 11, 12, 13, 14],
+           [ 1,  2,  3,  4,  5,  6,  7,  8],
+           [ 2,  3,  4,  5,  6,  7,  8,  9],
+           [ 3,  4,  5,  6,  7,  8,  9, 10],
+           [ 4,  5,  6,  7,  8,  9, 10, 11],
+           [ 5,  6,  7,  8,  9, 10, 11, 12],
+           [ 6,  7,  8,  9, 10, 11, 12, 13],
+           [ 7,  8,  9, 10, 11, 12, 13, 14],
+           [ 8,  9, 10, 11, 12, 13, 14, 15]])
+
+This gives you,
+for example,
+9-bit addition
+in three levels of LUT,
+plus whatever it takes to shuffle the bits around appropriately.
+
+#### bit shuffling ####
+
+In several of the previous items
+I have assumed a way to combine bits from disparate sources
+into a single positional input,
+or to drop bits.
+This problem also occurs
+on input.
+I hope there's a better way to do this,
+but one workable way is to use a LUT.
+I’ve pointed out earlier that a 4×0 → 1 bit LUT
+can select a single bit,
+but you can do things more generally.
+For example, in the shift-register case
+where we want to combine a neighbor MSB possibly being shifted left,
+an LSB possibly being shifted right,
+and a two-bit opcode,
+we can use two small LUTs:
+
+    >>> Numeric.array([[(opcode << 1 | msb) for opcode in range(8)] for msb in range(2)])
+    array([[ 0,  2,  4,  6,  8, 10, 12, 14],
+           [ 1,  3,  5,  7,  9, 11, 13, 15]])
+    >>> Numeric.array([[(opcodemsb << 1 | lsb) for opcodemsb in range(16)] for lsb in range(2)])
+    array([[ 0,  2,  4,  6,  8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30],
+           [ 1,  3,  5,  7,  9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]])
+
+If we have to simultaneously
+extract the msb and lsb from the nibbles they’re embedded in
+it is best to do this differently:
+
+    >>> Numeric.array([[(leftneighbor & 1 | (rightneighbor & 8) >> 2) 
+    ...  for leftneighbor in range(16)] for rightneighbor in range(16)])
+    array([[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+           [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3]])
+    >>> Numeric.array([[(opcode << 2 | msblsb) for opcode in range(4)] for msblsb in range(4)])
+    array([[ 0,  4,  8, 12],
+           [ 1,  5,  9, 13],
+           [ 2,  6, 10, 14],
+           [ 3,  7, 11, 15]])
+
+It would require many fewer LUT entries
+to extract those bits in a separate step.
+
+### circles instead of lines ###
+
+Mechanically, moving things linearly is a little trickier than moving
+them in circles --- there tends to be more slop.  If you transpose
+this “height field” LUT into cylindrical coordinates, you get a
+camshaft.  The normal sliding cam follower design imposes limits on
+the “slew rate” of the output function, but if you lift the “cam
+follower” while rotating the shaft and then use the same forest of
+holes and “lowering step” as with the flat X-Y approach.
+
+Cylindrical coordinates still leave two coordinates translational,
+though.  You can cheat a little bit by doing the axial positioning
+along a large-radius arc that almost parallels the axis of the
+camshaft, to within the diameter of the camshaft, rather than in a
+strictly translational fashion.
+
+A third coordinate system
+that might be useful
+approximates two translational dimensions
+with angles around two axes that are some distance apart
+as with the two wheels of a can opener, for example;
+or any two discs that overlap,
+while rotating around their own centers.
+This allows one dimension to “wrap around”,
+as with the camshaft approach.
+
+References
+----------
+
+[buckling logic]: http://www.zyvex.com/nanotech/mechano.html "Two Types of Mechanical Reversible Logic, by Ralph Merkle"
+[Buckling logic] was written in 1990 and published in Nanotechnology,
+Volume 4, 1993, pp. 114-131.
+
+<!--
+ LocalWords:  LUT LocalWords LUTs MSB LSB
+-->
