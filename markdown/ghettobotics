@@ -1,0 +1,909 @@
+Ghettobotics: making robots out of trash
+========================================
+
+I've been thinking for a while about low-cost electronics projects.
+What could you make out of the garbage?  People throw away electronics
+all the time, and recycling it is an interesting sustainability and
+autonomy experiment.
+
+The ultimate goal of Ghettobotics is a self-sustaining industrial
+economy that consumes nothing but discarded electronics and other
+trash and produces, with a minimal amount of human effort, useful
+robots.  To this end, every tool and material used in the Ghettobotics
+program can be made out of trash, by Ghettobotics itself.
+
+A big part of the problem is that you can't make much out of
+electronics without some fairly specialized tools.  So the first
+problem is how to build the tools out of garbage --- maybe using a
+previous generation of tools you bought in a store.
+
+So what tools do you need?  These would be desirable:
+
+* A soldering iron.
+* Desoldering equipment.
+* A basic VOM: volt-ohm-milliammeter.
+* An LCR meter.
+* An oscilloscope.
+* A display.
+* Current-limited variable-voltage power supplies.
+* A logic analyzer.
+* A JTAG board.
+* A serial terminal.
+* A PROM burner.
+* A pick-and-place robot.
+* A solder stencil cutter.
+* A reflow oven.
+* A CNC mold cutter.
+ 
+You also need some basic electronic and mechanical parts; the
+following are desirable:
+
+* Solder.
+* Wires.
+* Connectors.
+* Resistors, capacitors, inductors, transistors, diodes.
+* Displays.
+* Speakers.
+* Cases.
+* Motors and motor controllers.
+* Amplifiers.
+* Analog-to-digital converters.
+* Digital-to-analog converters.
+* Presence sensors.
+* Light sensors (pixel array or otherwise).
+* Motion measurement.
+* Microcontrollers.
+* Memory.
+* Batteries.
+* LEDs.
+* Other lights.
+* Buttons.
+* Touchpads.
+* Wireless communications modules.
+* Range measurement devices.
+* Power supplies.
+* Solder paste.
+* Temperature sensors.
+* Relays.
+* Shift registers.
+* Wheels.
+
+In taking apart and buying electronics, I'm highly impressed by the
+degree to which they seem to have been designed by people who can't
+program, and therefore prefer electronic or even mechanical complexity
+to simplify software.  Now that you can get low-power microcontrollers
+for under a dollar, this seems absolutely idiotic to me, except in
+cases where software simply won't cut it.  I conclude that knowing how
+to program is an incredible secret weapon in electronics design.
+
+A soldering iron
+----------------
+
+This is basically a resistive wire that can get hot and has a pointed
+tip.  This should be relatively easy to improvise, I haven't tried.
+In a pinch you don't even need the resistive part; you can heat up a
+chunk of metal with fire.
+
+For cleaning the tip, if cellulose sponges are hard to find, you can
+use wet paper or cardboard.
+
+A temperature-controlled soldering iron would be really useful; you
+can use a thermal-resistance "voltage divider" with your hand as the
+known-temperature "ground" to measure the tip temperature with pretty
+much any old temperature sensor.  Then you just need a little
+hysteresis and something to turn mains power on and off with; a triac?
+Not sure.  A high-power relay would work.
+
+Desoldering equipment
+---------------------
+
+Desoldering parts with just a soldering iron is feasible, but tricky
+and messy.  It's especially difficult using just a low-wattage
+pencil-type iron, which simply can't handle desoldering high-current
+or heat-sinking connections; a high-power soldering gun would have
+less risk of damaging chips.  Hot-air heating is apparently the
+standard approach here for rework stations, but I imagine you could
+also use a reflow oven or hot plate.
+
+Rework stations also have desoldering irons different-shaped tips for
+desoldering different parts quickly, heating up all their pads at
+once.  I don't know how to improvise this.
+
+Beyond just heating solder up, it's also handy to have other metals to
+mix into it to lower its melting point.  Standard lead-tin solder
+alone can help if you're trying to desolder modern lead-free devices;
+lead might work too.  The other alternatives that occur to me sound
+either expensive or, in the case of mercury, dangerous.
+
+Solder braid or a solder sucker also helps a lot.  Presumably if you
+have some copper wire sitting around you can braid it into solder
+braid, but a solder sucker would help more if you want to be able to
+recycle the solder.  An improvised solder sucker could maybe be made
+from a metal tip with heatsink fins on it and a rubber squeeze-bulb,
+but it's going to be difficult to make something that performs as well
+as a standard Teflon tip.
+
+A VOM
+-----
+
+The traditional way to build a VOM is with a galvanometer, a network
+of resistors with a selector switch, and a battery for the ohmmeter
+bit.  You can still do this (hard disks are built around voice-coil
+actuators that should work well for the galvo) but it's probably more
+reasonable to use a cheap analog-to-digital converter that measures
+voltage directly, then use a microcontroller to convert the reading to
+something comprehensible.
+
+Historically, VOMs have been designed around linear components,
+because nonlinearity is hard to compensate for in the analog realm.
+It's really easy to compensate for in the digital realm, so it
+probably makes more sense to not worry so much about linearity.
+
+The electrically simplest design for a VOM is something like a
+microcontroller with a built-in ADC, a voltage divider (one large
+resistor between the voltage input and the ADC pin, and one small
+resistor from there to ground), a speaker or piezoelectric sounder,
+and a battery; total of five components.  Current inputs connect
+directly to the ADC pin and ground; voltage inputs go through the
+large resistor, enabling the measurement of voltages much larger than
+the microcontroller can deal with directly.  An additional input pin
+with a pullup resistor and ADC input is used to measure resistance.
+The microcontroller uses speech synthesis to communicate the results
+of the measurement.
+
+If you're willing to require an external display, you can ditch the
+speaker and send the measurement results over a serial or USB
+connection; if you're willing to require an external power supply
+(say, an unplugged laptop on battery, connected via serial or USB),
+you can ditch the battery too, getting down to three components, two
+of which are resistors.
+
+Back-of-the-envelope calculation says that with a 10-bit ADC with
+selectable 5V and 1.1V range (like what you get on an Arduino) and a
+50:1 voltage divider, you can measure up to 250V with 0.25V precision
+and up to 55V with 0.05V precision.  If you then manually connect
+smaller voltages (below 5V) directly to the ADC pins, you can get up
+to 5V with 0.005V precision and up to 1.1V with 0.001V precision.
+
+You can use a microcontroller without an ADC if you can convert the
+quantity you want to measure to a measurement of time to exceed a
+digital threshold; for example, you can hook up a capacitor between a
+couple of pins of the microcontroller, instead of a resistor, and
+measure an RC time constant.  You may be able to get better precision
+this way, but it depends on your capacitor's temperature-constancy and
+on your oscillator's constancy.  You may be able to calibrate to
+temperature, both by charging the capacitor under microcontroller
+control at start time, and by using a temperature sensor.  (Many
+microcontrollers have temperature sensors built in.)
+
+A very useful feature of VOMs in general, lacking in the normal ones,
+is to correct for noisy connections.  If you average over time, a
+shaky connection to a 10-volt power source might look like 9 volts, 5
+volts, or 1 volt; but if you look at the voltage waveform at
+microsecond resolution, you can tell that it's 10 volts with a shaky
+connection, not 5 volts or whatever.  VOMs (and LCR meters) built
+around ADCs should be intelligent enough to do this correction.
+
+### Nonlinear frontend ###
+
+It would be interesting to examine some diode-resistor networks to see
+if you can get a wider range with good precision by building a
+nonlinear input circuit, avoiding the need to switch ranges in order
+to measure large and small voltages --- and, perhaps more importantly,
+the possibility of blowing up your meter by hooking it up to a
+too-large input signal.  I'm thinking something like using a
+high-current power-rectifier diode in place of the low-value resistor
+in the voltage divider, so that the voltage signal you measure is the
+diode's minimal turn-on voltage drop, plus an additional voltage
+that's nearly logarithmic in the current that passes through (which is
+more or less the input voltage E divided by the larger resistance R
+between the input and the ADC pin).
+
+Something like the ON Semiconductor MBRAF1100T3G Schottky power
+rectifier diode would be ideal: assuming 25°C, at 20 mA it drops 0.42
+volts; at 200 mA it drops 0.54 volts; at 2000 mA, which is above its
+maximum rating, it drops 0.70 volts; and at 20 A, it drops 0.98 volts.
+(Serious temperature compensation would be needed to get a reasonably
+accurate measurement, because the voltage varies by more than a
+millivolt per °C.)  It would be very difficult to drive the voltage
+across this diode into a range that would damage a microcontroller,
+even one without 5V-tolerant inputs.
+
+If your ADC precision were 1mV, this would give you measurement
+precision of around 1% for currents in this range, at the cost of
+imposing a significant voltage drop.
+
+If we assume that the diode doesn't turn on until 0.42 volts, which is
+probably about right, then you'd have effectively an ideal voltmeter
+up to 0.42 volts, and above that, nonlinear response depending on your
+input resistor.  You probably want your input resistor to be quite
+large, since the diode isn't going to provide much input impedance
+above half a volt, but you can't make it too large or you won't be
+able to measure voltage at all.  With an absolutely minimal
+requirement of being able to measure a doubling of input voltage per
+1mV increase at the ADC pin, and only trying to measure up to 100V
+(the maximum reverse-bias rating for this diode), you need 100V to
+give you 0.428 volts at the ADC pin, which would be about 23mA through
+the diode, so your input resistor can be at most about 4kΩ.  With this
+network, you can get better voltage precision than the quarter-of-a-
+digit that this implies, but only at the cost of a lower input
+impedance.
+
+I have no idea how common Schottky power rectifiers are.  I've found
+lots of power rectifier diodes in the garbage but I have no idea what
+kind they are.  I assume most of them are large standard silicon
+diodes.
+
+So you might be able to do better with a more elaborate network, or
+using a separate input pin for voltage measurement.  You probably want
+a diode that's rated for a lot less than an amp.  The Vishay SD101A,
+for example, goes from 200mV at 0.01mA to 1000mV at 15mA, and is rated
+for 60V max reverse voltage; the same 4kΩ input resistor and 1mV
+measurement precision at the ADC pin would then give you some ±2%
+precision on your voltage measurement over that range and down to
+50mV, rather than the +100%,-50% you'd get with the power rectifier.
+That is, with this configuration, your meter can measure voltages
+covering three orders of magnitude with a consistent ±2% error.
+That's probably better than the analog multimeter I normally use.
+
+(Incidentally, this configuration might also be useful for digitizing
+audio and other signals; you only get about 34dB of SNR, but it's a
+consistent 34dB across 60dB of dynamic range, instead of having a
+noise floor 34dB below the strongest possible signal.  You get 94dB
+separation between the strongest measurable signal and the weakest
+measurable signal, as if you were using a 17-bit ADC instead of a
+10-bit ADC.  Analog Devices recommends this in their application note
+[MT-018][5], and explains that this resistor-diode configuration is
+how Bell originally implemented μ-law for voice digitization!)
+
+[5]: http://www.analog.com/static/imported-files/tutorials/MT-018.pdf
+
+An LCR meter
+------------
+
+If you're fishing inductors and capacitors out of the trash, or even
+just using surface-mount ones, you probably need to be able to measure
+them; the device you need is an "LCR meter", and they are available
+new for less than US$40.  But variants on the previous section's
+ohmmeter circuit should be able to provide reasonable measurements.
+
+A really handy physical design for this is the "smart tweezers"
+design, where the probes for your LCR meter are flexible and elastic,
+so you can pick up the component under test between them, or even
+touch them to the component in-circuit before bothering to desolder
+it.
+
+Many microcontrollers have ADCs but no DACs, which means that
+stimulating a device under test with a sine wave is out of the
+question without further hardware.  Measuring the impulse response of
+the component is theoretically sufficient, but you can also generate
+digital white noise to stimulate the component with, then compute the
+Fourier transform of the noise and the measured current waveform.
+
+This test provides enough information that you can automatically test
+the hypothesis that the component you're measuring is actually just an
+RL or RC circuit, and rather than giving dubious numbers when it's
+clearly not, you should try some more elaborate hypotheses --- more
+elaborate network models, or nonlinear components like diodes and
+transistors.
+
+There are several articles about homebrewing LCR meters with
+microcontrollers:
+<http://www.kerrywong.com/2010/10/16/avr-lc-meter-with-frequency-measurement/>,
+<http://electronics-diy.com/lc_meter.php>,
+<http://web.archive.org/web/20080405215220/http://ironbark.bendigo.latrobe.edu.au/~rice/lc/>,
+<http://py2wm.qsl.br/LC_meter/LC_meter-e.html>,
+<http://reibot.org/2011/07/19/measuring-inductance/>.  Cypress has an
+example project using their analog PSoC chips at
+<http://www.cypress.com/?app=forum&id=2492&rID=76890>.
+
+An oscilloscope
+---------------
+
+This can be usefully separated into data acquisition and display.
+
+### Data acquisition ###
+
+At times I've had some success using my sound card in place of an
+oscilloscope.  If the signals are within the audio range, a standard
+8Ω speaker can also provide some valuable information about them.  But
+what you really want is to digitize the signal and display it on a
+screen.
+
+You can, of course, use any ADC.  But a standard cheap analog
+oscilloscope has 20MHz bandwidth, which would require a 40Msps ADC,
+and actually a 20MHz analog oscilloscope can still detect signals much
+higher than 20MHz.  40Msps ADCs are not commonplace.  AVR ADCs can be
+run at up to a couple of Msps with reduced resolution (about 6 bits),
+and I found a three-channel 12-bit 2Msps ADC in a discarded flatbed
+scanner.  Some such scanner ADCs can digitize a single channel at
+three times their three-channel speed.
+
+Many of the remarks about cheap-shit VOM frontends apply here too.
+You can use a nonlinear input network and restore linearity in
+software.
+
+If you want to examine a high-frequency signal that is repetitive or
+nearly so, you should be able to downconvert it into a lower frequency
+band in order to digitize it with a lower-data-rate ADC.  In fact, if
+the sample-and-hold circuit on your ADC is fast enough, you may be
+able to do this with no extra analog circuitry!
+
+Another approach is to use many ADCs in parallel, triggering them in a
+round-robin fashion.  The guts of about 8 scanners would suffice to
+produce a 40Msps data-acquisition system this way, with a little bit
+of coordinating circuitry.  This, however, also depends on the
+sample-and-hold circuits being sufficiently fast.
+
+### Oscilloscope display ###
+
+If you have a laptop, you should use that, because you can afford
+dramatically greater amounts of computation and storage for display
+that way than if you build it yourself out of garbage.  See below.
+
+Analog oscilloscopes provide great variation in intensity, carrying
+additional information.  Oona Räisänen demonstrated the rather
+impressive difference in her post [Rendering PCM with simulated
+phosphor persistence][0]:
+
+> Now how cool is that? It looks like an X-ray of the signal. We can
+  see right away that the beep is roughly a square wave, because
+  there's light on top and bottom of the oscillation envelope but
+  mostly darkness in between. Minute changes in the harmonic content
+  are also visible as interesting banding and ribbons.
+
+[0]: http://windytan.blogspot.com.ar/2013/03/rendering-pcm-with-simulated-phosphor.html
+
+A display
+---------
+
+For lots of measuring-equipment stuff, you need a display.  The
+traditional approach is to integrate the display into the measuring
+instrument, but it probably makes more sense to separate them, so that
+you can amortize the effort of building a good display over several
+measuring instruments, each of which can then be extremely simple.
+You may want a simple seven-segment display on the measuring
+instrument itself (easily recoverable from discarded calculators or
+watches) but more detailed data display is probably better with a
+separate display device.
+
+People are throwing out CRTs all over the place, but here in Buenos
+Aires, it's difficult to find an intact discarded CRT --- cartoneros
+break off the yoke to recycle, ruining the tube.  But if you can find
+an intact CRT, you can probably drive it with a VGA or composite NTSC
+or PAL video signal from a microcontroller, without having to worry
+about any of the electronics inside the case.
+
+The TVout library for AVR microcontrollers works quite well with just
+two output pins and a couple of resistors to generate a blocky one-bit
+black-and-white NTSC video signal, which is dramatically better than
+nothing, but I think you can do better with even a few bits of ADC.  A
+three-bit or four-bit R-2R ladder DAC is easy to construct.
+
+Trickier is that the TVout library uses a lot of memory (kilobytes)
+for a framebuffer.  This dramatically limits the resolution, and
+inhibits the use of grayscale.  More elaborate software could display
+higher-resolution vector graphics.
+
+A perhaps more interesting approach is to use displays from discarded
+cellphones, which typically have their own framebuffer.  You send them
+commands to write (and maybe even read) their framebuffer, so you
+don't need to have enough memory yourself.
+
+Audio output is another, cheaper option.  Aside from simple approaches
+like beeps for continuity testers, there are several implementations
+of speech synthesis on AVR microcontrollers, one of which is
+[Cantarino][2] (LGPL); I think you can get comprehensible speech at
+under 100k 8-bit multiply-accumulates per second, which is within the
+capability of many microcontrollers; it should be about 0.2% of the
+CPU cycles of an Arduino.  Arjo Chakravarty has even done speech
+*recognition* on an AVR, called [μSpeech][1].
+
+[1]: http://arjo129.github.io/uSpeech/
+[2]: http://code.google.com/p/tinkerit/wiki/Cantarino
+
+Bench power supplies
+--------------------
+
+For testing, you need a bench power supply with selectable output
+voltage, one that's not necessarily highly efficient, but is hard to
+burn out.  I found an adjustable-voltage DC-DC converter chip in a
+discarded scanner, but I haven't yet tried using it for anything.
+
+I don't know how to build robust power supplies, but I assume that big
+power clamping diodes and big current-limiting resistors are involved.
+
+A logic analyzer
+----------------
+
+This is especially important for reverse-engineering the undocumented
+controllers often found in discarded electronics, but you also need it
+to diagnose problems in the things you build.  You can make a slow
+logic analyzer (say, a few million samples per second) with just a
+microcontroller using its GPIOs; what remains is only to view the
+waveforms.
+
+A fast logic analyzer probably needs shift registers or something.
+
+A JTAG board
+------------
+
+Lots of embedded systems can be put into debug mode and even
+reprogrammed with a JTAG interface; you can also use JTAG's
+boundary-scan functionality to map out board connectivity and diagnose
+connectivity faults in your own devices.  Four pins on a
+microcontroller, hooked up to a standard 6-pin JTAG header, suffices
+to control other things through JTAG.
+
+One of the most common JTAG cable chips is the FTDI FT2232, which
+you're not likely to find in the garbage, unless it's garbage from an
+electronics lab.  But you probably want to emulate it in software so
+you can use existing JTAG software on your laptop.
+
+Felix Domke wrote [a paper about JTAG for reverse engineering][3] in
+2009, which he presented in much more detail in a talk at 26C3, and
+the NSA@home project used JTAG to reverse-engineer boards that had
+FPGAs on them to repurpose the FPGAs for hash cracking; they published
+software for this called "[jrev][4]".
+
+[3]: http://events.ccc.de/congress/2009/Fahrplan/attachments/1435_JTAG.pdf
+[4]: http://nsa.unaligned.org/jrev.php
+
+Among other things, JTAG lets you identify JTAG-attached chips
+automatically and use them as shift registers.
+
+A serial terminal
+-----------------
+
+Any old computer will work as a serial terminal, with its own display;
+but you may want a microcontroller-based serial terminal.  A "terminal
+emulator" program that does what the Arduino's serial monitor does is
+quite simple; it doesn't even support backspace.  A more full-featured
+serial terminal can easily fit into a microcontroller.
+
+A PROM burner
+-------------
+
+If you're recycling old garbage electronics, their ROMs can be useful
+for several different purposes:
+
+* Dumping the ROM can allow you to repair other instances of the same
+  device that have damaged ROMs, or to reverse-engineer the controller
+  that runs the program found in the ROM.
+
+* If the ROM is reprogrammable, you can use it to store other data, or
+  even...
+
+* if the ROM is programmable and asynchronous, use the ROM as a
+  programmable logic device whose inputs are the address lines and
+  whose outputs are the data lines.
+
+To reprogram an EPROM or EEPROM you need at least a PROM burner and
+possibly an EPROM eraser, which is a shortwave ultraviolet light.
+PROM burners are relatively straightforward to build with a
+microcontroller, although they do often need control of 12-volt
+voltage, which you can achieve with many of the chips you'd use for
+motor control.
+
+A pick-and-place robot
+----------------------
+
+If you're building your own circuits, eventually you will benefit from
+being able to assemble them automatically instead of by hand.  I don't
+know all of what is involved in this, but I think that a lot of the
+mechanical and electronic difficulties of high-precision X-Y
+positioning are already dealt with by many inkjet printers.o
+
+A solder stencil cutter
+-----------------------
+
+This lets you squeegee solder paste onto a printed circuit board so
+you can solder your surface-mount components all at once with a reflow
+oven instead of one at a time.  It's basically a plotter.  You should
+be able to use overhead-projector transparency film for the stencils
+themselves, but X-ray film might be an alternative where you don't
+have sufficient overhead transparency film handy.
+
+I don't know what's involved in actually cutting these.  I think a
+vinyl-cutting machine might work.
+
+A reflow oven
+-------------
+
+A reflow oven bakes your circuit board until the solder paste melts
+and all of your components are glued into place.  SparkFun has a
+tutorial on their site on how to use a hot plate for this instead, but
+presumably you can also build your own reflow oven from a metal box,
+some heating elements, and a thermostat.
+
+A CNC mold cutter
+-----------------
+
+Michal Zalewski's "Guerrilla guide to CNC" explains that often it's
+more reasonable to make even one-off robot parts by cutting molds for
+them and then casting them than to cut the parts directly.  You can go
+a long way with a three-axis robot for this, which might be the same
+one that does your pick-and-place.
+
+Long ago I saw a video of an X-Y robot that avoided the difficulties
+of gantry construction by using two turntables in parallel planes, one
+of whose edge passes over the center of the other; by this means, you
+need only rotary motion rather than linear motion.  This way, X-Y
+positioning needs no more mechanical complexity than a couple of
+bicycle wheels driven by belts from motors, which is considerably less
+than the mechanical complexity of an inkjet printer.
+
+Solder
+------
+
+Recycling solder is a little tricky, but I think a solder sucker is
+probably sufficient.  You probably need to add new flux; I think pine
+pitch is sufficient, but haven't tried it.  You probably also want to
+keep your RoHS lead-free solder separate from your traditional
+lead-tin solder.
+
+Wires
+-----
+
+Ethernet cables typically have nice solid wires that are easy to work
+with.
+
+Connectors
+----------
+
+It's a pain in the ass to deal with multi-board circuits that are
+connected by wires soldered to all the boards; they tend to break
+easily.  Connectors are easily recyclable.  The most robust connectors
+are from automotive systems.
+
+It's also valuable to be able to connect to standard cables: audio,
+video, network, etc.  Ethernet cables are especially useful for
+unintended uses, since they tend to be long.
+
+Resistors, capacitors, inductors, transistors, diodes
+-----------------------------------------------------
+
+Small ones of these are all over the place (many of them are literally
+a dime a dozen new from Digi-Key).  The tricky part is keeping them
+categorized, since you need so many of them.  It may be worthwhile to
+catalog them with an LCR meter in situ, only desoldering them from
+their original board when you need them after looking in a search
+engine.  Smart tweezers on a pick-and-place robot could theoretically
+categorize them into little boxes.
+
+Larger items are somewhat harder to find.  Discarded old fluorescent
+light fixtures typically contain large inductors as "ballast"; I've
+found large resistors in discarded microwave ovens, and of course
+they're often used as heating elements; large diodes are often found
+in power supplies.  Large transistors, capacitors, and transistors, I
+have no idea.
+
+Displays
+--------
+
+As components rather than tools --- I've mentioned CRTs, cellphone
+displays, and 7-segment displays from calculators and watches, but
+there are many other premade displays out there.
+
+LCDs can be recovered from broken laptops.
+
+I haven't yet tried to connect new wires to a broken e-ink screen, but
+if it's feasible, broken Kindles would be a rich source of excellent
+displays.
+
+Vacuum fluorescent displays are among the most visually appealing to
+me, but they also require a high-voltage source, so they're tricky to
+work with.
+
+Laser displays are traditionally done with a couple of
+galvanometer-driven mirrors, and they look awesome.  I've speculated
+about building laser displays by deflecting mirrors using speaker
+cones instead, which would make them cheap as dirt; and you could use
+a laser display with a light sensor as a camera or scanner, too.
+
+Speakers
+--------
+
+These are the easiest components to scavenge: half-broken earphones,
+dynamic speakers in broken TVs, piezoelectric speakers from greeting
+cards, and so on.
+
+Cases
+-----
+
+When I was a kid, we used cardboard boxes for our electronic projects;
+but nearly anything can be used as a case: empty bleach bottles,
+books, tin cans, discarded pots, blocks of wood, hunks of styrofoam
+(modulo ESD issues).  Many discarded electronics include particularly
+robust steel cases, but toys provide plastic cases that are easier to
+drill.
+
+Motors and motor controllers
+----------------------------
+
+Inkjet printers typically have two relatively powerful (around 20W)
+stepper motors and PWM-controlled H-bridges to run them.  Flatbed
+scanners will have one, which will be lower power.  Laser printers
+have motors too.  Power-supply fans have brushless DC motors.  CD
+drives need at least two motors, one to spin the CD and one to move
+the head, but may have a third one to open and close.  Disk drives
+have high-speed motors with the finest bearings in the world.  Washing
+machines, refrigerators, and the like have much higher power motors,
+into the hundreds of watts and beyond; car starter motors are *really*
+high power, into the tens of kilowatts, but only work on a very short
+duty cycle.
+
+Even small stepper motors probably need more than 5 volts.  Chips like
+the ULN2003 can help with this, but then there are PWM H-bridge chips
+like the LB1845.
+
+Recent Epson inkjet printers use proprietary motor control chips which
+seem like they'd be really useful if they can be reverse-engineered.
+
+Bigger motors need things that can control several amps of
+electricity, often relays.
+
+Amplifiers
+----------
+
+You need amplifiers for lots of things: driving speakers, controlling
+motors, and boosting delicate analog signals so they can get to where
+you digitize them.  Amplifiers tend to be fairly specialized.  Audio
+equipment tends to have lots of amplifiers in it, including opamp
+chips, that won't work much outside the audio range; but an awful lot
+of useful signals are in the audio range.
+
+Analog-to-digital converters
+----------------------------
+
+ADCs are fundamental to interfacing with the outside world.  Some
+microcontrollers have them built in; if not, you may be able to do
+delta-sigma DAC with not much more than an analog comparator, such as
+an opamp, and a resistor and capacitor.  But lots of discarded
+electronics has separate ADCs in it, because keeping the ADC on a
+separate chip reduces electromagnetic interference.  So you can find
+separate high-quality ADCs in scanners and some audio equipment, at
+least.
+
+Digital-to-analog converters
+----------------------------
+
+Even more audio equipment has high-quality digital-to-analog
+converters, and you can cheat by using PWM or PDM at a high frequency;
+just be careful your high carrier frequency isn't going to blow up any
+tweeters.
+
+Presence sensors
+----------------
+
+Optical presence sensors are ubiquitous in printers and scanners; the
+light from an infrared LED is blocked, or not, on its way to a
+phototransistor.  Typically they use them as a "home position" sensor.
+
+Light sensors
+-------------
+
+Scanners, digital cameras, cellphones with digital cameras, and
+optical mice contain light sensors.  LEDs can also be used as (slow,
+noise-sensitive) light sensors.  (I haven't been able to reproduce the
+Mitsubishi paper that reported microsecond-range sensing times with
+reverse-biased LEDs; I get more like hundreds of milliseconds.)
+
+Motion measurement
+------------------
+
+Robotics involves being able to measure how far things have moved and
+where they are --- at least parts of the robot, and maybe things the
+robot interacts with.  There are lots of ways to do this.  Stepper
+motors emit pulses as you turn their shafts; servomotors typically use
+integrated potentiometers; optical encoders like those used in ball
+mice give you a quadrature-encoded signal that tell you how fast
+things move; optical mice take a high-frame-rate video of the table
+the mouse is sitting on.  I've seen inkjet printers that use linear
+optical quadrature sensors to sense the printhead position, as well.
+At the high end, shaft encoders give you an absolute shaft position
+readout, typically using Gray code.
+
+Digital cameras in general can be used with machine vision algorithms
+to measure position and motion.  This is easier with structured
+illumination, e.g. a laser pointer.
+
+Binary chain codes are a promising alternative to quadrature encoding
+to measure absolute positions instead of just relative motion, with
+some bootstrapping time.  Random noise, as long as it's repeatable,
+should work almost as well as a designed binary chain code.
+
+Accelerometers and gyroscopes are a particularly important kind of
+position sensor for many purposes: balancing on wheels, flight
+control, and protection from falls, for example.  Off-the-shelf MEMS
+accelerometers and gyros are what current cellphones and laptops use,
+but they aren't old enough for many of them to have made their way
+into the trash stream yet.  The traditional kind of accelerometer is a
+sprung weight controlling a potentiometer slider, and it seems like
+that sort of thing shouldn't be too hard to improvise, given other
+kinds of position and distance measurements.
+
+Microcontrollers
+----------------
+
+This is one of the biggest problems for actually bootstrapping with
+garbage.  You need *something* you can program to take advantage of
+all the amazing digital circuitry you can fish out of the garbage.
+You can get really awesome Flash microcontrollers from Digi-Key for
+under a dollar these days, but options in garbage are more limited;
+garbage electronics tend to be old, and mass-produced microcontrollers
+often use mask ROM instead of Flash, or have fuses blown that prevent
+them from being reprogrammed.
+
+One option is to use a regular old computer running a real-time
+operating system like Linux-CNC's EMC2.
+
+Another option is to find something that has the controller program
+stored in a separate ROM chip, and replace that ROM chip.  This
+requires you to understand the instruction set of the controller,
+which is often not documented.  Lots of reverse engineering is
+required here.
+
+It turns out that lots of interesting devices from the last few
+decades actually do keep their program in a separate chip.
+
+Memory
+------
+
+Lots of devices have RAM, though usually small; fewer have Flash.  It
+might make more sense to look for discarded SD cards, which will be
+hard to notice in garbage, just because they're so tiny; but they're
+supposedly easy to interface with, because they support SPI.  I've
+encountered a DVD player with a one-megabyte Flash chip in it, and a
+discarded cellphone with a 1GiB mini-SD card.
+
+Actual old disks might make more sense for heavier robots.  A disk
+that's "only" ten gigabytes is too small to be worth bothering with if
+you have any money; but ten gigabytes is quite a bit compared to what
+microcontrollers typically have built in.  I'm not completely sure,
+but I suspect SATA is easier to deal with than parallel IDE/ATA.
+
+Batteries
+---------
+
+Few discarded devices have working batteries.  Some have marginal
+batteries.  Fewer have workable rechargeable batteries.
+
+Really building batteries out of trash will probably require
+re-purifying the materials from dead batteries and building fresh
+cells.
+
+LEDs
+----
+
+LEDs are in just about every discarded electronic device.  They wear
+out a bit after long use, but they remain useful.  High-brightness,
+blue, and white LEDs are recent (since about 1990), but you can still
+find them in trash occasionally.
+
+Other lights
+------------
+
+LCD displays and flatbed scanners typically include tiny cold-cathode
+tubes and high-voltage power supplies for them.
+
+Occasionally you might find neon lamps and the like.  Neon lights last
+*forever*.
+
+When fluorescent tube filaments burn out, people typically discard the
+tubes.  But I think it's possible to still run them as cold-cathode
+tubes; you just need a high-voltage power supply.
+
+Buttons
+-------
+
+You can use capacitive touch sensing to make buttons out of aluminum
+foil and paint; but also many devices contain multiplexed button
+matrices.  Any light sensor can be used as a button.
+
+PS/2 keyboards are commonly discarded and easy to interface to
+microcontrollers.  Sometimes the discarded keyboards themselves work
+fine; at other times it is more to your advantage to hook up a couple
+of the keyboard matrix wires to some other kind of buttons.
+
+Touchpads
+---------
+
+I think you can make a resistive touchpad that works like a
+touchscreen out of pencil lead on paper.
+
+Wireless communication modules
+------------------------------
+
+Only occasionally will you find a discarded device with working radio
+communication, other than cellphones, which are useless except for
+talking to the cellphone network, but there are DIY options: infrared,
+ultrasound, 900MHz, 2.4GHz; software-defined radio?  Basically any
+discarded audio or video device (or, here, air conditioner) will have
+an IR receiver for the remote control, which will also have been
+discarded --- but possibly separately.
+
+(Recent cellphones also have Wi-Fi, but I'm not seeing them yet in the
+trash.)
+
+Presumably you could also use the parts of optical presence sensors as
+infrared transmitters and receivers.
+
+Range measurement devices
+-------------------------
+
+Not only do you need to be able to tell where parts of your robot are,
+you also need to be able to tell what's nearby.
+
+Aside from the camera approaches mentioned earlier, ultrasound is a
+common ranging approach.  I think you can do ultrasonic ranging with a
+couple of piezoelectric sounders, but I haven't tried it yet.
+
+Power supplies
+--------------
+
+Nearly every discarded electronic device has some kind of power
+supply.  Often it's broken, and fixing it or replacing it will fix the
+entire device.  Sometimes it's partly broken, and some of its output
+voltages work fine.  Power-supply chips are versatile and useful for
+many things.
+
+Solder paste
+------------
+
+If you want to reflow solder a surface-mount board, you need solder
+paste.  You aren't going to find solder paste in discarded
+electronics, and in fact it has a quite limited shelf life.  It's also
+difficult to buy in small quantities.  I have no idea how to make
+solder paste out of garbage.
+
+Temperature sensors
+-------------------
+
+A lot of things (reflow ovens, temperature-compensated measurement,
+emergency scram on overheat) benefit from measuring temperature.
+Essentially every electronic component has significant behavior
+changes when its temperature changes, so in theory any electronic
+component can be used to measure the temperature!
+
+Some current microcontrollers have built-in temperature sensors, but
+if not, you can probably build a bridge circuit with a couple of
+different kinds of resistors to give you a voltage that changes
+dramatically with temperature.  Carbon-composition and wire-wound
+resistors have temperature coefficients that are opposite in sign.
+Alternatively, you could measure the RC constant of an RC constant.
+
+Relays
+------
+
+All kinds of high-power devices (microwaves, refrigerators, washing
+machines, etc.) have relays controlling them.  These are handy for
+robots too.  Typical relays are only good up to a few kHz, but reed
+relays are good up to tens of kHz.
+
+Shift registers
+---------------
+
+A crucial limitation on microcontrollers in general is the number of
+available digital GPIO pins.  You can use a shift register to turn two
+or three GPIO pins into an arbitrarily large number of slower GPIO
+pins.  But you aren't going to find a lot of discrete shift-register
+chips in modern discarded electronics.
+
+JTAG to the rescue!  Basically any JTAG-enabled device can be used as
+a shift register by using JTAG's "boundary scan" functionality.  That
+piece of shit undocumented SoC you ripped out of some scanner, which
+won't even let you read its program from Flash, will work fine as a
+200-bit shift register driven through JTAG!
+
+Wheels
+------
+
+This is skipping quite a bit of mechanical stuff, but wheels are
+important for mobility.  Wheels are often available from discarded
+cars or discarded bicycles; bicycle wheels are likely more practical,
+and back wheels already come with sprockets attached, dramatically
+reducing the need for gearboxes.
+
+Heavy robots probably need fairly powerful motors to propel their
+wheels.

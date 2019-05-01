@@ -1,0 +1,806 @@
+IN PROGRESS:
+- finish writing
+- describe segment directory structure
+- list awesome features
+
+Lucene filesystem
+=================
+
+I’ve been thinking about using something like Lucene’s index file
+structure to build a filesystem suitable for lots of small files,
+similar to Reiserfs’s goals.
+
+I’ve been using Reiserfs for a project recently, and I’ve been pretty
+annoyed at its lack of performance predictability for interactive use;
+for example, when I `find | wc -l` on a certain Reiserfs directory
+tree that contains 18GB in about 500 000 files (see the section
+“murdererfs problem” for exhaustive detail), it takes 9 minutes.  So I
+was thinking about how to avoid this.
+
+To some extent, lack of performance predictability is an unavoidable
+feature of disk-based filesystems; access to a random byte that’s in
+the buffer cache costs maybe 100ns, while access to a random byte on a
+spinning-rust disk unavoidably costs somewhere around 8ms, which is
+8 000 000 ns.  Since the disk is (generally) much bigger than the
+buffer cache, an adversarial program can always choose its next
+requested byte from a block that’s not in the buffer cache, thereby
+receiving terrible performance, 80 000 times worse than if it were to
+read data that was already in memory.
+
+So it’s not possible to design a filesystem to have consistently good
+performance for all possible access patterns, even for read-only
+access; read/write access complicates things even more.  Instead we
+should design a filesystem that has consistently good performance for
+the *common* access patterns.  As explained above and in the
+“murdererfs problem” section, reiserfs fails at this in the case of
+`find -print`.
+
+This is an exploration of how to do better, and why; but first, why
+not.
+
+Spinning Rust is Obsolete
+-------------------------
+
+Now, it’s possible that Flash SSDs will make this all irrelevant, as
+they become large and inexpensive.  I suspect that spinning-rust disks
+will remain relevant for a while longer, for the following reasons.
+
+First, there’s Moore’s Law and its effect on pricing.  For the last 15
+years, disks have doubled in capacity every 15 months, while chips
+have doubled in capacity only every 18 months. Flash has improved its
+density relative to feature size quite a lot during that time (that
+is, bits per square lambda; lambda is now 45nm, I think) and has
+become economically important enough to get access to the latest fab
+technology and have almost zero NRE expenses per unit.  However, I am
+guessing that from now on it won’t improve any faster than process
+sizes do.  At present 8GiB of Flash costs about US$20 (US$2.50 per
+GiB) and comes on a single smallish chip (that fits in a Micro-SDHC
+card).  At the standard Moore’s Law rate of 18 months per
+lambda-halving, we should see 32GiB of Flash for US$20 in a Micro-SDHC
+form factor around 2012, 128GiB for US$20 around 2015, and 512GiB
+(550GB) for US$20 around 2018.
+
+By contrast, 500GB disks currently cost US$80, or US$0.16 per GiB.  If
+they continue on their 15-month exponential growth curve, then 2018
+will be 7 doublings in the future for them, and so we should expect to
+have 64TB disks selling for US$80 in 2018, or US$0.00125 per gigabyte.
+That’s a 30× lower price per bulk gigabyte, as against 15× today.
+
+More surprisingly, though, in 2018 we should expect to have 4TB or 8TB
+disks selling for US$20, just as we have 40GB disks selling in that
+price range today.  Today buying a US$20-$40 disk instead of a
+US$20-$40 flash card costs you perhaps a factor of 5 in capacity; in
+2018 it would cost you a factor of 8 or 16, if these predictions hold.
+This reduces the market available for small Flash devices.
+
+Second, in the time between now and 2018, even the existing 15× price
+premium for Flash is too much for many applications.  It’s likely that
+Flash will spend many years (in systems bigger than your thumb)
+occupying a middle layer of the memory hierarchy, in between DRAM
+(US$10/GB, 100ns) and spinning rust (US$0.16/GB, 8 000 000ns).  Right
+now Intel’s 80GB SSD has access times of about 130 000ns, [according
+to Bonnie++] [Bonnie SSD], and it costs about US$550 (according to a
+Google search; all the other prices here are from Pricewatch), which
+is about US$6.70/GB.  Presumably this price will come down soon; I’m
+mystified that people are buying these things already.  Maybe database
+journaling?
+
+Anyway, so Flash will be filling the price/latency tradeoff gap
+between RAM and disk, much as disks and drums used to fill the
+price/latency gap between core and magtape.  (Again, this is in
+computers bigger than your thumb.  In small systems, Flash makes
+things possible that were simply impossible before: in the past it
+made possible MP3 players, cellphones that shoot video, and in the
+future it will make things possible we haven’t thought of yet.)
+
+The third reason that disks will remain relevant for a while is that
+[a lot of the current SSDs actually use a lot of power] [TH], which
+neutralizes one of Flash’s big potential advantages.  Hopefully this
+will get better soon.
+
+[TH]: http://www.tomshardware.com/reviews/ssd-hard-drive,1968.html "there is 
+indeed one Flash SSD that beats the living daylights out of any hard drive now"
+[Bonnie SSD]: http://www.tbray.org/ongoing/When/200x/2008/11/20/2008-Disk-Performance
+"Tim Bray benchmarks the Intel SSD"
+
+murdererfs problem
+------------------
+
+This section should contain enough information to either reproduce my
+performance problem or figure out why I have it and you don’t.  It
+probably contains too much detail to be interesting otherwise.
+
+I have a 30GB-max Reiserfs 3.6 filesystem (using ordered data mode,
+size 8192) in an 18GB sparse file on ext3fs, which I defragmented by
+using `cp` to make a fresh (presumably sequential) copy of the file
+before running this test.  I’m running a fairly stock Ubuntu 8.10
+Intrepid Ibex system with its standard 2.6.27-9-generic i686 (32-bit)
+kernel, on a 1.6GHz Celeron E1200 system with an Asus P5KPL-AM
+motherboard, 2GiB of RAM, and a Western Digital WD50000AAKS-75A7B0
+500108-MB hard disk, attached via SATA (although the kernel claims
+it’s configured for UDMA/133).
+
+Running Bonnie++ on the underlying ext3 filesystem, once with 12240M
+and once with 10240M of data, I got about 64000K/sec block writes with
+30% CPU usage, 75000K/sec block reads with 16% CPU usage, and 102
+random seeks per second with 1% CPU usage.
+
+I mounted the filesystem, for the first time since reboot, and ran
+`find reiserfs-mount-point/ | time wc -l` (actually I used a different
+piece of software that’s slightly different from `wc -l`, but that
+shouldn’t matter.)
+
+It took 9:07.38 elapsed time to get the 538 055 filenames from the
+reiserfs filesystem the first time.  (Almost half of the files are
+directories; there are 100 directories at the top level, each of which
+has around 2000 subdirectories; most of these subdirectories contain a
+single file, but some contain several.) Repeating, it took 0:08.54
+elapsed time, 64× as fast.  I was running `iostat 5` in another
+terminal while doing this; during the first read, `iostat` reported
+between 100 and 220 “tps” during the first read, and between 800 and
+1300 “Blk_read/s”.  There was also write traffic during this time, but
+it stopped shortly after the test was over, so I am guessing it is due
+to reiserfs.
+
+The system was generally idle otherwise, with under 2% CPU usage.
+
+The pathnames totaled 25.8 megabytes.
+
+As I have said, no filesystem can have good read performance for every
+access pattern, and it can’t have consistent read performance for
+every access pattern unless it does so by always hitting the disk
+(i.e. not caching).  However, I do not think `find` is such an unusual
+access pattern that it does not need optimizing for, especially since
+murdererfs’s raison d’être is explicitly to handle the “lots of small
+files” pattern better than ext2fs.
+
+It *does* handle this pattern a lot better than ext2fs (or ext3fs
+anyway), which needs something like six times as much time to do the
+same `find` (on a different machine!), and additionally wan’t any
+faster the second time around.
+
+According to `iostat`’s man page, a “block” is 512 bytes, so 1000
+blocks is 500kiB.  So reiserfs is running a 75MB/s disk at 0.5MB/s,
+less than 1% of its maximum speed.  The useful data it retrieved was
+538 055 filenames and inodes.  An inode is about 128 bytes, so there
+were about 69 megabytes of inodes, and the filenames totaled 4.9
+megabytes, for a total of 74 megabytes of *useful* data being read.
+(The filename and inode data would be entirely sufficient to answer
+the `find` query, although directory entries might have another 5
+megabytes of inode numbers, which serve only as pointers to find the
+inodes.)  But 0.5MB/s for 9:07 (547 seconds) is 270 megabytes, so only
+about 30% of the data Reiserfs read from the disk was actually useful
+for answering the query.
+
+If all of that data were stored sequentially on the disk, it would
+take 1.0 second to read the filenames and inodes, or 3.6 seconds to
+read all of whatever other useless data Reiserfs decided to read.  If
+it were scattered in 1000 pieces, requiring 1000 random seeks, it
+would take 11 or 14 seconds to read it.  But apparently Reiserfs
+managed to require about 55 000 separate disk transactions: roughly
+one transaction (and 0.5-1 seek, since it was getting 100-200
+transactions per second) per ten files!
+
+ext3fs manages to do substantially worse.
+
+Common Access Patterns
+----------------------
+
+A filesystem should have *fast*, *consistent* performance for *common
+access patterns*, as well as providing a way for applications to
+“escape” from the filesystem’s tradeoffs by providing *predictable*
+performance for applications that want to roll their own --- by
+storing their data inside a big file they structure as they please.
+Here’s a list of the common access patterns I think are important to
+be consistently fast:
+
+- Sequentially reading a large file that was sequentially written.
+  (Almost all filesystems do well at this.)
+- Sequentially reading a large file that was randomly written.  (Most
+  filesystems do well at this; LFS implementations, and ext3fs during
+  part of the 2.6 series, sometimes fail badly.)
+- Sequentially writing a large file.
+- Sequentially creating and writing a large number of small files in
+  the same subdirectory tree.  (None of the filesystems I know do well
+  at this.)
+- Sequentially reading a large number of small files in the same
+  subdirectory tree.
+- Statting or opening a file, given a path from the root of the
+  filesystem.
+- Reading the metadata of a large number of files in the same
+  subdirectory tree.
+- Random read/write access within parts of a single file.
+
+I think an approach based on Lucene’s index structure can provide
+reasonably good, but above all consistently not bad, performance for
+all of these access patterns, while providing the usual POSIX
+filesystem semantics.
+
+The Design
+----------
+
+The filesystem is a bag of variable-length (key, timestamp, data)
+triples.  There are three kinds of key: pathnames, inode numbers, and
+extent numbers.  The data associated with an *extent id* is an inode
+number and a list of variable-length (offset, contents) pairs, each of
+which gives a block of data stored at that offset in the file to which
+it belongs.  The data associated with an *inode number* is a list of
+(variable-length) pathnames that point to that inode.  The data
+associated with a *pathname* is more complicated, but usually it is
+the file’s metadata --- basically, most of the results of `stat()`.
+
+Writing to the filesystem consists of adding more triples to the bag
+with a newer timestamp than the triples already in the bag.  To get
+data about a file, you look up its pathname in the bag, and (if you
+want its contents) look up its extent ids in the bag too.  To list the
+contents of a directory, you search for triples whose keys are
+pathnames in a certain range.
+
+When there are multiple triples in the bag with the same key, you just
+get the triple with the latest timestamp and ignore the older ones.
+Eventually they will be removed by “merging”, as explained below.
+
+This is not a great match to traditional Unix filesystem semantics,
+since the file data is actually stored with the directory entry.  So
+when a pathname is a hardlink to an already-existing file, instead of
+storing the usual metadata, it just stores a *broken heart* containing
+just the inode number of the file.  When we try to get a file’s
+metadata and come up with a broken heart, we look up the inode to find
+out what pathnames point to that inode; the first one of them has the
+actual file metadata.  So we look up that pathname to get to the file.
+
+The tricky thing in such a system, which pretends to be a normal Unix
+filesystem where file contents and metadata are separate from a bunch
+of interchangeable directory entries, but actually stores them as a
+single unit, is how to handle deletion of the “primary” directory
+entry for a file with multiple hardlinks.  To handle this case, we
+add three triples:
+
+XXX we’d need less write bandwidth if we separated inodes, atimes, and
+filesystem paths.
+
+- a new version of the inode triple with its first entry removed;
+- a new version of the new primary directory entry, updated to contain
+  the file metadata instead of a broken heart;
+- a new version of the triple for the old primary directory entry,
+  which has a special “deleted” marker instead of file metadata or a
+  broken heart.
+
+This isn’t the simplest approach, but it’s not fiendishly overcomplex.
+
+Segments
+--------
+
+The triples are stored in segments.  A segment is a sequence of
+triples sorted by key, compressed with LZF, and stored in a contiguous
+sequence of disk sectors.  Each segment is normally around one
+megabyte in size compressed, which should decompress to around 2.5
+megabytes of data.  This size is chosen because reading less than
+about a megabyte of data from disk is pretty much a waste of a seek,
+but decompressing the segment (necessary to read its contents) might
+take 5–10ms of CPU time.  XXX not sure; compress in subsegment chunks?
+The sort order sorts the different kinds of keys apart: inode numbers
+are all together, not interspersed with pathnames, and extent ids are
+all together, not interspersed with inode numbers and pathnames.
+
+I’m not sure whether the slots the segments are in should be
+fixed-size; presumably that entails a certain amount of wastage.
+
+There’s a segment directory, which sort of like the superblock.  For
+each live segment, it lists the key of the first and last key in the
+segment, the timestamp of the newest triple in the segment, and the
+segment’s location on disk.  My new 500GB disk might be expected to
+contain up to around 500 000 segments at any given time; keys are
+probably mostly around 64 bytes; timestamps are perhaps 8 bytes; disk
+addresses are perhaps 8 bytes.  Consequently this is about 80 bytes
+per segment, or about 40 megabytes for the entire disk.  This can
+easily be kept in RAM.
+
+To look up a single key:
+
+- Find all the segments `seg` in the segment directory for which
+  `seg.first_key <= key <= seg.last_key`.  Sort them by timestamp,
+  with the newest segments first.  Start with `found_timestamp = 0`,
+  where 0 is a value that is less than any real timestamp.
+- For each segment in the list of candidate segments, if its
+  `latest_timestamp` is earlier than `found_timestamp`, bail out of
+  the loop; neither it nor any of the later segments can contain newer
+  data for that key.  Otherwise, load the segment from disk (if
+  necessary) and decompress it (if necessary) to see if it contains
+  the key with a timestamp greater than `found_timestamp`.  If so,
+  remember the triple and set `found_timestamp` to the timestamp of
+  the found triple.
+- Now you have in hand the latest triple for that key.
+
+The algorithm for finding all of the keys in a range (a “range query”;
+e.g. files in a directory) is similar, but can’t bail out of the loop
+early.  It is built on an algorithm for finding the first key after a
+given key (“get next”); there is an analogous algorithm for finding
+the last key before a given key (“get previous”).
+
+Segment Merging
+---------------
+
+Clearly the efficiency of this scheme, for read, largely boils down to
+not having very many overlapping segments, so that you don’t have to
+consult very many segments for each query.  If the segments are
+perfectly nonoverlapping, then only a single segment ever needs to be
+fetched and examined to answer a single-key probe.  So opening and
+reading a single-extent file (in the common case where it has only one
+directory entry) would require a single seek to fetch its metadata,
+then a single seek to fetch its contents. (Although see below under
+“extents and extent ids”.)
+Listing the contents of a directory (and `stat()`ing
+all of the files) would simply involve reading the one or more
+segments covering that directory’s key space.
+
+However, when we add new triples, we do it by putting them into a new
+segment.  So whenever we write to the filesystem, even to update an
+atime, we create overlapping segments.
+
+The solution is to periodically --- well, more or less constantly ---
+*merge* segments.  A merge takes some number of segments that partly
+overlap --- say, between 5 and 10 --- and turns them into roughly the
+same number of non-overlapping segments by merging them into a single
+sorted sequence of keys, while dropping outdated triples, and then
+chopping that sequence up into some number of new segments.  This
+merge operation should take around 400ms: say, 70ms to random-seek to
+8 overlapping segments, another 110ms to read their 8MB of data,
+another 100ms (overlapped) to decompress it into 20MB, 6ms to merge it
+into 20ms of sorted data, another 200ms to recompress it into 8MB, and
+another 110ms (overlapped) to write it in a sequential run of new
+segments.  The segment directory on disk need not be updated until
+that is necessary for some other reason.
+
+On a machine with 8 idle processors (which should be most desktop
+computers most of the time, starting with desktop computers sold in
+2011), the recompression step could be done in 8-way parallel, cutting
+the time by 175ms.
+
+Merging should clearly be done preferentially to fairly young segments
+that cover a comparatively large part of the keyspace, since they will
+tend to cause slowness to many more queries; and it is preferable to
+do it to segments that are already in the buffer cache and
+decompressed.
+
+So one strategy that might work reasonably well for merging under load
+would be to merge after answering a query that required too many seeks
+--- specifically, merge exactly the set of segments that were needed
+to answer that query.  In the above scenario, this would leave only
+the 6ms of merging, the parallelizable 25–200ms to recompress, and the
+overlappable 110ms of writing --- so maybe 30ms on CPU and 110ms
+talking to the disk.
+
+That isn’t optimal in general, though; it’s pretty wasteful to merge a
+very young, sparse, and therefore wide segment with a bunch of old,
+dense, and narrow segments; in the limit, you end up with the first
+half of the young segment, followed by the first half of an older
+segment, followed by the contents of a yet older segment, followed by
+the second halves of the other two segments.  It’s much more
+profitable to merge segments that are similar in density.
+
+Every byte written to a new segment, if not superseded, must be
+eventually read, merged, and written into some new, denser, merged
+segment N times before reaching its final resting place in a very
+dense segment.  This would seem to mean that only 1/N of the disk
+write bandwidth is available for writing new data!  This may be
+ameliorated somewhat by churn, but it remains the case that to get a
+disk from empty to mostly full with this scheme, the data must be
+copied N times.
+
+For 500 000 total segments and average 8-way merges, randomly
+distributed data would need to go through 6 or 7 steps to reach a
+totally non-overlapping state.
+
+However, the inode numbers are not natural keys; it’s probably
+possible to keep their segments from overlapping very much by the
+simple expedient of allocating them sequential serial numbers from a
+space large enough that it never gets exhausted.  (Again, atime may
+play havoc with this.)  (This may be a reason to go back to the
+traditional Unix approach of storing the inodes separately --- you’ll
+have new filenames inserted between old ones much more often than
+you’ll have inodes inserted.)  And for all but the smallest files,
+it’s the extents that really matter.  My original data set, for
+example, had 538 055 files totaling 18GB; their filenames totaled
+4.9MB; their uncompressed inodes presumably were 67MB.  So the
+presumably mergey metadata is only 1/300 of the total, while the
+hopefully nonmergey file contents data is the rest.  See below about
+“extents and extent ids” for how those are handled.
+
+Extents and Extent ids
+----------------------
+
+XXX need special case for merge and/or lookup; should extent id
+include length?
+
+An extent id consists of an (inode number, offset) pair; so retrieving
+the extents associated with an inode consists of a range query.  The
+data associated with it in the filesystem is some number of bytes of
+the file contents, starting at that offset.  So to retrieve the
+contents of a file, you just retrieve all extents identified with that
+file’s inode number; to retrieve file contents starting at an
+arbitrary offset, you use the “get previous” algorithm to find the
+last few extents that start at or before that offset, and take the
+most recent one that is long enough to reach that offset.
+
+Extents have a maximum length, which I think should be around 32kiB,
+for several reasons:
+
+- If extents had unbounded length, potentially into tens of gigabytes,
+  they would create segments of unbounded length; this would impede
+  random reads from the middles of files.
+- If extents had unbounded length, then reading the byte at location
+  28920620234 in a file would require reading all of the extents
+  starting at locations 0 to 28920620233, of which there could be up
+  to 28920620234, because until you have read them all, you never know
+  if the next one is going to be a 28920620234-byte long extent that’s
+  newer than all the ones you’ve seen so far.  Limiting extents to
+  32kiB means you only have to fetch the extents beginning in the
+  previous 32kiB in order to make sure you have the current version of
+  the file data.
+
+Making the maximum length too small, however, will impede compression
+efficiency and impose too much scatter-gather overhead.
+
+In a contiguous bulk write, you’ll lay down segments consisting
+entirely of new extents (already in order) and new versions of the
+file’s metadata with updated size and mtime.  These segments, after a
+merge, will keep the extents in order, and the extent segments will be
+"dense" in the sense that no other segment will ever overlap their key
+space, except when it updates that same file.  Consequently that data
+will never need to be moved on disk unless it’s updated.
+
+When partial updates of a file are written to disk, they will be in a
+separate segment from the original data; the file is “fragmented”.
+Eventually a merge will bring all of this data together; this is
+“online defragmentation”.
+
+Continuous snapshotting
+-----------------------
+
+If you don't delete triples with timestamps older than some cutoff
+date, you can roll time back to any arbitrary point in the past
+since that cutoff date, at
+some overhead cost to reads of data that's been updated since then.
+This permits a variety of useful features:
+
+- online database table backup (you don’t have to worry that the file
+  is being modified while you back it up, giving you inconsistent
+  backups; just backup a snapshot)
+- file undeletion
+- general undo
+- filesystem change auditing (“what did that install just change?”)
+
+View Updating
+-------------
+
+If you have some application that wants to maintain some data that's
+dependent on the data currently in the filesystem --- say, locate
+(although with this filesystem, `find` might be fast enough to render
+`locate` obsolete), or a full-text indexing system, or something like
+`make` that runs instantly, that application currently has to function
+as follows.  At startup, it scans the entire filesystem, or the
+subtree it cares about, in order to compare them to its database.  As
+it scans, it uses `inotify` to request notifications of any future
+changes.  Then it has to sleep, waiting on notifications, for a long
+enough time to justify the expense of its startup scan.
+
+Things like these are analogous to “materialized views” in a database:
+a full-text index is a “view” of the files it indexes, a compiled
+program is a “view” of the source code that makes it up.  So I'm
+calling this general problem "view updating", because it's analogous
+to the problem of updating materialized views in a database.
+
+By contrast, on this filesystem, the segment directory contains a
+latest-timestamp for each segment, and most segments should contain
+data written during a fairly narrow time window, so you can
+efficiently retrieve all of the segments containing data written since
+some recent timestamp (if it hasn’t already been merged with older
+segments.)  And all of the data is efficiently reverse-mappable: if
+you find that there's a new extent, you can look up what pathnames it
+belongs to quite quickly, even if the mtime in the inode hasn’t been
+updated (e.g. because the update followed another update in the same
+second).
+
+This allows you to run view-updating programs on-demand, or from
+`cron`.
+
+Filesystem Resizing
+-------------------
+
+Resizing a mounted filesystem is fairly straightforward, either to
+expand or shrink it, and doesn’t pose any special risks due to power
+failure at the wrong moment.  Expanding the filesystem just adds some
+free space for use in new segments; the segment directory needs to be
+expanded correspondingly.  Shrinking the filesystem requires
+relocating (and, if possible, merging) the segments in the region to
+be freed.
+
+Use as Full-Text Index
+----------------------
+
+If you have a bunch of (word, document_id, position) triples, you can
+encode them as pathnames: "#{word}/#{document_id}/#{position}", and
+create those paths as empty files.  The efficiency of operations such
+as bulk-create, merge, and lookup should be comparable to the
+efficiency of the same operations in Lucene,
+although the inodes will make it somewhat worse.
+
+Directories with Lots of Descendants
+------------------------------------
+
+There is a case where this design is slower, even unpredictably
+slower, than standard designs like ext3fs: `ls`, when you're in a
+directory that has a lot of descendants.  In theory, `ls` at the top
+level of the filesystem has to scan through the entire space of
+pathnames (you could potentially have billions of pathnames) in order
+to extract the dozen or so immediate descendants of the root
+directory.  However, there’s a reasonably efficient way to solve this
+problem.
+
+Let’s assume for the moment that the pathname segments are nicely
+merged so that there are no overlapping segments.  Now we need to
+consult the segment directory to find out which segments might contain
+pathnames under, say, the root directory.  But the first-and-last-key
+information we get this way actually contains enough information to
+know that most of these pathname segments don't contain any
+transitions between children of the root!  For example, a segment that
+begins with `/usr/lib/perl/5.8.8/regcomp.h` and end with
+`/usr/lib/python2.6/xdrlib.py` doesn’t contain any children of `/` or
+even `/usr` --- only descendants of `/usr/lib`.
+
+So this gives us a worst-case bound: at worst, we only need to fetch
+one segment per child of the directory we’re listing.  For the `ls /`
+case above, this amounts to 120ms.  However, only large subtrees (over
+around 100 000 pathnames) will actually push the next child into
+another segment, so at worst, we only need to fetch one segment per
+*large-subtree* child of the directory we're listing.
+
+out of place XXX
+------------
+
+The advantage of storing things in this way is that it optimizes for
+the common case:
+
+- statting a file through its primary directory entry (and most files
+  have only primary directory entries) only requires a single
+  contiguous read from the relevant spot in the segment.  (How you
+  find that spot is explained later.  It may require a few seeks.)
+- reading or creating and writing the entire contents of a
+  subdirectory tree 
+
+Intra-segment structure
+-----------------------
+
+The data inside a single segment will normally decompress to around
+2.5MB, but if the compression ratio is good, it could be considerably
+larger, like 20MB or more.  But decompressing even 2.5MB of data will
+totally blow your cache, so you don't want to do that too much if you
+can avoid it.
+
+So the segment is compressed in about 16 “sub-segments” of about 64kiB
+of compressed data, each prefixed with an (uncompressed!) length field
+and the first key in that segment, and containing some number of whole
+triples.  This allows you to find the right sub-segment (assuming you
+only want one sub-segment) in about 16 cache line fills, and then
+decompress it into your L2 cache.  
+There is a SHA-256 sum of the uncompressed data inside of that data,
+at the end of the subsegment,
+in order to make it possible to verify that the data hasn’t
+been corrupted by memory, disk hardware, or
+the decompression/compression step.
+
+For large extents, the sub-segments will contain about two
+maximal-size extents each.  Small data, such as inodes and pathnames,
+might be 128–256 bytes per triple uncompressed (and 40–80 bytes per
+triple compressed).  So a sub-segment might contain a thousand or more
+triples.  To allow finding the right triple quickly, the triples
+inside a sub-segment form a sort of skip list --- each one is prefixed
+not only with its own length but with some number of "pointers" giving
+the length of the sequence of 2, 4, 8, etc., triples that it begins.
+These pointers can be two bytes (they need to be fixed-width so
+they’re easy to backpatch) and they add about 2000 bytes to the
+uncompressed data.  This allows search inside a sub-segment to use at
+most about 20 probes.
+
+XXX now we have three levels of index using different structures: the
+segment directory (which presumably has some in-memory indices of its
+own), the sub-segment directory, and the skip list.  Maybe these could
+be unified‽
+
+XXX Are segments placed in fixed “segment slots” implying slack space
+at the end?  Like what, 10k?
+
+At the end of the segment,
+there’s a SHA-256 
+of the SHA-256s of the sub-segments
+to allow early detection of serious segment corruption.
+
+fsck
+----
+
+The filesystem has some internal invariants:
+the list of pathnames at an inode should match the set of pathnames
+that have that inode number;
+the size in the inode should match the 
+
+Details
+-------
+
+stat() (inode
+number, mode, number of hard links, uid, gid, size or device ID,
+atime, ctime, mtime)
+
+Durability
+----------
+
+It’s highly desirable that the filesystem not lose committed data when
+the machine loses power suddenly.
+
+Group commit.  Micro-segments.  NVRAM/network backup/Flash.
+
+Why Transparent Compression
+---------------------------
+
+Segments are compressed before being written to disk and decompressed
+when read from disk.  This has several benefits.
+
+First, it decreases the amount of disk bandwidth needed.  The disk
+interface is still fairly slow; the machine I’m testing this on can
+sequentially write to the disk, as I’ve said a zillion times already,
+at 64 megabytes per second.  Also, if I understand correctly, it can
+do 1600 million 32-bit memory transactions per second, which is 51.2
+gigabytes per second.
+
+Second, it means we don’t care very much about the representation
+efficiency of the on-disk data structures.  We don’t have to agonize
+over how many bits to allocate to the inode field or how to represent
+numbers efficiently or how to represent pathnames efficiently or how
+to avoid storing a separate uid, gid, ctime, and mtime for each small
+file in a large directory.
+
+As an example, I made a list of 2000 pathnames from my Reiserfs
+partition.  (Yes, that did take 20 seconds.)  Raw, the pathnames are
+57kB (or 121kB if you include the mount point at the beginning of the
+paths instead of starting them with “./”).  Compressed with the
+`frcode` program from GNU findutils 4.4.0, a program carefully
+designed to compress precisely such sequential lists of pathnames, it
+is reduced to 18kB.  But compressed with LZF (a general-purpose
+high-speed compressor), it’s 13kB, and compressed with gzip, it’s
+10kB.  The compressed numbers don’t change significantly depending on
+whether the pathnames include the mount point.
+
+So the effort that went into writing `frcode`, and its corresponding
+decompressor, and the ";login:" article about it, and maintaining it
+over the years, has been wasted, and actually counterproductive; if
+`findutils` used `gzip` (or originally `compress`) instead, it would
+have been getting better compression all along.  Still, `frcode` is
+only about 200 lines of code; but there are many carefully optimized
+but very specific representations like that, scattered around the
+system.
+
+I tried another example that wasn’t so successful: compressing an
+executable versus *compressing a hexadecimal dump* of the executable
+--- two hex digits in place of each byte in the original executable,
+with no newlines or offset numbers.  The original executable was 34kB;
+hexdumped and compressed with LZF it was 28kB; compressed with LZF
+without hexdumping, it was 21kB.  (`bzip2` was able to compress it to
+16kB, which is perhaps a reasonable estimate of the actual entropy of
+the data.  It did only slightly worse on the hexdump version, like
+17kB.)  So hexadecimal-encoding frustrated LZF’s ability to extract
+redundancy to some degree, but LZF was still able to remove more
+redundancy than the hexadecimal encoding added.
+
+As a third example, I made a *list of 1533 numbers* that were the
+sizes of files in a directory tree.  Encoded as ASCII decimal numbers
+separated by newlines, they took 6.6kB; binary-encoded as 32-bit
+integers (none of the files happened to be 4GiB or over), they took
+6.1kB; the list of ASCII numbers compressed with LZO was 4.5kB.
+(LZO-compressing the numbers in their binary form put them at 4.9kB.)
+So there’s no gain in space-efficiency in this case from using binary
+encoding, and actually a substantial loss --- barely a win over just
+using ASCII decimal numbers.  (Note that ASCII decimal numbers also
+have no arbitrary size limit.)
+
+Third, compressing segments means that groups of small, similar files
+in the same directory can be compressed as a group, as can groups of
+inodes.  Long experience with the `.tar.gz` format has shown us that
+this is a win, often a significant one.  Storing the file contents in
+extents separate from the metadata means that both the files’ contents
+and the metadata are intermixed with a minimal amount of foreign data
+in a different format.
+
+Fourth, by removing, in most cases, the need for applications to
+compress their data files, it can make those data files easier for
+users to reverse-engineer, modify, and use for other purposes.  For
+example, Gnumeric’s data file format is `gzip`ped XML.  I made a
+simple spreadsheet with 45 cells; the Gnumeric data file was 2kB, the
+uncompressed XML was 13kB, and the LZF-compressed data file was 3kB.
+Clearly the 6× reduction in bulk is worthwhile; but a Gnumeric
+designed to run on an LZF-compressed filesystem, where `gzip` saves
+only 30%, could reasonably have chosen a different path.  (Obviously
+Gnumeric is pretty far down this path already by using XML to store
+spreadsheets.)
+
+Fifth, it effectively increases the size of the buffer cache
+substantially, increasing the buffer cache hit rate dramatically.
+
+Sixth, it effectively increases the size of the disk substantially for
+no effort on the part of the user or their application software.
+(This is the traditional reason for filesystem compression, but I
+think it’s less important than the previous four.)
+
+Seventh, it may improve the security of whole-disk encryption.  This is
+a disadvantage too --- it makes data recovery more difficult.
+
+Compression Isn’t Too Costly
+----------------------------
+
+Despite all the advantages I ascribe to transparent disk compression
+in the previous section, we wouldn’t want to use it if it made the
+filesystem too slow.  It turns out that it shouldn’t.
+
+`gzip -1c` on one of the CPUs of the 1.6GHz Celeron E1200 gets about
+3.3× compression at about 20MB/s input.  At `-9` it gets about 3MB/s
+and gets (on a test file, i.e. my reiserfs image) 3.9×, i.e. about 15%
+smaller.  `gzip -d` decompresses at about 60MB/s output, and is about
+15% faster when the input data is compressed with `-9`.
+
+These are pretty expensive, CPU-wise.  But if we assume that typical
+computers in the next few years will have more CPU cores than hard
+disks, and that compression and decompression of independent segments
+can be partitioned into embarrassingly-parallel tasks, it might be
+reasonable.
+
+However, `gzip` (LZ77) is not one of the fastest lossless compression
+algorithms out there.  There are other algorithms around that beat the
+living shit out of `gzip` for speed.
+
+LZW is no longer patented, and supposedly [compresses at 50 kilobytes
+per second on a 386] [TIFF], which runs maybe 12 million 32-bit
+instructions per second --- maybe 250 instructions per byte --- so
+you’d expect it to run on one of the Celeron’s CPUs at about 50
+megabytes per second.  However, Thomas and Woods's `compress` program
+only compresses at about 10 megabytes per second on the same machine,
+half as fast as `gzip -1c`, and only compressing by 2.7×.  LZW was
+discovered in 1984; it’s about 2K of code to implement.
+
+LZO and LZF are two new LZ77 variants with, like LZW, low CPU usage.
+[LZF is being used in the kernel for suspend to disk] [LZFk].  
+
+LZO was supposedly [a third the speed of `memcpy` at decompression]
+[LZO] on a Pentium 133 --- 20 MB/sec to `memcpy`’s 60MB/sec --- and
+four times slower for compression.  On my same machine that I was
+testing with earlier, `lzop` 1.02rc1 (using liblzo 2.03-1) compresses
+at 64—100 megabytes per second and decompresses at 143 megabytes per
+second.  It compresses by about 2.7×, slightly better than
+`compress`’s LZW.  Apparently [in 2002 on a 200MHZ Pentium] [ACT]
+`lzop` 1.00w took 1.47 seconds to compress (and 0.99 to extract) a
+corpus that `gzip` 1.2.4 (with no options, which seems to be about
+`gzip -6` these days, 10 megabytes per second) took 15.57 seconds to
+compress.
+
+That means LZO used to be 10.6× as fast as `gzip -6` at compression at
+the time, but now it's only 3–5× as fast.  Maybe `gzip` got better,
+but also it seems that LZO’s performance has gotten relatively worse
+--- it was 20MB/sec on a Pentium 133 and only 3–5× faster on a 1.6GHz
+four-issues-and-retires-per-cycle processor, which does 1600 million
+memory transactions per second instead of 66 million?
+
+[LZF] [LZF] is even faster.  It only compresses by about 2.4×, but it
+compresses on the same hardware at 77–138 megabytes per second and
+decompresses at 138–199 megabytes per second.  (I built liblzf-3.4
+with `./configure && make -j3` with GCC 4.3.2-1-ubuntu11, which used
+`-g -O2 -O3 -funroll-all-loops`.)  I don’t understand the algorithm
+well enough to see if it could be optimized more or run on a GPU, but
+the current version is a small amount of C and seems to include CRC32
+checking.
+
+[TIFF]: http://www.fileformat.info/format/tiff/corion-lzw.htm "The
+TIFF LZW Compression Algorithm"
+[LZFk]: http://linux.derkeiler.com/Mailing-Lists/Kernel/2006-08/msg09857.html
+"Message about LZO in Reiser4"
+[LZO]: http://www.oberhumer.com/opensource/lzo/ "Oberhumer’s LZO homepage"
+[ACT]: http://compression.ca/act/act-text.html "Jeff Gilchrist’s ACT
+Text Compression Test"
+[LZF]: http://home.schmorp.de/marc/liblzf.html "LZF homepage"

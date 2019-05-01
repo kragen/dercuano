@@ -1,0 +1,1038 @@
+Why John Backus Was on the Wrong Track
+======================================
+
+**This document is unfinished.**
+
+So I’ve been reading John Backus’s Turing Award paper from 1977
+[Backus 1977], and a lot of the assertions he makes therein seem
+dubious to me.  Perhaps this is a little unfair, since von Neumann
+computers are now 60 years old, and were only 30 years old when Backus
+wrote; and much of the interesting stuff in the intervening 30 years
+has been elaboration on Backus’s ideas.  And I’m just some wanker,
+while Backus was a Turing Award winner, so probably whatever I can say
+here is pretty obvious now; but quite a bit of it was anticipated by
+Dijkstra’s EWD-692 response immediately afterwards.
+
+According to [Eliezer Yudkowsky][yudk], Max Gluckman once said: “A
+science is any discipline in which the fool of this generation can go
+beyond the point reached by the genius of the last generation.”
+
+So maybe this article is a demonstration that computer programming is
+a science.
+
+Still, I thought it would be useful to collect 30 years of perspective
+on the very influential ideas he expresses in this paper.
+
+[yudk]: http://www.overcomingbias.com/2007/12/ayn-rand.html
+
+Summary
+-------
+
+Backus’s initial complaint about the obesity of von Neumann languages
+was myopic, coming as it did on the heels of five years of remarkable
+innovation in the invention of small von Neumann languages.  Although
+he correctly identifies “word-at-a-time thinking” as a serious
+obstacle to good programming, its cure is garbage collection, not the
+removal of the assignment statement.  
+
+The point-free style he advocates could have been adopted a decade or
+more before he wrote his paper, but it wasn’t, apparently because
+programs in that style are fucking hard to read.  Many languages
+available today reduce the problems he identified with von Neumann
+languages of the time, as illustrated by his inner product example,
+but without using that point-free style; some of those languages were
+already available when he wrote, but were not in the mainstream.
+
+Most people who have commented on the paper don’t seem to have read
+most of the meat of the paper, probably because it’s badly presented.
+I suggest another order of presentation that I think makes them
+easier.
+
+Backus’s pessimism that formal semantics would make von Neumann
+languages more tractable was wrong, although this is in part because
+those languages have been redesigned over the years to be analytically
+tractable.  Similarly, his assertion that the word-at-a-time nature of
+von Neumann languages makes them non-extensible is both unsupported
+and simply mistaken, as illustrated by ample counterexamples from his
+time and our own.
+
+Myopia About Existing Languages
+-------------------------------
+
+Backus: “Each successive language incorporates, with a little cleaning
+up, all the features of its predecessors plus a few more.  Some
+languages have manuals exceeding 500 pages; others cram a complex
+description into shorter manuals by using dense formalisms. . . . For
+twenty years programming languages have been steadily progressing
+toward their present condition of obesity; as a result, the study and
+invention of programming languages has lost much of its excitement.”
+
+The C programming language was already in use at Bell Labs and a few
+universities when he wrote this, although Kernighan and Ritchie’s
+manual (120 pages, I think?) didn’t come out until, I think, the next
+year.  C is not a minimal language, but as K&R says, it demonstrates
+that a language that doesn’t have everything can be easier to use than
+those that do.  Other smallish languages in use in 1977 — almost all
+substantially created during the previous five years — included
+BLISS-10 and BLISS-11, Scheme [Sussman 1975], Prolog, Smalltalk, and,
+of course, Forth, which is perhaps the ultimate in simplicity of
+mechanism among high-level languages.
+
+Backus does say, in the next paragraph, “Since large increases in size
+bring only small increases in power, smaller, more elegant languages
+such as Pascal continue to be popular.”  But I think this dramatically
+understates the reality of 1977, as seen from 2007; there had been a
+renaissance in small, elegant languages over the several years
+immediately preceding Backus’s paper, languages whose simplicity,
+elegance, and power has kept many of them in use until the present
+day.  Some of them were not widely known at the time, but perhaps
+Backus’s disgust owes more to overexposure to PL/1, which had been
+standardized the previous year after 13 years of drafts, and to Algol
+68, than to a paucity of alternatives.
+
+Dijkstra makes a similar comment in EWD-692:
+
+> He writes that “smaller, more elegant languages than Pascal
+> continue to be popular”, where in the case of Pascal “rapidly
+> gaining in popularity” would be more accurate.
+
+The Intellectual von Neumann Bottleneck Isn’t
+---------------------------------------------
+
+Backus says, “Not only is the tube [between the processor and memory]
+a literal bottleneck for the data traffic of a problem, but, more
+importantly, it is an intellectual bottleneck that has kept us tied to
+word-at-a-time thinking instead of encouraging us to think in terms of
+the larger conceptual units of the task at hand.”
+
+This is necessarily true of programs for the Altair 8800, which
+shipped with 256 bytes of memory and could run Altair BASIC in 4096
+bytes, or an un-upgraded Apple ][, which I think had shipped around
+the time of Backus’s talk.  But, as demonstrated by APL, the various
+FP and FL systems that came after this paper, and the “Lambda: The
+Ultimate” series of papers around the same time, the limitation is not
+really imposed by the hardware architecture; it takes some cleverness
+but not a huge amount of code to allow those single words to represent
+the larger conceptual units in question.
+
+In a sense, McCarthy’s 1960 Lisp article that Backus cites also showed
+this — or rather, the Lisp implementation that followed it in the
+next few months.  That Lisp (modulo its bugs and its dynamic scoping,
+which had to be papered over with the FUNARGS (XXX?) form) was capable
+of more or less directly implementing all of the primitive functions
+and functional forms that Backus presents in this paper.
+
+His sample program from section 5.2 is:
+
+    Def Innerproduct = (Insert +)o(ApplyToAll ×)o Transpose
+
+or
+
+    Def IP = (/+)o(α ×)o Trans.
+
+where “o” is the function composition operator, “×” multiplication,
+and “α” the alpha he uses for ApplyToAll.  We can define the
+operations needed to write this quite concisely in modern Scheme, with
+lists for vectors, as follows.  (Remember that Backus’s functions are
+to be applied to a single argument which is a vector of its
+arguments.)
+
+    (define (plus args) (apply + args))
+    (define (x args) (apply * args))
+    (define (o f g) (lambda (x) (f (g x))))
+    ; Note that this implementation doesn't discover whether its
+    ; argument has a unit so that it can do the right thing in the
+    ; case of an empty vector.
+    (define (insert fn) 
+      (lambda (args) (if (null? (cdr args)) (car args)
+                         (fn `(,(car args) 
+                               ,((insert fn) (cdr args)))))))
+    (define (alpha fn)
+      (lambda (args) (if (null? args) '()
+                         `(,(fn (car args)) . 
+                           ,((alpha fn) (cdr args))))))
+    (define (transpose1 heads tails)
+      (if (null? tails) '()
+          (cons (cons (car heads) (car tails))
+                (transpose1 (cdr heads) (cdr tails)))))
+    (define (transpose0 lst)
+      (if (null? lst) '() (cons '() (transpose0 (cdr lst)))))
+    (define (transpose lst)
+      (transpose1 (car lst) (if (null? (cdr lst)) (transpose0 (car lst))
+                                (transpose (cdr lst)))))
+    (define ip (o (o (insert plus) (alpha x)) transpose))
+    (begin (display (ip '((1 2 3) (6 5 4)))) (newline))  ; outputs "28"
+
+You will notice that the definition of “ip” here is identical to the
+one from Backus’s paper, except for being in prefix order with
+parentheses.  This code makes heavy use of closures, but with some
+cost in readability could use the Lisp 1.5 FUNARGS (XXX?) form
+instead, and similarly quasiquotation could be replaced with explicit
+calls to “cons”.  Maybe it would be 30 lines of code instead of 22.
+(I don’t have a Lisp 1.5 implementation handy to test on, so I can’t
+say for sure.)
+
+So, however tied we may have been to “word-at-a-time thinking” in the
+first 30 years of von Neumann computers, there had been systems in use
+since 1964 or so that could express Backus’s functional forms in a few
+lines of code each.
+
+And APL had already shown some of the way from the mid-1960s on.
+While APL expressions’ values were internally represented as pointers,
+they were presented to the user in a very non-word-at-a-time fashion;
+and indeed, in many cases, they represented finite maps with domains
+of integers less than some limit, or integer pairs, and so on.
+
+And, of course, Church’s SK-combinators (which Backus mentions in his
+paper) are straightforward to implement even in ancient Lisp,
+sufficient to express any computable function, support the writing of
+higher-order functions, and don’t name their arguments.  (But I think
+the first efficient implementations of SK-combinators on computers,
+using graph reduction instead of tree reduction, either did not
+precede Backus’s paper by much, or actually followed it.)  XXX find
+out, asshole
+
+So why had programming with higher-order functions that don’t name
+their arguments — what we now call “point-free style” — not taken
+off in the 1960s?  Was it really because programmers were too tied to
+“word-at-a-time thinking”?  That doesn’t seem plausible to me.
+
+The alternative I suggest — after 40 years of our collective
+experience with “point-free style” in Forth, as well as 30 years in
+languages inspired by this very paper, languages such as Miranda,
+Haskell, and ML, plus more than 50 years of APL one-liners that are
+nearly point-free — is that while point-free programs are indeed
+much easier to “refactor” (i.e. perform semantics-preserving
+transformations on), they are fucking hard to read, maybe because
+they’re too abstract.
+
+This is based not only on my own limited experience, but the
+experiences of other hackers who have spent years programming in
+point-free style.  Even the HaskellWiki Pointfree page [HaskellWiki
+Pointfree] admits that it can sometimes be hard to read:
+
+> Point-free style can (clearly) lead to Obfuscation when used
+> unwisely. As higher-order functions are chained together, it can
+> become harder to mentally infer the types of expressions. The mental
+> cues to an expression’s type (explicit function arguments, and the
+> number of arguments) go missing.
+
+> Point-free style often times leads to code which is difficult to
+> modify. A function written in a pointfree style may have to be
+> radically changed to make minor changes in functionality. This is
+> because the function becomes more complicated than a composition of
+> lambdas and other functions, and compositions must be changed to
+> application for a pointful function.
+
+> Perhaps these are why pointfree style is sometimes (often?)
+> referred to as pointless style.
+
+(However, other parts of the same page advocate point-free style as
+“clearer”, “cleaner”, and “good discipline”.)
+
+Today’s Programs for Inner Product
+----------------------------------
+
+So today, the state of the art (due largely to work in languages
+inspired by Backus’s paper) is something like this Python program:
+
+    def innerproduct(a, b): return sum(ai * bi for ai, bi in zip(a, b))
+
+Which compares favorably to Backus’s 1977 “von Neumann program for
+Inner Product”:
+
+    c := 0
+    for i := 1 step 1 until n do
+      c := c + a[i] × b[i]
+
+(This could be translated to C as follows, gaining a bit of clarity
+but not changing in any substantial way:)
+
+    c = 0;
+    for (i = 0; i < n; i++) c += a[i] * b[i];
+
+Backus lists seven undesirable properties of this program:
+
+> a) Its statements operate on an invisible “state” according to
+>    complex rules.
+
+This is not really true of the Python program above.  Although it is a
+user-visible feature that the expression `(ai*bi for ai, bi in zip(a,
+b))` results in a stateful iterator that eventually runs out of values,
+this program does not make use of that property.
+
+The rules that govern the evaluation of the program are more complex
+than those of Backus’s FP, though.
+
+> b) It is not hierarchical.  Except for the right side of the
+>    assignment statement, it does not construct complex entities
+>    from simpler ones.
+
+Actually, the assignment statement contains four nested compound
+expressions, made out of five atomic variables and one another.  The
+Python program contains `zip(a, b)`, `ai * bi`, the generator
+expression, and the `sum` expression — exactly the same number; but
+perhaps `zip(a, b)` and the generator expression would be more to
+Backus’s liking, since they express exactly the return values of the
+Trans and (α ×) operations in his functional IP program.
+
+> c) It is dynamic and repetitive.  One must mentally execute it to
+>    understand it.
+
+This is not true of this Python program, although it is true of many
+Python programs.  Incidentally, this is exactly Guido van Rossum’s
+reason for wanting to remove Backus’s “insert”, called `reduce`, from
+Python [van Rossum XXX] — he finds he has to mentally execute the
+reduction process to understand it.
+
+> d) It computes word-at-a-time by repetition (of the assignment)
+>    and by modification (of variable i).
+
+This is true of the actual execution of the Python program, as it is
+of the execution of Backus’s FP programs or any other programs on a
+von Neumann machine; but if you try to interpret it as a statement
+about the user-level semantics of the code, it reduces to criticism
+(c).
+
+> e) Part of the data, `n`, is in the program; thus it lacks
+>    generality and works only for vectors of length `n`.
+
+Not true of the Python program.
+
+> f) It names its arguments; it can only be used for vectors `a` and
+>    `b`.  To become general, it requires a procedure declaration.
+>    These involve complex issues (e.g. call-by-name versus
+>    call-by-value.)
+
+Almost as true of the Python program as of the C version; in fact, the
+procedure declaration constitutes fully half of my program as written.
+
+“Call-by-name” here refers to evaluating procedure parameters when
+their values are needed, rather than before entering the procedure;
+it’s like lazy evaluation, but may evaluate the procedure parameter
+more than once.  In effect, this allows you to construct any arbitrary
+zero-argument closure, called a “thunk”, subject to the limitations of
+what you can express in an expression in the language in question.
+
+In the cases where the parameter will always evaluate to the same
+value, it is therefore just a gratuitously inefficient version of lazy
+evaluation; in the cases where it can evaluate to different values,
+its value therefore depends on some information that could be thought
+of as a parameter to the thunk, but which generally needs to be passed
+in by mutating some apparently-unrelated variable, and so in those
+cases, it is just a gratuitously bug-prone version of a general
+closure facility (limited to passing the closures downward through the
+stack).
+
+“Call-by-name” was therefore replaced by a combination of
+call-by-reference and a general closure facility, albeit one limited
+to “downward funargs”, in Pascal (XXX did Algol-60 have downward
+funargs? I think so); and C and most languages designed since then
+have simply stuck to call-by-value.  So, although call-by-name does
+indeed involve complex issues, it should have been an irrelevancy long
+before 1977, and merely adding procedure declarations to your language
+does not imply that your semantics will suffer the slings and arrows
+of outrageous call-by-name.
+
+XXX sometimes people say “call-by-name” when they mean “lazy
+evaluation”; maybe that’s what Backus meant?
+
+> (Of the other languages I’ve used or mentioned in this note,
+> C, Scheme, Python, Smalltalk-80, APL, OCaml, 1960 Lisp,
+> Miranda, Haskell, ML, and Forth just use call-by-value; Perl 5
+> just uses call-by-reference; C++ has both call-by-value and
+> call-by-reference; Algol 60 has both call-by-value and
+> call-by-name; Prolog uses something else entirely; Altair
+> BASIC didn’t have procedures; I’m not sure about BLISS-10 and
+> BLISS-11; Lisp 1.5 had call-by-value and, I think, also
+> FEXPRs; I think Smalltalk-72 did something vaguely FEXPR-like;
+> and PL/1 and (I think) Algol 68, consistent with the rest of
+> the language design, have every horrifying deformed
+> argument-passing convention you can imagine.)
+
+However, the distinction between call-by-value and call-by-name
+includes another complexity — strictness.  A function “f” is strict
+in some parameter if it can’t compute its return value without getting
+the value of that parameter.  Backus calls this property
+“bottom-preserving”, and not having procedure declarations has not
+saved him from strictness; throughout the paper there are a number of
+minor logical errors having to do with this particular extra
+complexity.
+
+Backus implies that procedure declarations import some other
+complexities that he hasn’t mentioned; the ones I can think of are
+variable scoping (lexical vs. dynamic vs. broken) and the creation of
+closures (downward-only or generalized; interchangeability with
+non-closure function pointers; etc.).
+
+This absence of variables is the central difference, as I read it,
+between Backus’s proposed programming system and most of the purely
+applicative systems that preceded it: unlike them, it doesn’t have
+lambda substitution.  It is interesting to note that nearly all of the
+systems inspired by Backus’s paper over the ensuing 30 years have
+acquired lambda substitution rather quickly.
+
+> g) Its “housekeeping” operations are represented by symbols in
+>    scattered places (in the for statement and the subscripts in
+>    the assignment).  This makes it impossible to consolidate
+>    housekeeping operations, the most common of all, into single,
+>    powerful, widely used operators.
+
+This is still somewhat true of the generator expression `(... for
+... in ...)`  but not the `sum` and `zip` operations.  Backus never
+defines “housekeeping” anywhere in his paper, but as additional
+examples, he gives function composition, matrix transposition,
+apply-to-all, and “insert”, more commonly known as “reduce” or “fold”.
+
+A modern C++ program, using the STL, is somewhat similar in structure,
+although dramatically wordier.  C++ is probably the poster child for
+obese von Neumann languages; here I have included the entire file with
+a `main()` function, because that turned out to be a little tricky for
+me to write concisely with my limited knowledge of C++, and I would
+hate for anyone else to have to suffer the same way.  It’s only the 4
+lines inside `innerproduct` that correspond to the 2-3 lines of C
+given at the top of this section or the half-line of Python.
+
+    #include <iostream>
+    #include <vector>
+    #include <numeric>
+    using namespace std;
+
+    template<typename T>
+    T innerproduct(vector<T> a, vector<T> b) {
+      vector<T> result;
+      transform(a.begin(), a.end(), b.begin(),
+                back_insert_iterator<vector<T> >(result), multiplies<T>());
+      return accumulate(result.begin() + 1, result.end(), result[0], plus<T>());
+    }
+
+    #define arrayend(array) ((array)+sizeof(array)/sizeof((array)[0]))
+    int main(int argc, char **argv) {
+      int aa[] = {1, 2, 3};
+      int bb[] = {6, 5, 4};
+      vector<int> a(aa, arrayend(aa)), b(bb, arrayend(bb));
+      cout << innerproduct(a, b) << endl;
+      return 0;
+    }
+
+(I think that’s purely standard C++.  I tested it with g++ 4.1.2.
+There’s no particular reason `transform()` couldn’t have been defined
+to produce an `InputIterator` instead of consuming an
+`OutputIterator`, but it wasn’t.  Oh, and the STL contains an
+`inner_product()` template function that does this already, but you have
+to give it a starting value, as with `accumulate()`, so it’s hard to
+make a call to it generic across element types.)
+
+> (A note about performance: the above program compiles to 3632 bytes
+> of machine code, on the order of 750 instructions, containing
+> obvious inefficiencies; the inner-product function itself,
+> instantiated for vectors of integers, is 86 instructions, and on my
+> laptop, it takes 3300 nanoseconds on Backus’s example vectors. By
+> comparison, the analogous non-generic C function, with the code at
+> the top of this section, is 23 instructions, contains no calls to
+> other functions, and consequently executes in 54 nanoseconds.  So
+> much for the STL’s vaunted “absolute efficiency”.  The C++ version
+> also requires four dynamic libraries at run-time.)
+
+In “A Short History of STL” [Stepanov 2007], Stepanov writes about how
+his work was inspired by Backus’s FP work.
+
+In OCaml, which is very much inspired by Backus’s paper, we could
+write:
+
+    List.fold_left2 (fun a b c -> a + b * c) 0
+
+Although that’s not generic across numeric types the way the Python
+and C++ versions are.
+
+In Squeak Smalltalk, it looks like this, as a method on
+`SequenceableCollection`:
+
+    innerProduct: aCollection 
+        ^ (self with: aCollection collect: [:a :b | a * b ]) sum.
+
+I don’t know if `with:collect:` and `sum` existed in Smalltalk-80, let
+alone the Smalltalk that existed in 1977; the oldest version in Squeak
+was in 1999 by “di”, which is presumably Dan Ingalls, but older
+versions may exist.
+
+In R5RS Scheme, if I don’t restrict myself to trying to reproduce the
+structure of Backus’s program exactly using facilities that I’m sure
+were present in early Lisp, I can write it quite concisely as well:
+
+    (define (innerproduct a b) (apply + (map * a b)))
+
+I don’t know when Scheme’s map acquired the ability to apply to an
+arbitrary number of arguments, but I suspect it was a bit later than
+Backus’s paper.
+
+The Smalltalk and Scheme versions, too, are generic across all numeric
+types; although the Scheme version, unlike the Python, C++, and
+Smalltalk versions, doesn’t support user-defined numeric types.
+
+These programs are improvements over the C version along Backus’s
+criteria in the following ways: Python: abceg; C++: beg; OCaml: abceg;
+Squeak: abceg; Scheme: aceg.
+
+So, in sum, von Neumann programming languages — the avant-garde, if
+not yet the mainstream — have adopted features that provide most of
+Backus’s desiderata, but without requiring the point-free style he
+considers crucial.  Some of them, I think, had those features before
+his paper.
+
+Garbage Collection is the Key to Not Thinking Word-at-a-Time
+------------------------------------------------------------
+
+In section 4, Backus writes, “The assignment statement is the von
+Neumann bottleneck of programming languages and keeps us thinking in
+word-at-a-time terms in much the same way the computer’s bottleneck
+does.  Consider a typical program; at its center are a number of
+assignment statements containing some subscripted variables.  Each
+assignment statement produces a one-word result.”
+
+But actually, even years before Backus wrote his paper, PL/1 supported
+assignment statements that copied entire arrays, and C eventually
+acquired the ability to copy `struct`s in simple assignment statements
+as well.  But you can’t write the functional forms used in Backus’s
+“InnerProduct” program in those languages, the way you can in Python,
+OCaml, Smalltalk, or Scheme.  The key is that, even though assignment
+statements in Python or Scheme only copy single words (unlike those in
+C and PL/1!) those single words can effectively stand for much larger
+data structures that they point to.
+
+In C, a single word can point to a much larger data structure, but you
+must constantly be aware of the difference between the pointer and the
+thing it points to, because you must be careful to free the thing it
+points to before overwriting the last copy of the pointer, or letting
+it go out of scope.  C++ can do better here because its destructors
+and copy-constructors allow you to automate that work.
+
+So, even though C’s assignment statements and parameter-passing can
+copy entire `struct`s (say, complex numbers, or begin-end pointer
+pairs), they can’t copy structures of irregular and unpredictable
+size, such as the transposed list of pairs in the inner-product
+function.  Garbage-collected languages can universally pass structures
+of irregular and unpredictable size without worrying about who
+deallocates them, and so you can toss around a list, or a parse tree,
+or an arbitrary-precision number, or an arbitrary-size matrix, or a
+drawing, as easily if it were a single byte.
+
+(As long as you don’t mutate it.  Once you start mutating it, you have
+to worry about aliasing.  But most of the time, that doesn’t impose a
+large practical complexity penalty on your programs — just your
+proofs.)
+
+In sum, Backus misidentified the source of word-at-a-time thinking; it
+is not the assignment statement and its ability to transfer only a
+word at a time, but rather the hassle of manual memory management.
+
+This is perhaps somewhat surprising; garbage collection had been
+invented for Lisp in 1958 or 1959, and Algol-68 implementations were
+required to provide it.  But it seems that in 1977, Backus didn’t have
+much experience programming in garbage-collection languages.  Perhaps
+this is because, despite Algol-68’s mandate, garbage-collected
+programming environments weren’t in wide use by 1977, largely because
+garbage collection was grossly inefficient until the invention of
+generational garbage collection (in 1982? XXX).
+
+However, this myopia about garbage collection was not limited to
+Backus; Dijkstra comments in EWD692, about this very paper:
+
+> In the first step [of the program MM] each of the component
+> functions in the construction (“1” and “trans o 2” ,
+> respectively) is combined with the total operand <m, n> —a
+> sequence of two matrices— from which in the last step
+> (Selection) each extracts the half it really needs.  If the
+> matrices m and n are sizeable [sic], a naive [sic]
+> implementation that first copies those matrices and then kicks
+> out half of it again seems absolutely unacceptable on _any_
+> machine —von Neumann or not—.
+
+But That’s Not the Point!
+-------------------------
+
+But the “abcdefg” desiderata in section 5 aren’t the real point of the
+paper!  The real point of the paper, found in section 9, is that
+languages that are more mathematically tractable permit “algebraic
+laws” to be “used in a rather mechanical way to transform a problem
+into its solution.”  Backus proposes to solve this problem by
+inventing a new programming style that is particularly easy to
+manipulate mathematically.
+
+There is definitely merit in using programming styles that make it
+easy to prove things and to mechanically transform programs without
+changing their semantics; this was the idea of Dijkstra’s “structured
+programming”, which Backus mentions in passing.
+
+Unfortunately, while I think Backus was correct that
+purely-applicative programs in general, and point-free
+purely-applicative programs in particular, are particularly amenable
+to formal manipulation, he doesn’t do a very good job of presenting
+this in the paper.
+
+Backus’s Pessimism About Formal Semantics Was Wrong
+---------------------------------------------------
+
+In section 9, Backus writes:
+
+> Axiomatic semantics [Hoare 1969] precisely restates the
+> inelegant properties of von Neumann programs
+> (i.e. transformations on states) as transformations on
+> predicates.  ... [Its practitioners’] success rests on two
+> factors in addition to their ingenuity: First, the game is
+> restricted to small, weak subsets of full von Neumann
+> languages that have states vastly simpler than real ones.
+> Second, the new playing field (predicates and their
+> transformations) is richer, more orderly and effective than
+> the old (states and their transformations).  But restricting
+> the game and transferring it to a more effective domain does
+> not enable it to handle real programs (with the necessary
+> complexities of procedure calls and aliasing) ... As axiomatic
+> semantics is extended to cover more of a typical von Neumann
+> language, it begins to lose its effectiveness with the
+> increasing complexity that is required.
+
+Although Scheme contains a large and useful applicative subset, it is
+certainly a von Neumann language in the sense that Backus is
+describing.  R5RS includes a formal denotational semantics for Scheme.
+It’s only two and a half pages, and handles the primitive forms of the
+whole language; another two pages are concerned with formal
+definitions of rewrite rules that reduce the other special forms in
+the system to those primitive forms.  Real programs in Scheme have had
+useful properties proved of them, or so I hear.  I haven’t written or
+read any of those proofs myself.  XXX PreScheme
+
+(Axiomatic semantics is a different approach from the denotational
+semantics used by R5RS, as Backus points out in section 12, but his
+skepticism is not confined to one or the other.)
+
+More recently [Leroy 2006], Xavier Leroy’s team at INRIA has
+constructed a compiler in OCaml from a large subset of C, which they
+call Clight, to PowerPC assembly.  The compiler is automatically
+extracted from a machine-checked proof of its correctness written in
+Coq.  While the source language Clight is, at this point, still a toy
+language (it lacks `struct`s, `union`s, `typedef`, `goto`, `switch`,
+and, I believe, casts) its compiler is definitely a “real program”.
+
+On the other hand, while the problems Backus identifies are not as
+severe as he thought, neither are they nonexistent.  Apparently [Leroy
+2006] it is still the case that nobody has published a formal
+semantics for C, which was the most-widely-used von-Neumann-style
+language during much of the 30 years since Backus’s paper (say, 1984
+to 1994, or possibly even until today).  So the early hopes
+accompanying formal denotational semantics work were overoptimistic,
+essentially for the reasons Backus identifies.
+
+And Backus’s other skepticism expressed later has turned out to be
+correct: “If the average programmer is to prove his programs correct,
+he will need much simpler techniques than those the professionals have
+so far put forward.”  And point-free purely-applicative programs have
+indeed turned out to be among the easiest to manipulate in this way.
+
+Dijkstra writes in EWD-692:
+
+> ...his objection is less against von Neumann programs than against
+> his own clumsy way of trying to understand them.
+
+(But over the next few dozen EWD notices, Dijkstra seems to have
+changed his mind about the ease of proving properties of functional
+programs.)
+
+Von Neumann Languages Can Be Powerfully Extensible
+--------------------------------------------------
+
+Backus writes:
+
+> Let us distinguish two parts of a programming language.  First,
+> its *framework* which gives the overall rules of the system, and
+> second, its *changeable parts*, whose existence is anticipated by
+> the framework but whose particular behavior is not specified by
+> it.  For example, the for statement, and almost all other
+> statements, are part of Algol’s framework but library functions
+> and user-defined procedures are changeable parts...
+> 
+> Now suppose a language had a small framework which could easily
+> accommodate a great variety of changeable features entirely as
+> changeable parts.  Then such a framework could support many
+> different features and styles without being changed itself.  In
+> contrast to this pleasant possibility, von Neumann languages
+> always seem to have an immense framework and very limited
+> changeable parts.  What causes this to happen?  The answer
+> concerns two problems of von Neumann languages.
+> 
+> The first problem...a von Neumann language must have a semantics
+> closely coupled to the state, in which every detail of a
+> computation changes the state.  The consequence of this semantics
+> closely coupled to states is that every detail of every feature
+> must be built into the state and its transition rules.
+> 
+> Thus every feature of a von Neumann language must be spelled out
+> in stupefying detail in its framework.  ...many complex features
+> are needed... The result is the inevitable rigid and enormous
+> framework of a von Neumann language. . . .
+> 
+> The second problem of von Neumann languages is that their
+> changeable parts have so little expressive power.  Their
+> gargantuan size is eloquent proof of this; after all, if the
+> designer knew that all those complicated features, which he now
+> builds into the framework, could be added later on as changeable
+> parts, he would not be so eager to build them into the framework.
+
+His “first problem” is a non sequitur.  Why would having every detail
+of a computation change the state, and therefore semantics being
+closely coupled to states, result in not being able to define
+“features” such as the `for` statement?  Backus never explains what
+“feature” means, nor does he explain any kind of connection between
+operational semantics and lack of extensibility.
+
+The only additional complication operational semantics bring to
+extensibility is that when you define a new expression or statement
+type — such as a `for` statement — you must specify if, when, and
+how many times each subexpression is executed, while
+purely-applicative languages need only specify what to do with their
+results.
+
+In fact, there already existed many highly-extensible von Neumann
+languages when he wrote this, Lisp and Forth being among the prime
+examples of the type.  Smalltalk-72 was more extensible than
+Smalltalk-80, but even Smalltalk-80 supports easy user-level
+definitions of things such as the Algol `for` statement.  Here's the
+definition of Number>>#to:do: from Squeak, which is a Smalltalk-80
+implementation:
+
+    to: stop do: aBlock 
+            "Normally compiled in-line, and therefore not overridable.
+            Evaluate aBlock for each element of the interval 
+            (self to: stop by: 1)."
+            | nextValue |
+            nextValue _ self.
+            [nextValue <= stop]
+                    whileTrue: 
+                            [aBlock value: nextValue.
+                            nextValue _ nextValue + 1]
+
+This allows you to write a for loop like this:
+
+    1 to: 10 do: [:i | Transcript show: ('item ', i asString); cr]
+
+As the comment explains, the compiler specially recognizes the #to:do:
+selector and inlines an implementation equivalent to this one; but you
+can use the code to define another loop structure that does the same
+thing under another name.
+
+There are several different approaches to defining highly extensible
+von Neumann languages:
+
+1.  Lisp macros: by running arbitrary user-defined code at
+    compile-time, you can add arbitrarily complex language features.
+    R5RS defines Scheme in terms of only six primitive expression
+    types: variables, `quote`-expressions, procedure calls, `lambda`
+    expressions, `if`, and assignments.  Everything else — `cond`,
+    `case`, `let`, `let*`, `letrec`, `begin` (sequencing), `do` (the
+    `for` loop), even access to the macro system — is defined in terms
+    of the macro system.  While Lisp macros had their shortcomings at
+    the time Backus wrote (hygienic macros wouldn’t be successfully
+    implemented for, I think, another ten years) they were already in
+    heavy use in, at least, MacLisp.  R5RS defines `do` in the
+    following fairly tricky way:
+
+        (define-syntax do
+          (syntax-rules ()
+            ((do ((var init step ...) ...)
+                  (test expr ...)
+                  command ...)
+             (letrec ((loop
+                       (lambda (var ...)
+                         (if test
+                             (begin (if #f #f) expr ...)
+                             (begin command ...
+                                    (loop (do "step" var step ...) ...))))))
+               (loop init ...)))
+            ((do "step" x) x)
+            ((do "step" x y) y)))
+
+    (Some Scheme dialects also have a Common-Lisp-style macro system in
+    which the code to rewrite the tree is normal Scheme rather than
+    this `syntax-rules` crap, but it’s somewhat trickier to use because
+    of name-capture problems.)
+
+    C++ uses a similar approach; like standard Scheme, it has, in
+    effect, a completely different programming language that runs at
+    compile-time, based on pattern-matching of C++ types.
+
+    Forth uses this approach to the extreme.  The Forth equivalent of
+    the `for` loop is the `DO LOOP` loop, which looks like `10 0 DO I
+    . LOOP` — 10 is the loop limit, 0 is the starting value, `I .` is
+    the body of the loop (which prints the value of the loop counter),
+    and `LOOP` ends the loop.  There are variants, but that’s the basic
+    structure.  Here’s the implementation of `DO LOOP` in F-83, a 1983
+    implementation of Forth; this version is for MS-DOS, and so some
+    structures are written in an RPN version of 8086 assembly for
+    speed.  (I gathered this together from several different parts of
+    `KERNEL86.BLK`.)
+
+        ASSEMBLER HEX
+        CODE (DO)   (S l i -- )   AX POP   BX POP
+        LABEL PDO   RP DEC   RP DEC   0 [IP] DX MOV   DX 0 [RP] MOV
+          IP INC   IP INC   8000 # BX ADD   RP DEC   RP DEC
+          BX 0 [RP] MOV   BX AX SUB   RP DEC   RP DEC   AX 0 [RP] MOV
+          NEXT END-CODE
+        CODE BRANCH   (S -- )
+        LABEL BRAN1   0 [IP] IP MOV   NEXT END-CODE
+        CODE (LOOP)   (S -- )   1 # AX MOV
+        LABEL PLOOP   AX 0 [RP] ADD   BRAN1 JNO
+          6 # RP ADD   IP INC   IP INC   NEXT END-CODE
+        FORTH
+        : DO      COMPILE (DO)   ?>MARK                    ; IMMEDIATE
+        : LOOP
+            COMPILE (LOOP)  2DUP 2+ ?<RESOLVE ?>RESOLVE    ; IMMEDIATE
+
+    Essentially everything is the “changeable parts” in Forth.  The
+    eForth 1.0 model from 1990, in an effort to define a maximally
+    portable Forth, has 171 instructions of actual machine code
+    constituting a two-instruction “interpreter” and 31 primitive
+    “words” or procedures.
+
+    I want to emphasize that, although some of these words are written
+    in assembly, and some run at compile-time, in no way do they form
+    an unchangeable part of the framework in the sense that Backus
+    deplores; any user of the system can define new words in assembly
+    at any time, or define new words that run at compile-time to define
+    new control structures, and those words are immediately available.
+
+    Although the above exercise in archaeology is from six years after
+    1977, the relevant attributes of Forth were in place from some time
+    before Backus wrote.
+
+2.  Lightweight closures: Smalltalk-80 gets most of its extensibility
+    from a very lightweight syntax for (restricted) closures, as shown
+    in the above code for Number>>#to:do:.  This has undesirable
+    effects occasionally — in 
+    `((index <= limit) & (anArray at: index))`, the second half of the
+    conjunction is evaluated regardless of the value of the first half.
+    There’s another method that allows you to write 
+    `((index <= limit) and: [anArray at: index])` and only evaluate the
+    second part if the first one is true; but the notation is
+    undesirably asymmetrical and non-infix.
+
+    Perl 5’s prototypes and Ruby’s block arguments give them a
+    similarly lightweight closure syntax in some circumstances, which
+    can provide similar facilities.
+
+3.  Reflection: if there’s very little done at compile-time that your
+    code can’t change at run-time, such as constructing new classes,
+    enumerating the methods of classes, constructing method names and
+    calling the named methods, evaluating strings of source code, and
+    so on, you can get a certain amount of extensibility without any
+    special features of the actual language.  Smalltalk’s
+    #doesNotUnderstand: method, for example, allows classes to reuse
+    the method namespace for their own purposes.
+
+In sum, Backus’s assertion that the changeable parts of von Neumann
+languages are necessarily quite limited in their expressiveness is
+poorly reasoned and simply wrong, and ample counterexamples existed
+even before he wrote it, although he may not have been aware of them.
+
+The Design of His FP System
+---------------------------
+
+Backus’s FP system is a bit different from modern “functional
+programming” systems, although it inspired the explosion in them over
+the next few years.  They are generally based on the lambda-calculus,
+and so it is easy to define new higher-order functions in them, and
+they incorporate parameter substitution as a fundamental mechanism.
+
+Space Usage
+-----------
+
+Backus writes, “[This MM program] is an inherently inefficient program
+for von Neumann computers (with regard to the use of space), but
+efficient ones can be derived from it and realizations of FP systems
+can be imagined that could execute MM without the prodigal use of
+space it implies.”
+
+Here’s the MM program:
+
+    Def MM = (α α((/+)o(α ×)o trans))o(α distl)o distr o[1,trans o 2]
+
+The most obvious interpretation of his remark follows, and under that
+interpretation, the remark is wrong.
+
+What he means is that the result of the next-to-last step of MM is a
+four-dimensional array with dimensions (A, B, C, 2), where the the
+original matrices have dimensions (A, C) and (C, B) and the result has
+dimensions (A, B).  So, for instance, taking the product of two
+1000×1000 matrices, producing a million-number result, would require a
+two-billion-number intermediate result, which is then reduced to a
+million numbers in a billion multiplications.
+
+Dijkstra made a similar assumption; see the quote from him above in
+the section about garbage collection.
+
+But, as he says, there’s no reason to physically realize all the
+values of that intermediate result.  “An APL Machine” [XXX 1970?],
+written several years before Backus began his work, describes an
+architecture for evaluating APL programs that avoids materializing
+many such intermediate results.  In this case, it’s sufficient to copy
+the sequences by reference, even if you materialize them all.
+
+I was thinking that linear logic was going to be helpful here, since
+obviously there’s no point in materializing a sequence of values that
+gets used only once when you might as well produce it on the fly
+(modulo locality of reference and instruction-level parallelism
+concerns), but actually the values of concern here are the rows and
+columns, which are indeed used multiple times; distl and distr are not
+“linear” in Girard’s sense.
+
+This straightforward Python translation of the above MM program can
+multiply a 10000×40 matrix by a 40×10000 matrix, producing a 40×40
+result, in 5MB.  If it created an intermediate 40 × 40 × 2 × 10000
+matrix with no sharing, as Backus seems to have envisioned, that
+intermediate matrix would contain 32 million values.  It takes about
+five minutes on my computer.
+
+    #!/usr/bin/python
+    # A Python implementation of some of John Backus's "FP" system.
+    def selector(n):
+        return lambda x: x[n-1]
+    def insert(f):
+        def rv(x):
+            rv = x[-1]
+            for xi in x[-2::-1]: rv = f([xi, rv])
+            return rv
+        return rv
+    def apply_to_all(f):
+        return lambda x: [f(xi) for xi in x]
+    def compose(*fs):
+        if len(fs) == 1: return fs[0]
+        f = fs[0]
+        g = compose(*fs[1:])
+        return lambda x: f(g(x))
+    def construct(*fs):
+        return lambda x: [fi(x) for fi in fs]
+    def transpose(x):
+        return [[x[i][j] for i in range(len(x))]
+                for j in range(len(x[0]))]
+    plus =  lambda (x, y): x + y
+    times = lambda (x, y): x * y
+    distl = lambda (y, z): [(y, zi) for zi in z]
+    distr = lambda (y, z): [(yi, z) for yi in y]
+    innerproduct = compose(insert(plus), apply_to_all(times), transpose)
+    print innerproduct([[1, 2, 3], [6, 5, 4]])
+    mm = compose(apply_to_all(apply_to_all(innerproduct)),
+                 apply_to_all(distl),
+                 distr,
+                 construct(selector(1), compose(transpose, selector(2))))
+    matrices = [[[1, 0, 1], [0, 1, 0]], [[1, 2], [3, 4], [0, 0]]]
+    print mm(matrices)
+    bigmatrices = [[range(10000)] * 40, [range(40)] * 10000]
+    print mm(bigmatrices)
+
+It could be that Backus was merely considering the necessity to
+allocate *any* variable-sized space for intermediate results as an
+“inefficient” use of space, since all you really need for a matrix
+multiply is three loop counters and an accumulator.
+
+Presenting Some of Backus’s Results Better
+------------------------------------------
+
+Backus’s section 12.5.1 is a correctness proof for a recursive
+factorial function, defined as follows:
+
+        f = eq0 -> constant(1); times o [id, f o s]
+        s = - o [id, constant(1)]
+        eq0 = eq o [id, constant(0)]         [from section 11.3]
+
+XXX so the idea here is to work through the proof from section 12.5 to
+get f = / times o [ id, id o s, id o s o s, ... constant(1) o crap ]
+and then generalize it.  But I’m too sleepy right now.  And I probably
+want a “recursion lemma for f” and a “linearly expansive lemma for f”.
+`p = eq0; g = constant(1); h = times; i = id; j = s`
+
+Misc Crap
+---------
+
+From HaskellWiki: “To find out more about this style, search for
+Squiggol and the Bird-Meertens Formalism, a style of functional
+programming by calculation that was developed by Richard Bird, Lambert
+Meertens, and others at Oxford University. Jeremy Gibbons has also
+written a number of papers about the topic, which are cited below.”
+
+Other Stuff to Read
+-------------------
+
+TODO reformat this section for inline links
+
+[Backus 1977] John Backus.  Can programming be liberated from the von
+Neumann style?  A functional style and its algebra of programs.  1977
+ACM Turing Award lecture, Communications of the ACM volume 21, number
+8, with this funny number: 0001-0782/78/0800-0613.
+
+> <http://www.stanford.edu/class/cs242/readings/backus.pdf>
+
+
+[Hoare 1969] C. A. R. Hoare. An axiomatic basis for computer
+programming.  Communications of the ACM volume 12, number 10 (October
+1969), pages 576-583
+
+> <http://ls14-www.cs.uni-dortmund.de/ls14Medien/Dokumente/Lehre/PaperdesMonats/hoare.pdf>
+
+
+[Knuth 1973] Donald Ervin Knuth.  Structured Programming with Go To
+Statements. Computing Surveys, volume 6, number 4 (December 1974),
+pages 261-301.
+
+> <http://pplab.snu.ac.kr/courses/adv_pl05/papers/p261-knuth.pdf>
+
+
+[Leroy 2006] Xavier Leroy.  Formal Certification of a Compiler
+Back-end: or: Programming a Compiler with a Proof Assistant. POPL '06,
+with this funny number: 1-59593-027-2/06/0001.
+
+> <http://pauillac.inria.fr/~xleroy/publi/compiler-certif.pdf>
+
+
+[Sussman 1975] Gerald Jay Sussman and Guy Lewis Steele Jr. Scheme: an
+interpreter for extended lambda calculus. MIT Artificial Intelligence
+Memo 349 (AIM-349), December 1975.  This was the initial definition of
+Scheme, preceding AIM-452, the Revised Report on Scheme.
+
+> <ftp://publications.ai.mit.edu/ai-publications/pdf/AIM-349.pdf>
+
+
+[van Rossum XXX] that thing he wrote about removing reduce and lambda
+from Python 3000
+
+
+[Stepanov 2007] "Short History of STL", by Alexander Stepanov
+(contributed to Evolving a language in and for the real world: C++
+1991-2007 by Bjarne Stroustrup)
+
+> <http://www.stepanovpapers.com/history%20of%20STL.pdf>
+
+
+[XXX 1970?] That guy's APL machine paper, with the D-machine and the
+E-machine and the drag-along.
+
+
+[HaskellWiki Pointfree] The "Pointfree" page on HaskellWiki as of
+2008-01-08.
+
+> <http://www.haskell.org/haskellwiki/Pointfree>
+
+<link rel="stylesheet" href="http://canonical.org/~kragen/style.css" />
+
+<!--
+  LocalWords:  ve von wanker EWD yudk Gluckman wasn didn doesn Isn un FUNARGS
+  LocalWords:  XXX Def Innerproduct ApplyToAll Trans args fn cdr lst ip SK def
+  LocalWords:  HaskellWiki Pointfree pointfree pointful innerproduct ai bi std
+  LocalWords:  stateful Rossum funargs FEXPRs FEXPR hasn iostream typename int
+  LocalWords:  arrayend sizeof argc argv aa bb cout endl couldn InputIterator
+  LocalWords:  di abceg aceg garde FP FL struct InnerProduct weren trans aren
+  LocalWords:  abcdefg Hoare PreScheme INRIA Clight Coq overoptimistic cr
+  LocalWords:  aBlock nextValue whileTrue asString inlines cond letrec wouldn
+  LocalWords:  MacLisp var init expr RPN BLK BX PDO RP DX MOV PLOOP JNO DUP rv
+  LocalWords:  eForth anArray doesNotUnderstand distl distr fs len fi zi yi eq
+  LocalWords:  bigmatrices Misc Squiggol Meertens TODO rel stylesheet href
+  LocalWords:  OutputIterator SequenceableCollection innerProduct aCollection
+-->
