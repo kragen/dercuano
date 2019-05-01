@@ -1,0 +1,249 @@
+Immediate-mode GUI libraries, which are popular for some kinds of
+games nowadays, allow you to define your GUI structure by using the
+execution trace of a callback instead of an in-memory data structure.
+They can be used with immediate-mode graphics libraries to draw the
+GUI bit by bit as the function runs, requiring a really minimal amount
+of RAM.  Aside from the advantage in memory consumption, this approach
+reduces or eliminates the cache-invalidation problem of redrawing the
+view when the underlying model changes; whenever you draw a frame,
+your drawing function fetches the most current state directly from the
+model.
+
+An interesting feature of this approach is that there are at least two
+different reasons the library might call your callback: to *draw* the
+GUI or to *react to an event* in the GUI.  For example, you might have
+a `button(x, y, w, h, label)` function with a boolean return value;
+when called in drawing mode, it draws the button and always returns
+false, but when called in reacting mode, it draws nothing, and returns
+true if the user just clicked on the button.  So really your callback
+isn’t so much a “draw interface” callback as a “describe interface”
+callback.
+
+So I was thinking about using this approach for serialization of data
+structures.
+
+Example application
+-------------------
+
+I’m writing a VNC server, and the VNC protocol (though a beautiful
+dream compared to, for example, the Spice protocol or the X11
+protocol) has some godawful things like `PIXEL_FORMAT` and
+`SetEncodings` in it.  `PIXEL_FORMAT`:
+
+             +--------------+--------------+-----------------+
+             | No. of bytes | Type [Value] | Description     |
+             +--------------+--------------+-----------------+
+             | 1            | U8           | bits-per-pixel  |
+             | 1            | U8           | depth           |
+             | 1            | U8           | big-endian-flag |
+             | 1            | U8           | true-color-flag |
+             | 2            | U16          | red-max         |
+             | 2            | U16          | green-max       |
+             | 2            | U16          | blue-max        |
+             | 1            | U8           | red-shift       |
+             | 1            | U8           | green-shift     |
+             | 1            | U8           | blue-shift      |
+             | 3            |              | padding         |
+             +--------------+--------------+-----------------+
+
+`SetEncodings`:
+
+           +--------------+--------------+---------------------+
+           | No. of bytes | Type [Value] | Description         |
+           +--------------+--------------+---------------------+
+           | 1            | U8 [2]       | message-type        |
+           | 1            |              | padding             |
+           | 2            | U16          | number-of-encodings |
+           +--------------+--------------+---------------------+
+
+   This is followed by number-of-encodings repetitions of the following:
+
+              +--------------+--------------+---------------+
+              | No. of bytes | Type [Value] | Description   |
+              +--------------+--------------+---------------+
+              | 4            | S32          | encoding-type |
+              +--------------+--------------+---------------+
+
+As it happens, the server is supposed to be able to either encode or
+decode `PIXEL_FORMAT`.  It would be nice to be able to describe the
+`PIXEL_FORMAT` encoding with a function and derive both the decoder
+from it automatically; something like this, in Golang syntax:
+
+    func (p *PIXEL_FORMAT) format() {
+            u8(p.bits_per_pixel)
+            u8(p.depth)
+            boolU8(p.big_endian_flag)
+            boolU8(p.true_color_flag)
+            u16(p.red_max); u16(p.green_max); u16(p.blue_max)
+            u8(p.red_shift); u8(p.green_shift); u8(p.blue_shift)
+            padBytes(3)
+    }
+
+Now, as it happens, the way I’m doing this right now is with the
+Golang `encoding/binary` module, which uses reflection to slowly read
+the above description from the definition of a struct type:
+
+    type PIXEL_FORMAT struct {
+            bits_per_pixel, depth, big_endian_flag, true_color_flag byte
+            red_max, green_max, blue_max                            uint16
+            red_shift, green_shift, blue_shift                      uint8
+            _, _, _                                                 byte
+    }
+
+That’s all the code that’s needed to describe the format above to
+`encoding/binary`, which can then both write and, in theory, read it
+(though I haven’t actually tried this yet), and this is awesome.  But
+`encoding/binary` doesn’t support any variable-length data like the
+`encoding-type` list in `SetEncodings`, nor can it do things like
+“deserialize a client-to-server message”, in which the first byte of
+the message contains the message-type.
+
+This suggests an approach reminiscent of recursive-descent parsing
+with backtracking, which is a simple and fully general approach to
+parsing context-free languages, although it takes exponential time in
+the worst case (though see the Packrat parsing algorithm for a fix).
+When parsing, the input stream can manage an error status and a stack
+of backtracking points; when a parse fails, it sets the error status,
+which prevents further parsing from doing anything until the format
+function backtracks to a non-erroneous backtracking point.  This
+allows ordered choice among a set of possible parses.
+
+A proposed solution
+-------------------
+
+So let’s think about what `SetEncodings` might look like in this
+form:
+
+    func (e *SetEncodings) Format(s *Stream) {
+            LiteralByte(s, 2)
+            PadBytes(s, 1)
+
+            n := U16Split(s, len(e.encodingTypes))
+
+            if s.Parsing() {
+                    e.encodingTypes = make([]encodingType, n)
+            }
+
+            for i := 0; i < n; i++ {
+                    &e.encodingTypes[i].Format(s)
+            }
+    }
+
+When marshalling, the `LiteralByte` call emits the byte 0x2; the
+`PadBytes` call emits the byte 0x0; the `U16Split` call emits two
+bytes with a big-endian encoding of `len(e.encodingTypes)` (say, 0x00
+0x03, if it’s 3), and returns the number it just encoded; `Parsing`
+returns false; and then each of the three `Format` calls to the items
+in `e.encodingTypes` invokes an `S32` function to emit four bytes
+serializing that encoding type.
+
+When unmarshalling, the `LiteralByte` call consumes a byte, and if
+it’s not 0x2, it marks the `Stream` as failed, so that all the future
+calls on it (until possible backtracking) will be no-ops.  If it was
+successful, though, `PadBytes` consumes and discards 1 byte, and
+`U16Split` ignores its second argument, decodes two input bytes, and
+returns the decoded value.  Then `Parsing` returns true, so the format
+function allocates the slice, and then the iteration parses each
+encoding type in turn, by invoking its `Format` method.
+
+I’m not familiar enough with Golang’s type system yet to know if there
+is a better way to express this function:
+
+    func formatSliceU16(s *Stream, items *[]Formattable, make_item func() Formattable) {
+            n := U16split(s, len(*items))
+
+            if s.Parsing() {
+                    *items = make([]Formattable, n)
+            }
+
+            for i := 0; i < n; i++ {
+                    items[i] := make_item()
+                    items[i].Format(s)
+            }
+    }
+
+The difficulty here is that the items in the slice of interfaces
+(assuming `Formattable` is an interface!) needs a separate factory
+function to instantiate them, since this function doesn’t have any
+other way to invoke the proper `Format` for the particular type of
+`Formattable` the caller was hoping for.  This is pretty bad compared
+to just having a slice of `int32` values with some nominal type; if
+you have 60 of them, you have 61 heap allocations totaling 1680 bytes
+(assuming interface values are three 64-bit pointers, and not counting
+the size of the slice itself) instead of 1 allocation of 240 bytes.
+
+Anyway, this `formatSliceU16` function would reduce the above `Format`
+method to this:
+
+    func (e *SetEncodings) Format(s *Stream) {
+            LiteralByte(s, 2)
+            PadBytes(s, 1)
+            formatSliceU16(s, &e.encodingTypes, func() Formattable { return &encodingType{} })
+    }
+
+Using the same API, and allowing the various scalar functions to be
+variadic, the earlier-mentioned `PIXEL_FORMAT` structure can then
+serialize and deserialize as follows:
+
+    func (p *PIXEL_FORMAT) Format(s *Stream) {
+            U8(s, &p.bits_per_pixel, &p.depth)
+            BoolU8(s, &p.big_endian_flag, &p.true_color_flag)
+            U16(s, &p.red_max, &p.green_max, &p.blue_max)
+            U8(s, &p.red_shift, &p.green_shift, &p.blue_shift)
+            PadBytes(s, 3)
+    }
+
+The KeyEvent client-to-server message can be formatted as follows:
+
+    func (e *KeyEvent) Format(s *Stream) {
+            LiteralByte(s, 4)
+            U8(s, &e.downFlag)
+            PadBytes(s, 2)
+            U32(s, &e.keySym)
+    }
+
+### Backtracking — not sure if this is the right approach ###
+
+Suppose we are receiving a message from the client which might be
+either a `KeyEvent` or a `SetEncodings` (or other possibilities we
+might add).  We could imagine writing an `Any` function something like
+the following:
+
+    func Any(s *Stream, result *Formattable, fs ...Formattable) {
+            if !s.Parsing() {
+                    result.Format(s)
+                    return
+            }
+
+            s.SaveBacktrackingPoint()
+            defer s.DiscardBacktrackingPoint()
+            for _, f := range fs {
+                    f.Format(s)
+                    if !s.Failed() {
+                            *result = f
+                            return
+                    }
+                    s.Backtrack()  // Preserves backtracking point
+            }
+    }
+
+And then we could call it with something like the following:
+
+    var ke KeyEvent, se SetEncodings, msg Formattable
+    switch Any(s, &msg, &ke, &se); msg.(type) {
+
+I’m not sure exactly how that would work for output; ideally you’d
+like to be able to use that same code to *generate* a client message,
+leaving the parsed message in the same place when parsing that it
+would have found it when emitting, so that any subsequent conditionals
+or logic on what the actual message was will be unified between the
+parsing and emitting paths.
+
+In the particular case of client-to-server messages in VNC, this
+bidirectionality probably isn’t that useful, because the client can
+just as easily call `&KeyEvent{downFlag: true, keySym: key}.Format(s)`
+in the appropriate place as it can call `formatClientToServerMsg(s,
+&KeyEvent{downFlag: true, keySym: key})`.  But in cases where the
+variant type is embedded down inside some other data structure, the
+simplification could be considerable.
+

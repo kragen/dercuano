@@ -1,0 +1,216 @@
+We can do a lot more automated testing now than we could before, but
+manual testing still requires the same amount of human effort.  To
+some extent our new powers of automated testing are counterbalanced by
+our new ability to write inefficient software, but not in all cases.
+
+When we have a program, we can run it many times on different inputs
+to see what it does.  “Hypothesis” is David R. MacIver’s Python system for
+doing this automatically (“generative testing” or “property-based
+testing”), and it has been remarkably effective in my experience in
+flushing out hidden bugs in programs — including, unfortunately, the
+Python interpreter!
+
+The number of test cases we can run scales inversely with the amount
+of work done by each test.  Consider this function:
+
+    void
+    yp_font_show(yp_font *font, char *text, ypic where)
+    {
+      int x = 0, y = 0;
+      for (int i = 0; text[i]; i++) {
+        ypic g = yp_font_glyph(font, text[i]);
+        if (x + g.size.x > where.size.x) {
+          x = 0;
+          y += font->max_height;
+        }
+        if (x + g.size.x > where.size.x) return; /* Glyph is too wide to fit */
+        if (y > where.size.y) return;
+
+        yp_copy(yp_sub(where, yp_p(x, y + font->max_height - g.size.y), g.size), g);
+        x += g.size.x;
+      }
+    }
+
+In a benchmark, this function takes about 36 μs on my laptop to draw
+the text “hello, world” in a window in a large font, or 5.7 μs in a
+12-pixel-tall font.
+
+One core of my four-core laptop executes about 2.4 billion 64-bit
+instructions per second.  A 33-MHz 80386 executed [about 4.3 million
+32-bit instructions per second][0]; we can extrapolate that it might
+have run this function some 560 times slower, perhaps requiring 3.2 ms
+for the 12-pixel font instead of 5.7 μs.  So the 386 could test this
+function (with similar inputs) 300 times per second, while my
+four-core laptop can test it 700’000 times per second.
+
+Testing hardware: a 40-kW, 100-million-MIPS Pi Beowulf per programmer?
+----------------------------------------------------------------------
+
+Moreover, I can potentially take advantage of more than just my laptop
+for automated testing.  A Raspberry Pi 2 [is about 5000 MIPS][0] and
+[runs on about 2][1] [to 2.3 watts][2].  If I have a 1-kilowatt
+testing budget, I can run about 500 Pi 2s and get about 2.5 trillion
+instructions per second, testing this function roughly 700 million
+times per second.
+
+(This works out to 400–460 pJ per instruction.  The STM32L Cortex-M0
+(see files `low-power-micros` and `stm32`) uses about a third of that,
+but has less memory.)
+
+Is a kilowatt a reasonable budget?  Such a rig also costs about US$20k
+up front and has 500 gigabytes of RAM; at 67×56×11.5 mm each, it would
+occupy about 21 liters, a box 275 mm on a side, but probably a bit
+more space is needed for cooling fans and power supplies.  A kilowatt
+costs about US$0.10 per hour, or US$900 per year, which is about a
+sixth of the depreciation, depending on how you calculate it.  This
+suggests looking for ways to reduce the up-front cost per MIPS even if
+they increase power consumption.
+
+If we figure that employing a programmer these days costs about US$300k per
+year (including overhead and benefits), the programmer dominates the
+expenses until the testing budget gets to 43 kilowatts per programmer,
+at which point we’re spending US$600k per year and getting 30 billion
+tests of `yp_font_show` and 108 trillion instructions per second.
+This is more than a cubic meter of computer.
+
+[0]: https://en.wikipedia.org/wiki/Instructions_per_second
+[1]: https://raspi.tv/2018/how-much-power-does-raspberry-pi-3b-use-power-measurements
+[2]: https://www.pidramble.com/wiki/benchmarks/power-consumption
+
+Manual vs. automatic testing cost comparison
+--------------------------------------------
+
+By contrast, I might be able to write JUnit-style regression tests of
+this function at a rate of one per minute or so — which should be
+downgraded to one per ten minutes if we include the time to maintain
+those tests, and perhaps one per thirty minutes if we include the time
+I’m asleep or otherwise not working on the project.
+
+So, to the extent that we can get any benefit at all out of running
+computer-generated tests, they have a multiplier of around 700 million
+· 1800 = 1.3 trillion over human-generated tests, or 30 billion · 1800
+= 54 trillion with a 43-kilowatt system.  Writing a test by hand costs
+about as much as running 54 trillion randomly-generated tests.  In the
+days of the 386, this multiplier was about half a million, and now it’s one to
+fifty trillion, or nearly a billion without extra hardware†.
+Each of your manual tests need to be worth more than a billion or a
+trillion automatic tests to be worthwhile.  (This is not as hard to
+achieve as it sounds, particularly when we’re considering tests number
+eleven trillion to twelve trillion for the same code; remember that a
+trillion is only a bit under 2⁴⁰.)
+
+† If you’re using Python, automated tests lose a factor of 100 or so
+because of the interpreter’s poor performance.
+
+Extending generative testing
+----------------------------
+
+Two obstacles to the usefulness of random testing are reduction and
+repeatability.  The initial randomly-generated test case that reveals
+the bug may be fairly large and include any number of strange things
+not related to the failure, while manually-written test cases are
+simple by design.  And, once the failing test case has been found,
+it’s important to be able to run it again in the future — otherwise it
+doesn’t help you know whether you’ve fixed the bug (or avoided
+reintroducing it.)  Hypothesis includes an automated test-case
+reduction which reduces the failing case to a (usually) fairly minimal
+case before reporting it, and a system for recording previously failed
+tests to run again — although I haven’t tried checking them into Git,
+and I suspect there might be some impedance mismatches there.
+
+Hypothesis has recently (I think around late 2017) acquired the ability
+to combine its generative testing approach with statement coverage
+testing, which is where you measure which lines of code were executed
+by your tests, so that you can work to focus new tests on lines that
+haven’t been tested yet.  In theory, this kind of testing could also
+give you a reasonable suspicion of which lines of code were
+responsible for a bug.  And you could conceivably augment this with
+[extended kinds of coverage][3] such as loop coverage, multi-condition
+coverage, and mutation testing; these are just as expensive to apply
+now by hand as when Marick wrote his paper on it, if not more so, but
+three orders of magnitude cheaper to apply automatically — Marick was
+writing in 1991 or 1992, at a time when the 386 was current, though
+not cutting-edge.
+
+Thus a moderate amount of introspection or reflection, like that
+needed for statement coverage testing, might enable large gains in
+test power.
+
+[3]: http://www.testingeducation.org/BBST/foundations/Marick_experience.pdf
+
+Program search
+--------------
+
+Earlier I said, “Each of your manual tests need to be worth more than
+a billion or a trillion automatic tests to be worthwhile.”  Turning
+that on its head, what if you just write the tests and not the
+implementation?  In a way, this is the approach behind deep learning:
+try to generate a program for a very restricted machine that passes
+some large set of tests.
+
+You could imagine a generative testing system like Hypothesis that
+suggests code mutations that cause failing test cases to pass; this is
+a very small version of “what if you write the tests and not the
+implementation?”.  Once you have found a failing test case, you can
+try on the order of 50 million modified versions of the code per
+second.  Perhaps you could expand this to a practical program search
+system by accelerating the process by writing some very verbose test
+cases that include some debug messages showing intermediate results
+while running the algorithm, so that the Kolmogorov complexity of each
+successive search objective is only 16–32 bits, making the search
+tractable.
+
+The functional-programming equivalent might be to write test cases for
+subordinate functions that can be composed to do the desired
+computation.
+
+Michał Zalewski’s American Fuzzy Lop testing system, which provides
+random input data to programs to test them (“fuzzing”), uses Unix’s
+fork() to virtually “take snapshots” of a process under test at
+different times during its execution; this allows it to execute many
+more test cases per second, because new test cases can start from the
+program state some tens of microseconds before the program exited,
+rather than from the beginning.  Using this facility, he has
+demonstrated some very impressive results, including constructing a
+legal JPEG file by fuzzing a JPEG decoder to find an input file it
+would accept.
+
+Linux’s implementation of snapshotting with fork() is unfortunately
+rather slow (though faster than other Unixes): some 130 μs on my
+laptop to fork() and wait() for a dietlibc-linked child process that
+merely invokes exit(), perhaps on another core.  This compares to 0.4
+μs for a minor page fault, 0.3 μs to call read(), and probably
+something like (guessing based on others’ measurements) 5 μs to
+context-switch the core to another already-existing process and
+(guessing) 0.1–0.2 μs for a one-way IPC under seL4.
+
+This suggests that, even using conventional protection mechanisms, it
+should be possible to take lazy process memory snapshots an order of
+magnitude faster than Linux does it, which in turn would make it
+practical to take them an order of magnitude more often — every 5 μs,
+for example, rather than every 50 μs.  In cases where the the
+execution time from the last test case input to getting a test
+result — the feedback lag — is on the order of those 5 μs, this is an
+order-of-magnitude speedup, but its importance goes far beyond that,
+because the input search problem is exponential in the feedback lag.
+5 μs is about 12000 instructions, which admits an insanely large
+number of possible executions to search through.
+
+This suggests that unconventional protection mechanisms, such as
+Valgrind-like machine-code compilation and interpretation, might work
+better for program search; by recording every change to memory and
+registers, they can rewind the timeline to any arbitrary instruction
+execution, at a cost of optimistically 10× to more likely 100×
+execution time (and also some memory).  In cases where the feedback
+lag can be reduced below, say, 120–1200 instructions, you can thus
+fail more tests per second with this approach than by using
+arm’s-length mechanisms like virtual memory protection.  With the
+Linux implementation, which costs on the order of 300’000
+instructions, the crossover point is around 3000–30’000 instructions
+of feedback lag; for shorter feedback lags, the Valgrind and
+interpreter approaches will work better.
+
+Abstract interpretation techniques can yield bigger speedups in some
+cases, like the miniKANREN system that is capable of finding a quine
+by searching through possible executions of an interpreter for one
+whose output is the same as its input.

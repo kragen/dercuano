@@ -1,0 +1,187 @@
+I was thinking about filtering the air in my house, which is on a
+major thoroughfare with lots of diesel buses, burning that dirty
+high-sulfur diesel fuel which produces a lot of soot.
+
+The standard approach, of course, is HEPA filters, which are made of
+disposable paper.  I was thinking that a possible improvement would be
+to bubble the air through liquids, which could catch not only
+particulates but also a number of gases.  Also, if you color the
+liquids, illuminate them with LEDs, and keep them in transparent
+tanks, it would look a lot cooler than a HEPA filter.  You could use a
+series of such tanks to eliminate a lot of different particulates.
+
+After the bubbles finish the tanks, they would need to pass through a
+fine screen to filter out any remaining droplets.
+
+My apartment is 101 m³; filtering all of the air in it every six hours
+would thus require 4.7 ℓ/s of airflow, which is 10 cfm; as described
+in file `house-scrubber`, you can get that out of a 75mm-diameter
+4-watt 3000 RPM fan designed for a CPU cooler.  However, that fan
+won’t generate the head needed to bubble the air through a liquid; if
+we have a series of four tanks, each with liquid 100mm deep and of
+more or less the density of water, then we need 18 watts just to
+counteract the hydrostatic pressure, let alone producing the necessary
+flow rate through the bubble orifices.  This suggests that perhaps
+using a few axial fans in series, each designed for a substantially
+higher flow rate, would likely do the trick.
+
+XXX how do you calculate the head to produce a given flow through an
+orifice?
+
+If the tanks are 10% bubble by volume, which seems like achievable and
+difficult to exceed by much, and the bubbles take 500ms to rise to the
+surface, then you need 23½ liters in each tank.  If the tanks are 2
+meters long, then they need to be 117½ mm wide in order to contain
+this much liquid.
+
+You would need some system for replacing dirty filter liquids at some
+point, either manually or automatically.  This is ideally done in
+batches to minimize the mixing of old dirty liquid in the new clean
+filter liquid.
+
+Possibly useful liquids include:
+
+- Plain water, which increases humidity, absorbs droplets of
+  water-soluble liquids airborne from previous tanks, and absorbs
+  particulate pollutants that aren’t hydrophobic.  It will also
+  dissolve small amounts of gaseous contaminants, but probably not
+  enough to be useful.
+- Vegetable oil, which absorbs hydrophobic particulate pollutants.
+  Any oil would work for this, but vegetable oil has the advantages
+  that it’s nontoxic, has very low vapor pressure at room temperature,
+  and has somewhat higher surface tension than many alternative oils,
+  reducing droplet formation.  Used frying oil would likely work.
+- Propylene glycol, which is nontoxic, has very low vapor pressure,
+  won’t rot, and will absorb both hydrophilic and hydrophobic
+  particulates, as well as vapors of many volatile organic compounds.
+  It has relatively high surface tension (36 mN/m), reducing droplet
+  formation.  A lot of VOCs that won’t dissolve significantly in
+  vegetable oil are completely miscible with propylene glycol.  It’s
+  also quite hygroscopic, so it serves to reduce humidity, but this
+  could be a problem if it results in substantial dilution in normal
+  use.  At room temperature, propylene glycol reaches equilibrium with
+  60%-humidity air only once it’s absorbed about 20% of its own weight
+  in water!
+- An aqueous solution of CaCl₂ or a similar salt will reduce humidity,
+  potentially down to a very low level.  Aside from directly
+  controlling the humidity of the output air, this could be used to
+  reduce the dilution by humidity of a later propylene-glycol or
+  similar stage.  Calcium chloride is also nontoxic.  (An anhydrous
+  calcium-chloride desiccator is actually what Dow’s _A Guide to
+  Glycols_ recommends for drying air that will be in contact with
+  propylene glycol if a nitrogen pad is not feasible.)
+- An aqueous solution of a weak acid or weak base, such as sodium
+  bicarbonate, could remove reactive gases such as SO₂ from the air.
+  If you use calcium hydroxide (not weak!) or calcium carbonate for
+  this, you produce gypsum as a bonus.
+- Calcium hydroxide would also remove CO₂ from the air.  If this is
+  desirable, ethanolamine, diethanolamine or triethanolamine (in
+  aqueous solution) may be a better choice, because it’s substantially
+  easier to “regenerate” by heating (to 120° in the case of
+  ethanolamine) to drive out the carbon dioxide (somewhere outside).
+  These unfortunately require at least 5 but ideally 200 atmospheres
+  to absorb the carbon dioxide.
+
+Regeneration
+------------
+
+I mentioned above that the ethanolamines absorb a lot of carbon
+dioxide, which can be driven back out by heating, “regenerating” them.
+The topic of regeneration is interesting in general: rather than
+discarding the dirty filter liquid, you go through some kind of
+process to clean it, thus extending its life.
+
+Particulates can be removed by filtration, but in some sense this is
+not a solution — you could have just filtered the air.  More
+interesting is if you can remove them by centrifugation or
+flocculation.
+
+Hygroscopic solutions such as propylene glycol and aqueous calcium
+chloride can also be regenerated by heating to drive off some of the
+water.
+
+Pebble-bed alternatives
+-----------------------
+
+As mentioned earlier, Dow’s recommendation for drying air that will be
+used to pad propylene glycol is to use an _anhydrous_ calcium chloride
+desiccator.  As I understand it, this is a pebble-bed kind of affair,
+with solid crystals of calcium chloride with air space between them.
+
+Other kinds of pebble-bed-like things include the following:
+
+- Platinum or palladium catalytic converters to remove organic
+  compounds from the atmosphere, including even methane, as well as
+  nitrogen oxides and ozone.  Since a substantial part of the
+  pollution from both Otto and diesel engines consists of unburnt
+  hydrocarbons, nitrogen oxides, and ozone, this could be very helpful
+  in the city.  These need to be hot to work, typically requiring a
+  refractory substrate such as alumina, and they produce carbon
+  dioxide, which may need to be managed.
+- Activated carbon to adsorb many kinds of contaminant gases.
+- Oxide or hydroxide of calcium, lithium, sodium, magnesium, or even
+  potassium, to combine with carbon dioxide or (I assume) nitrogen
+  oxides.
+- Sodium bicarbonate is famous for adsorbing unpleasant odors, and
+  would also eat acid gases like SO₂ or nitrogen oxides, though not
+  carbon dioxide.
+
+In general, pebble beds have the advantage over bubble tanks that they
+have no minimum pressure to operate.  Also, as desiccators, they can
+reach lower humidities than aqueous solutions of salts can.  They have
+the distinct disadvantage in this case of looking substantially less
+bitchin.
+
+Also, pebble beds are less suited to continuous-flow processes.  You
+can regenerate pebble beds in place by taking them out of service and
+passing a regenerant over them — typically hot air, but activated
+carbon needs a hot non-oxidizing gas instead, such as hot carbon
+dioxide.  Steam is not suitable, as it degrades the carbon to produce
+highly toxic water gas.  (It would be nice to have a non-oxidizing gas
+that isn’t flammable or absurdly reactive, and is liquid or solid at
+room temperature, so that your activated-carbon regeneration gas
+doesn’t pose a suffocation hazard.  But nothing occurs to me at the
+moment.)
+
+Plasma alternatives
+-------------------
+
+If you want an air purifier that looks *really* cool, nothing can beat
+plasma, especially a reduced-pressure plasma with different alkali
+metals evaporating into it (from oxide or carbonate feedstocks applied
+to your electrodes, presumably).  This will look especially cool if it
+uses high-frequency AC and it’s inside a thin glass envelope so you
+can guide the plasma arcs with your fingers!  But probably corona
+discharge in approximately atmospheric pressure is more practical.
+
+Like a catalytic converter, this will also burn unburnt volatile
+hydrocarbons, and maybe also particulates, but the resulting gas is
+very far from breathable — it contains a substantial fraction of brown
+nitrogen oxide (NO₂), plus ozone and nitrous oxide (NO₂).  The N₂O is
+reactive enough that you can combine it with just about anything
+(maybe bubbling it through sodium bicarbonate would be the easiest
+choice) but I’m not sure what to do about the ozone and nitrous other
+than using a catalytic converter from a car.
+
+Oxidizing sodium, lithium, potassium, or even calcium or magnesium
+into the plasma, in addition to producing super awesome colors, might
+help to cut down on the nitrogen oxide production, too.  But then you
+need to make sure you filter the generated metal oxides out of the air
+before you breathe it.  Maybe some kind of hot acid refractory would
+work.  Silica, for example, famously combines with sodium hydroxide to
+produce sodium silicate.
+
+(Sodium and potassium nitrates are “saltpeter”, a stable mineral that
+acts as the oxidant in gunpowder.  Calcium nitrate, “norwegian
+saltpeter”, also works for this.  Magnesium nitrate is also stable.
+These are mostly used as fertilizer these days.
+
+??? What are sodium, lithium, potassium, calcium, and magnesium
+nitrates like?
+
+??? What are the other acid refractories?
+
+Maybe the ozone could be made safe by passing the resulting gas over a
+“pebble bed” of something like used yerba mate or coffee grounds, thus
+converting it into relatively harmless carbon dioxide, and maybe a bit
+of water.

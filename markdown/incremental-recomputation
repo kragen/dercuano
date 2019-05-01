@@ -1,0 +1,230 @@
+Let’s solve cache invalidation, legendarily one of the two hardest
+problems in computer science.
+
+Why is it hard?  We can construct a hard example in three lines of code.
+
+Suppose we construct a unidirectional data flow graph as follows:
+
+    x, y, z = Input(value=3), Input(value=4), Input(value=2)
+    p = Max(x, y)
+    for i in range(10000): p = Max(p, Subtract(p, z))
+
+This constructs a directed acyclic graph of dataflow with 20004 nodes:
+three Input nodes, 10001 Max nodes, and 10000 Subtract nodes.  If we
+increase y’s value to 5, this changes the value of all of the Max
+nodes to 5 and all of the Subtract nodes to 3.  By contrast, if we
+increase or decrease the value of x by 1, no other nodes have new
+values.  How can we implement this efficiently?
+
+There are a variety of different strategies you can use to evaluate
+such a dataflow graph, but most of them have serious pitfalls which
+can be demonstrated on the above graph.
+
+To keep the scope of this note manageable, I’m only writing about
+algorithms for *static* dataflow graphs here, where the topology of
+the computation is independent of the data that flows through it, like
+an electronic circuit.  To some extent, you can force conditionals
+into a static dataflow framework as conditional or multiplexing nodes,
+and iteration as array-valued values (as in TensorFlow), so this is
+somewhat less restrictive than it sounds.
+
+Pure immediate mode
+-------------------
+
+The simplest strategy is to calculate values on demand.  To be
+concrete, you might have an `eval` method of no arguments which
+invokes the `eval` methods of the node’s inputs:
+
+    def eval(self):  # for Max nodes
+        return max(self.input1.eval(), self.input2.eval())
+
+This is pretty much the approach I use in Pytebeat, for example, with
+values being arrays of 1024 numbers.  On some dataflow graphs, this
+works fine, but on this one, it requires 4 + 2¹⁰⁰⁰¹ calls to `eval`,
+which on my laptop would take about 10²⁹⁹⁵ years, at which point all
+the stars will have gone out and essentially all matter will be either
+iron or leptons, depending on whether protons are stable; this is not
+a practical way to evaluate this dataflow graph.  The issue is that
+nodes whose output is used more than once will be evaluated more than
+once, which is exponential-time in such pathological cases.
+
+(In Python it actually fails sooner than that by default because the
+default stack limit is not high enough.)
+
+Topologically-sorted immediate mode
+-----------------------------------
+
+You can calculate values on demand in guaranteed linear time, though.
+You begin by doing a topological sort of the nodes to construct a
+sequence such that each node comes before the nodes that use its
+value; then you can simply iterate over the sequence, storing the
+output of each node in an array or something.
+
+This allows you to do the calculation several times for different
+input values without repeating the topological sort.  In effect, you
+have compiled the dataflow graph into a branchless virtual machine
+program with a certain flavor of common subexpression elimination.
+
+But, if you think about the standard topological sort algorithm, you
+will see that you could also do the equivalent of interpretation — you
+can evaluate the value for each node as you generate the
+topologically-sorted sequence.
+
+(As it happens, in the example code, the nodes are necessarily created
+in a topologically-sorted sequence, because each node is constructed
+with its inputs as parameters.  So in this case you can simply define
+`Max, Subtract, Input = max, operator.sub, lambda value: value` and
+never construct the graph in memory at all.)
+
+Either way, this approach only touches each node once; on this graph
+it takes perhaps 100000 function calls, or about a millisecond for
+this graph, if you do it in Python with an existing in-memory graph.
+
+This doesn’t sound so bad, and in the case where you are evaluating
+some dataflow graph on all new inputs you've never seen before it's
+absolutely optimal and everything else we'll discuss in this note is
+slower, but in the case where you just changed x by 1, it takes 100000
+function calls to tell you that nothing else has changed as a result.
+That’s about three to five orders of magnitude slower than would seem
+reasonable.  So let’s look at incremental approaches to dataflow
+evaluation.
+
+Invalidation propagation
+------------------------
+
+I wrote about how you could treat the topologically-sorted sequence of
+operations as a sort of program.  But this suggests that you could
+backtrack in it: if you have 50 operations, and input A isn’t used
+before the 25th operation, the first 25 are guaranteed not to change
+their value just because input A changed.  So you could just start the
+execution from operation 25, using the previously calculated values
+for operations 0–24, and then you don’t have to do a bunch of
+redundant recalculation of values that are guaranteed not to have
+changed.
+
+But this actually works a lot better with the “intepretive”
+topological sort, because it doesn’t have to arbitrarily pick an
+ordering among nodes that have no actual data dependencies, so it can
+evaluate only nodes that changed data feeds into.
+
+The way this looks is that changing an input works in two steps:
+first, you “retract” the current value, causing all the nodes that
+depend on it to also retract their current values; then, you assert a
+new value, causing all the nodes that depend on it to be recomputed.
+If a node gets an input asserted while some other input whose value it
+needs is still retracted, its output remains retracted.  Only once all
+the required inputs are asserted can it assert a value.
+
+In many cases, you can improve performance by retracting several
+things at once and then asserting their new values, instead of
+changing their values one at a time.
+
+This approach is pretty broadly applicable, but it doesn’t help for
+our example graph; when we retract x=3, the invalidation propagates
+through 20002 nodes, and then when we assert x=2, the same value
+propagates through those same nodes again.  It takes about twice as
+long as just calculating all the values from scratch without trying to
+be incremental.
+
+Pull-based invalidation, or laziness
+------------------------------------
+
+As I’ve described it above, invalidation propagation is eager — when
+you initially assert values for x and y, that pushes the Max node to
+compute their max, which then pushes the first Subtract node to
+compute a zero, which then pushes another Max node to compute a value,
+and so on.  Computation is initiated by inputs and results in outputs.
+
+It may happen that the end result of all this computation is, for
+example, to display a number on the screen, which can only happen at
+most about 60 times a second, depending on your hardware.  But suppose
+you are changing x or y much more often than this — most of the values
+computed will never be used.
+
+Now, if the value computed has to be available on a tight deadline,
+you need some kind of eager computation to store it ahead of time
+instead of computing it on demand.  But what if it’s okay to compute
+it on demand?
+
+In that case, you can have nodes assert their outputs only upon
+request.  In the case of our example graph, first you construct the
+graph, but don’t calculate values for any of the nodes except x and y.
+Then, you request the output from the final p node.  Since its inputs
+are retracted, it requests them to compute; whichever input tries to
+compute first finds that its inputs are also retracted, so it asks one
+of them to compute; and so on, until we are requesting the output of
+Max(x, y).  Its inputs are asserted, so it computes its result (4) and
+asserts it; this allows a Subtract node to compute its result (2) and
+assert it; and so on.
+
+This is roughly two thirds as efficient as the push-based approach in
+this case, and when we retract x later, it does the same invalidation
+propagation.  The difference is that, when we assert x again, no
+further computation happens — nothing is currently requesting x’s
+value.  We can change x or y many times in between screen frames,
+cheaply.
+
+However, it still has to recompute all 20002 computational nodes in
+order to discover that changing x doesn't change the final output
+value.
+
+Change propagation
+------------------
+
+What if we don’t have a separate retraction step, but just assert the
+new value of x?  This helps a lot in this case — the Max node that
+depends on x can detect that its output values remains 4, so it
+doesn’t need to propagate any change.
+
+But what happens when we change y?  If we change y to 8, the Max node
+updates to 8.  This value needs to be sent to the next Max node and
+the Subtract node.  Suppose we pick the Subtract node.  Now its value
+(y-z) is 6, so it updates its value to 6.  This gets pushed to the
+next Max node, which is now comparing 6 to 5, and so it asserts 6 on
+its output, pushing to two nodes.  Later on, when the new value from
+the previous Max node reaches it, it must recompute a second time.
+This kind of thing can result in an exponential number of
+recomputations, just as with pure immediate mode.
+
+XXX hmm, maybe I need a better example to show the potential exponential behavior, because it peters out here
+
+XXX does breadth-first propagation solve the exponential-time problem?
+
+There’s another problem, though, besides efficiency: “glitches” or
+“timing hazards”.  That second Max node’s output was 4 at the
+beginning and 8 at the end.  But for a moment in the middle, after its
+first recomputation but before its second one, its output was 6.  6
+was never a correct value for max(max(x, y), max(x, y) - z)!  If that
+value change results in your software system taking some action, you
+could be in trouble.
+
+This happens at a very concrete level in digital logic circuits, in
+which "glitch" is a technical term for this kind of transient wrong
+answer.  There, the standard solution is a clock whose edges trigger
+flip-flops.
+
+Memoization
+-----------
+
+As an alternative to storing the current value of each node, we could instead
+store some set of previously computed values, according to the inputs that
+affect them.  In the most direct form, of course, applied to a single node,
+this doesn't help much — computing the max of 3 and 4 is faster than looking up
+(3, 4) in a cache to return 4.  But we could imagine, for example, memoizing a
+larger chunk of the graph.
+
+The potential benefit of memoization, as opposed to the strategies described
+above, is that if part of the graph returns to a previous state, the result of
+that previous state can be retrieved from the cache — it isn't just a matter of
+"state unchanged" or "state changed".
+
+Chunking
+--------
+
+In fact, chunking the graph into smaller subgraphs — giant nodes that perhaps produce multiple values — is an approach that can be applied to all of the previous 
+
+Reduced affine arithmetic
+-------------------------
+
+Delta propagation
+-----------------

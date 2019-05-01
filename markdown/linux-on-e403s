@@ -1,0 +1,232 @@
+Installing Debian GNU/Linux on an ASUS E403S
+============================================
+
+I have this new Asus laptop that says it’s model E403S, and
+unfortunately it comes with Microsoft Windows 10 installed.  These are
+my notes on trying to install Linux (specifically Debian GNU/Linux 8.6, a
+version of “jessie”) on it.
+
+So far I have gotten Debian to boot on it, despite UEFI, but I have
+not been successful installing it to the disk.  Also, X is running at
+800×600 (on a 1920×1080 screen), and the touchpad doesn’t work.
+
+By contrast, the current Linux Mint installs fine and everything works
+(encrypted install including swap, 1920×1080, touchpad, Wi-Fi, sound
+input and output, access to the 100GB SSD, webcam) except hibernation.
+I may return to Debian at some point.
+
+Downloading the Debian live CD image
+------------------------------------
+
+This step can take a while; for me it was a bit under an hour.  Start
+it first unless you’re on a very-high-speed internet connection.  Some
+of the other steps can be done in parallel.
+
+The best way to download Debian CD images is using zsync, and the best
+image to download is typically one of the “+nonfree” ones which have
+the drivers you need in order to bring up Wi-Fi successfully.  These
+are “unofficial” because Debian does not condone the use of non-free
+software.
+
+I did this with this command:
+
+    time zsync http://cdimage.debian.org/cdimage/unofficial/non-free/cd-including-firmware/8.6.0-live+nonfree/amd64/iso-hybrid/debian-live-8.6.0-amd64-standard+nonfree.iso.zsync
+
+The resulting ISO file was 494927872 bytes and had the following
+cryptographic hashes:
+
+    sha256sum 496bef6cba35d5348d5cb2662f649f1949b0d9ee4a4b4ea7addf46b369a70507 debian-live-8.6.0-amd64-standard+nonfree.iso
+    sha1sum   60e52866683d7205adabc6c41d2f0ce04d159b77 debian-live-8.6.0-amd64-standard+nonfree.iso
+    md5sum    d79befa133725bb07251feb81a980ccc debian-live-8.6.0-amd64-standard+nonfree.iso
+
+The “standard” live “CD” doesn’t bring up a GUI environment, but it’s
+half the size of the alternatives that do (472 megabytes vs. 1.1+
+gigabytes).
+
+[zsync](http://zsync.moria.org.uk/) is the best option because it
+detects and can recover from data transmission errors, and can restart
+after an interruption after taking only about 20 to 200 seconds to
+resynchronize.  If I understand correctly, it checks the truncated MD4
+of each block of the file and the SHA-1 of the whole file.  It’s like
+a less demanding version of rsync.
+
+Creating a UEFI-bootable USB stick for Debian
+---------------------------------------------
+
+The Debian Live images are in “hybrid ISO” format, which means they
+are bootable under ancient BIOS from either USB or CD/DVD.
+Unfortunately, although [the official instructions don’t mention
+this](https://www.debian.org/releases/stable/amd64/ch04s03.html.en),
+they are not bootable via UEFI, so I followed the following steps to
+get Debian to boot from USB under UEFI, as [explained by Desmond86 in
+a Debian User Forums
+thread](http://forums.debian.net/viewtopic.php?t=124417).
+
+I formatted the USB stick as FAT32 (so UEFI would understand it) using
+`sudo cfdisk /dev/sdc`, creating a type-0c partition filling the
+entire disk, and then running `sudo mkfs -t vfat /dev/sdc1`.  Then I
+mounted it with `sudo mount /dev/sdc1 /mnt` and copied `Shell.efi`
+from
+<https://svn.code.sf.net/p/edk2/code/trunk/edk2/ShellBinPkg/UefiShell/X64/Shell.efi>
+into `/mnt`.
+
+In SVN revision 22855, `Shell.efi` is 909280 bytes and has the
+following checksums:
+
+    sha256sum 889a1f28051955fc33a9512901b2d0f5a5d500750e09fb7caf21defb1fd3b657 Shell.efi
+    sha1sum   6621d657f470c3902ab1bc2423e45e74d5c286cc Shell.efi
+    md5sum    8f2922f6d148c5a5776cf16c8952a1f4 Shell.efi
+
+Then, I mounted the Debian ISO with `sudo mkdir /iso; sudo mount -o
+loop debian-live-8.6.0-amd64-standard+nonfree.iso /iso` and copied its
+contents onto the USB stick.
+
+This was tricky; here’s the command that finally worked:
+
+    time sudo cp -iLr /iso/{a*,.d*,di*,[f-z]*} /mnt/
+
+The weird filename specification is to avoid copying the circular
+symlink called `debian` (which, fortunately, isn’t strictly necessary)
+or the `..` directory entry.  I used `-r` rather than `-a` to avoid
+errors about not being able to set ownerships on FAT32.  The `-L` flag
+is to avoid errors about not being able to create symbolic links on
+FAT32.  The missing symlinks might prevent some firmware files from
+being found (although it wasn’t necessary to get my Wi-Fi working the
+first time around).  The `-i` flag is to stop and tell me what’s going
+on if there are clashes with files already there (like if I forgot to
+delete this stuff previously).  This copying takes about five minutes
+(with one of the larger images, the Mate one) on my USB stick, most of
+which is copying `/iso/live/filesystem.squashfs`, although that
+depends on the speed of the USB stick in question.  Mine is only
+writing at 5 megabytes per second, as shown by `iostat 10` in another
+window.
+
+The following command was useful for watching the progress of the
+copying and figuring out what went wrong; it will go wrong itself if
+you have another `cp` command running somewhere.
+
+    watch -d -n .1 'sudo lsof -p $(pidof cp) | tail'
+
+Things I tried for copying that didn’t quite work:
+
+* `cp -a …`, which spews lots of error messages about failing to
+  create symlinks (because FAT32 doesn’t support them) and failing to
+  set file ownership (because FAT32 doesn’t support that either).
+* `cp -iLr /iso /mnt`, which puts everything in `/mnt/iso`.
+* `cp -iLr /iso/{.,}* /mnt`, but it ends up trying to copy my
+  entire filesystem onto the USB stick, including `/usr` and whatnot.
+* `cp -iLr /iso/{*,.[^.],.??*} /mnt/`, which almost works, but copies
+  everything into both `/mnt` and `/mnt/debian`, doubling the space usage.  
+
+Then I created a text file called `/mnt/liveboot.nsh` containing
+just this line:
+
+    live\vmlinuz initrd=live\initrd.img append boot=live components
+
+Disabling hiberboot in Microsoft Windows 10
+-------------------------------------------
+
+This isn’t actually necessary for what I’m doing, since I’m going to
+erase Windows completely.  I thought I had to do this to get into the
+BIOS setup, but I was wrong.  It is necessary, however, to avoid
+filesystem corruption if you want to dual-boot and have any
+filesystems available to both Windows and Linux.
+
+In Windows 10, I got to this via Settings (Windows → Settings) in
+System → Power & Sleep → Additional Power Settings, which takes me to
+Control Panel → Hardware and Sound → Power Options, from which I
+choose “Choose what the power buttons do” in the left sidebar,
+followed by “Change settings that are currently unavailable”, which
+makes a “Shutdown settings” section appear, containing a checkbox for
+“Turn on fast startup (recommended)”, which I unchecked, followed by
+clicking the “Save changes” button.  The rumors that a locked filing
+cabinet guarded by a leopard is involved are unfounded.
+
+Then I shut Windows down from the Windows → Power menu.
+
+Entering BIOS setup
+-------------------
+
+During the ASUS splash screen, before the blue-background Windows
+booting screen starts, pressing Esc gives a “Please select boot
+device” menu, one of whose options is “Enter setup”.
+
+Booting from USB
+----------------
+
+This part is tricky and dangerous, because the BIOS 
+
+Once I had the UEFI-bootable USB stick and disabled secure boot (in
+BIOS setup, under “Security”, “Secure Boot menu”, set “Secure Boot
+Control” to “Disabled”) I was able to add the EFI shell as a boot
+option as follows.  In BIOS setup, in “Boot”, with the USB stick
+plugged in, I selected “Add New Boot Option”, whose resulting menu
+contains “Add boot option” (prompting for an arbitrary but mandatory
+name, such as “walnuts”) and “Path for boot option”, which allowed me
+to navigate to “PCI(14|0)\USB(0,09)\HD(Part1,Sig0D30060D)” and then
+select the “Shell.efi” file I’d put on the USB stick in the previous
+section.  Then I selected “Create”, used Esc to get back to the
+previous menu and see that my new boot option was selected.  Upon
+pressing F10 to reboot, I got the UEFI Interactive Shell, which has
+the USB stick mapped as FS1: and apparently the internal disk mapped
+as FS0:; I can `dir FS0:\EFI` and see Microsoft in there, while `dir
+FS1:` shows me the contents of the USB stick.
+
+Typing `liveboot` and hitting “enter” runs the liveboot.nsh batch file
+mentioned in the previous section, booting Debian.
+
+Updating the ASUS E403S BIOS
+----------------------------
+
+The BIOS version on this machine is 213, which ASUS’s page (see below)
+tells me is from 2015-11-10.
+
+The Debian kernel isn’t seeing the disk, and [AskUbuntu suggests that
+this may be fixed by upgrading the
+BIOS](http://askubuntu.com/questions/726751/can-boot-from-ssd-drive-but-ubuntu-installer-cant-find-it).
+
+So I loaded version 301 of the BIOS, date 2016-10-21, from [ASUS’s
+page](https://www.asus.com/uk/support/Download/45/18/0/1/whrkB7XhvSbwkFBA/41/).
+This page says it’s for model E403SA, but the tag on the laptop says
+the model is both “E403S” and “E403SA-US21”.  The file I got is
+2847438 bytes and has the following cryptographic checksums:
+
+    sha256sum a9f49a64fae2d915a2b9b6f7c515bfd4473a50f1ba4db071fa6e554397045113  E403SAAS301zip.zip
+    md5sum    3204c1bb9527bba7777cd89a4a528dbb  E403SAAS301zip.zip
+    sha1sum   a8f6ffc513d14e47b2771e737c753ecc40c5a55b  E403SAAS301zip.zip
+
+The option to update the BIOS is in the BIOS setup under “Advanced”:
+“Start Easy Flash”.  This is supposed to be able to read the above zip
+file from USB media.  Unfortunately it insists on being plugged in to
+AC power, and I left the adaptor elsewhere tonight.  So for now I’m
+kind of stuck at this point, although I can run a live Debian system
+from USB.
+
+Launching the Debian installer from the login prompt
+----------------------------------------------------
+
+For whatever reason, the Debian Live USB image I booted
+(`debian-live-8.6.0-amd64-standard+nonfree.iso`) gives me a login
+prompt instead of automatically launching a desktop or an installer.
+I logged in with the login name `user` and the password `live` ([these
+are documented on Stack
+Overflow](http://stackoverflow.com/questions/30842216/debian-8-live-cd-what-is-the-standard-login-and-password))
+and ran `sudo debian-installer-launcher`.
+
+A few steps into the installer, it queried me for the wireless network
+configuration, bringing the network up successfully.  From this point
+on, things basically worked, except that it couldn’t find the disk to
+install on, as documented above.  I had to tell it my network was
+“WPA/WPA2 PSK”, as most are these days, rather than “WEP/Open
+Network”, the poorly-chosen default.
+
+At this point I’m stuck, as mentioned above, because I can’t get Linux
+to see the disk I want it to install on.
+
+I did manage to get Mate running (from a different Debian live image),
+but the touchpad mouse doesn’t work and the display only supports a
+resolution of 800×600, which is 23% of its native resolution of
+1920×1080 and also blurry and smushed.  Alt-F1 brings up the main menu
+despite the touchpad not working.
+
+<script src="http://canonical.org/~kragen/sw/addtoc.js"></script>
