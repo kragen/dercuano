@@ -1,0 +1,245 @@
+I was thinking about how to generalize the arithmetic-computer device
+Sutherland mentions in his Sketchpad thesis, and I came up with an
+architecture presumably less powerful than an FPGA but maybe easier to
+program and simpler to implement.  Preliminary calculations suggest
+that it might be capable of FPGA-like performance on DSP-like
+problems.
+
+A 4×4 synchronous crossbar switch
+---------------------------------
+
+Suppose you have a block with 4 16-bit inputs and 4 16-bit outputs,
+which outputs are driven by clocked registers attached to 4-way muxes.
+You can configure the 4 4-way muxes with 8 bits of topology
+configuration data.  This allows each of the output ports to receive
+the input from any of the four input ports on each clock cycle.  This
+can achieve not only any of the 24 permutations of the 4 input words,
+but also 232 more configurations which discard some inputs and
+duplicate others.
+
+It looks something like this:
+
+
+    →→-X---X---X---X
+       |   |   |   |
+    →→-X---X---X---X
+       |   |   |   |
+    →→-X---X---X---X
+       |   |   |   |
+    →→-X---X---X---X
+       |   |   |   |
+       ↓   ↓   ↓   ↓
+
+
+Here each of the "X” points is a switch which can either transmit a
+signal from the input to the output, or not, according to the switch
+configuration, and each of the “↓“s is an output register consisting
+of 16 D flip-flops which registers the input that has been routed to
+it.  An example configuration, with “+” indicating switches that are
+disconnected and “#” indicating those that are connected, follows:
+
+    →→-+---#---+---+
+       |   |   |   |
+    →→-+---+---#---+
+       |   |   |   |
+    →→-#---+---+---+
+       |   |   |   |
+    →→-+---+---+---#
+       |   |   |   |
+       ↓   ↓   ↓   ↓
+
+(With some logic families, it might be appealing to double that to 16
+bits of configuration data instead of 4 and get wired-AND or wired-OR
+functions between the inputs, plus a free all-zeroes or all-ones
+value, depending on whether it’s AND or OR.)
+
+Now suppose you have three “fully-connected layers” made of 4 such 4×4
+switches; if dataflow goes from left to right, it looks something like
+this:
+
+    digraph f{rankdir=LR;node[shape=box,label=""];{1 2 3 4}->{5 6 7 8}->{9 a b c}}
+
+The idea here is that each output port on a single node is connected
+to a different node in the next layer, and each input port on a single
+node is connected to a different node in the previous layer.  Since
+the nodes are synchronous, the whole system can run at just as high a
+clock speed as a single crossbar node, but with three cycles of
+latency instead of one, 12 bytes of topology data instead of one, and
+16 words per cycle instead of 4.
+
+What may not be immediately apparent is that this simple, regular
+topology is sufficient to achieve any of the 20'922'789'888'000
+permutations of the 16 inputs, although not all of the
+18'446'744'073'709'551'616 possible ways of assigning inputs to
+outputs are represented in its 79'228'162'514'264'337'593'543'950'336
+configurations, due to redundant configurations. [Proof missing.]
+With only two layers this is not the case, since you can get at most
+one value from a given input node to a given output node, but with
+three layers you can get all four values from the same input node to
+the same output node if necessary, routing them through four different
+nodes in the intermediate layer.
+
+Additional layers permit larger numbers of inputs and outputs, at the
+cost of higher latency.  I think, but am not sure, that each two
+additional layers permits a permutation of four times as many
+inputs — thus, 4 inputs with 1 layer, 16 inputs with 3 layers, 64
+inputs with 5 layers, 256 inputs with 7 layers, etc.
+
+(I learned about this topology from the IBM SP2, but I think it
+actually originated in telephone networks.  In the SP2 “high-speed
+switch”, only permutations were supported, but they were created and
+removed dynamically, and there was also buffering.)
+
+Note that if the individual crossbar nodes are inverting and you do
+the wired-AND or wired-OR trick, then you can get words of either all
+zeroes or all ones out of the same network by generating them at
+different levels of the network, and you can also get both wired-AND
+and wired-OR, though not completely without restriction.  This can get
+a wide range of bitwise functions out of the network, though not all
+16 bitwise functions.
+
+Transport-triggered crossbar computation
+----------------------------------------
+
+Suppose you hook up an adder to two of the outputs of the above switch
+network and its output to one of the network inputs.  Supposing the
+adder can operate with the same cycle time as the crossbar nodes, you
+can then send it a stream of pairs of numbers to add, and the stream
+of its (three-cycle-delayed) outputs becomes available as another
+stream of values for the network.
+
+Indeed, you could do the same with a multiplier, or a
+multiply-accumulate element, with three inputs; or a bitwise XOR, or
+an AND, a signed or unsigned comparator, a signed or unsigned max, or
+a general ternary operator.  A barrel shifter could quite reasonably
+derive several outputs from a single input, as could a more general
+ALU — by simultaneously generating several functions of its two inputs
+on different outputs, all connected to network inputs, the routing
+configuration of the network serves to determine which output or
+outputs are actually used.
+
+In some cases, you might want to just connect network outputs directly
+to inputs, providing a feedback path from one cycle through the
+network to the next.  This can be used not just to remember a data
+value, like a register in a conventional processor, but also to
+accumulate results iteratively.
+
+Where does the stream of input values come from?  You could imagine
+configuring a memory read port as an input-output pair — an output for
+the memory address and an input for the data read from the memory.  Or
+you could connect the address bus to a counter and initialize the
+counter by some other means, perhaps the same means used to set up the
+network topology configuration.  Or, rather than a counter, you could
+use a register hooked up to an adder which increments by some amount
+on each cycle, in order to allow strided reads.
+
+Where does the stream of output values go to?  Aside from hooking some
+output ports directly to peripherals such as a DAC, you could quite
+reasonably have a memory write port as well.
+
+Interleaving
+------------
+
+In the above, I’ve described both cases where the data fed back into
+the network is purely a function of the network’s current
+outputs — the adder, say, or the ALU, or the outputs wired to
+inputs — and cases where some state is kept outside the network.  I
+want to distinguish between the cases where this state is kept in RAM
+and where it’s kept in some kind of register attached to the network
+directly.
+
+I claim that if we abjure entirely having separate registers attached
+to the network, allowing only RAM and pure functions, then we can
+think of the processor as a temporal interleaving of several different
+processors.  If we have, say, seven cycles of latency through the
+network, then we can think of it as seven virtual processors with
+completely separate sets of registers; the outputs on cycle 7 are a
+function of the inputs on cycle 0, the outputs on cycle 14 are a
+function of the inputs on cycle 7, and so on.  They could even be
+computing unrelated things if we also switch between seven different
+configurations for the interconnect network on each clock cycle.
+Breaking our abjuration with a one-cycle delay element — a register
+external to the network — suffices to provide communication from one
+virtual processor to the next.
+
+This approach would suggest that we handle, for example, strided
+memory access with an adder connected to a fixed value and its own
+previous output, which is also routed to the memory read port, rather
+than an external register that increments by the stride each cycle.
+
+Bit-serial variants
+-------------------
+
+If you make the nodes bit-serial instead of parallel, you lose a
+factor of 16 in bandwidth.  But you gain a factor of 256 (!!) in area,
+and you may also gain some bit-shifting power — suddenly a delay
+element is capable of shifting a word by a bit, as for a
+multiplication.
+
+With this approach, it’s still likely worthwhile to interleave virtual
+processors, but they’re interleaved on a bit-by-bit basis rather than
+a word-by-word basis.  The replacement for a 16-bit register in a
+normal processor is, rather than wiring an output directly around to
+an input, a longish shift register from an output back to an input.
+(If the network latency is 7 bits, for example, you need a 112-bit
+shift register.)  A delay element to shift a word by a bit could
+similarly be a shift register.  (A 7-bit shift register if, again,
+your network latency is 7 bits.)  But you don’t need one — you can
+just use a path through the network!  Doing the same thing for a
+16-bit value would use up 16 inputs and outputs, though.
+
+An interesting thing about bit-serial processors is that they more
+comfortably accommodate processing data of arbitrary-length words than
+data of fixed-length words.  Dropping the carry from an addition after
+16 bits or whatever is an extra exceptional case to add, rather than
+something you have to take special pains to avoid.  Also, you get
+perhaps some extra use out of the elements used for addition — if you
+route a 0 carry to a bitwise adder, it gives you simultaneously XOR
+and (perhaps integrally delayed) AND, which you can use for other
+things.
+
+Per-bit LUT
+-----------
+
+One possible interesting operation for the bit-serial case is
+demuxing: given four or eight bitstreams, demultiplex the values of
+two or three other bitstreams to select among them.  This provides a
+programmable universal Boolean function which can, if desired, vary
+bit by bit.
+
+Very crude performance analysis
+-------------------------------
+
+The idea here is that you load the inner loop of your algorithm into
+the configuration of the network and just let it rip for a while.
+Under such circumstances, modern high-end CPUs can generally take
+advantage of SIMD operations, carrying out something like 128 bit
+operations per cycle.  Small microcontrollers are stuck at something
+like one 32-bit payload operation every five cycles or so, so
+something like six bit operations per clock cycle.
+
+If you have a 256-input 256-output bit-serial network that is 7 bits
+deep, you might allocate half of its lines to ALUish things, half a
+dozen or so to memory, and split the other half between long shift
+registers and simple loopbacks.  This gives you a max of 128 bit
+operations per cycle, but maybe 64 is a more likely estimate.
+
+Let’s estimate that each D flip-flop uses 6 transistors and that we
+have 56 bits of FIFO on each of the 64 long-shift-register outputs,
+making them more akin to 8-bit registers.  (It’s easy enough to chain
+two of them together when you want a 16-bit register.)  This gives us
+21504 transistors in this register file, which is a lot but not the
+majority of the whole chip.  The 1792 D flip-flops in the network
+itself are just 10752 transistors, and the 1792 corresponding MUXes
+might be another 10752 transistors.  Then, on our 128 or so ALU lines,
+we have, say, 5 NAND gates each, each with 4 transistors, for a total
+of 2560 more transistors.  The total, then, is 45568 known
+transistors, and if we add 50% or so for stuff I’m not thinking of,
+it’s similar to the count on a 68000 or other mid-80s workstation
+CPU — but clockable at very high speeds because of its very short path
+length, and doing 128 bit operations per cycle instead of 6 or
+whatever.
+
+However, that doesn’t account for the control unit, the thing that
+decides when and how to reconfigure the network and whatnot.
+

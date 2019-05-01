@@ -1,0 +1,208 @@
+A hammer is a simple machine; you apply energy to it over a long
+period of time, and upon impact, all that energy is released in a
+short time.  As an example, you might swing a 2kg hammer in a
+3m-diameter circle at 2Hz, which works out to 9.4 m/s and 89 J, and it
+might take you 500ms over 2.4 m for the whole swing, thus an easily
+human-achievable 37 N and 178 W (though at least the power must vary,
+increasing as it does from zero); upon impact, this energy is released
+within, say, a millimeter, which is about 200 μs, 450 kW, and 89 kN.
+So in effect you have a mechanical advantage of about 2400 — your 37 N
+applied over 2.4 m is amplified to 89 kN applied over 1 mm.
+
+Correspondingly, your 178 W is amplified by 2500 to get 450 kW,
+because it’s released over 1/2500 the time.
+
+Springs can be used in a somewhat similar way, and also in reverse,
+which is a thing we don’t usually do with hammers.  Springs have the
+feature that the input force and distance are always the same as the
+output force and distance, but the input and output power need not be.
+A bow, slingshot, or onager is the hammer-like
+approach — you apply a small power over a long period of time to
+charge up the spring, then release the energy over a short period of
+time.  Applying the same principle in reverse, you can wind a watch,
+applying a large power over a short period of
+time, and then let it run down, applying a small power over a long
+period of time.
+
+A traditional simple machine like a lever doesn’t have the variability
+in time that hammers and springs do — the instantaneous power in is
+always equal to the instantaneous power out.  A rough electrical
+equivalent of the lever, if we disregard dc, is the transformer — the
+input voltage can have whatever relationship to the output voltage,
+but the power in is equal to the power out.
+
+Capacitors and inductors can be used like springs or hammers in the
+electrical world.  You can add energy to either one slowly over a
+period of time, then release it over a short period of time; in the
+case of the inductor, the voltage is arbitrarily different from the
+original voltage, while the current changes continuously, while in the
+case of the capacitor, the current is arbitrarily different form the
+original current, but the voltage changes continuously.  As one
+example, engine spark plugs are fired with ignition coils that work
+this way, and flashtubes are fired with capacitors that work this way.
+Some spot-welding machines also use either capacitors or inductors in
+either of these two ways, and of course ordinary switching power
+supplies use inductors precisely in order to change voltages.  And
+it’s easy to provoke accidental, and dangerous, energy releases from
+either kind of device.  Heck, I just spewed sparks of vaporized copper
+into the air when I plugged in my power strip because it has a
+wall-wart plugged into it.
+
+In this process, the non-ideal properties of the various devices,
+including even switching elements, come into play.  The ESR and ESL of
+capacitors limits how quickly they can discharge (or charge), their
+leakage current wastes energy, and the ESR also causes energy losses
+during both charge and discharge; parasitic capacitance of inductors
+limits how quickly they can store or release energy, and their ESR
+causes energy losses during the whole time they are storing energy.
+The limited energy density of either device also 
+
+For capacitors, the resistive losses are concentrated in the
+high-power part of the cycle, because they are quadratic in current.
+Consider charging a 1μF 1Ω capacitor with a constant-current source to
+1 V over 1 second and then discharging it, also at constant current,
+over 1 millisecond.  You charge it at 1μA, eventually depositing 1μC
+in it, dissipating 1pW and thus finally 1pJ in its ESR (and 1μJ in its
+dielectric).  When you discharge it at 1 mA, it’s dissipating 1μW, a
+million times as much, and finally 1nJ, a thousand times greater.
+
+For inductors, instead, resistive losses are concentrated in the
+low-power part of the cycle.  If you spin up a 1mJ 1Ω inductor with a
+constant-voltage source to 1 A over 1 second, then discharge it
+through a constant-voltage load in 1 ms, your current rises linearly
+from 0 A to 1 A, and the resistive loss rises quadratically from 0 W
+to 1 W over that second, dissipating a total of ⅓J.  During the
+discharge cycle, it drops again from 1 W back to 0 W, playing the same
+curve backwards but a thousand times faster, and so dissipating only
+⅓μJ.
+
+So I was wondering about the limits of this kind of thing.
+
+The Pulse Electronics PA4309.105NLT unshielded drum-core inductor is
+1mH (±20%), 1.08 A, and 3.915Ω; it’s 7mm × 12.8mm × 12.8mm.  At its
+full current, it stores 0.58 mJ and dissipates 4.6 W, which I guess
+means it only stores about 127 μs worth of power, about 0.5 J/liter.
+I don’t know what its self-resonant frequency or parasitic capacitance
+are, but Pulse measures the inductance at 100kHz, so I’m guessing it’s
+at least 1MHz.  So you can probably get a boost or dropdown of up to
+about a factor of 100 or 200 higher or lower voltage and power out of
+these inductors, with microsecond-scale spikes of a few hundred watts
+and volts.
+
+Their PA4309.104NLT is 0.1mH (±20%), 3.5 A, and 0.405Ω, and is the
+same size.  It can store 0.61 mJ, almost the same as the previous one
+(which makes sense, since all that’s changed is the wire!) and
+dissipates even more, 5.0 W (which, again, makes sense).
+
+The PA4309 series goes down to a 1μH 20A 19mΩ inductor of the same
+size, which is slightly higher power (7.6W) and lower energy (0.2 mJ).
+
+So it seems like, for energy-storage purposes, the power, energy per
+unit size, and cutoff frequency don’t really vary with inductance, at
+least within a given core material and size.
+
+Capacitors can handle much longer energy storage (going beyond
+microseconds up to seconds, hours, even longer) as a result of us
+having much better approximations to perfect insulators than to
+perfect conductors, at least around our normal temperatures.  They’re
+also much denser.
+
+A random capacitor I have lying around (in a broken CFL bulb) is a can
+8mm in diameter, 17mm long, 3.3 μF, 400 V.  This works out to 264 mJ
+in 0.854 mℓ, 309 J/ℓ, 600 times denser than the inductors I was
+looking at.  I don’t know how fast it can discharge and whether it’s
+electrolytic (as it appears) or polyester (it says “PET” all over one
+side).  But I think electrolytics are good up to about 10kHz or so, so
+it might not be able to do under 100 μs or so.  In the CFL, it’s being
+used to smooth the ripple in rectified 50Hz ac.
+
+A random inkjet printer board I had sitting around has a Nichicon
+supercapacitor on it: 8mm diameter, 20mm long, 2.7 V, and an
+astounding 2.2F, which works out to an astounding 7.3 J in 1.0 mℓ, and
+thus 7.3 kJ/ℓ.  However, supercapacitors have high ESR and much lower
+capacitance over short timescales.
+
+Checking out datasheets and stock at Digi-Key, the Nichicon
+JUWT1105MCD costs 92¢ down to 30¢ (quantity 5000). It’s a 1-farad 2.7V
+6.3mm-diameter 10.5mm-long EDLC rated at 4Ω ESR at 1kHz.  The
+datasheet lists a 4Ω “DCR”, but I don’t know what that is.  The
+capacitance rating is based on discharging in, I guess, 270 seconds
+after a 30-minute (!) charge cycle.  (See file `capacitors`.)  This
+works out to 0.33 mℓ, 3.6 J, and 11.1 kJ/ℓ.  The datasheet gives
+4Ω ESR at 1kHz, so its maximum energy output at around that timescale
+would be into a 4Ω load, which would work out to 460 mW.
+
+Another inkjet printer power supply has an electrolytic that is 16mm
+in diameter, 35mm long, 50 V, and 2200 μF, which works out to 2.75 J
+in 7 mℓ, 390 J/ℓ.
+
+At the other end of some kind of scale, I have a microwave oven
+capacitor which is 25 μF and 450 V, 50 mm diameter and 70 mm long,
+137 mℓ, 2.5 J, 18 J/ℓ.  This is presumably designed for high currents
+and low ESR, although its extensive surface markings do not provide
+any indication of how high and how low.
+
+Comparing to batteries, a lead-acid Yuasa GYZ16H holds 16 amp-hours at
+nominally 12 volts (690 kJ), is 150 mm × 87 mm × 145 mm (1.89 ℓ),
+weighs 12.4 lbs (5.6 kg), and can deliver 240 amps (nominally 2.9 kW,
+but I bet the voltage dips) to start your motorcycle.  This works out
+to 365 kJ/ℓ or 120 kJ/kg, orders of magnitude better than even the
+supercapacitor.  Li-ion and Li batteries are even better, and
+combustible fuels are orders of magnitude better again.
+
+Murata has a line of “GR7” ceramic capacitors specifically optimized
+for camera flashes, the largest of which (GR731CW0BB473KW03#) is
+3.2 mm × 1.6 mm × 1.8 mm.  These are ceramic capacitors rated for
+350VDC, 10nF to 47nF, with 50mA max discharge current, which works out
+to at least a megavolt per second, except that its capacitance droops
+below 50% at full rated voltage, so it’s more like two megavolts per
+second.  The power output of this device is an astounding 17.5 watts,
+but its energy content is only 2.2 mJ, which works out to 234 J/ℓ.  I
+don’t know what their ESR or ESL is; the datasheet lists their
+“dissipation factor” as 0.025 max at 1V and 1kHz.
+
+Most promising are tantalum capacitors like the AVX TAJB226M010RNJ,
+which costs 69¢ in quantity 1, 23¢ in quantity 1000.  It’s 3.5 mm ×
+2.8 mm × 2.8 mm, 22μF, 10V, has an ESR of 2.4Ω at 100kHz, and has a
+leakage current of 2.2 μA.  This works out to 2.2 mJ, 27 μℓ, and a
+rather poor 80 J/ℓ.  The leakage current will steal 100 mV/s, so these
+are only good for storing energy for timescales of up to a minute or
+two.  Discharging through a 2.4Ω load, it can theoretically deliver
+2100 mA and thus 20 W.
+
+****
+
+So, suppose I want to dump 1000 J into a spark that lasts 1 ms — a
+rather high power of 1 MW.  If electrolytic capacitors are my medium
+of choice, I need 3.2 ℓ of electrolytic capacitors!  If I were to use
+tiny ones like the one from the CFL, I’d need 3800 electrolytic
+capacitors.  Using the bigger one from the inkjet, I’d need 360
+capacitors, totaling 2.5 ℓ.
+
+(Putting this power into context, arc welding on steel commonly uses a
+spark of 40 V at 150 A, melting a weld puddle a few millimeters
+across, which works out to 6 kW.  This spark would generate heat 167
+times as rapidly.)
+
+Supercapacitors are apparently capable of discharges over a timescale
+of milliseconds, but their ESR is too high; using the one whose
+datasheet I examined above, you’d need 2.2 million capacitors,
+containing a total energy of 7.9 MJ, to get an instantaneous 1 MW out
+of them.  Also it would cost you US$650 000 and they would occupy 720
+liters.
+
+Using Murata’s camera-flash capacitor, on the other hand, you could
+get 1 MW out of only 57000 capacitors, which is actually a more
+reasonable quantity than it sounds like — the capacitors are tiny, so
+it’s only 530 mℓ.  But the total energy capacity would be only 126 J,
+which is an eighth of what I specified above, even if it is a bit
+larger than the literal 89J hammer blow I started the explanation
+with.  To get to 1000 J you need 450 000 capacitors, but they “only”
+occupy 4.2 liters.  I don’t have the price handy but I imagine it
+would add up to around US$45000.
+
+The AVX tantalums seem like perhaps a better balance: they hold the
+same 2.2 mJ as the ceramic capacitors, but can deliver a higher
+maximum discharge current despite the lower voltage, so the output
+power ends up being almost the same.  Unfortunately, they occupy even
+more space and are probably more expensive.

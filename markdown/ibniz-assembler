@@ -1,0 +1,186 @@
+Three-stack generic macro assembler (design sketch)
+===================================================
+
+IBNIZ is viznut’s bytebeat and display-hack virtual machine; it uses a
+stack-based instruction set, and when it’s in run mode, it’s
+constantly executing the program as you edit it.  The program runs
+repeatedly on the same stack, and whatever it leaves on the stack is
+interpreted as pixels to paint the screen contents.  (Audio works
+similarly.)
+
+I was just reading Longo’s _Introduction to DECSystem-20 Assembly
+Programming_ and thinking about how the DEC assemblers and the
+assembler described in file `nova-rdos` didn’t have even the machine’s
+fundamental opcodes defined internally; they were defined as manifest
+constants and macros, but basically almost all the assembler did by
+default was put numbers into memory and build a symbol table, which
+always seemed like a really cool idea to me.  (And it was fundamental
+to how Gates, Allen, and Davidoff wrote Microsoft BASIC, by
+incrementally hacking the DEC machine into emulating an 8080.)
+
+The first example program in Longo begins as follows:
+
+    EXAMPLE 1, ADDING TWO NUMBERS
+    I:    3    ;I=3
+    K:    2    ;K=2
+    J:    0    ;save a spot called J
+
+This assembles three numbers into memory and sticks three entries into
+the symbol table.
+
+Now, symbol tables are awesome and really flexible, but it would be
+even simpler if we could do without them, at least at the fundamental
+level.  And some constructs — notably nestable conditionals and
+loops — are somewhat awkward to write in macro assemblers using
+labels.  I mean, it’s not that the labels stop you, but they don’t
+help.
+
+It occurred to me that maybe a stack-based assembler that filled the
+object file the way IBNIZ fills the screen could work.
+
+How it would work
+-----------------
+
+If the assembler interprets the input `3 2 0`, it would first push 3
+on the stack, then 2, then 0.  If that’s the whole input, those stack
+contents are, in some encoding, the contents of the binary file it
+will write out.  Similarly, if the input contains `"ABC"`, some
+representation of that string gets pushed onto the stack — maybe 65 66
+67 3, the UTF-8 values of the string and then its length, for example.
+But then you could define “macros”, little functions that would pop
+things off the stack, change the state of the interpreter, and push
+more things back onto the stack.  For example, you might have a `MOV`
+macro that would push the encoding of a MOV instruction onto the
+stack, popping off an appropriate number of operands.
+
+(Such an assembler designed for AMD64 machines would need to work in
+bytes, while a SPARC assembler might be easier if it worked in 32-bit
+words.  You could in theory do the conversion at the end of the
+process.)
+
+Advantages; the landscape
+-------------------------
+
+Nestable control structures — the whole raison d’etre of this goofy
+idea — would use a third stack for their jump addresses, in addition
+to the operand stack that’s accumulating the output file and the macro
+execution stack that keeps track of which macros are invoking which.
+And adding some peephole optimization would be pretty trivial,
+although you’d have to be careful with variable-length instruction
+encodings, and you might want to have some kind of low water mark that
+prevented such rewriting, since you wouldn’t want to invalidate a jump
+destination.  (Your macros could still inspect the previously emitted
+code, though.)
+
+You’d still have a symbol table, of course, so you can call named
+functions.  It would just be built and maintained by macros.
+
+Although you’d probably want to use some kind of RPN syntax, there’s
+no reason the macros would have to be programmed at a FORTH-like
+level, except perhaps as a bootstrappability exercise.  On the
+contrary, the compile-time macro data world can be garbage-collected,
+dynamically-dispatched, pattern-matching, backtracking, theorem
+proving, SAT solving, whatever is most convenient for writing bits of
+compiler macros.  PostScript and Factor are not the limit.
+
+If you gave the compiler macro language the ability to read from its
+own input stream — the way FORTH immediate words do in order to read
+the name of a word to define, for example, or the way PostScript
+programs do to incrementally read and render bitmap data — you could
+convert your macro assembler into a compiler for arbitrary languages
+by providing different preludes.  It might not be a good idea, but you
+could do it.
+
+What’s the difference from emitting binary from whatever random
+high-level language?  The smooth incremental path from manually typing
+in (or hexdumping) some binary data to refactoring parts of it to
+enable you to generate more of it.
+
+Self-bootstrapping
+------------------
+
+Maybe also the smooth incremental path of building more capable
+assemblers.  This might be a way to do something like StoneKnifeForth
+that gradually adds features from one stage of the language to the
+next, without ever requiring a backwards-incompatible language leap.
+The most basic bootstrap compiler could handle nothing more than
+converting binary to decimal, while valid input to it could remain
+valid for all later versions.  Here’s a somewhat small, though surely
+not minimal, implementation of such a basic bootstrap.  This is for
+AMD64 Linux, and it doesn’t check its input for validity.
+
+            ## Convert space-separated decimal numbers to binary
+
+            ## You know, I think this is almost the same as the i386
+            ## system call interface, but maybe with different registers?
+            ## Also, different system call numbers!  On i386 %eax=1 is
+            ## _exit().
+
+            .globl _start
+            ## First, read a byte:
+    _start: xor %edi, %edi          # fd 0
+            mov $buf, %esi          # into buf
+            xor %edx, %edx
+            inc %edx                # 1 byte
+            xor %eax, %eax          # _NR_read is 0
+            syscall
+
+            test %eax, %eax         # quit if error or EOF
+            jle done
+
+            ## Only if we’ve got a space, write out the number:
+            mov (buf), %eax
+            cmp $32, %eax
+            jne keep_converting
+
+            ## We got a space, so we should write out our byte:
+            mov %ebx, (buf)         # store byte into buf
+            xor %edi, %edi
+            inc %edi                # fd 1
+            mov $buf, %esi          # write from buf
+            mov %edi, %edx          # 1 byte
+            mov %edi, %eax          # _NR_write is 1
+            syscall
+
+            ## Then repeat:
+            xor %ebx, %ebx          # clear accumulating number
+            jmp _start
+
+    keep_converting:
+            imul $10, %ebx
+            mov (buf), %eax
+            and $15, %eax
+            add %eax, %ebx
+            jmp _start
+
+            ## Got EOF or error, so exit.
+    done:   xor %edx, %edx
+            mov $231, %eax          # _NR_exit_group in unistd_64.h
+            syscall
+
+            .data
+            .align 8
+    buf:    .byte 0
+            .byte 0
+            .byte 0
+            .byte 0
+
+            .byte 0
+            .byte 0
+            .byte 0
+            .byte 0
+
+This can reproduce its own 119 bytes of machine code (well, of an
+earlier version of itself) given this input:
+
+    echo 49 255 190 96 1 96 0 49 210 255 194 49 192 15 \
+    5 133 192 126 55 139 4 37 96 1 96 0 131 248 32 117 26 49 255 255 199 137 \
+    28 37 96 1 96 0 190 96 1 96 0 137 250 137 248 15 5 49 219 235 199 107 219 \
+    10 139 4 37 96 1 96 0 131 224 15 1 195 235 182 49 210 184 231 0 0 0 15 \
+    5' '|./binout > binout.bin
+
+Reproducing a valid ELF executable presumably requires a few dozen
+more numbers, hopefully not hundreds.
+
+So once you have that working, you can patch in a couple more features
+and fix up some jump offsets.

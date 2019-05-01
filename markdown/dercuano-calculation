@@ -1,0 +1,53 @@
+A lot of the notes in Dercuano contain calculations. To take a random
+example, file `lab-power-supply` says:
+
+> It could maybe dissipate like 20W, which at 12V would be just 1.7
+> amps…
+
+> Supposing arbitrarily that I were to use a similar ATX power supply
+> capable of 18A on its 12V output, which works out to 216W (a bit
+> over a quarter horsepower), it would be nice to be able to carry
+> that 216W most of the way down the range, say down to 2V — which
+> would mean 108 fucking amperes.…
+
+> How much energy do we need to store in the inductor at 62.5kHz?
+> That’s 16 microseconds per cycle.  I’m a little unclear on exactly
+> how the math of buck converters works out but I am pretty sure that
+> it will not involve storing more than 16 microseconds’ worth of
+> power in the inductor, which would be three or four millijoules, and
+> I’m pretty sure it’s okay for the inductor current to fluctuate by
+> 10% or so, maybe a lot more.  So if ½LI² = 4 mJ and I = 18 A, then L
+> = 2·4 mJ / (18 A)² = 25μH,
+
+> Refreshing at 1kHz (again, as suggested in the display datasheet)
+> would require iterating at 11kHz.  At the AVR’s internal RC
+> oscillator speed of 8MHz, this gives us 727 clock cycles per display
+> update…
+
+These calculations are unfortunately “dead”, not “live” like the
+calculations in a spreadsheet, and by the same token, they’re
+time-consuming to verify — if you want to check to see if my
+calculations are wrong, you need to enter each number into a
+spreadsheet or calculator and redo the calculation from scratch.  I
+typically use units(1) to do the calculations (as described in file
+`executable-scholarship`) which reduces my chances of accidentally
+dropping a “milli” or a “kilo” from the calculation, or using the
+wrong conversion constants, but if you’re using Gnumeric or whatever,
+you have to check those too.
+
+And the calculations are just individual points, while the underlying
+formula is a much richer interrelationship.  If you’re looking at the
+½LI² formula above (see also file `dercuano-formula-display`) and you
+wonder how high the inductance L would need to go to support 20 A of
+current, you need to think about it for a while.  If you’re not used
+to this kind of thing, the answer may require some square roots and
+stuff.
+
+Such calculations can be made “live” by generating them from some kind
+of JS library that does calculations.  I’m thinking that something
+like [my prototype RPN editor][0] could be developed into a
+comfortable way of computing the quantities and displaying how they
+were derived, although it does require a context switch from editing
+plain text.
+
+[0]: http://canonical.org/~kragen/sw/dev3/rpn-edit

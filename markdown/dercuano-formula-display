@@ -1,0 +1,130 @@
+Dercuano contains a bunch of text, which can be more readable and
+comprehensible and navigable if properly formatted (see
+`dercuano-stylesheet-notes`), but a lot of that text also contains
+mathematical formulae, things like ½LI² or k (2 cos θ₀ cos² ω - cos θ₀
+- 2 sin θ₀ sin ω cos ω) or log cos x ≈ -x²/2 - x⁴/12 - x⁶/45 -
+17x⁸/2520 - ... when x² < π²/4.  One problem is that Unicode’s ability
+to represent mathematical formulae is pretty limited; you can do xⁱ
+but not vice versa, you can’t do simultaneous subscripts and
+superscripts (for things like ∫), and any kind of two-dimensional
+layout is pretty limited.  Another problem is that the spacing and
+fonts are all wrong; that last formula, for example, should look more
+like
+
+<center>
+<table cellspacing=0 cellpadding=0 style="text-align: center">
+<tr><td valign=middle rowspan=2 style="padding-right: 3px">log cos *x* ≈ –</td>
+<td style="border-bottom: 1px solid black">*x*<sup style="font-size: .66em">2</sup></td>
+<td valign=middle rowspan=2> – </td>
+<td style="border-bottom: 1px solid black">*x*<sup style="font-size: .66em">4</sup></td>
+<td valign=middle rowspan=2>…</td>
+</tr>
+<tr><td>2</td><td>12</td></tr></table>
+</center>
+
+only with better fonts and no misalignment between the minus signs and
+fraction bars.  (That’ll depend on your fonts.)
+
+The standard approach to solving this problem on the web is MathJax,
+which scans your HTML after page load for T<sub>E</sub>X formulas
+tagged with \\(\\) and renders them into nice readable formulas.  I
+downloaded a copy, and it doesn’t look like it sends the formulas to a
+server for rendering (the way Wikipedia’s alternative does) but it’s
+33MB.  And it looks like a big chunk of that 33MB is necessary to use
+MathJax in the usual way.
+
+MathJax can generate SVG and HTML with CSS, though, so maybe I could
+somehow get it to compile my formulas to HTML or SVG at build time.
+Although, to bring up problems reminiscent of those in file
+`dercuano-drawings`, here's the bletcherous markup it spat out for
+`$\sim\bigoplus_{i=0}^7b_{n,i}$`, generating screen output which looks
+absolutely gorgeous:
+
+    <span class="math" id="MathJax-Span-9" role="math" style="width:
+    6.018em; display: inline-block;"><span style="display:
+    inline-block; position: relative; width: 4.959em; height: 0px;
+    font-size: 121%;"><span style="position: absolute; clip:
+    rect(1.17em, 1004.96em, 2.78em, -1000em); top: -2.302em; left:
+    0em;"><span class="mrow" id="MathJax-Span-10"><span class="mo"
+    id="MathJax-Span-11" style="font-family:
+    MathJax_Main;">∼</span><span class="munderover"
+    id="MathJax-Span-12" style="padding-left: 0.278em;"><span
+    style="display: inline-block; position: relative; width: 2.334em;
+    height: 0px;"><span style="position: absolute; clip: rect(3.087em,
+    1001.05em, 4.441em, -1000em); top: -4.014em; left: 0em;"><span
+    class="mo" id="MathJax-Span-13" style="font-family: MathJax_Size1;
+    vertical-align: 0em;">⨁</span><span style="display: inline-block;
+    width: 0px; height: 4.014em;"></span></span><span style="position:
+    absolute; clip: rect(3.359em, 1000.43em, 4.207em, -1000em); top:
+    -4.491em; left: 1.111em;"><span class="mn" id="MathJax-Span-14"
+    style="font-size: 70.7%; font-family: MathJax_Main;">7</span><span
+    style="display: inline-block; width: 0px; height:
+    4.014em;"></span></span><span style="position: absolute; clip:
+    rect(3.366em, 1001.22em, 4.207em, -1000em); top: -3.729em; left:
+    1.111em;"><span class="texatom" id="MathJax-Span-15"><span
+    class="mrow" id="MathJax-Span-16"><span class="mi"
+    id="MathJax-Span-17" style="font-size: 70.7%; font-family:
+    MathJax_Math; font-style: italic;">i</span><span class="mo"
+    id="MathJax-Span-18" style="font-size: 70.7%; font-family:
+    MathJax_Main;">=</span><span class="mn" id="MathJax-Span-19"
+    style="font-size: 70.7%; font-family:
+    MathJax_Main;">0</span></span></span><span style="display:
+    inline-block; width: 0px; height:
+    4.014em;"></span></span></span></span><span class="msubsup"
+    id="MathJax-Span-20" style="padding-left: 0.167em;"><span
+    style="display: inline-block; position: relative; width: 1.369em;
+    height: 0px;"><span style="position: absolute; clip: rect(3.143em,
+    1000.42em, 4.202em, -1000em); top: -4.014em; left: 0em;"><span
+    class="mi" id="MathJax-Span-21" style="font-family: MathJax_Math;
+    font-style: italic;">b</span><span style="display: inline-block;
+    width: 0px; height: 4.014em;"></span></span><span style="position:
+    absolute; top: -3.864em; left: 0.429em;"><span class="texatom"
+    id="MathJax-Span-22"><span class="mrow" id="MathJax-Span-23"><span
+    class="mi" id="MathJax-Span-24" style="font-size: 70.7%;
+    font-family: MathJax_Math; font-style: italic;">n</span><span
+    class="mo" id="MathJax-Span-25" style="font-size: 70.7%;
+    font-family: MathJax_Main;">,</span><span class="mi"
+    id="MathJax-Span-26" style="font-size: 70.7%; font-family:
+    MathJax_Math; font-style: italic;">i</span></span></span><span
+    style="display: inline-block; width: 0px; height:
+    4.014em;"></span></span></span></span></span><span style="display:
+    inline-block; width: 0px; height:
+    2.302em;"></span></span></span><span style="display: inline-block;
+    overflow: hidden; vertical-align: -0.436em; border-left: 0px
+    solid; width: 0px; height: 1.662em;"></span></span>
+
+That gzips to 643 bytes.  Without using the MathJax fonts or
+`position:`, you might try doing something like
+
+<table cellspacing=0 cellpadding=0><tr><td rowspan=2 style="font-size:
+2em">~⊕</td><td style="font-size: .71em">7</td><td
+style="padding-left: 3px" rowspan=2><i>b<sub>n,i</sub></i></td
+></tr><tr><td style="font-size: .71em"><i>i</i>=0</td></tr></table>
+
+Markdown won’t let me treat a `<table>` as an inline element, but CSS
+will, and the idea would be to hack the math stuff in further down the
+processing chain anyway.  The source code to that looks like this,
+reformatted:
+
+    <table cellspacing=0 cellpadding=0>
+        <tr><td rowspan=2 style="font-size: 2em">~⊕</td>
+            <td style="font-size: .71em">7</td>
+            <td style="padding-left: 3px" rowspan=2><i>b<sub>n,i</sub></i></td>
+        </tr><tr>
+            <td style="font-size: .71em"><i>i</i>=0</td>
+        </tr>
+    </table>
+
+It's 253 bytes, gzipping to 180 bytes — more than the 50 bytes of the
+original formula, but not the 3 kilobytes gzipping to 643 bytes (not
+counting the fonts!) generated by MathJax.
+
+So one alternative, which also might be reasonably okay for some
+things, is to hack together some kind of thing to spit out some HTML.
+It won’t look as good as MathJax or real T<sub>E</sub>X, but it’s
+potentially a lot more capable than raw Unicode, and it should be able
+to express most of what I want to express.
+
+Certainly when I’m *editing* formulas I want to see them with MathJax,
+though.  And if someone is online and willing to take advantage of
+MathJax, they should be able to.

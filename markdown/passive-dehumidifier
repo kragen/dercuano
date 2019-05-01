@@ -1,0 +1,234 @@
+I was watching [Thunderf00t’s self-congratulatory video about the
+failure of the Fontus self-filling water bottle][0], and it occurred
+to me to do some calculations.
+
+[0]: https://www.youtube.com/watch?v=wNHcIYyYDhU
+
+Looking at a [psychrometric chart][1] we can see that under the 21°
+32% relative humidity conditions the dude was testing the dehumidifier
+under, the dewpoint is about 4°; this means you need to cool the air
+by 17 K before you start getting any water out.  To a great extent,
+you could do this with a heat exchanger such as a recuperator or
+regenerator which cools the air on the way into the condensing chamber
+and warms it back up on the way out; the total energy involved is the
+[1.012 J/g/K specific heat of air][2] times 17 K, or about 17 J/g.
+That’s because the humidity ratio horizontal line on the psychrometric
+chart shows us that we have about 0.005 g of water per g of dry air
+under these conditions, which doesn’t change as we cool the air down
+to saturation; this 0.005 ratio means this is about 3.4 kJ per g of
+water contained in the air, which we hope to conserve in the heat
+exchanger.
+
+[1]: https://en.wikipedia.org/wiki/Psychrometrics#/media/File:PsychrometricChart.SeaLevel.SI.svg
+[2]: https://en.wikipedia.org/wiki/Heat_capacity#Table_of_specific_heat_capacities
+
+[Water’s enthalpy of vaporization is about 44 kJ/mol][3], 2.4 MJ/kg,
+or 2.4 kJ/g, and that’s the energy we have to remove in order to
+condense the water.  You also have to remove more energy to cool the
+air (and, less significantly, the water) further.  It probably isn’t
+practical to cool it below 0°, because then you have to waste more
+cold on forming ice, but (as you can see on the psychrometric chart)
+at 0° the saturation concentration is still .0037 grams of water per
+gram of air, so at that point you’ve only gotten about a quarter of
+the water out.
+
+So in summary, you cool a gram of air down from 21° to 0°, spending
+21.3 J to cool it down and another 3.1 J to extract 1.3 mg of water
+from it.  Then you use this 0° air to cool down the incoming air
+through a heat exchanger as much as possible, getting back most of
+that 21.3 J.  To quantify, I think a typical energy recovery heat
+exchanger can recover 85% of the “lost heat”, so we probably only
+“lose” 3.2 J in this scenario — that is, have to actively remove 3.2 J
+of heat from each gram of input air in addition to the 3.1 J spent on
+condensation.
+
+[3]: https://en.wikipedia.org/wiki/Enthalpy_of_vaporization
+
+Thermoelectric coolers like those used in the Fontus are unfortunately
+rather inefficient, with typical coefficients of performance of around
+0.5, though perhaps as high as 1.5 for the small 20 K temperature
+difference we’re talking about here, [according to Meerstetter’s
+chart][4].  But there are other refrigeration technologies with better
+coefficients of performance.
+
+[4]: http://www.meerstetter.ch/compendium/tec-peltier-element-design-guide
+
+So, we have to remove about 3.2 J + 3.1 J = 6.3 J of energy per gram
+of air, and we may have to spend 12.6 J to do that with a Peltier
+cooler.  And we get 1.3 mg of water.  This works out to about 9.7
+megajoules per kilogram or liter of water produced.  This is higher
+than Thunderf00t’s number of 2.3 MJ/ℓ, which was merely an
+approximation of the enthalpy of vaporization of water.
+
+(Thunderf00t’s original video was working from the “energy factors” of
+dehumidifiers, which are required to be at least 1.2 ℓ/kWh to
+1.6 ℓ/kWh to qualify for an “ENERGY STAR” label.  These work out to
+2.25 to 3 MJ/ℓ, but maybe that’s measured on a more humid or hotter
+day.)
+
+To support one person with four liters of water per day, then, we
+would need about 39 MJ, which is an average of about 450 watts.  This
+is feasible for a person to carry a solar panel for, but not to exert.
+
+Avenues of improvement
+----------------------
+
+But that isn’t all we can do.
+
+### Greenhouse evaporation probably works ###
+
+There’s supposedly a wilderness survival trick for distilling water
+using a sheet of clear plastic.  You dig a hole in the ground, put a
+bowl in the center of the hole, cover the hole with plastic, weight it
+down with rocks around the edge, and put another rock in the center to
+make a dimple over the bowl.  In the sun, the air under the plastic
+heats up like a greenhouse, evaporating water from the dug surface of
+the soil, until its dewpoint rises above the temperature of the
+plastic.  Water then condenses on the plastic and runs down the slope
+to the dimple in the center, where it drips into the bowl.
+
+To keep the air under the plastic saturated with moisture, it is often
+recommended to pile foliage in the hole, perhaps smashed up a bit in
+order to allow faster evaporation.
+
+That is:
+
+1. Harness solar thermal energy to evaporate water and warm air so it
+   can hold more water.
+2. Condense water from 100% saturated air instead of 30% saturated air
+   by bringing the air into contact with moist matter.
+
+If you can raise the air temperature to 30° in your greenhouse, which
+is fairly easy, and get the air to 100% saturation by blowing it
+through smashed-up leaves or moist dirt or whatever, then you have
+about 27 mg of water per gram of air.  If you can cool that back down
+to 20° — a purely passive process, and again one that can be
+facilitated with a recuperative heat exchanger — you can recover about
+12 mg per g of it.
+
+Not only is this almost an order of magnitude more humidity per volume
+of air, reducing the problems associated with device size, the bigger
+deal is that it’s powered almost entirely by low-grade thermal energy,
+like what you can get from sunlight.  Some fans would be useful to
+circulate air between the condenser and the evaporator, and maybe some
+water pumps, but the mechanical power needed will be orders of
+magnitude smaller — less than 10 W, probably less than 1 W.
+
+The thermal power still needs to be adequate to evaporate the water;
+if the thermal collector is 50% efficient (a common figure for
+inexpensive glazed solar thermal collectors, much better than the 16%
+of photovoltaic panels) then you need 4 kg/day · 2.4 MJ/kg / 50% =
+220W on average.  You probably need 660W during the day to average
+220W for all 24 hours, so at 1000 W/m² you need almost a square meter
+of thermal collector per person.
+
+### Purely passive condensation probably isn’t practical ###
+
+You might think that you could avoid this solar evaporation nonsense,
+since temperature changes between day and night are often sufficiently
+large to cross the dewpoint by themselves.  And that’s true, but even
+in moist climates, that is not dependable every day, and in dry
+climates it never happens.
+
+Here in Buenos Aires, it’s currently 21°, and the dewpoint is 18°; we
+should hit 18° for a couple of hours at about 4 AM.  This should
+happen again on Thursday, where the dewpoint will rise to 19° during
+the day (with a temperature of 22° to 24°) and then the temperature
+will fall to 19° during the night and morning.
+
+At a dewpoint of 18°, the air holds about 0.013 grams of moisture per
+gram of air, of which you can condense about 0.001 g/g per kelvin of
+cooling.  So to condense 4 kg of water by cooling the humid
+Rioplatense air by a single degree below its dewpoint, you need to
+slightly cool 4 tonnes of air, extracting about 4 megajoules of heat
+from it, plus the 9.6 megajoules (4 kg · 2.4 MJ/kg) for condensing the
+water.  The most reasonable way to do this is probably to cool down a
+cold reservoir at night by some 15 megajoules.  If your cold reservoir
+is just water, this is going to require minimally 3.5 tonnes of water
+and probably 7 or 10 tonnes.  On the bright side, 10 tonnes of water
+can be stored a lot more easily than 4 tonnes of air.
+
+Phase-change materials, like the recently-discussed saturated aqueous
+solution of sodium hydroxide, probably allow you to do this with only
+a few hundred kg of mass.
+
+However, all of this is overlooking the fact that it wouldn’t work
+very well this week, because in both cases the low temperature comes
+*after* the high dewpoint.  You’d have to store the cold from now
+until Thursday afternoon, four days.  Doable, but a major undertaking.
+
+Consider, by contrast, Albuquerque.  Currently the temperature there
+is 17° and the dewpoint is -8°.  Despite its 15° temperature swing
+from day to night, you are just not going to have any luck condensing
+water out of that air with a passive cool reservoir stored on a
+timescale of less than months; the highest the dewpoint gets is -1°.
+
+### Purely passive condensation with weather balloons ###
+
+If you send a balloon up, it gets cold.  The environmental lapse rate
+of the lower troposphere, up to about 11 km, is about -6.5 K / km, so
+at 11 km the temperature is usually about 70 K colder than at sea
+level.  In almost all cases, that brings it below the dewpoint at
+ground level.
+
+If a balloon goes up and then comes back down, it has done no net
+work, so need not necessarily have dissipated any energy.  By bringing
+heat from the ground up, or bringing cold from the upper atmosphere
+down, it has not done any work yet either — the thermodynamic free
+energy there comes from the sun heating the earth’s surface, energy
+which is eventually dissipated by winds forming convection cells.
+It’s just speeding up the convection a bit locally.
+
+In practice, you need *some* energy difference to induce the
+balloon-atmosphere system into motion in the desired direction, but it
+could be very small compared to the heat you harvest.  A net force of
+1 N should be enough to induce a 100 kg phase-change reservoir payload
+to rise at an acceptable rate.  If you let it rise 3200 meters,
+dissipating that 1 N in drag, it will have dissipated 3.2 kJ.  Having
+cooled the payload to below 0° and dropping a little gas at that
+altitude so as to reduce lift by 2 N (about [170 liters at 1.2
+kg/m³][5]), it will then return to the ground dissipating another 3.2
+kJ.  A payload of 100 kg of [water ice at 333 kJ/kg][6] will have lost
+33.3 MJ of enthalpy of fusion, which was bought with 6.4 kJ, about
+0.02% of the total.  You could probably even afford 10 N or 100 N.
+
+[5]: https://en.wikipedia.org/wiki/Atmosphere_of_Earth#Density_and_mass
+[6]: https://en.wikipedia.org/wiki/Enthalpy_of_fusion
+
+That said, it is nontrivial to construct and fly a balloon of the
+83 m³, 5.4 m in diameter, needed to lift 100 kg.  (I’m disregarding
+the weight of the hydrogen or helium within as smaller than my margin
+of error.)
+
+Your 100 kg of ice is enough to condense almost 14 ℓ of water at
+2.4 MJ/kg.
+
+### Compressor-based heat pumps reach much higher efficiencies ###
+
+Typical vapor-compression heat pumps like residential air conditioners
+and normal electric refrigerators have coefficients of performance
+around 2, which is largely a result of having to pump heat against a
+large heat gradient, typically 15° to 25° of difference.  (Note,
+however, that this is already several times better than Peltier
+coolers typically reach.)
+
+(Thunderf00t implicitly claims that it would violate thermodynamic law
+for a refrigerator to have a CoP over 1, but he is mistaken.)
+
+We can’t do much about the ΔT (we have to pump heat from the
+water-condensing chamber into the surrounding environment) but if we
+can reach that COP of 2, then instead of spending 12.6 J per gram of
+air to remove 6.3 J of heat, we can spend 3.2 J, which works out to
+2.4 MJ/kg of water, coincidentally exactly the same as the enthalpy of
+vaporization of water.
+
+If it so happens that your air is already at 100% humidity, a heat
+pump could in theory condense water with an arbitrarily small ΔT, just
+by replacing the air very rapidly.  With an arbitrarily small ΔT, a
+heat pump could theoretically have an arbitrarily high coefficient of
+performance.  In practice, water-source heat pumps used in Japan for
+residential climate control often reach a CoP of 6, which would allow
+you to condense water at 2.4 MJ/kg ÷ 6 = 0.4 MJ/kg.
+
+However, as Thunderf00t points out, under those circumstances, water
+is probably already abundant.
