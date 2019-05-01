@@ -1,6 +1,8 @@
 I want to spiff up the Dercuano display a little so that it is
 pleasant to read, but more with the objective of being like a book
-than being like an advertising brochure.
+than being like an advertising brochure.  (When I started writing
+this, the only CSS thing I’d done was give it a max-width to keep the
+lines from being 2000 pixels long.)
 
 Medium
 ------
@@ -67,6 +69,14 @@ printing with movable type *on top of* a color or even grayscale
 background, as opposed to inserting figures, is basically impossible.
 So there might be reasons other than imitating sales brochures for
 using color.
+
+In the other direction, common browsers (notoriously Chromium) still
+don’t do hyphenation, and their paragraph-filling algorithms are
+minimialistic at best, and justification in browsers never adds
+letter-spacing, so enabling justification in CSS gives you wildly
+varying word spacing, which looks shitty.  So if you’re targeting web
+browsers you need to suck it up and accept ragged right margins.  Or,
+if you’re sufficiently eccentric, ragged left or ventilated prose.
 
 ### _T<sub>E</sub>X: the Program_ ###
 
@@ -164,10 +174,10 @@ because it’s a treatise on the visual display of quantitative
 information, and the authors have dedicated a great deal of care to
 its visual appearance; they set it in Times Roman and Times Italic
 with FrameMaker.  There is a strong hierarchical structure to the
-book, with numbered section headers that frequently run four levels
+book, with numbered section headings that frequently run four levels
 deep (“*6.2.5.3 Fisher’s z Scale*”), which are all in Times Italic.
-There are occasional subheaders before level-4 headers, which are not
-numbered.  Paragraphs are indented (except when following a header)
+There are occasional subheadings before level-4 headings, which are not
+numbered.  Paragraphs are indented (except when following a heading)
 and justified, but with no extra vertical skip between them.
 
 There are about 46 lines per page, although there is extra leading
@@ -180,8 +190,8 @@ points as the line height, and the escapement of an “m” also measures
 4.0 mm.  (XXX apparently it’s more like 3.0 mm?)  Hyphenation is quite
 frequent, so whitespace is very consistent despite justification.
 Margins are a generous 20mm to the sides and 22mm at the bottom of the
-page; the top margin below the page header is smaller, more like 9mm,
-but there’s another 15mm above the page header.
+page; the top margin below the page heading is smaller, more like 9mm,
+but there’s another 15mm above the page heading.
 
 This suggests that the text is set in 11-point Times Roman with no
 leading and 30-em lines.
@@ -190,13 +200,13 @@ Level-1 headings (“14. Time”) are chapter headings.  The chapter
 number is set in bold italic with a line height of about 16 mm
 (44 pt), while the chapter name is set below it below an 8-mm skip in
 medium italic at about 8 mm (22 pt).  Both of these parts of the
-header are right-aligned.  The page header above the chapter title is
+heading are right-aligned.  The page heading above the chapter title is
 omitted, and blank pages are used to ensure that chapters always begin
-on odd pages.  Below the chapter header, there is a skip of some 24 mm
+on odd pages.  Below the chapter heading, there is a skip of some 24 mm
 above the body text.
 
-Level-2 headers (“14.1 Mathematics of Time”) are set in italic, with
-the header number in bold, and are set somewhat larger than the body
+Level-2 headings (“14.1 Mathematics of Time”) are set in italic, with
+the heading number in bold, and are set somewhat larger than the body
 text, perhaps twice the point size (8 mm, 22 pt), though it seems to
 be about 25% smaller than the chapter title somehow.  There is only a
 small extra skip below them, but about a one-line skip above them.
@@ -204,22 +214,22 @@ There is an extra large space, about a quad, between the number and
 the title; they also do this after bullets in bulleted lists, and
 Knuth also did it after section numbers.
 
-Level-3 headers (“14.1.1 Deterministic Models of Time”) are set in the
+Level-3 headings (“14.1.1 Deterministic Models of Time”) are set in the
 same bold/bold-italic combination of styles, but in a slightly smaller
 font-size, again by about 25%, but still about a 50% larger point size
 than the body text.  These *do* have extra leading below them, though
 less than above.
 
-Level-4 headers (“14.1.1 Orbits and Vibrations”) are set entirely in
+Level-4 headings (“14.1.1 Orbits and Vibrations”) are set entirely in
 bold italic, and the body text is smaller than they are by about 25%.
 Perhaps the bold is intended to add contrast with the body text to
 compensate for the smaller difference in size, or perhaps bold was not
 used in the larger titles simply to avoid overwhelming the reader.
 Again, they have extra leading above and below.
 
-Level-5 subheaders (e.g., “Updates” on p. 438, within §14.3.3.1
+Level-5 subheadings (e.g., “Updates” on p. 438, within §14.3.3.1
 “Data”) are the same size and with apparently the same leading as
-level-4 headers, but without numbers.
+level-4 headings, but without numbers.
 
 FrameMaker’s typesetting of the equations is very much inferior to
 T<sub>E</sub>X’s, with poor kerning, parentheses that fail to enclose
@@ -227,7 +237,7 @@ and whose line thickness never varies (though that of the letters and
 digits does), and so on.  Aside from that, though, its layout is much
 the same.
 
-The leading above headers, of course, goes away when they are at the
+The leading above headings, of course, goes away when they are at the
 top of a page.
 
 They use a monoline sans-serif font for the names of their data
@@ -239,19 +249,19 @@ figures.
 I think a good approximation of the layout can be expressed as follows:
 
 1. Body text is 11-point Times Roman with 30-em justified paragraphs.
-   Paragraphs that don’t follow headers are indented by two ems.  Body
+   Paragraphs that don’t follow headings are indented by two ems.  Body
    text has no extra leading, even between paragraphs.
-2. The text sizes of headers of levels 4, 3, 2, and 1 are a geometric
+2. The text sizes of headings of levels 4, 3, 2, and 1 are a geometric
    progression ending at 22 points; this would make them 13.1-point,
    15.6-point, 18.5-point, and 22-point, or, expressed in ems of the
    body text, 1.19 ems, 1.41 ems, 1.68 ems, and 2.0 ems.
 4. Except that chapter numbers are on a separate line in 44-point text.
-5. Chapter headers are right-aligned with page breaks to an odd page
-   before them.  All other headers are left-aligned with leading above
+5. Chapter headings are right-aligned with page breaks to an odd page
+   before them.  All other headings are left-aligned with leading above
    them equal to their line-height and leading below equal to the
    line-height of the body text.
 
-Occasionally two headers (of different levels) occur in succession.
+Occasionally two headings (of different levels) occur in succession.
 
 ### _How to Make a Telescope_ ###
 
@@ -266,11 +276,11 @@ entirely on glossy paper, although it’s yellowed a bit in the ensuing
 black and white.
 
 Its body text is set in a serif font in justified paragraphs with what
-T<sub>E</sub>X calls "French spacing" — about twice as much space
+T<sub>E</sub>X calls “French spacing” — about twice as much space
 after periods and colons as between words.  The paragraphs
 occasionally have figures centered in the middle of them; they never
 flow around figures, and they are all indented, by about three or four
-ems.  More surprisingly, section headers within chapters (“II-18.  The
+ems.  More surprisingly, section headings within chapters (“II-18.  The
 Polishing Operation” — bold, in the same size as the body text, with
 leading below and even more extra leading above) are also indented by
 the same amount as the paragraphs.  10 lines occupy 42 mm, so the line
@@ -283,7 +293,7 @@ numeral, below which is a vertical skip of some 17 mm, and
 right-justified, given extra letter-spacing, in a sans-serif font, in
 all capitals, in a somewhat larger text size (perhaps 16 points rather
 than 12), is the title.  Beneath the title is another 20mm of leading
-and then the section header of the first section of the chapter.
+and then the section heading of the first section of the chapter.
 
 The Roman numerals at the openings of chapters are still larger than
 the chapter titles themselves; perhaps they reach 24 points.
@@ -300,11 +310,507 @@ the body text) and divided into sections with page-width horizontal
 rules.  Columns are separated by whitespace with no rules.  Figures
 are captioned below in the same smaller font used for footnotes.
 
+### _The Palmer Method of Business Writing_ ###
+
+This book was published in 1915; [the copy I’m looking at][2] was
+digitized from the collection of the University of California, and I
+downloaded the DjVu from the Internet Archive.  A Microsoft watermark
+contaminates every page.  It’s a penmanship textbook.  Both its layout
+and its textual tone are considerably more bombastic than the other
+specimens I looked at above.
+
+[2]: https://archive.org/details/palmermethodofbu00palmrich
+
+I don’t have a reliable way to determine its absolute size, since I
+have only a DjVu scan.
+
+Sans-serif fonts make no appearance whatsoever, except possibly in the
+legend on the original book cover, “THE A. N. PALMER COMPANY, New
+York, …”, which I can’t be sure of because DjVu has corrupted it too
+badly.  The book is full of black-and-white photos (presumably
+halftoned) and illustrations (which are not); at times the text flows
+around them, but usually they are placed above and below the text.
+
+The pages are, unusually, in landscape orientation, and seem to have
+been bound on a short edge; the ratio is about 5 parts length to 3
+parts height.  Although the typography is somewhat inconsistent, often
+varying in the body text size from page to page, it is mostly set in
+two columns, with French spacing (plus spaces inside quote marks), but
+headings and most of the abundant illustrations span both columns.
+Occasionally body text also spans both columns, typically for very
+short sections.  Boldface is used liberally, for all the headings and
+occasionally for emphasis in the body text, while italic is entirely
+absent.
+
+The body text is set fairly tight with no apparent leading.  The
+columns are about 35 ems wide, and separated by about two ems.  The
+paragraphs, even the first, are indented by about three ems, and are
+of course justified, with only very occasional hyphenation, resulting
+in substantial variation in word spacing.  Occasionally there is a
+vertical skip of a line or so between paragraphs, but not usually.
+Evidently no concern has been given to preventing widows and orphans,
+as they occur frequently, while unequal column lengths never occur at
+all.
+
+The headings found throughout the book (“LESSON 80”, “Drill 95”) are
+centered and boldfaced.  Typically each section has a title (“LESSON
+76”) which may be broken onto two lines (“LESSON 70”, “Drill 85”) or
+written on a single line with an em dash, and may sections also have a
+subtitle (“TO RELIEVE MUSCULAR TENSION”); the subtitle is about 1.5
+times the point size of the body text, and the title is about 1.5
+times larger than that.  These headings have equal and miserly leading
+above and below.
+
+Semantically the “Drills” are subordinate to the “lessons” in the
+sense that some lessons contain more than one drill, and may contain
+other sections, whether or not headed by what I’ve called a
+“subtitle”, that aren’t part of a “drill”.
+
+Many pages have a centered boldface injunction at the bottom in the
+same point size as the body text, saying things like, “It is not
+Palmer Method if the lines are tremulous.  Study the instructions for
+speed requirements.”  On p. 19 instead this same injunction is
+repeated in large boldface type at the top of the page, with the
+period removed so it will fit.  Truly, the typographic crimes of this
+manual are manifold.
+
+Some paragraphs, though indented as usual, begin with an inline heading
+in boldface followed by an em dash or colon:
+
+> **Height**—Reference has already been made to one-sixteenth of an
+
+> **To the teacher:**  If you have studied the lessons in advance, have
+
+As an interesting side note, where arrows are present in the diagrams,
+they are fletched.
+
+### _Standard Handbook for Electrical Engineers_ ###
+
+This is the [1922 Fifth Edition][0], scanned from a copy at the University
+of Toronto library.  It’s printed by The Maple Press of York, PA, but
+copyright by the McGraw–Hill Book Company.
+
+[0]: https://archive.org/details/standardhandbook00fowluoft
+
+It does use italics, as well as small caps, but still has no
+sans-serif fonts.
+
+The book is divided into “sections” rather than “chapters”.  Section
+titles are centered, bold, in all caps, with extra letter-spacing and
+a largish vertical skip above them, and a short centered horizontal
+rule below them above the subtitles, if present, and body text.  The
+title is about 1.5 times the point size of the body text.  Paragraphs
+are indented (by about one em), even the first, and justified with
+generous hyphenation, and line spacing is somewhat loose.  Margins are
+very narrow (on p. 377 the operator scanned their finger, and much of
+the material near the spine is lost to the Scribe’s glass join).
+Spacing is French, and quotes seem to be concatenated apostrophes,
+perhaps with extra whitespace inside of them.  There are places where
+letter-spacing is compromised for the sake of justification, as on
+p. 62.
+
+(Because p. 19 has a ruler printed on it, I can report an absolute
+text size for this book: at “300%” zoom, 30mm of the original book is
+58mm on my screen, so the actual zoom is 193%.  9 lines of body text
+being 37 mm on my screen means that they were 19.1 mm in the original
+book, so the body text was printed at the minuscule size of 6
+PostScript points!)
+
+Section subtitles are centered, bold, in all caps, at a size
+intermediate between that of the body text and the section title, so
+about 1.2 times the point size of the body text.  At times there is an
+additional sub-subtitle in centered italics at the normal body text
+style.  There is some inconsistency.  We have:
+
+<center>
+> **SECTION 2**  
+> ****
+> **ELECTRIC AND MAGNETIC CIRCUITS**  
+> **BY VLADIMIR KARAPETOFF,**  
+> *Professor of Electrical Engineering, Cornell University, Fellow,
+> American Institute of Electrical Engineers*  
+> **CONTENTS**
+</center>
+
+Here “SECTION 2” is what I’ve been calling a “section title”,
+“ELECTRIC AND MAGNETIC CIRCUITS” is formatted at the same point size
+but bolder and without the extra letter-spacing; the author’s byline
+is formatted at the intermediate font size I called a “subtitle”
+before; his credentials are centered, wrapped, in italics; and
+“CONTENTS” is formatted as a subsection heading as described later.
+But then, on the next page, we have:
+
+<center>
+> **SECTION 2**  
+> ****  
+> **ELECTRIC AND MAGNETIC CIRCUITS**  
+> **ELECTRIC POTENTIAL**
+</center>
+
+And here we have returned to the formatting I described above: section
+title, rule, subtitle, subsection heading.
+
+Sections are mostly divided into subsections, which have their own
+(centered, bold, all-caps) headings, usually at the same point size as
+the body text, with a little extra leading above and
+below — especially above, in cases where the page is a bit loose.  In
+some cases they use a larger font, as on p. 576, and may have a
+subsection subtitle (centered, all-caps, bold, at the size of the body
+text), as on p. 897, where it gives the author’s name.
+
+Within the body of the book, paragraphs are numbered and begin with a
+boldface title, which sometimes forms part of a sentence, e.g.,
+“**5. The English weights and measures** are based upon old Roman
+weights and measures.”  Paragraph numbering does not restart after
+subsection headings.  At times the numbering becomes hierarchical,
+perhaps to maintain numbering compatibility across editions, with
+numbers such as **2.**, **3(a₁)**, **3(b₂)**, and **3(B)**, which
+inexplicably comes between paragraphs **3(b₂)** and **3(c₁)**.
+Hyperlinks between paragraphs also use bold for the paragraph number:
+“(Par.**102**).”  In the introductory part, a larger text size is
+used, making the paragraphs about 25 ems wide, but in the body of the
+book, the paragraphs are about 32 ems wide due to their smaller font
+size.
+
+Occasionally an numbered “paragraph” is divided into multiple
+typographical paragraphs, each indented and commonly with a boldface
+title.
+
+Text flows around figures, which are captioned below and numbered
+using small caps for the abbreviation “Fig.”.  The caption is
+typically formatted as a wrapped centered paragraph, but sometimes
+justified.
+
+Footnotes are used frequently to cite sources, separated from the body
+text on the page with a page-width horizontal rule; they are not
+numbered but use the symbols \*, †, ‡, §, ||, ¶, and then \*\*, ††,
+etc.  In other cases sources are simply cited in the body text, or in
+a bibliography at the end of a section.  (In one case Simpson’s Rule
+is given in a footnote stretched across two pages.)
+
+Equations are centered, inserted into the middle of sentences with no
+extra leading, and some of them are numbered on the right.  The line
+before the equation is not justified, as if it ended a paragraph
+(difficult to avoid in cases where it consists simply of, say, “or”,
+as on p. 59), but the line after it is not indented, and typically
+continues the sentence containing the equation.  In some cases, the
+line with the equation ends with a comma or semicolon that forms part
+of the sentence.
+
+Amusingly, integrals are sometimes written using “∂” for the
+differential, sometimes written with an italic *d*, and sometimes omit
+the differential entirely.
+
+Boldface is used within paragraphs for emphasis, perhaps to aid
+skimming:
+
+> **11. The meter** was selected as a length equal to the **ten
+> millionth part** of the **northern quadrant of the earth**, or
+> distance from pole to equator…
+
+Page headers have the section title, centered in italic caps, and on
+the side away from the fold, give the section and paragraph numbers in
+bold, e.g., “Sec. 1—5 *UNITS, FACTORS, AND TABLES*” or “*UNITS,
+FACTORS, AND TABLES* Sec. 1–11”.
+
+Extra leading is often but not always used between paragraphs, perhaps
+to stretch the page to the right height; in these cases extra leading
+is also used above subsection headings, as mentioned above.
+
+Ordered lists are usually indicated with parenthesized italic letters
+(*a*) (*b*) (*c*) and occasionally with numbers and periods
+1. 2. 3. or numbers with parentheses (1) (2) (3).  Occasionally they
+are split into a paragraph (not part of the normal paragraph
+numbering) per item, and those paragraphs are indented as usual.
+Occasionally, as on p. 1505, the list items are given a hanging indent
+of another couple of ems (so the first line is indented by one em and
+subsequent lines by three), and even nested lists are found, with the
+nested list items indented to an intermediate level.  No extra leading
+is used in any case.  Bulleted lists do not occur.
+
+Tables generally use both horizontal and vertical rules to separate
+rows and columns, broken at intersections, and are usually printed in
+landscape mode.  They are numbered and captioned in bold above.  Table
+column and row headings are centered but otherwise use the same
+typography as table contents.  Table section headings (spanning all
+columns) are additionally boldfaced.  In some cases, instead of
+horizontal rules, they use dot leaders, or are split into five-row
+groupings using whitespace.  Table borders are heavier rules.
+Numerical table columns are usually decimal-point-aligned, using
+lining (“capital”) figures.  Sometimes table contents are flowed
+across multiple “supercolumns” separated by double vertical rules.
+
+The mini-table of contents at the start of section 2 is split into two
+columns and uses hanging indents to continue subsection names across
+lines.
+
+On p. 881 we have a tree structure depicted with braces “{” for
+branching and blocks of text for the nodes.
+
+Unidirectional arrows in diagrams are usually fletched, but not
+always.  Dimension arrows are not fletched and use the long-short-long
+dash pattern which to me indicates a center line.  Open-triangle
+arrowheads (with a line through the middle), single-barbed arrowheads,
+and open-line arrowheads both appear, but solid-triangle arrowheads do
+not.
+
+Plots of quantitative data are uniformly grid-ruled, with the rules
+often broken to preserve readability of legend text that runs along a
+plotted line.  In places, as on p. 584, an area of the grid is removed
+to make space for a plot caption, but plots are usually just captioned
+externally as figures.  Qualitative plots usually have only the axes
+ruled.
+
+### _The Book of Useful Knowledge: A Cyclopædia of Six Thousand Practical Receipts_ ###
+
+[This book, by an Arnold James Cooley][1] (“Practical Chemist”), was
+published in 1850 in New York, Philadelphia, and Cincinnati, a reprint
+of the original London edition (and thus presumably done without the
+consent of the author).  The full title and subtitle is “The Book of
+Useful Knowledge: A Cyclopædia of Six Thousand Practical Receipts, and
+Collateral Information in the Arts, Manufactures, and Trades,
+including Medicine, Pharmacy, and Domestic Economy.  Designed as a
+Compendious Book of Reference for the Manufacturer, Tradesman,
+Amateur, and Heads of Families.”  This is centered on the title page
+in somewhere between eight and twelve different fonts, one of them a
+blackletter, but of course no sans-serif fonts.
+
+[1]: https://archive.org/details/acyclopaediasix01coolgoog
+
+The scan is, unfortunately, by Google, so the scan quality is very
+poor, and I have no idea of the original physical size.
+
+The main body of the text is a series of alphabetized entries, each
+beginning with an all-caps headword, set in two columns of 68 lines
+with a vertical rule between them; most paragraphs within each entry
+begin with an italicized header.  Paragraphs, even the initial
+paragraph of each entry, are all indented by about one em.  No leading
+seems to be used.  The columns are only about 20 ems wide, and of
+course are justified with heavy hyphenation.
+
+Occasionally an entry is subdivided into sequences of paragraphs with
+a centered italic header with a blank line above it.
+
+The end of the body text is followed by the notation, centered, in
+boldface, in all capitals, with extra letter-spacing, near the bottom
+of the page: “THE END.”
+
+Frequent use of italics for emphasis gives an impression of great
+excitability:
+
+> then spread it *thinly* on a dish, and expose it before the fire, or
+> to a current of dry air, until nearly dry.  It will then keep for
+> years in wide-mouthed bottles or pots, covered over with bladder. 
+> For *use*, a little is dissolved in water.
+
+Spacing is French, to the extent of using thin spaces before the
+colons and abundant semicolons and following open double- and
+single-quotes, as in “do the ‘ important’ at”.
+
+A typical entry begins:
+
+>   ABRASION.  A superficial injury of the skin, resulting from the
+> partial removal of the cuticle by friction.
+>
+>   *Treat.*  When the injured surface is small, and unexposed, no
+> application is generally required,…
+
+Trailing punctuation goes inside close parentheses:
+
+> not only suffers refraction at the spherical surface, (called
+> spherical aberration,) but the different colored rays, forming the
+> beam of light,
+
+Each page has a horizontal rule above its body text, above which are
+the guidewords for that page (or their first three letters, at any
+rate) and its page number.
+
+Page margins are fairly generous, but column margins are quite
+cramped — perhaps a single em of column separation, with that vertical
+rule running down the middle of it.
+
+Tables have horizontal rules delimiting them and separating their
+header, but not separating their rows; by contrast, they separate
+their columns with vertical rules, but usually have no vertical
+borders.  Often table row boundaries are indicated only by braces “}”,
+and intermittent dot leaders facilitate column-to-column traversal.
+They are neither numbered, but sometimes captioned above.  As in the
+_Standard Handbook_, tables are sometimes flowed into “supercolumns”
+separated by double vertical rules.  Lining figures are used.  Decimal
+points are vertically centered: “its sp. gr. about 1·069 or 1·070;”,
+and numeric columns are aligned by them.
+
+Some simpler tables (e.g., the alkaloids on p. 47) are simply two
+columns of text joined by dot leaders with italic headers at the top.
+
+In a few cases, the columns end to make room for a large table, like
+the table captioned “I. *French Decimal Measures of Length*”, on
+p. 419.
+
+Text flows around small figures; large figures interrupt paragraphs.
+As with tables, figures are neither numbered nor captioned, but
+sometimes they include a legend set in smaller type below them.
+
+Footnotes are set in smaller type below a horizontal rule at the
+bottom of a column; they are linked with \* and †.
+
+Hyperlinks to other Cyclopædia entries are at times merely indicated
+with notations such as “, (which see.)” or even “; to each of which
+the reader is referred, in their alphabetical places.”.  Small caps
+are used frequently for synonyms and surnames and I think they may
+also indicate hyperlinks, as they traditionally do in dictionaries:
+“(See BREWING.)”  Sometimes they seem to merely indicate emphasis, as
+in the bipartite name given for the almond tree.
+
+Ordered lists are sequences of paragraphs, indented as usual by about
+an em, but beginning with the ordinals “1st.”, “2d.”, “3d.”, “4th.”,
+etc., or the Hindu-Arabic numerals “1.”, “2.”, “3.”, etc., or
+italicized letters “*a*.”, “*b*.”, etc., or the Roman numerals “I.”,
+“II.”, “III.”, etc.  Commonly these varying forms of numeration
+indicate nested list structures, but no typographical cues as to the
+hierarchy are visible.
+
+Bulleted lists do not occur, though simple tables fulfill their
+function.  On p. 108, for example, we have this table of plants for
+attracting bees:
+
+<table><tr><td>
+<i>Shrubs, &c.</i><br />Rosemary,<br />Broom,<br />Heath,<br />Furze,<br />Fruit-blossoms. 
+</td><td>
+<i>Flowers.</i><br />Mignonette,<br />Lemon thyme,<br />Borage,<br />White clover,<br />Bean-flowers.
+</td></tr></table>
+
+The book uses a number of ideograms that are no longer in use,
+although perhaps surprisingly, Unicode has them.  Its rendering of “%”
+uses a horizontal bar, and many recipes are given with lower-case
+j-terminated Roman numerals in scruples (written as “℈”, as in “℈iv”),
+drachms (written “ʒ”), and ounces (written “℥”).  This is explained on
+p. 561.  Thus “ʒij” means “two [troy] drachms”, which is to say, a
+quarter of a troy ounce (a quarter of “℥j”), or 7.78 g in modern
+units.
+
+### _The Mechanism of Weaving_ ###
+
+[This book was unfortunately scanned by Google][3], so the scan is of
+extremely poor quality.
+
+[3]: https://archive.org/details/mechanismweavin00foxgoog
+
+Published in London in 1894 and in New York by MacMillan.  Everything
+is Roman or italic except the word “London” on the title page, which
+is blackletter and includes many fonts, and the lettering in the
+illustrations.  Headings are all-caps, bold, centered, and at times
+with extra letter-spacing.  The table of contents uses indentation to
+show structure, with sparse dot leaders, as well as small caps for
+top-level headings; and the index, set in two columns separated by a
+vertical rule, also uses indentation to show structure.  The index has
+a blank line before each new letter.
+
+Line spacing is somewhat loose.  There are 33 lines per page.
+Paragraphs are justified and indented by about two ems, except for (at
+times) the first paragraph after a heading, whose first word is
+instead rendered with small caps.  In one unusual case on p. 250, the
+section heading begins a sentence completed in the body text; the same
+thing happens with a subsection heading on p. 311.  Paragraphs are not
+separated by extra leading.  Spacing is French, including thin spaces
+before semicolons and colons and inside double quotes.  Hyphenation is
+sparse, and word spacing is consequently somewhat uneven.
+
+The text is divided into parts, which are divided into sections, which
+contain subsections.  Any of these may begin in the middle of a page.
+Subsection headers are in small caps of the size of the body text;
+section headers are slightly larger (say 1.2× the point size), in
+caps; part headers (“PART I”) are slightly larger still (say 1.5× the
+point size of the body text), also in caps, with a bit of extra
+letter-spacing.  All three types of headings are centered and given
+extra leading, about a line’s worth; part headers have even more extra
+leading above them, maybe two lines’ worth.  Subsection headers may
+have a little extra leading above them, but perhaps only when preceded
+by a paragraph; it varies from page to page.
+
+Widows occur frequently, and on p. 56, there’s a totally avoidable
+orphan due to placing a figure between the first line of text and the
+other four lines on the page.
+
+Illustrations are numbered below in small caps (“FIG. 1”).
+Unfortunately they are rarely on the same page as the text about them,
+even though text sometimes flows around them.  Italics are used in the
+text for letters referencing figures, and mysteriously at the end of
+the preface for the word “September”, but barely used at all for
+emphasis, though occasionally for Latin phrases like *vice versa*.
+
+Illustrations contain hand-inked letters and digits which do not have
+serifs, though they are rarely monoline, so you could reasonably argue
+that this book *does* include sans-serif text.  But the first
+occurrence of a sans-serif letter in text as such is an “X” in the
+middle of p. 138 (“fulcrumed at X”), and it happens again on p. 391,
+though, as I said before, typically italic is used for this.  (Of
+course, the multiplication sign × is always monoline and never has
+serifs.)  You could argue that sans-serif is playing a role here
+similar to the role played by typewriter text in modern texts about
+programming.
+
+Tables have ruled borders, ruled column separators, and a rule between
+the headers and the table body, with rules interrupted where they
+would cross, but no ruled row separators.  They are not numbered or
+captioned.  Lining figures are used in tables and text, though page
+numbers use old-style figures.  Decimal points are vertically centered
+(“1·125”) but vulgar fractions (“1⅛”) are used more often; inversely,
+periods are used at times in formulas to indicate multiplication,
+though “×” is used more often.
+
+Tables with no rules occur occasionally as well, in the form of a
+non-indented paragraph set in smaller type with extra leading above
+and below, consisting of many nearly identical lines with the
+identical parts replaced with ditto marks (double low 9 quotation
+marks, here.)  An example is on p. 121.  In a more unusual case on
+p. 264, the table has a horizontal rule and a total placed beneath it,
+and the paragraph continues from there.
+
+In one case, a numbered list (“1.”, “2.”, “3.”) is indented by the
+same amount as a paragraph, but then a hanging indent is used so that
+later lines in the list are indented more deeply.  They have short
+vertical skips above and below them, but as with paragraphs, none
+within.  In another case (p. 275–8) the list items are paragraphs
+leading with a parenthesized number (“(1) Power consumed.”) which
+function as headings for the following paragraphs, but are not
+otherwise typographically distinguished.
+
+Formulas, when interrupting a paragraph, are set in slightly smaller
+type, but are not numbered.  Sometimes tall formulas in running text
+are accommodated with more leading.
+
+Inches are indicated by oblique double prime signs, which differ from
+the “” signs used for quotes; similarly, the prime signs used to
+indicate parts of figures are distinct from apostrophes.  Em dashes
+are used (often immediately after colons) and almost never have spaces
+around them (except once on p. 326), but en dashes are not used; on
+p. 119 and p. 167 a hyphen is instead used to indicate a range of
+years. (Conversely, on p. 247 there are spaces around two otherwise
+ordinary hyphens, and again on p. 249 and p. 260.)  The ideogram “∴”
+is used to mean “therefore”, and “a:b::c:d” is used to mean “a÷b =
+c÷d”.  Arrows are extensively fletched, but otherwise the visual
+language of the illustrations is quite modern — dashed lines indicate
+hidden lines; gears are indicated by a circle at their pitch radius
+plus dash-dot lines at their root and outermost radii; hatched
+potato-chip cutaways are used to suggest round shafts; in one place a
+line alternating short and long dashes indicates the line above a
+center of rotation; hatches up to a line suggest a solid surface.
+
+Wikipedia
+---------
+
+Wikipedia has `border-bottom: 1px solid #a2a9b1` to underline its
+`<h1>`s and `<h2>`s.  (The rule applies to other headings, but for them
+it’s overridden with a `border-bottom: 0`.)  This is not entirely
+unobtrusive, but it’s less obtrusive than horizontal rules in black
+ink typically are in books.
+
 Firefox default styles
 ----------------------
 
 Firefox’s default for body text on my laptop is 16 pixels with
-font-weight 400, for `<h1>` it's 32 pixels with font-weight 700, and
+font-weight 400, for `<h1>` it’s 32 pixels with font-weight 700, and
 for `<h2>` it’s 24 pixels with font-weight 700.
 
 As I said before, my pixels are about 161 μm, so 16 pixels is 7.3
@@ -313,7 +819,8 @@ _T<sub>E</sub>X_ is set seems more reasonable, and the 19 points to
 which I had it zoomed is eminently readable.
 
 Firefox’s default margins for `<h2>` etc. are equal on top and bottom,
-which is semantically idiotic; headers belong to the text below them,
+which is semantically wrong, though it duplicates formatting
+that is common with T<sub>E</sub>X; headings belong to the text below them,
 not the text above them.  Right now I have an `<h2>` with 29.6px
 margin-bottom and a font-size of 35.7px, and an `<h3>` with 29.4px
 margin-bottom and a font-size of 29.4px.  And the `<h1>` on top of
@@ -342,7 +849,10 @@ should be able to make a reasonable compromise and get things to fit:
 text; that works out to about 43em width, 22px body text, and 19px
 typewriter text, giving a total compression of 24.5%.
 
-That worked nicely!
+That worked nicely!  And 22 pixels (which Firefox is indeed
+interpreting as 22 of the literal screen pixels) is still only 10
+points on my screen, and I still get 25 or 30 lines in the browser
+window, so the larger size doesn’t compromise readability.
 
 Looser letter spacing
 ---------------------
@@ -358,6 +868,17 @@ readability, up to a point.
 
 I may try this with the body text: add an extra 10% letter-spacing and
 line-height and reduce the font-size by a corresponding 9.1%.
+
+As it says in _The Palmer Method_ I examined:
+
+> [S]tudents sometimes think that large figures are necessarily
+> plainer, but such is not the case.  Examine carefully the diagram.
+> At the left are figures that are absolutely plain; one could not be
+> mistaken for another, and yet their extreme size in the small spaces
+> makes them difficult to read.  At the right are the same figures, no
+> more perfect, but not so large.  Please note carefully that these,
+> surrounded by white paper, and much smaller, are more legible, even
+> at a distance, than the large figures at the left.
 
 I tried that, and also a more extreme version where I changed
 max-width from 45em to 54em, the font-size from 22px to 18.3px, the
@@ -381,9 +902,9 @@ with the size hierarchy from _The Grammar of Graphics_:
     h6 { font-size: 1em }
 
 However, because most articles only use a single `<h1>` and some
-`<h2>`s and occasionally an `<h3>`, most headers are 1.7em and 1.4em,
+`<h2>`s and occasionally an `<h3>`, most headings are 1.7em and 1.4em,
 which is a bit large.  Since I’m using a sans-serif font for all the
-headers (except `<h1>`), there’s little danger they’ll blend into the
+headings (except `<h1>`), there’s little danger they’ll blend into the
 body text in any case, so perhaps I should make the last three levels
 the same size as the body text, distinguished only with different
 typography (say, bold, roman, and italic), permitting the use of sizes
@@ -393,7 +914,7 @@ like 1.4em and 1.2em for `<h2>` and `<h3>`.
 and it only does so once; nothing used `<h6>`.)
 
 So that’s how I ended up with these somewhat less extreme font styles for
-headers:
+headings:
 
     h1 { font-size: 2em }
     h2 { font-size: 1.59em }
