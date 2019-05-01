@@ -19,8 +19,7 @@ I’ve been hacking on this thing for 23½ hours,
 which means that at this point it’s gone from an “afternoon hack”
 to a “weekend hack”, and now it’s looking kind of okay actually.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
-compressed.  So far I have stuck 90 of them in, totaling 621K and
-240,000 words.  So I
+compressed.  I
 am about three or four doublings away from finishing the job;
 the last doubling, adding 46 documents, took less than three hours, but
 the last doubling, adding 21 documents, took six hours,
@@ -30,8 +29,9 @@ the doubling (well, near tripling) before that
 took an hour, and the doubling before that took half an hour.
 Unfortunately at this point it’s taking five entire seconds to rebuild
 the HTML tree from scratch.  The
-notes are currently only a bit easier to read in this form than as plain
-text files, due to the lack of CSS and date/time metadata.
+notes are now considerably easier to read in this form than as plain
+text files, due to the substantially improved formatting, hyperlinks
+between notes, chronological organization, and tagging by topics.
 
 I may hack together some kind of web UI for adding things to the
 triple store, but so far I’ve been adding them by hand.  But now it
