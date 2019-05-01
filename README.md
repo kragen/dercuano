@@ -15,7 +15,7 @@ installed on this machine.
 Status
 ------
 
-I’ve been hacking on this thing for 20½ hours,
+I’ve been hacking on this thing for 23½ hours,
 which means that at this point it’s gone from an “afternoon hack”
 to a “weekend hack”, and now it’s looking kind of okay actually.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
@@ -55,3 +55,5 @@ Time log
 2019-04-28 13:27 to 16:24 (3 hours): add 46 more notes, bringing the total to 90  
 2019-04-28 17:25 to 19:55 (2½ hours): tweak CSS some more, add introduction to main page, add note counts and word counts  
 2019-04-28 22:13 to 22:45 (½ hour): add start and end dates to notes  
+2019-05-01 00:00 to 01:00 (1 hour): add 9 more notes, tweak CSS
+2019-05-01 10:00 to 12:00 (2 hours): add 19 more notes, change sort order, add author to pages
