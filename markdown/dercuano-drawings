@@ -72,7 +72,9 @@ running iOS support it now.  SVG is super cool; it supports
 alpha-blending, Bézier curves, gradients, arbitrary affine transforms,
 and text.  You can do a lot in very few bytes of SVG, and it’s a lot
 more readable and debuggable than PostScript, my pre-SVG favorite.
-The standard example is probably something like this 78-byte triangle:
+The standard example is probably something like this 78-byte triangle,
+which is perhaps an especially good example because it renders
+incorrectly in old versions of Firefox:
 <svg width="30" height="40">
 <path d="M 10,10 L 20,20 10,30" fill="red"/>
 </svg>
@@ -80,8 +82,76 @@ The standard example is probably something like this 78-byte triangle:
     <svg width="30" height="40"><path d="M 10,10 L 20,20 10,30"
         fill="red"/></svg>
 
-However, the standard tools for generating SVGs produce data that
-looks more like this:
+#### An example diagram in handwritten SVG ####
+
+And I *have* used SVG for diagrams, for example in file
+`mechano-optical-vector-display`:
+
+<div><svg width="128" height="128"><!-- This is a diagram. -->
+<use xlink:href="#burst" transform="translate(128 60.24)" />
+<path class="beam" d="M128,60.24 L60,60.24 l-121.1,-992.5" />
+<path class="mirror" d="M90.51,128 A90.51,90.51 0 0,0 0,37.49 v90.51" />
+<path class="arrow" d="M20,57.49 a70.51,70.51 0 0 1 50.51,50.51" />
+</svg>
+<!-- SVG for definitions of common things used in embedded SVGs. -->
+<svg><defs>
+<marker id="v" overflow="visible" orient="auto">
+  <path d="M-8,-4 0,0 -8,4" />
+</marker>
+<marker id="vv" overflow="visible" orient="auto">
+  <path d="M-8,-4 0,0 -8,4 M4,-5 12,0 4,5" />
+</marker>
+<symbol id="burst" overflow="visible">
+<path d="M0,0 l-16,-16 16,16  -16,16 16,-16  -16,-8 16,8
+         -16,8 16,-8  -8,-16 8,16  -8,16 8,-16" class="beam" />
+</symbol>
+</defs></svg>
+<style>
+path { stroke: black; stroke-width: .5px; fill: none }
+.beam { stroke: red }
+.mirror { stroke-width: 0; fill: #ccc }
+.arrow { marker-end: url(#v); marker-start: url(#vv) }
+</style>
+</div>
+
+The source code for that looks like this, which is somewhat verbose
+but arguably not unreasonably so.
+
+    <div><svg width="128" height="128"><!-- This is a diagram. -->
+    <use xlink:href="#burst" transform="translate(128 60.24)" />
+    <path class="beam" d="M128,60.24 L60,60.24 l-121.1,-992.5" />
+    <path class="mirror" d="M90.51,128 A90.51,90.51 0 0,0 0,37.49 v90.51" />
+    <path class="arrow" d="M20,57.49 a70.51,70.51 0 0 1 50.51,50.51" />
+    </svg>
+    <!-- SVG for definitions of common things used in embedded SVGs. -->
+    <svg><defs>
+    <marker id="v" overflow="visible" orient="auto">
+      <path d="M-8,-4 0,0 -8,4" />
+    </marker>
+    <marker id="vv" overflow="visible" orient="auto">
+      <path d="M-8,-4 0,0 -8,4 M4,-5 12,0 4,5" />
+    </marker>
+    <symbol id="burst" overflow="visible">
+    <path d="M0,0 l-16,-16 16,16  -16,16 16,-16  -16,-8 16,8
+             -16,8 16,-8  -8,-16 8,16  -8,16 8,-16" class="beam" />
+    </symbol>
+    </defs></svg>
+    <style>
+    path { stroke: black; stroke-width: .5px; fill: none }
+    .beam { stroke: red }
+    .mirror { stroke-width: 0; fill: #ccc }
+    .arrow { marker-end: url(#v); marker-start: url(#vv) }
+    </style>
+    </div>
+
+However, you can probably kind of tell from reading that that it was
+pretty slow to write, and from looking at it that the workflow doesn’t
+really support rapid iteration to get it to look good.
+
+#### WYSIWYG SVG editors produce insanely bloated output ####
+
+On the other hand, the standard tools for generating SVGs produce data
+that looks more like this:
 
     <path d="M 21.789062 16.140625 L 20.332031 15.941406
              L 20.335938 15.742188 L 20.371094 15.53125
@@ -120,6 +190,8 @@ like this (line breaks added for clarity):
 That is, Inkscape has converted my three-significant-figure mouse
 coordinates into coordinates with seven to nine significant figures.
 Just in case.  How helpful.
+
+#### Why this is too much bloat for Dercuano to tolerate ####
 
 The trouble with this is that 15.6 compressed kilobytes per 110
 seconds is 1.1 kilobit per second, and the entire five-megabyte target
