@@ -265,8 +265,19 @@ class Note:
                                  for category in categories]))
                          if categories else [])
 
-        date = ley(div(self.date_string(), **{'class': "metadata"}))
-        return html.replace('</h1>', '</h1>' + date)
+        subtitle = ley(div(self.author(), ', ', self.date_string(),
+                           **{'class': "metadata"}))
+        return html.replace('</h1>', '</h1>' + subtitle)
+
+    def author(self):
+        for subj, verb, obj in self.bundle.triples():
+            if subj == self.notename and verb == 'note-by':
+                return obj
+        for subj, verb, obj in self.bundle.triples():
+            if subj == 'dercuano' and verb == 'by':
+                return obj
+
+        return 'Anonymous'
 
     def categories(self):
         return self.category_set
