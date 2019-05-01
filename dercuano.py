@@ -334,8 +334,11 @@ def category_html(bundle, category_name):
                     h1('Notes concerning “', category_title, '”'),
                     ul([li(note.link_ley(), note.extra_ley(), "\n")
                         for note in sorted(bundle.notes_in_category(category_name),
-                                           key=word_count)
+                                           key=note_date)
                         ])))
+
+def note_date(note):
+    return note.date_string()
 
 def index_html(bundle):
     categories = sorted(bundle.categories())
@@ -346,7 +349,7 @@ def index_html(bundle):
                     bundle.get_intro(),
                     h2('Notes'),
                     ul([li(note.link_ley(level=0), note.extra_ley(), "\n")
-                        for note in sorted(bundle.notes(), key=word_count)]),
+                        for note in sorted(bundle.notes(), key=note_date)]),
                     div(h2('Topics'),
                         ul([li(bundle.category_link(category, level=0),
                                " (%d notes)" % bundle.category_size(category),
