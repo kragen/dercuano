@@ -1,0 +1,535 @@
+A mechano-optical vector display for animation archival
+=======================================================
+
+*DRAFT*
+
+I was sitting in Christmas Mass, sweating in midsummer, and the
+reflection of the lights off the oscillating fans pointed out to me
+the immense unrealized potential for mechano-optical laser displays,
+like the kind we used for psychedelic light shows back in my childhood.
+In particular, we can use them for archival of moving pictures.
+
+However, it looks like opacity holograms will continue to be more
+practical and have comparable information density.
+
+Reflecting a laser to a desired point on the wall
+-------------------------------------------------
+
+<div><svg width="128" height="128"><!-- This is a diagram. -->
+<use xlink:href="#burst" transform="translate(128 60.24)" />
+<path class="beam" d="M128,60.24 L60,60.24 l-121.1,-992.5" />
+<path class="mirror" d="M90.51,128 A90.51,90.51 0 0,0 0,37.49 v90.51" />
+<path class="arrow" d="M20,57.49 a70.51,70.51 0 0 1 50.51,50.51" />
+</svg></div>
+
+Point a laser pointer obliquely at a mirror-surfaced cylinder rotating
+around its axis.  The laser pointer bounces off the cylinder and makes
+a spot on the wall, at an angle that depends on its angle to the
+surface; because the surface is curved, it diverges a bit in the plane
+perpendicular to the cylinder's axis.  It doesn't move as the cylinder
+rotates.
+
+Now suppose we cut a flat mirror-finish facet into the cylinder,
+parallel to the axis, such that it will rotate into the beam at some
+point.  When this happens, the spot on the wall will jump to a new
+position as the surface under the beam abruptly changes angle; then,
+as the cylinder continues rotating, the rotation of that surface will
+move the spot perpendicular to the cylinder's axis; and finally, when
+the beam runs off the other edge of the facet, the spot will jump back
+to where it was originally.
+
+<div><svg width="128" height="32"><!-- diagram of dash on wall -->
+<rect fill="black" x="0" y="0" width="128" height="32" />
+<path class="beam" opacity=".3" d="M32,16 96,16" />
+<path class="beam" d="M63,16 65,16" />
+</svg></div>
+
+If we rotate the cylinder fast enough
+that the motion isn't visible, it will draw a short dash on the wall
+around the point where the beam normally ends up.
+
+The angle subtended by the dash, as seen from the center of the
+cylinder, is exactly twice the angle subtended by the facet.
+
+If the facet, instead of being flat, describes a logarithmic spiral
+centered at the center of the cylinder, then instead of a dash, we
+will just be drawing another point on the wall.
+
+If, instead of making it a spiral, we angle the facet so that it's not
+flat and parallel to the axis of the cylinder, but conical instead, we
+can displace the point parallel to the axis as well.
+
+By combining conicality and spirality, we can place the point anywhere
+on the wall.
+
+From here on, I'm going to use "up" and "down" to mean the directions
+on the wall parallel to the cylinder's axis, "right" to mean the
+direction in which the point reflected from a flat axis-parallel facet
+would be moving, and "left" to mean its opposite.
+
+If a facet, rather than being perfectly flat, is slightly concave, we
+can focus the initially-collimated beam to a smaller point on the
+wall, if we know the focal distance to the wall, so that the point can
+be smaller than the illuminated part of the facet.  This actually
+isn't going to be useful for the rest of what I'm discussing here.
+
+Animations by scanning the beam over the medium's surface
+---------------------------------------------------------
+
+By forming a series of many such facets on the circle that the beam
+describes on the surface of the cylinder, we can draw many points on
+the wall in quick succession, forming an arbitrary image --- indeed,
+one that changes over time.  If the facets are smaller than the spot
+on the cylinder illuminated by the beam, several of them will be
+illuminated simultaneously, and indeed we can run several parallel
+tracks of them.  Smaller facets allow us to program a larger number of
+points.
+
+Fresnel reflectors allow you to keep surface nonflatness to small scales
+------------------------------------------------------------------------
+
+There isn't a guarantee that the facets will form an approximately
+cylindrical shape if we put them edge to edge.  Consider, for example,
+the case where the animation is just a single stationary point to the
+left of center; your shape is a logarithmic spiral.  And, of course
+when one point is significantly above or below its predecessor, there
+is a gap between the facets, which must be bridged in some fashion.
+You can do this Fresnel-lens-style by introducing discontinuities in
+the surface that won't be illuminated, so that the aforementioned
+single-point-left-of-center has the shape of a circular-saw blade
+rather than a continuous spiral.
+
+If you bias the image to be in one particular direction from the
+centerline, such that an unbroken surface encoding it would be roughly
+a logarithmic spiral expanding as it rotates, you can ensure that the
+discontinuities introduced by the Fresnel-reflector operation are
+never illuminated, so you don't lose any light to them.
+
+Edges of facets will tend to diffract: a planar wavefront reflected
+from the center of a flat facet will be reflected as a planar
+wavefront, but the part that reflects from the edge of that flat facet
+will form cylindrical wavefronts spreading out from the edge.  If the
+facet is very large compared to the wavelength of light, the
+diffraction from the edges will not be significant, but if it is
+small, a significant amount of incident light will end up reflected as
+stray light by this mechanism.  Worse, if these edges occur at regular
+intervals (like the sawblade shape mentioned previously) the
+diffracted light will form planar wavefronts going in other
+directions, but divided up by color, like any other diffraction
+grating.  It's possible that you could use this mechanism to get an
+arbitrary color picture from a white light source, but I'm not sure
+you have enough degrees of freedom; alternatively, randomizing the
+discontinuities should break up such patterns and result in the stray
+light being just a generalized wash.
+
+Diffraction-limited microradian pixel density is around one frame per 4 sq mm 
+-----------------------------------------------------------------------------
+
+<div class="fig" style="max-width: 192px">
+<a href="https://commons.wikimedia.org/wiki/File:Airy-pattern.svg"
+>&lt;img width="192"
+src="https://upload.wikimedia.org/wikipedia/commons/1/14/Airy-pattern.svg"
+></a>
+Public-domain Airy disk image by :en:Sakurambo.
+</div>
+
+Also, though, the divergence of the reflected beam is
+diffraction-limited: a small facet is like a small aperture, and so you end up
+with the projected point being an [Airy disk][1].  This is what imposes the
+information capacity limit on this medium: if you try to light up more
+pixels by making smaller facets, you have more stray light and you
+unavoidably light them up with bigger spots.
+
+[1]: https://en.wikipedia.org/wiki/Airy_disk
+
+So how many pixels can you have?
+
+This depends on the Airy limit.
+Suppose we use 600nm as our relevant wavelength,
+which is a slightly orangish yellow and very nearly as sensitive as
+our daytime [spectral sensitivity][2] peak of 555nm.
+
+[2]: https://en.wikipedia.org/wiki/Spectral_sensitivity
+
+So how far off the center axis
+of a facet at right angles to the light source do you have to go
+before the far edge of the facet is a whole wavelength further from
+you than the near edge, so that you're in the first null?
+Consider if we try to make our pixel facets 20μm across.
+The sine of
+that angle is 600nm / 20 microns, or about 1/32 to 1/40, so it turns
+out it's about 1.4 to 1.8 degrees --- and the whole bright beam
+reflected from that facet, inside that first null, is therefore a cone
+of 2.8 to 3.6 degrees.  (1.22 λ/d is the Airy formula typically given
+for a round aperture, which is a little smaller than the 2 λ/d I'm
+using here.)
+
+<div class="fig" style="max-width:256px">
+<a
+href="https://commons.wikimedia.org/wiki/File:Airy_disk_created_by_laser_beam_through_pinhole.jpg"
+>&lt;img
+src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Airy_disk_created_by_laser_beam_through_pinhole.jpg/240px-Airy_disk_created_by_laser_beam_through_pinhole.jpg"
+></a>
+Public-domain laser diffraction Airy disk photo by :en:Anaqreon.
+</div>
+
+To put that in more normal terms, a visible-wavelength light beam
+passing through a 20-micron aperture will be diffracted into a cone
+with about 3 or 4 degrees of divergence.
+
+(To see if I was smoking crack here,
+I checked [the Wikipedia article on "beam divergence"][0].  It says,
+"Gaussian laser beams are said to be diffraction-limited when their
+radial beam divergence [half the cone angle] is close to the minimal
+possible value, given by θ = λ/πw, where λ
+is the laser wavelength and w is the radius of the beam at its
+narrowest point, which is called the 'beam waist'."  In this case,
+λ/w is about 1/16 to 1/20, so our divergence in radians
+should be a πth of that, which is only slightly narrower than the
+answer I got above, and the difference may depend on where you set
+your cutoff.)
+
+[0]: https://en.wikipedia.org/wiki/Beam_divergence
+
+This stands in sharp contrast to what we normally expect from, say, a
+megapixel display, which is pixels of something like 2 arcminutes,
+0.03 degrees, two orders of magnitude better.  You can improve things
+by putting the projector closer to the wall than your eye is, but
+you're still only going to get reasonable resolution over about one
+radian in each dimension, before things start to kind of sketch out
+around the edges due to the super oblique angles.
+
+If you want to get megapixel-sharpness images out of this thing,
+you're going to have to use bigger facets so that you can get
+milliradian-level resolution.  So you can't get 2500 pixels per square
+millimeter in a useful way.
+
+You can use curved facets if your image is made out of lines; the
+curvature is equivalent to a bunch of facets that are very narrow in
+one dimension, and so scatter the light more in that direction, along
+the line of light, at right angles to the long skinny facet.
+
+A mixed model may provide the best information density: use small
+facets toward the center of the beam to direct the overall brightness
+of a scene to the right places (with necessarily high divergence) and
+larger or curved facets, perhaps in the dimmer outer parts of the
+beam, to draw outlines with milliradian-resolution definition.  Such a
+facet might be 10 microns by 1mm, diffracting the incident beam into a
+line about 100 milliradians by 1 milliradian, in some arbitrary
+orientation, placed in some arbitrary place on the screen.  You have
+space for, say, 75 such lines in a square millimeter, with another 400
+facets in the range of 24 microns across, each directing some
+brightness onto an area something like 30 milliradians in size.  1-4
+square millimeters should be enough to encode a "frame" of video, and
+getting a spot of light down to 1-4 millimeters is easily feasible.
+It isn't necessary to get it *up* to 1-4 millimeters, because instead
+of using a diffuse spot, you can just scan the spot quickly over a
+long distance of the surface.
+
+This means that a second of animation is something like 100 square
+millimeters, or a square centimeter, of reflective medium.
+
+There's an additional degradation of resolution in the left-right
+direction caused by the beam striking the reflected medium being of
+nonzero size and the medium rotating through it, but I don't think
+that's important for two reasons. First, there's no fundamental
+obstacle stopping you from making that beam be however small you
+decide to make your individual facets; second, you can diminish that
+rotation arbitrarily by using arbitrarily large cylinders, or even
+using a flexible cylinder that you depress to be locally flat so that
+its movement under the beam is purely translational, or rotational
+around its focal point on the wall.  If you don't take such measures,
+though, a 1mm-diameter beam illuminates about 1/50 radian on a
+10cm-diameter cylinder, so you get a left-right smearing of about 1/25
+radian from the rotation.
+
+As a point of comparison, [fancy professional laser shows often use
+galvanometer-driven mirrors capable of 25000 points per
+second](https://www.youtube.com/watch?v=sJl2pkiALaE), and what I've
+proposed above (475 "points" per square millimeter and 100 square
+millimeters per second) is about 47500 points per second; so this is
+clearly capable of producing visually arresting animations.
+
+Solar illumination instead of using a laser
+-------------------------------------------
+
+If we don't have a laser pointer, we can use a sunbeam through a hole
+the size of the desired beam.  The divergence of the beam, and thus
+the resolution of the projected image, will be limited by the angular
+size of the sun in the sky, about half a degree.  This resolution can
+be improved substantially, at the cost of brightness, by putting a
+pinhole between the hole and the sun, blotting out most of the sun's
+disk.  If the pinhole is fairly near, that will introduce substantial
+nonplanarity in the light wavefront, which will change the effective
+focal length of concave facets.
+
+A milliradian-sized pinhole to blot out most of the sun will blot out
+about 74/75 of it, reducing the illuminance available to light the
+image by about 20dB, down from, say, 100 kilolux down to, say, 1000
+lux at the point where the beam hits the facets, so the illuminance on
+the screen will be something like 1 lux, if it's being spread out over
+a screen area around 1000 times the size of the illuminated area on
+the facets.  This probably means that such an animation will require a
+dark room for viewing by sunlight at full resolution without
+concentrating the sunlight using some kind of nonimaging optics.
+
+(Of course, if you just illuminate it with direct sunlight, you'll get
+the image anyway, just blurred by convolution with the sun's disk.)
+
+Non-cylindrical media
+---------------------
+
+So far I've been talking about cylinders, but all of this continues to
+work just as well for animation if we're talking about a disc, too, or
+even just a flat sheet.  Any illuminated circle on the surface
+corresponds to some image; as the circle shrinks, it will include
+images from fewer and fewer physically adjacent frames of video until
+it starts including only certain drawing elements of a single frame;
+and any path the circle takes over the surface will produce an
+animation.  Purely translational motion also eliminates the rotational
+left-right intraframe smearing mentioned in an earlier section, which
+can easily reach tens of milliradians.
+
+Low-resolution text
+-------------------
+
+Suppose that, instead of shooting for milliradian-resolution line
+drawings, you just want to put an animation of readable text onto your
+surface.  Maybe you only need to be able to display a word or two at a
+time, or even a letter.  Does this help?  Remember, before, we were
+looking at something like only 100 vectors per square millimeter,
+because of milliradian-level sharpness requirements at visible
+wavelengths.
+
+How many vectors do you need per letter?
+
+<div class="fig">
+<a href="http://canonical.org/~kragen/bible-columns.png"
+>&lt;img src="http://canonical.org/~kragen/bible-cropped.png"
+></a>
+</div>
+
+I designed a 6-pixel-tall proportional pixel font a while back, with
+the objective of conserving text with laser-printed microscopic
+letters on paper, which encoded my 4.45-megabyte test Bible in
+4866x19254, or 21 black-and-white pixels per letter, which means that
+each letter averages 3.5 pixels wide, including the space needed
+between the letters to make the text readable.  It's black on white,
+and it's about 29% black, so that's about 6.1 black pixels per letter.
+Based on that, let's figure that we probably need about 4 vectors per
+letter and a resolution of about 0.05 radians.
+
+Well, this lets us use the originally-hoped-for 20-micron-wide facets,
+which do in fact give us about 0.05-radian resolution.  For lines,
+again, we can use narrow facets that diffract light into a streak in
+the desired direction, so that they actually take up *less* space.
+For example, a lowercase "i" might require a full 20-micron-square
+facet for the dot, but only a 20-micron-wide by 6-micron-tall facet
+for the vertical line beneath it.
+
+If we figure that the average facet is then half of that
+20-micron-square configuration, then we can get about 5000 vectors per
+square millimeter, or 1250 letters.  That is similar to my
+laser-printed microprint approach, which at 1200dpi only gets 2232
+pixels per square millimeter, which works out to about 1100 letters;
+but it doesn't need a microscope to read it.  (A laser-printed 1200dpi
+pixel is about 20 microns in size, so this comparability is not
+totally surprising.)
+
+Now, though, we run into a different problem.  An average word might
+need only about 20 vectors to display it, but it's going to be
+projected over 0.3 by 0.9 radians, which means that you only have room
+for about three or four words to be displayed at a time.  But that's
+60-80 vectors, which fit into a 200-micron-square area.  Maybe you can
+get a laser pointer down to 200 microns square, but getting a sunbeam
+that small is hard.
+
+If, instead, we figure that we need something more like 0.015-radian
+resolution, and thus our facets need to be 60 microns across when
+they're full points, we can fit 30 or 40 words onto the screen at a
+time.  But now we only have about 500 vectors per square millimeter,
+which is also about 40 words.  40 words per square millimeter is
+somewhat inferior to microfilm, but dramatically higher than
+traditional printing's 0.014 words per square millimeter.
+
+It's probably best to organize the words such that they "scroll"
+around the screen like the words in an old ytalk session: rather than
+attempting to move old words, after filling up the last line, you wrap
+around to the top and put new words on the top line.  If your spot of
+light is too small, you'll have less than a 30-40-word screenful of
+text visible, while if it's too large, you'll have new words
+overlapping old words, maybe several screensful.  Ideally, as you scan
+your light beam over the text, new words fade in shortly after old
+words fade out.  You can display some kind of position indicator in
+some fixed part of the screen; it can be quite a long streak, so it
+can use up very little space on the medium.
+
+Solar sundials
+--------------
+
+You can use this technique to make a super awesome solar sundial which
+not only projects the time, to the minute, onto the wall, but also
+tells you what day of the year it is, although typically you'll have
+two choices for that.
+
+Fabrication techniques
+----------------------
+
+How would you go about fabricating such a demandingly-shaped
+reflector?  If it's a one-off, I think you can probably use
+electrochemical machining, which is sort of the opposite of
+electroplating --- you make your workpiece the anode, pumping
+electrons out of it, which it then hungrily obtains from negative ions
+floating around in water, which then combine with metal atoms from the
+surface; you limit the current flow to a tiny part of its surface area
+by moving the cathode around very close to it; and you wash away the
+electrolyte rapidly enough to prevent the metal ions from the anode
+from being reduced onto the cathode.  Due to anodic leveling, it
+produces a mirrorlike finish.
+
+You probably want to use a sort of rake-shaped cathode to produce the
+desired surface complexity, dragging many wire points over the
+surface, each with its height controlled separately to within a
+fraction of a micron, say, 50 nanometers.  They should probably be
+spaced something like 10 microns apart, 100 of them to a millimeter.
+Each one will tend to cut out a spherical shell into the metal around
+it, cutting a cylindrical trench through the metal as it moves.  We
+want to keep the deviation from the desired shape of the metal down
+below, say, 100 nanometers, to avoid fucking up the light wavefront
+too much, and there's 5 microns from the center to the edge of the
+trench; acos(1 - (100nm/5 microns)) = 0.2 radians, so we want those
+wire points to be carving out 25-micron-radius spheres.  That's going
+to make it a little tricky to control the angles of 10-micron-wide
+facets, but I think it's doable.
+
+A 25-micron inter-electrode gap is smaller than is typical for
+electrochemical machining, but not outrageously so; 80 to 800 microns
+is typical.  Some "pECM" processes use an inter-electrode gap of as
+little as 10 microns, along with vibrating electrodes and pulsed
+current.
+
+We can do a little electropolishing afterwards to try to anodically
+smooth the surface, but we'd like to be removing very little material.
+Electropolishing is also going to round off the Fresnel-reflector
+knife edges and result in more stray light.
+
+How much overall material do we need to remove?
+
+Suppose our facets have angles varying over more or less a quarter of
+a radian in every direction from the overall surface, and that we can
+generally choose to alternate them to minimize discontinuities.  In
+the above, the biggest facets were up to a millimeter in size.  If
+we're cutting millimeter-sized facets at a quarter-radian from
+horizontal, we have to cut up to a quarter-millimeter deep!  On
+average, we might be removing 100 microns of the surface of the
+material, 100 milliliters per square meter, or 0.01 milliliters per
+square centimeter.
+
+If we're doing this in aluminum (which may not be the highest-quality
+choice, but millimeter-thick gold is expensive) that's 27 milligrams
+per square centimeter.  Aluminum is conveniently 27 grams per mole, so
+that's a millimole per square centimeter.  We have to pump off three
+electrons from each aluminum atom in order to turn it into aluminum
+chloride, so we need three millimoles of electrons per square
+centimeter.  A coulomb is only 6.2e18 electrons, while a millimole is
+6.0e20, so that's 97 coulombs per square centimeter, plus whatever
+gets wasted in electrolyzing the water; at 1 ampere, that's about a
+minute and a half per square centimeter, or 280 micrograms per second.
+
+Some random paper about the material removal rate of electrochemical
+machining (Sudiarso, Latifah, Ramdhani, and Mahardika 2013) says that
+at 0.6 to 1.09 amps on aluminum 1100 with a 2-mm-diameter brass
+cathode, at 15 volts, they were able to remove 79 micrograms of
+aluminum per second.  That's a factor of almost four less efficient
+than the calculation I pulled out of my ass above, which is far more
+accurate than that calculation had any damned right to be.
+
+That also works out to be about (79 micrograms/sec) / (0.8 amps * 15
+volts) = 6 or 7 micrograms of aluminum removed per joule.  27
+milligrams per square centimeter is then 4 kJ/cm^2.  This is a very
+small amount of energy.
+
+How can you control the position of 100 metal points per millimeter to
+within 50 nanometers, with a total range of vertical motion of 250
+microns (5000 times the resolution)?  This seems very challenging
+indeed.  The most promising approach would seem to be using a small
+number of points, such as 10 to 30, with a separate piezoelectric
+actuator for each one; a small hydraulic actuator might also work.
+
+I conclude that it's probably feasible to do electrochemical machining
+of these surfaces, but it requires making some advances in
+electrochemical machining.
+
+Electrical discharge machining (EDM) is reportedly somewhat more
+advanced than ECM and can typically produce even better surface
+finishes, but it doesn't seem like it is applicable to this process,
+because it consumes its electrodes.  Wire EDM is a common process,
+using a consumable wire electrode, but it runs the wire through the
+workpiece and then discards it; so it can't be used to make concave
+shapes.  Perhaps it might be possible to perform a kind of wire EDM
+that consumes the end of the wire, completely, rather than merely
+spark-eroding the side of the wire somewhat.
+
+It might make more sense to press or stamp the facets into the surface
+using a hard tool, one press per facet, particularly if you're using a
+soft metal like aluminum or gold.  You need five degrees of freedom
+(two to control the reflection angle of the facet) with 10-micron
+positioning precision, and, in the Z-axis, enough force to stamp
+plastically 125 microns deep into the surface.
+
+For reproduction, there are existing models of mass-production of
+reflective metallized surfaces with micron-level detail, specifically
+for diffraction gratings.  Master gratings are cut into glass on a
+ruling engine at the Grating Lab in upstate New York, which has three
+ruling engines, one made by the hands of Michelson himself; and then
+casts are taken in plastic from the glass, and then other casts from
+the casts, and so on.  Each grating can only withstand a few casting
+operations, perhaps five or ten, before being damaged enough to
+degrade its quality, but you can make several generations of them,
+which is sufficient to supply the world demand for lab-quality
+diffraction gratings.  The final gratings are metallized, typically by
+vacuum deposition of aluminum.
+
+Exactly the same process would work for these animations, although the
+particular resin and hardening process used for the gratings seems to
+be a secret.
+
+&lt;link rel="stylesheet" href="http://canonical.org/~kragen/style.css" />
+
+<style>
+/* p { max-width: 40em }
+svg, .fig { float: right; clear: right; padding: 0.5em; margin-right: -7.48em }
+*/
+.fig a { display: block }
+.fig { font-size: smaller; color: #666 }
+path { stroke: black; stroke-width: .5px; fill: none }
+.beam { stroke: red }
+.mirror { stroke-width: 0; fill: #ccc }
+.arrow { marker-end: url(#v); marker-start: url(#vv) }
+</style>
+
+<!-- SVG for definitions of common things used in embedded SVGs. -->
+<svg><defs>
+<marker id="v" overflow="visible" orient="auto">
+  <path d="M-8,-4 0,0 -8,4" />
+</marker>
+<marker id="vv" overflow="visible" orient="auto">
+  <path d="M-8,-4 0,0 -8,4 M4,-5 12,0 4,5" />
+</marker>
+<symbol id="burst" overflow="visible">
+<path d="M0,0 l-16,-16 16,16  -16,16 16,-16  -16,-8 16,8
+         -16,8 16,-8  -8,-16 8,16  -8,16 8,-16" class="beam" />
+</symbol>
+</defs></svg>
+
+<!--
+SVG URLs:
+http://tutorials.jenkov.com/svg/path-element.html
+http://wphooper.com/svg/examples/markers.php
+http://www.w3.org/TR/SVG/painting.html#Markers
+https://developer.mozilla.org/en-US/docs/Web/SVG/Element/marker
+http://www.w3.org/TR/SVG/painting.html
+https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths
+http://www.w3.org/TR/SVG/paths.html
+http://blag.oztechninja.com/post/25724196581/pretty-arrowheads-are-pretty
+-->

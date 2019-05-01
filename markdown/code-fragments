@@ -1,0 +1,1043 @@
+I’ve been thinking about code size, bytecode formats, and so on: what
+kind of tradeoffs in program representation are best?  Existing
+microbenchmarks tend to be very atypical of real code; real code is
+mostly much more straightforward and boring than microbenchmarks.
+
+So here are some sample code fragments to try different compilation
+strategies with (after hand-translating them to some uniform syntax, I
+suppose).  These are chosen to cover the range of real code found in
+the wild, although they are biased towards code bases of high quality
+and towards medium-length functions: functions between 8 and 64 lines
+are better represented.  There is code here in Pascal, C, C++, C#,
+Java, Golang, Perl, Tcl, Python, PHP, JS, Lua, Elisp, Ruby, Haskell,
+R, and Visual Basic — every popular programming language except Excel,
+Swift, assembly, SQL, and Matlab.  The idea here is to include things
+written in somewhat different paradigms.
+
+I thought about including code in bash, TeX, assembly, SQL, CSS,
+Prolog, and HTML, but their execution models are too different from
+the mainstream to be reasonably translatable to a mainstream virtual
+machine.  Even R and Haskell are kind of pushing it.
+
+The classic dumb Fibonacci, in C:
+
+    fib(n) { return n < 2 ? 1 : fib(n-1) + fib(n-2); }
+
+A nearly totally vacuous class definition:
+
+    class Match:
+        def __init__(self, length, rendering):
+            self.length = length
+            self.rendering = rendering
+
+A test of the mod_pubsub JS interface, some code I think I wrote in
+2000, unless it was Ben or Rohit:
+
+    function do_it()
+    {
+        var topic = kn_argv['kn_topic'];
+        kn_publish(topic, {}, { onSuccess: function(e) {succeed()},
+                                onError: function(e) {fail(e.kn_payload)} });
+    }
+
+Part of the Perl abstract base class DBD::File:
+
+    sub table_meta_attr_changed
+    {
+        my ($class, $meta, $attrib, $value) = @_;
+        defined $reset_on_modify{$attrib} and
+            delete $meta->{$reset_on_modify{$attrib}} and
+            $meta->{initialized} = 0;
+        } # table_meta_attr_changed
+
+The Lua code in LuaTeX for computing the full platform string on
+Linux:
+
+    function os.resolvers.platform(t,k)
+        local platform = "linux"
+        os.setenv("MTX_PLATFORM",platform)
+        os.platform = platform
+        return platform
+    end
+
+A byteswapping function by Jon Lech Johansen in C#:
+
+    byte [] NetToHost( byte [] Input, int Pos, int Count )
+    {
+        if( BitConverter.IsLittleEndian )
+        {
+            for( int i = 0; i < Count; i++ )
+            {
+                Array.Reverse( Input, Pos + (i * 4), 4 );
+            }
+        }
+
+        return Input;
+    }
+
+In GNU `cp`, some slight options parsing hackery:
+
+    /* For long options that have no equivalent short option, use a
+       non-character as a pseudo short option, starting with CHAR_MAX + 1.  */
+    enum
+    {
+      ATTRIBUTES_ONLY_OPTION = CHAR_MAX + 1,
+      COPY_CONTENTS_OPTION,
+      NO_PRESERVE_ATTRIBUTES_OPTION,
+      PARENTS_OPTION,
+      PRESERVE_ATTRIBUTES_OPTION,
+      REFLINK_OPTION,
+      SPARSE_OPTION,
+      STRIP_TRAILING_SLASHES_OPTION,
+      UNLINK_DEST_BEFORE_OPENING
+    };
+
+
+A function from netqmail to downcase a NUL-terminated string:
+
+    #include "case.h"
+
+    void case_lowers(s)
+    char *s;
+    {
+      unsigned char x;
+      while (x = *s) {
+        x -= 'A';
+        if (x <= 'Z' - 'A') *s = x + 'a';
+        ++s;
+      }
+    }
+
+Part of Jon Lech Johansen’s DeDRMS utility in C#:
+
+    class M4PStream
+    {
+        // ...
+        public M4PStream( FileStream fs )
+        {
+            br = new BinaryReader( fs );
+            bw = new BinaryWriter( fs );
+            sbuffer = br.ReadBytes( Convert.ToInt32( fs.Length ) );
+
+            alg = Rijndael.Create();
+            alg.Mode = CipherMode.CBC;
+            alg.Padding = PaddingMode.None;
+        }
+        // ...
+    }
+
+A function from the Nouveau video driver in the Linux kernel:
+
+    u16
+    nvbios_cstepEe(struct nvkm_bios *bios, int idx, u8 *ver, u8 *hdr)
+    {
+            u8  cnt, len, xnr, xsz;
+            u16 data = nvbios_cstepTe(bios, ver, hdr, &cnt, &len, &xnr, &xsz);
+            if (data && idx < cnt) {
+                    data = data + *hdr + (idx * len);
+                    *hdr = len;
+                    return data;
+            }
+            return 0x0000;
+    }
+
+Part of the Elisp code for Flymake, which gives you on-the-fly error
+checking in Emacs, in this case converting between a couple of
+slightly different data formats in order to pop up a list of suggested
+corrections when you click on an error:
+
+    (defun flymake-make-emacs-menu (menu-data)
+      "Return a menu specifier using MENU-DATA.
+    MENU-DATA is a list of error and warning messages returned by
+    `flymake-make-err-menu-data'.
+    See `x-popup-menu' for the menu specifier format."
+      (let* ((menu-title     (nth 0 menu-data))
+             (menu-items     (nth 1 menu-data))
+             (menu-commands  (mapcar (lambda (foo)
+                                       (cons (nth 0 foo) (nth 1 foo)))
+                                     menu-items)))
+        (list menu-title (cons "" menu-commands))))
+
+The SafeBuffer indexing method from Ruby ActiveSupport:
+
+    def [](*args)
+      return super if args.size < 2
+
+      if html_safe?
+        new_safe_buffer = super
+        new_safe_buffer.instance_eval { @html_safe = true }
+        new_safe_buffer
+      else
+        to_str[*args]
+      end
+    end
+
+A function from the Linux network scheduling code:
+
+    static int ingress_dump(struct Qdisc *sch, struct sk_buff *skb)
+    {
+            struct nlattr *nest;
+
+            nest = nla_nest_start(skb, TCA_OPTIONS);
+            if (nest == NULL)
+                    goto nla_put_failure;
+
+            return nla_nest_end(skb, nest);
+
+    nla_put_failure:
+            nla_nest_cancel(skb, nest);
+            return -1;
+    }
+
+A function from Godoc, the Golang documentation extractor:
+
+    func findSpec(list []ast.Spec, id *ast.Ident) ast.Spec {
+            for _, spec := range list {
+                    switch s := spec.(type) {
+                    case *ast.ImportSpec:
+                            if s.Name == id {
+                                    return s
+                            }
+                    case *ast.ValueSpec:
+                            for _, n := range s.Names {
+                                    if n == id {
+                                            return s
+                                    }
+                            }
+                    case *ast.TypeSpec:
+                            if s.Name == id {
+                                    return s
+                            }
+                    }
+            }
+            return nil
+    }
+
+Part of the GNU ISO C++ library implementing the thin_heap type:
+
+    PB_DS_CLASS_T_DEC
+    inline void
+    PB_DS_CLASS_C_DEC::
+    fix_sibling_rank_1_unmarked(node_pointer p_y)
+    {
+      _GLIBCXX_DEBUG_ASSERT(p_y->m_p_prev_or_parent != 0);
+
+      _GLIBCXX_DEBUG_ONLY(node_pointer p_w = p_y->m_p_l_child;)
+      _GLIBCXX_DEBUG_ASSERT(p_w != 0);
+      _GLIBCXX_DEBUG_ASSERT(p_w->m_p_next_sibling == 0);
+      _GLIBCXX_DEBUG_ASSERT(p_y->m_p_next_sibling == 0);
+
+      p_y->m_p_next_sibling = p_y->m_p_l_child;
+      p_y->m_p_next_sibling->m_p_prev_or_parent = p_y;
+      p_y->m_p_l_child = 0;
+      PB_DS_ASSERT_NODE_CONSISTENT(p_y, false)
+    }
+
+Part of the tests for d3.js:
+
+    "can output a percentage with rounding and sign": function(format) {
+      var f = format("+.2p");
+      assert.strictEqual(f(.00123), "+0.12%");
+      assert.strictEqual(f(.0123), "+1.2%");
+      assert.strictEqual(f(.123), "+12%");
+      assert.strictEqual(f(1.23), "+120%");
+      assert.strictEqual(f(-.00123), "-0.12%");
+      assert.strictEqual(f(-.0123), "-1.2%");
+      assert.strictEqual(f(-.123), "-12%");
+      assert.strictEqual(f(-1.23), "-120%");
+    },
+
+Another function from netqmail, this one for comparing two strings
+lexically:
+
+    int str_diffn(s,t,len)
+    register char *s;
+    register char *t;
+    unsigned int len;
+    {
+      register char x;
+
+      for (;;) {
+        if (!len--) return 0; x = *s; if (x != *t) break; if (!x) break; ++s; ++t;
+        if (!len--) return 0; x = *s; if (x != *t) break; if (!x) break; ++s; ++t;
+        if (!len--) return 0; x = *s; if (x != *t) break; if (!x) break; ++s; ++t;
+        if (!len--) return 0; x = *s; if (x != *t) break; if (!x) break; ++s; ++t;
+      }
+      return ((int)(unsigned int)(unsigned char) x)
+           - ((int)(unsigned int)(unsigned char) *t);
+    }
+
+A module from the Free Pascal compiler providing access to an AmigaOS
+timer function:
+
+    unit timerutils;
+
+    interface
+
+    uses exec, timer, amigalib;
+
+    Function CreateTimer(theUnit : longint) : pTimeRequest;
+    { some stuff omitted }
+
+    implementation
+
+    Function CreateTimer(theUnit : longint) : pTimeRequest;
+    var
+        Error : longint;
+        TimerPort : pMsgPort;
+        TimeReq : pTimeRequest;
+    begin
+        TimerPort := CreatePort(Nil, 0);
+        if TimerPort = Nil then
+            CreateTimer := Nil;
+        TimeReq := pTimeRequest(CreateExtIO(TimerPort,sizeof(tTimeRequest)));
+        if TimeReq = Nil then begin
+            DeletePort(TimerPort);
+            CreateTimer := Nil;
+        end;
+        Error := OpenDevice(TIMERNAME, theUnit, pIORequest(TimeReq), 0);
+        if Error <> 0 then begin
+            DeleteExtIO(pIORequest(TimeReq));
+            DeletePort(TimerPort);
+            CreateTimer := Nil;
+        end;
+        TimerBase := pointer(TimeReq^.tr_Node.io_Device);
+        CreateTimer := pTimeRequest(TimeReq);
+    end;
+    { lots of stuff omitted }
+    end.
+
+From quodlibet, some PyGTK code with a callback:
+
+    def edit_patterns(cls, button):
+        def valid_uri(s):
+            # TODO: some pattern validation too (that isn't slow)
+            try:
+                p = Pattern(s)
+                u = URI(s)
+                return (p and u.netloc and
+                    u.scheme in ["http", "https", "ftp", "file"])
+            except ValueError:
+                return False
+
+        win = StandaloneEditor(filename=cls.PATTERNS_FILE,
+            title=_("Search URL patterns"), initial=cls.DEFAULT_URL_PATS,
+            validator=valid_uri)
+        win.show()
+
+From slide-rule.tcl, some Tk code with callbacks that I wrote in like 1997:
+
+    proc sl_ru_bind {canvas} {
+            bind $canvas <1> {
+                    global old_x
+                    set old_x %x
+                    global dragobj
+                    set dragobj [groupof %W [%W find closest %x %y]]
+            }
+            bind $canvas <B1-Motion> {
+                    global old_x dragobj
+                    %W move $dragobj [expr (%x - $old_x) / 2] 0
+                    set old_x %x
+            }
+    }
+
+A perspective projection in JS from some code I wrote to design domes:
+
+    function project(points, zDist, zMin, width) {
+      var rv = [];
+      for (var ii = 0; ii < points.length; ii++) {
+        var p = points[ii]
+          , xx = p[0]
+          , yy = p[1]
+          , zz = p[2] + zDist
+        ;
+        if (zz > zMin) {
+          rv.push([width * xx / zz, width * yy / zz]);
+        } else {
+          rv.push([NaN, NaN]);
+        }
+      }
+      return rv;
+    }
+
+Some disappointingly boilerplatish code from Lucene:
+
+      public String toString(String field) {
+        StringBuffer buffer = new StringBuffer();
+        buffer.append("spanNot(");
+        buffer.append(include.toString(field));
+        buffer.append(", ");
+        buffer.append(exclude.toString(field));
+        buffer.append(")");
+        buffer.append(ToStringUtils.boost(getBoost()));
+        return buffer.toString();
+      }
+
+From Darius’s constraint-programming draft in JS:
+
+    // Try to reduce eqns to an equivalent system with each variable
+    // defined by a single equation. (The result may be inconsistent 
+    // or underconstrained.)
+    function reduceEquations(eqns) {
+        for (let i = 0; i < eqns.length; ++i) {
+            const eqi = eqns[i];
+            const v = eqi.aVariable();
+            if (v === null) continue;
+            for (let j = 0; j < i; ++j) {
+                eqns[j] = eqns[j].substituteFor(v, eqi);
+                if (eqns[j].isInconsistent()) {
+                    return {isConsistent: false};
+                }
+            }
+        };
+        return {isConsistent: true,
+                equations: (eqns.filter(eqn => !eqn.isTautology())
+                                .map(eqn => eqn.normalize()))};
+    }
+
+The glue code in the Lua 5.1 OS interface to allow Lua code to call
+mktime(3):
+
+    static int os_time (lua_State *L) {
+      time_t t;
+      if (lua_isnoneornil(L, 1))  /* called without args? */
+        t = time(NULL);  /* get current time */
+      else {
+        struct tm ts;
+        luaL_checktype(L, 1, LUA_TTABLE);
+        lua_settop(L, 1);  /* make sure table is at the top */
+        ts.tm_sec = getfield(L, "sec", 0);
+        ts.tm_min = getfield(L, "min", 0);
+        ts.tm_hour = getfield(L, "hour", 12);
+        ts.tm_mday = getfield(L, "day", -1);
+        ts.tm_mon = getfield(L, "month", -1) - 1;
+        ts.tm_year = getfield(L, "year", -1) - 1900;
+        ts.tm_isdst = getboolfield(L, "isdst");
+        t = mktime(&ts);
+      }
+      if (t == (time_t)(-1))
+        lua_pushnil(L);
+      else
+        lua_pushnumber(L, (lua_Number)t);
+      return 1;
+    }
+
+A fairly boilerplatish class definition in Perl:
+
+    package Pod::Simple::PullParserToken;
+     # Base class for tokens gotten from Pod::Simple::PullParser's $parser->get_token
+    @ISA = ();
+    $VERSION = '3.16';
+    use strict;
+
+    sub new {  # Class->new('type', stuff...);  ## Overridden in derived classes anyway
+      my $class = shift;
+      return bless [@_], ref($class) || $class;
+    }
+
+    sub type { $_[0][0] }  # Can't change the type of an object
+    sub dump { Pod::Simple::pretty( [ @{ $_[0] } ] ) }
+
+    sub is_start { $_[0][0] eq 'start' }
+    sub is_end   { $_[0][0] eq 'end'   }
+    sub is_text  { $_[0][0] eq 'text'  }
+
+    1;
+    __END__
+
+Some R code from the CRAN survival analysis package, doing some kind
+of magic metaprogramming hackery that I don’t understand:
+
+    as.character.Surv <- function(x, ...) {
+        if (is.R()) class(x) <- NULL
+        else        oldClass(x) <- NULL
+        type <- attr(x, 'type')
+        if (type=='right') {
+            temp <- x[,2]
+            temp <- ifelse(is.na(temp), "?", ifelse(temp==0, "+"," "))
+            paste(format(x[,1]), temp, sep='')
+            }
+        else if (type=='counting') {
+            temp <- x[,3]
+            temp <- ifelse(is.na(temp), "?", ifelse(temp==0, "+"," "))
+            paste('(', format(x[,1]), ',', format(x[,2]), temp,
+                             ']', sep='')
+            }
+        else if (type=='left') {
+            temp <- x[,2]
+            temp <- ifelse(is.na(temp), "?", ifelse(temp==0, "<"," "))
+            paste(temp, format(x[,1]), sep='')
+            }
+        else {   #interval type
+            stat <- x[,3]
+            temp <- c("+", "", "-", "]")[stat+1]
+            temp2 <- ifelse(stat==3,
+                             paste("[", format(x[,1]), ", ",format(x[,2]), sep=''),
+                             format(x[,1]))
+            ifelse(is.na(stat), "NA", paste(temp2, temp, sep=''))
+            }
+        }
+
+A method from Cynthiune, an MP3 player written in Objective-C for
+GNUStep, showing the old style retain/release/autorelease
+memory-management for NeXTSTep apps:
+
+    @implementation M3UUnarchiver : PlaylistUnarchiver
+
+    + (NSArray *) _fileListFromLines: (NSArray *) arrayOfLines
+                inReferenceDirectory: (NSString *) directory
+    {
+      NSMutableArray *filelist;
+      NSEnumerator *lines;
+      NSString *currLine, *newString;
+
+      filelist = [NSMutableArray new];
+      [filelist autorelease];
+
+      lines = [arrayOfLines objectEnumerator];
+      currLine = [lines nextObject];
+      while (currLine)
+        {
+          if (![currLine hasPrefix: @"#"] && [currLine length])
+            {
+              newString = [NSString stringWithString: currLine];
+              if (![newString isAbsolutePath])
+                newString = [directory stringByAppendingPathComponent: newString];
+              newString = [newString stringByStandardizingPath];
+              [filelist addObject: newString];
+            }
+          currLine = [lines nextObject];
+        }
+
+      return filelist;
+    }
+
+A C part of the SQLite test suite:
+
+    /*
+    ** Usage: sqlite3_shared_cache_report
+    **
+    ** Return a list of file that are shared and the number of
+    ** references to each file.
+    */
+    int sqlite3BtreeSharedCacheReport(
+      void * clientData,
+      Tcl_Interp *interp,
+      int objc,
+      Tcl_Obj *CONST objv[]
+    ){
+    #ifndef SQLITE_OMIT_SHARED_CACHE
+      extern BtShared *sqlite3SharedCacheList;
+      BtShared *pBt;
+      Tcl_Obj *pRet = Tcl_NewObj();
+      for(pBt=GLOBAL(BtShared*,sqlite3SharedCacheList); pBt; pBt=pBt->pNext){
+        const char *zFile = sqlite3PagerFilename(pBt->pPager, 1);
+        Tcl_ListObjAppendElement(interp, pRet, Tcl_NewStringObj(zFile, -1));
+        Tcl_ListObjAppendElement(interp, pRet, Tcl_NewIntObj(pBt->nRef));
+      }
+      Tcl_SetObjResult(interp, pRet);
+    #endif
+      return TCL_OK;
+    }
+
+A small part of the SQLite test suite, in Tcl:
+
+    # Convert a string containing EXPR, AGG, and BOOL into a string
+    # that contains nothing but X, Y, and Z.
+    #
+    proc extract_vars {a} {
+      regsub -all {EXPR} $a X a
+      regsub -all {AGG} $a Y a
+      regsub -all {BOOL} $a Z a
+      regsub -all {[^XYZ]} $a {} a
+      return $a
+    }
+
+    # Test all templates to make sure the number of EXPR, AGG, and BOOL
+    # expressions match.
+    #
+    foreach term [concat $aggexpr $intexpr $boolexpr] {
+      foreach {a b} $term break
+      if {[extract_vars $a]!=[extract_vars $b]} {
+        error "mismatch: $term"
+      }
+    }
+
+From some dumb test code I wrote for a C random music generator:
+
+    int
+    main()
+    {
+      int ii, jj, kk;
+      score sc;
+      srand(getpid());
+      generate_score(&sc);
+      for (ii = 0; ii != 256; ii++) {
+        for (jj = 0; jj != 8192; jj++) {
+          unsigned char samp = 0;
+          for (kk = 0; kk < 6; kk++) {
+            int t = ii << (kk/2) | jj >> (13 - (kk/2));
+            int f = freq(next_note(t, &sc, kk));
+            samp += jj * f * (1 << kk) >> 10 & 32;
+          }
+          printf("%c", samp);
+        }
+      }
+      return 0;
+    }
+
+More code from SQLite, this time in one of its memory allocators:
+
+    /*
+    ** Unlink the chunk at mem5.aPool[i] from list it is currently
+    ** on.  It should be found on mem5.aiFreelist[iLogsize].
+    */
+    static void memsys5Unlink(int i, int iLogsize){
+      int next, prev;
+      assert( i>=0 && i<mem5.nBlock );
+      assert( iLogsize>=0 && iLogsize<=LOGMAX );
+      assert( (mem5.aCtrl[i] & CTRL_LOGSIZE)==iLogsize );
+
+      next = MEM5LINK(i)->next;
+      prev = MEM5LINK(i)->prev;
+      if( prev<0 ){
+        mem5.aiFreelist[iLogsize] = next;
+      }else{
+        MEM5LINK(prev)->next = next;
+      }
+      if( next>=0 ){
+        MEM5LINK(next)->prev = prev;
+      }
+    }
+
+A function in the Maybe monad from Brandon Moore’s Haskell ray tracer:
+
+    hit :: Vec -> Vec -> Sphere -> Maybe (Float, Vec, Vec)
+    hit x d (Sphere r center _ _) = do
+      let face = diff x center
+          a = dot d d
+          b = 2*dot d face
+          c = (dot face face) - (r*r)
+          disc = b^2 - 4*a*c
+      guard (b < 0) -- vector from center to camera should point opposite from ray
+      guard (disc >= 0)
+      let t = 2*c / (-b + sqrt disc)
+          intersection = x `add` scale t d
+          normal = normalize (diff intersection center)
+          xbounce = dot d normal
+          reflected = add d (scale (-2*xbounce) normal)
+      return (t, intersection, reflected)
+
+From Lucene:
+
+    public class DateTools {
+
+      private final static TimeZone GMT = TimeZone.getTimeZone("GMT");
+
+      private static final SimpleDateFormat YEAR_FORMAT = new SimpleDateFormat("yyyy", Locale.US);
+      private static final SimpleDateFormat MONTH_FORMAT = new SimpleDateFormat("yyyyMM", Locale.US);
+      private static final SimpleDateFormat DAY_FORMAT = new SimpleDateFormat("yyyyMMdd", Locale.US);
+      private static final SimpleDateFormat HOUR_FORMAT = new SimpleDateFormat("yyyyMMddHH", Locale.US);
+      private static final SimpleDateFormat MINUTE_FORMAT = new SimpleDateFormat("yyyyMMddHHmm", Locale.US);
+      private static final SimpleDateFormat SECOND_FORMAT = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+      private static final SimpleDateFormat MILLISECOND_FORMAT = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
+      static {
+        // times need to be normalized so the value doesn't depend on the 
+        // location the index is created/used:
+        YEAR_FORMAT.setTimeZone(GMT);
+        MONTH_FORMAT.setTimeZone(GMT);
+        DAY_FORMAT.setTimeZone(GMT);
+        HOUR_FORMAT.setTimeZone(GMT);
+        MINUTE_FORMAT.setTimeZone(GMT);
+        SECOND_FORMAT.setTimeZone(GMT);
+        MILLISECOND_FORMAT.setTimeZone(GMT);
+      }
+
+      private static final Calendar calInstance = Calendar.getInstance(GMT);
+
+      // cannot create, the class has static methods only
+      private DateTools() {}
+      // ...
+    }
+
+
+From shlex in the Python standard library:
+
+    def read_token(self):
+        quoted = False
+        escapedstate = ' '
+        while True:
+            nextchar = self.instream.read(1)
+            if nextchar == '\n':
+                self.lineno = self.lineno + 1
+            if self.debug >= 3:
+                print "shlex: in state", repr(self.state), \
+                      "I see character:", repr(nextchar)
+            if self.state is None:
+                self.token = ''        # past end of file
+                break
+            elif self.state == ' ':
+                if not nextchar:
+                    self.state = None  # end of file
+                    break
+                elif nextchar in self.whitespace:
+                    if self.debug >= 2:
+                        print "shlex: I see whitespace in whitespace state"
+                    if self.token or (self.posix and quoted):
+                        break   # emit current token
+                    else:
+                        continue
+                elif nextchar in self.commenters:
+                    self.instream.readline()
+                    self.lineno = self.lineno + 1
+                elif self.posix and nextchar in self.escape:
+                    escapedstate = 'a'
+                    self.state = nextchar
+                elif nextchar in self.wordchars:
+                    self.token = nextchar
+                    self.state = 'a'
+
+Some test code for a Visual Basic interface to mod_pubsub:
+
+    Module TestUtil
+        Public TU_OK As String = "OK"
+
+        Dim TU_VERBOSE_ALL As Boolean = False
+        Dim TU_TESTSUITE As String = ""
+        Dim TU_TESTCASE As String = ""
+        Dim TU_SERVER As String = ""
+        Dim TU_MISSINGSERVER As String = ""
+        Dim TU_SERVERNAME As String = ""
+        Dim tu_servers As New ArrayList()
+
+        Dim tu_count_subListener_OnUpdate As Integer = 0
+        Dim tu_count_subConnSH_OnConnStatus As Integer = 0
+        Dim tu_count_subReqSH_OnError As Integer = 0
+        Dim tu_count_subReqSH_OnSuccess As Integer = 0
+        Dim tu_count_pubConnSH_OnConnStatus As Integer = 0
+        Dim tu_count_pubReqSH_OnError As Integer = 0
+        Dim tu_count_pubReqSH_OnSuccess As Integer = 0
+
+        '/////////////////////////////////////////////////////////////////////////
+        '/// Public Events
+                '/////////////////////////////////////////////////////////////////////////
+
+        Public Class TU_SubListener
+            Inherits LibKNDotNet.IListener
+
+            Public Overrides Sub OnUpdate(ByVal msg As LibKNDotNet.Message)
+                TU_dumpMsg("TU_SubListener.OnUpdate", msg)
+                tu_count_subListener_OnUpdate = tu_count_subListener_OnUpdate + 1
+            End Sub
+
+        End Class
+
+        Public Sub TU_INIT_TESTCASE(ByVal testCaseName As String)
+            TU_TESTCASE = testCaseName
+            If TU_VERBOSE_ALL = False Then
+                Return
+            End If
+            Console.WriteLine()
+            Console.WriteLine("===============================================================================")
+            Console.WriteLine("=== Start test: " & TU_TESTSUITE & "." & testCaseName)
+            Console.WriteLine("===============================================================================")
+        End Sub
+
+        ' lots more stuff here omitted
+    End Module
+
+A PHP class from Laravel:
+
+    namespace App\Providers;
+
+    use Illuminate\Contracts\Auth\Access\Gate as GateContract;
+    use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+    class AuthServiceProvider extends ServiceProvider
+    {
+        /**
+         * The policy mappings for the application.
+         *
+         * @var array
+         */
+        protected $policies = [
+            'App\Model' => 'App\Policies\ModelPolicy',
+        ];
+
+        /**
+         * Register any application authentication / authorization services.
+         *
+         * @param  \Illuminate\Contracts\Auth\Access\Gate  $gate
+         * @return void
+         */
+        public function boot(GateContract $gate)
+        {
+            $this->registerPolicies($gate);
+
+            //
+        }
+    }
+
+A database schema migration in PHP from Laravel:
+
+    class CreateUsersTable extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::create('users', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('name');
+                $table->string('email')->unique();
+                $table->string('password');
+                $table->rememberToken();
+                $table->timestamps();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         *
+         * @return void
+         */
+        public function down()
+        {
+            Schema::drop('users');
+        }
+    }
+
+Part of the Python 3.2 marshal module:
+
+    static void
+    w_object(PyObject *v, WFILE *p)
+    {
+        Py_ssize_t i, n;
+
+        p->depth++;
+
+        if (p->depth > MAX_MARSHAL_STACK_DEPTH) {
+            p->error = WFERR_NESTEDTOODEEP;
+        }
+        else if (v == NULL) {
+            w_byte(TYPE_NULL, p);
+        }
+        else if (v == Py_None) {
+            w_byte(TYPE_NONE, p);
+        }
+        else if (v == PyExc_StopIteration) {
+            w_byte(TYPE_STOPITER, p);
+        }
+        else if (v == Py_Ellipsis) {
+            w_byte(TYPE_ELLIPSIS, p);
+        }
+        else if (v == Py_False) {
+            w_byte(TYPE_FALSE, p);
+        }
+        else if (v == Py_True) {
+            w_byte(TYPE_TRUE, p);
+        }
+        else if (PyLong_CheckExact(v)) {
+            long x = PyLong_AsLong(v);
+            if ((x == -1)  && PyErr_Occurred()) {
+                PyLongObject *ob = (PyLongObject *)v;
+                PyErr_Clear();
+                w_PyLong(ob, p);
+            }
+            else {
+    #if SIZEOF_LONG > 4
+                long y = Py_ARITHMETIC_RIGHT_SHIFT(long, x, 31);
+                if (y && y != -1) {
+                    w_byte(TYPE_INT64, p);
+                    w_long64(x, p);
+                }
+                else
+    #endif
+                {
+                    w_byte(TYPE_INT, p);
+                    w_long(x, p);
+                }
+            }
+        }
+        // other cases omitted
+    }
+
+A three-page function from GNU `cp`:
+
+    static bool
+    make_dir_parents_private (char const *const_dir, size_t src_offset,
+                              char const *verbose_fmt_string,
+                              struct dir_attr **attr_list, bool *new_dst,
+                              const struct cp_options *x)
+    {
+      struct stat stats;
+      char *dir;            /* A copy of CONST_DIR we can change.  */
+      char *src;            /* Source name in DIR.  */
+      char *dst_dir;        /* Leading directory of DIR.  */
+      size_t dirlen;        /* Length of DIR.  */
+
+      ASSIGN_STRDUPA (dir, const_dir);
+
+      src = dir + src_offset;
+
+      dirlen = dir_len (dir);
+      dst_dir = alloca (dirlen + 1);
+      memcpy (dst_dir, dir, dirlen);
+      dst_dir[dirlen] = '\0';
+
+      *attr_list = NULL;
+
+      if (stat (dst_dir, &stats) != 0)
+        {
+          /* A parent of CONST_DIR does not exist.
+             Make all missing intermediate directories. */
+          char *slash;
+
+          slash = src;
+          while (*slash == '/')
+            slash++;
+          while ((slash = strchr (slash, '/')))
+            {
+              struct dir_attr *new IF_LINT ( = NULL);
+              bool missing_dir;
+
+              *slash = '\0';
+              missing_dir = (stat (dir, &stats) != 0);
+
+              if (missing_dir || x->preserve_ownership || x->preserve_mode
+                  || x->preserve_timestamps)
+                {
+                  /* Add this directory to the list of directories whose
+                     modes might need fixing later. */
+                  struct stat src_st;
+                  int src_errno = (stat (src, &src_st) != 0
+                                   ? errno
+                                   : S_ISDIR (src_st.st_mode)
+                                   ? 0
+                                   : ENOTDIR);
+                  if (src_errno)
+                    {
+                      error (0, src_errno, _("failed to get attributes of %s"),
+                             quote (src));
+                      return false;
+                    }
+
+                  new = xmalloc (sizeof *new);
+                  new->st = src_st;
+                  new->slash_offset = slash - dir;
+                  new->restore_mode = false;
+                  new->next = *attr_list;
+                  *attr_list = new;
+                }
+
+              if (missing_dir)
+                {
+                  mode_t src_mode;
+                  mode_t omitted_permissions;
+                  mode_t mkdir_mode;
+
+                  /* This component does not exist.  We must set
+                     *new_dst and new->st.st_mode inside this loop because,
+                     for example, in the command `cp --parents ../a/../b/c e_dir',
+                     make_dir_parents_private creates only e_dir/../a if
+                     ./b already exists. */
+                  *new_dst = true;
+                  src_mode = new->st.st_mode;
+
+                  /* If the ownership or special mode bits might change,
+                     omit some permissions at first, so unauthorized users
+                     cannot nip in before the file is ready.  */
+                  omitted_permissions = (src_mode
+                                         & (x->preserve_ownership
+                                            ? S_IRWXG | S_IRWXO
+                                            : x->preserve_mode
+                                            ? S_IWGRP | S_IWOTH
+                                            : 0));
+
+                  /* POSIX says mkdir's behavior is implementation-defined when
+                     (src_mode & ~S_IRWXUGO) != 0.  However, common practice is
+                     to ask mkdir to copy all the CHMOD_MODE_BITS, letting mkdir
+                     decide what to do with S_ISUID | S_ISGID | S_ISVTX.  */
+                  mkdir_mode = src_mode & CHMOD_MODE_BITS & ~omitted_permissions;
+                  if (mkdir (dir, mkdir_mode) != 0)
+                    {
+                      error (0, errno, _("cannot make directory %s"),
+                             quote (dir));
+                      return false;
+                    }
+                  else
+                    {
+                      if (verbose_fmt_string != NULL)
+                        printf (verbose_fmt_string, src, dir);
+                    }
+
+                  /* We need search and write permissions to the new directory
+                     for writing the directory's contents. Check if these
+                     permissions are there.  */
+
+                  if (lstat (dir, &stats))
+                    {
+                      error (0, errno, _("failed to get attributes of %s"),
+                             quote (dir));
+                      return false;
+                    }
+
+
+                  if (! x->preserve_mode)
+                    {
+                      if (omitted_permissions & ~stats.st_mode)
+                        omitted_permissions &= ~ cached_umask ();
+                      if (omitted_permissions & ~stats.st_mode
+                          || (stats.st_mode & S_IRWXU) != S_IRWXU)
+                        {
+                          new->st.st_mode = stats.st_mode | omitted_permissions;
+                          new->restore_mode = true;
+                        }
+                    }
+
+                  if ((stats.st_mode & S_IRWXU) != S_IRWXU)
+                    {
+                      /* Make the new directory searchable and writable.
+                         The original permissions will be restored later.  */
+
+                      if (lchmod (dir, stats.st_mode | S_IRWXU) != 0)
+                        {
+                          error (0, errno, _("setting permissions for %s"),
+                                 quote (dir));
+                          return false;
+                        }
+                    }
+                }
+              else if (!S_ISDIR (stats.st_mode))
+                {
+                  error (0, 0, _("%s exists but is not a directory"),
+                         quote (dir));
+                  return false;
+                }
+              else
+                *new_dst = false;
+              *slash++ = '/';
+
+              /* Avoid unnecessary calls to `stat' when given
+                 file names containing multiple adjacent slashes.  */
+              while (*slash == '/')
+                slash++;
+            }
+        }
+
+      /* We get here if the parent of DIR already exists.  */
+
+      else if (!S_ISDIR (stats.st_mode))
+        {
+          error (0, 0, _("%s exists but is not a directory"), quote (dst_dir));
+          return false;
+        }
+      else
+        {
+          *new_dst = false;
+        }
+      return true;
+    }

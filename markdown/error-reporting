@@ -1,0 +1,518 @@
+Error Reporting is Part of the Programmer's User Interface
+==========================================================
+
+(This is about the user interface provided to the application
+programmer, not the user interface the application programmer provides
+to the non-programmer.)
+
+I have a quibble with the user interface design approach of
+[web.py](http://webpy.org/).  Its user interface design slogan says:
+
+> "Think about the ideal way to write a web app.
+> Write the code to make it happen."
+
+And in [a February 2006 post on the web.py mailing
+list](http://groups.google.com/group/webpy/msg/f266701d97e7ceb1):
+
+> The goal of web.py is to build the ideal way to make web apps. If
+> reinventing old things with only small differences were necessary to
+> achieve this goal, I would defend reinventing them. The difference
+> between the ideal way and the almost-ideal way is, as Mark Twain
+> suggested, the difference between the lighting [sic] and the
+> lightning bug.
+
+This is a very respectable user-interface-design philosophy: start
+from a conception of the user interface, and then proceed to write the
+code to make the user interface work.  I totally agree with this point
+of view.
+
+Unfortunately, the user interface for a library doesn't just include
+the code you have to write to use the library; it also includes
+implicit coupling created between parts of that code, and the error
+messages produced when your code is wrong.  And web.py doesn't do very
+well on those latter items, because of hyper-optimizing the code you
+have to write --- to the point of being deceptive.
+
+The fundamental merit that is somewhat lacking is that of explicitness;
+[explicit is better than implicit][], because explicitly stating the
+relationships in your program makes them both comprehensible to a reader
+and changeable by a maintainer.  Implicit relationships are neither.
+Also, explicitly stating relationships allows errors in these
+relationships to be reported in the terms of the user's model (the 
+[green code][]) rather than the implementation model (the yellow code).
+
+An Example of the Problem
+-------------------------
+
+I'm developing on top of web.py 0.3, which hasn't been released yet.
+Here I'm trying to reproduce an example from the docstring of
+`web.application.request`, but with `web.config.debug` turned on.
+
+    kragen@thrifty:~/devel/watchdog-git$ python
+    Python 2.4.4 (#2, Apr  5 2007, 20:11:18) 
+    [GCC 4.1.2 20061115 (prerelease) (Debian 4.1.1-21)] on linux2
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import web
+    >>> web.config.debug = True
+    >>> urls = ("/hello", "hello")
+    >>> class hello:
+    ...     def GET(self):
+    ...         web.header('Content-Type', 'text/plain')
+    ...         return "hello"
+    ... 
+    >>> app = web.application(urls, globals())
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in ?
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 62, in __init__
+        module_name = modname(fvars)
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 54, in modname
+        file, name = fvars['__file__'], fvars['__name__']
+    KeyError: '__file__'
+    >>> 
+
+This error leads me to wonder, "WTF?"  This is not an error phrased in
+terms of anything I passed in to web.py.  And it only occurs when
+`web.config.debug` is turned on.
+
+It turns out that the problem is that, when `autoreload` is true,
+`web.application.__init__` tries to reload the module that contains
+the `urls` and `mapping` arguments I'm passing in, and it does so by
+assuming that the `mapping` is the `globals()` of some module loaded
+from a file and therefore will contains a `__file__` key that tells
+where to find that file.
+
+Here's another test case that shows a related problem, this time in a
+file:
+
+    #!/usr/bin/python
+    import web
+
+    class hello:
+        def GET(self):
+            web.header('Content-Type', 'text/plain')
+            return "hello"
+
+    def main():
+        web.config.debug = True
+        urls = ("/hello", "hello")
+        app = web.application(urls, globals())
+        app.request("/hello")
+
+    if __name__ == '__main__': main()
+
+This gives the following error, which you'll note is several times
+longer than the program itself --- actually two errors:
+
+    Traceback (most recent call last):
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 186, in wsgi
+        result = self.handle_with_processors()
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 158, in handle_with_processors
+        return process(self.processors)
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 153, in process
+        return p(lambda: process(processors))
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 457, in processor
+        return handler()
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 153, in <lambda>
+        return p(lambda: process(processors))
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 153, in process
+        return p(lambda: process(processors))
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 456, in processor
+        h()
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 68, in reload_mapping
+        self.mapping = getattr(mod, mapping_name)
+    TypeError: getattr(): attribute name must be string
+
+    Traceback (most recent call last):
+      File "../webpybug.py", line 15, in ?
+        if __name__ == '__main__': main()
+      File "../webpybug.py", line 13, in main
+        app.request("/hello")
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 142, in request
+        response.data = "".join(self.wsgifunc()(env, start_response))
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 196, in wsgi
+        result = self.internalerror()
+      File "/home/kragen/devel/webpy.dev/web/application.py", line 227, in internalerror
+        return debugerror.debugerror()
+      File "/home/kragen/devel/webpy.dev/web/debugerror.py", line 305, in debugerror
+        return djangoerror()
+      File "/home/kragen/devel/webpy.dev/web/debugerror.py", line 293, in djangoerror
+        return t(exception_type, exception_value, frames)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 499, in __call__
+        return f.go()
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 761, in go
+        self.output._str = ''.join(map(self.h, self.parsetree))
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 729, in h_for
+        out.extend(self.h_lines(i[BODY]))
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 757, in h_lines
+        return map(self.h, lines)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 700, in h_if
+        expr = self.h(i[CLAUSE])
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 621, in h_expr
+        item = self.h(i[THING])
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 651, in h_test
+        return e(ox) and e(oy)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 621, in h_expr
+        item = self.h(i[THING])
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 588, in h_paren
+        return self.h(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 621, in h_expr
+        item = self.h(i[THING])
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 635, in h_test
+        return e(ox) in e(oy)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 621, in h_expr
+        item = self.h(i[THING])
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 553, in h
+        return getattr(self, 'h_' + item[WHAT])(item)
+      File "/home/kragen/devel/webpy.dev/web/template.py", line 676, in h_var
+        raise NameError, 'could not find %s (line %s)' % (repr(i[NAME]), i[LINENO])
+    NameError: could not find 'x' (line 178)
+
+Again, I didn't pass in anything called "x"; I never asked web.py
+anything about "x"; and I didn't pass in any non-string things that
+could reasonably be used as dict keys.  It turns out that in order to
+get the auto-reloading logic to work, web.py is rooting through the
+globals of the specified module in order to find the `mapping`
+argument I passed in, so that it can reload `mapping` from that module
+after it reloads the module.
+
+This is an example of what is wrong with "magic".  The error is rather
+confusing for the user to debug, at least if they're kind of dumb like
+me, because the web.py API being called makes all sorts of hidden
+assumptions about the arguments and the relationships between them.  The
+API leads you to believe that it is called with some arbitrary mapping
+and a dictionary to look up keys from the mapping, but that's a lie.  At
+least when you have `debug` turned on, it really needs a module and a
+global variable name in that module, in order to support auto-reloading.
+It's just sneaky about it, and produces incomprehensible error messages.
+
+The solution, for what it's worth, is to instantiate the
+`web.application` with `autoreload` turned off:
+
+    app = web.application(urls, globals(), autoreload=False)
+
+The Cost In The Yellow Code
+---------------------------
+
+It's not just that this magic makes it harder to write and debug
+applications on top of web.py.  It also makes web.py itself harder to
+understand.  Here's the code in `web.application.__init__` to do this
+magic:
+
+            if autoreload:
+                def modname(fvars):
+                    """find name of the module name from fvars."""
+                    file, name = fvars['__file__'], fvars['__name__']
+                    if name == '__main__':
+                        # Since the __main__ module can't be reloaded, the module has 
+                        # to be imported using its file name.                    
+                        name = os.path.splitext(os.path.basename(file))[0]
+                    return name
+
+                mapping_name = utils.dictfind(fvars, mapping)
+                module_name = modname(fvars)
+
+                def reload_mapping():
+                    """loadhook to reload mapping and fvars."""
+                    mod = __import__(module_name)
+                    self.fvars = mod.__dict__
+                    self.mapping = getattr(mod, mapping_name)
+
+                # to reload modified modules
+                self.add_processor(loadhook(Reloader()))
+
+                # to update mapping and fvars
+                self.add_processor(loadhook(reload_mapping))
+
+Here's what I think it would look like if you passed in `module_name`
+and `mapping_name` directly:
+
+            if autoreload:
+                def reload_mapping():
+                    """loadhook to reload mapping and fvars."""
+                    mod = __import__(module_name)
+                    self.fvars = mod.__dict__
+                    self.mapping = getattr(mod, mapping_name)
+
+                # to reload modified modules
+                self.add_processor(loadhook(Reloader()))
+
+                # to update mapping and fvars
+                self.add_processor(loadhook(reload_mapping))
+
+Additionally there's copy-and-pasted code in `web.webpyfunc`.  Here's
+what it looks like now:
+
+        if not hasattr(inp, '__call__'):
+            if autoreload:
+                def modname():
+                    """find name of the module name from fvars."""
+                    file, name = fvars['__file__'], fvars['__name__']
+                    if name == '__main__':
+                        # Since the __main__ module can't be reloaded, the module has 
+                        # to be imported using its file name.
+                        name = os.path.splitext(os.path.basename(file))[0]
+                    return name
+
+                mod = __import__(modname(), None, None, [""])
+                #@@probably should replace this with some inspect magic
+                name = utils.dictfind(fvars, inp)
+                func = lambda: handle(getattr(mod, name), mod)
+            else:
+                func = lambda: handle(inp, fvars)
+        else:
+            func = inp
+
+I don't completely understand this, but I think that with a more
+honest interface, all that code would look more like this:
+
+    func = lambda: handle(getattr(__import__(modname, None, None, [""]), name),
+                          inp)
+
+This would enable the removal of `web.utils.dictfind`:
+
+    def dictfind(dictionary, element):
+        """
+        Returns a key whose value in `dictionary` is `element` 
+        or, if none exists, None.
+
+            >>> d = {1:2, 3:4}
+            >>> dictfind(d, 4)
+            3
+            >>> dictfind(d, 5)
+        """
+        for (key, value) in dictionary.iteritems():
+            if element is value: 
+                return key
+
+That's about 30-50 lines of code to implement this single misfeature,
+which could be removed with a simple interface change.
+
+The (Lack of) Benefit in the Green Code
+---------------------------------------
+
+But how much does all that extra complexity above shorten the code you
+have to write to use the library?  (I've argued above that it actually
+makes the application code harder to write, although shorter, because it
+renders important dependencies invisible.)
+
+If the interface were changed as I suggest, the cost to user code
+would be that instead of writing this:
+
+    app = web.application(urls, globals())
+
+You would write this:
+
+    import mywebapp
+    app = web.appreloader(mywebapp, 'urls')
+
+Or, if you standardized on the name `'urls'` (which is what most
+web.py apps call the mapping) it would just be:
+
+    import mywebapp
+    app = web.appreloader(mywebapp)
+
+But I think that, in this case, [explicit is better than implicit][].
+
+Global Variables: Another Example
+---------------------------------
+
+I originally ran into the above problem not because I was manually
+setting `web.config.debug` to `True` in Python's REPL, but rather
+because I was writing post-hoc unit tests for a web app that did
+(<http://watchdog.net/>).  That app set `web.config.debug` to `True`
+when it was imported.  This violates the normal Python principle that
+you should be able to import a module without fear, but there doesn't
+seem to be another solution with web.py.  In order to work around some
+of the bad effects of storing state in global variables, web.py uses
+`ThreadedDict`s so that HTTP requests in different threads don't
+interfere with each other.
+
+Reporting Problems in the Terms of the User's Model
+---------------------------------------------------
+
+Above I said that being explicit instead of implicit makes it possible
+to "report problems in the terms of the user's model".  Here's an
+example of what that means, from another context, where the user is the
+programmer in a language, not the caller of a library.  Here's a small
+Python program that forgets to check its inputs:
+
+    kragen@thrifty:~/devel$ cat > len.py
+    import sys
+    print len(sys.argv[1])    # print length of first command-line argument
+    kragen@thrifty:~/devel$ python len.py  # note: no command-line arguments
+    Traceback (most recent call last):
+      File "len.py", line 2, in ?
+        print len(sys.argv[1])
+    IndexError: list index out of range
+
+That's pretty straightforward.  It shows you the broken line of code and
+tells you that what it's doing is trying to index into a list
+(`sys.argv`), but the supplied list index is off the end of that list.
+Both the list and the index are objects in the world of the Python
+programmer, the user of Python; they appear in the program.
+
+How about in C?
+
+In C, we don't have lists; instead we have mostly machine words with
+associated types.  Any connection between the starting address of an
+array and the number of items in the array is necessarily implicit.
+(There are things like `valgrind` that can sometimes tell you if you
+violate array bounds, but the ANSI standard requires the compiler to
+allow some kinds of pointer arithmetic outside of array bounds.)
+Consequently the C runtime can't report such an error in the terms of
+the source C program (that is, the terms of the user of the C compiler);
+it has to report it in terms of the implementation of C.
+
+So here's the same program in C:
+
+    kragen@thrifty:~/devel$ cat > len.c
+    #include <string.h>
+    #include <stdio.h>
+
+    int main(int argc, char **argv) {
+      printf("%d\n", strlen(argv[1]));
+      return 0;
+    }
+    kragen@thrifty:~/devel$ gcc -Wall len.c -o len
+    kragen@thrifty:~/devel$ ./len
+    Segmentation fault
+
+That's not a very helpful error message, but we can do better.
+
+    kragen@thrifty:~/devel$ gcc -Wall -g -O0 len.c -o len
+    kragen@thrifty:~/devel$ ./len
+    Segmentation fault
+    kragen@thrifty:~/devel$ gdb len
+    GNU gdb 6.4.90-debian
+    Copyright (C) 2006 Free Software Foundation, Inc.
+    GDB is free software, covered by the GNU General Public License, and you are
+    welcome to change it and/or distribute copies of it under certain conditions.
+    Type "show copying" to see the conditions.
+    There is absolutely no warranty for GDB.  Type "show warranty" for details.
+    This GDB was configured as "i486-linux-gnu"...Using host libthread_db library "/lib/tls/i686/cmov/libthread_db.so.1".
+
+    (gdb) r
+    Starting program: /home/kragen/devel/len 
+    Failed to read a valid object file image from memory.
+
+    Program received signal SIGSEGV, Segmentation fault.
+    0x0804837c in main (argc=Cannot access memory at address 0xffffffff
+    ) at len.c:5
+    5	  printf("%d\n", strlen(argv[1]));
+
+So now we know what line the error happened at (although this is not
+always possible in C) but it still isn't telling us that it was a
+pointer arithmetic error.  To find that, we have to descend to the
+implementation level, which happens to be x86 assembly.  Here's `main`:
+
+    (gdb) disassemble
+    Dump of assembler code for function main:
+    0x08048354 <main+0>:	lea    0x4(%esp),%ecx
+    0x08048358 <main+4>:	and    $0xfffffff0,%esp
+    0x0804835b <main+7>:	pushl  0xfffffffc(%ecx)
+    0x0804835e <main+10>:	push   %ebp
+    0x0804835f <main+11>:	mov    %esp,%ebp
+    0x08048361 <main+13>:	push   %edi
+    0x08048362 <main+14>:	push   %ecx
+    0x08048363 <main+15>:	sub    $0x10,%esp
+    0x08048366 <main+18>:	mov    0x4(%ecx),%eax
+    0x08048369 <main+21>:	add    $0x4,%eax
+    0x0804836c <main+24>:	mov    (%eax),%eax
+    0x0804836e <main+26>:	mov    $0xffffffff,%ecx
+    0x08048373 <main+31>:	mov    %eax,0xfffffff4(%ebp)
+    0x08048376 <main+34>:	mov    $0x0,%al
+    0x08048378 <main+36>:	cld    
+    0x08048379 <main+37>:	mov    0xfffffff4(%ebp),%edi
+    0x0804837c <main+40>:	repnz scas %es:(%edi),%al
+    0x0804837e <main+42>:	mov    %ecx,%eax
+    0x08048380 <main+44>:	not    %eax
+    0x08048382 <main+46>:	dec    %eax
+    0x08048383 <main+47>:	mov    %eax,0x4(%esp)
+    0x08048387 <main+51>:	movl   $0x80484b8,(%esp)
+    0x0804838e <main+58>:	call   0x8048290 <printf@plt>
+    0x08048393 <main+63>:	mov    $0x0,%eax
+    0x08048398 <main+68>:	add    $0x10,%esp
+    0x0804839b <main+71>:	pop    %ecx
+    0x0804839c <main+72>:	pop    %edi
+    0x0804839d <main+73>:	pop    %ebp
+    0x0804839e <main+74>:	lea    0xfffffffc(%ecx),%esp
+    0x080483a1 <main+77>:	ret    
+    End of assembler dump.
+
+OK, but where are we?
+
+    (gdb) x/i $pc
+    0x804837c <main+40>:	repnz scas %es:(%edi),%al
+
+`repnz scas` is what `gcc` compiles `strlen` to, so the problem is the
+argument of `strlen`.  It reads from where `%edi` points.  So `%edi`
+must be pointing somewhere bogus.
+
+    (gdb) x/a $edi
+    0x0:	Cannot access memory at address 0x0
+
+Aha, `%edi` is a null pointer.  So we probably passed a null pointer to
+`strlen`.  Where did that come from?
+
+    (gdb) x/a argv
+    Cannot access memory at address 0x3
+    (gdb) p argv
+    Cannot access memory at address 0x3
+    (gdb) info locals
+    No locals.
+    (gdb) info args
+    argc = Cannot access memory at address 0xffffffff
+
+Looks like our `argv` got horked.  Oh well, too bad.  We know the
+problem is that `argv[1]` was null.
+
+    (gdb) q
+    The program is running.  Exit anyway? (y or n) y
+
+There is a striking family resemblance between the debugger session
+above and the process required to comprehend the web.py error:
+
+    TypeError: getattr(): attribute name must be string
+
+It took me something like half an hour to figure out what was going on
+there.  Probably if I were smart, it would have been more like five
+minutes, but in either case, the entire class of such hard-to-diagnose
+errors could be avoided by interface design that's explicit enough to
+report errors in the terms of the user's model.
+
+References
+----------
+
+[green code]: http://weblog.raganwald.com/2006/12/economizing-can-be-penny-wise-and.html "Reg Braithwaite's influential Red/Yellow/Green categorization of code"
+
+In [Economizing can be Penny-Wise and Pound-Foolish][green code],
+Reginald Braithwaite describes how you can divide code into "red code",
+which you don't understand, "yellow code" which you understand but which
+belongs to the solution domain rather than the problem domain, and
+"green code" which is purely problem-domain code.
+
+[explicit is better than implicit]: http://www.python.org/dev/peps/pep-0020/ "The Zen of Python explains the principles of Python's design."
+
+[Explicit is better than implicit][] is one of the design principles of
+Python.  It's not an absolute law, but a design heuristic, helpful for
+the reasons explained here.  You can read a little bit of Paul Prescod
+trying to explain it to Paul Graham at
+<http://people.csail.mit.edu/gregs/ll1-discuss-archive-html/msg01587.html>.

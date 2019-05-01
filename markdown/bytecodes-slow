@@ -1,0 +1,566 @@
+This is responding to this paragraph of a post by Ola Bini, "Can
+Bytecodes Perform Well?" [0]:
+
+    Let's see, what's next? Oh yeah. Bytecodes are always slow. No
+    argument here. C++ will always beat a bytecode based engine. And C
+    will almost always beat C++. And assembler (in the right hands)
+    will usually beat C. But wait... Isn't Java bytecode based? And
+    doesn't Java 6 perform on the same level as C in many cases, and
+    in some cases performing better than C? Well, yes, it does... And
+    wasn't Smalltalk always based on bytecodes? Most Smalltalk engines
+    performed very well. Why is MRI switching to bytecodes for 1.9?
+    And why has Python always been bytecode based?  And why is the CLR
+    bytecode based? Why was even Pascal using bytecodes back in the
+    day? (OK, that is cheating... Pascal used bytecodes for
+    portability, not performance, but it still worked well in that
+    aspect too). Erlang is bytecode based.
+
+He's taking issue with a comment of mine on his previous post; I
+quoted him saying, "[Rubinius] is byte code based. This means it's
+easier to handle performance," and flippantly responded, "If by
+'handle' you mean 'not have'." [1]
+
+Summary of My Rebuttal
+----------------------
+
+I didn't say bytecodes are always slow.  Bini's fast examples are
+actually native-code compilers, not bytecode interpreters.  Bini's
+examples that aren't native-code compilers are slow.  Python, for
+example, is slow when the inner loop is in Python bytecode.  Erlang
+used to be really slow when it was a bytecode interpreter. OCaml's
+bytecode interpreter is considerably slower than its compiled code.
+But the OCaml native-code compiler is considerably simpler than the
+interpreter.  On-the-fly "JIT" compilers don't need bytecode.  In
+fact, bytecode may be a bad input format for JIT compilers.  There
+exists an ahead-of-time Java compiler that doesn't use bytecode, and
+it produces code comparable to that produced by JIT compilers.
+
+There are valid reasons to use bytecode, but performance is not one of
+them.
+
+Several of Ola Bini's statements are dubious.
+
+Detailed explanations of each of these statements follow.
+
+I Didn't Say Bytecodes Are Always Slow
+--------------------------------------
+
+My original statement was not that "bytecodes are always slow," but I
+can see how it would be interpreted that way.  I said that building a
+language interpreter around bytecode makes it easier to not have
+performance.  More specifically, I'm saying that building an
+interpreter as a bytecode interpreter does not make it fast, not even
+necessarily faster than today's popular Ruby interpreter.
+
+Bini's Fast Examples Are Actually Native-Code Compilers
+-------------------------------------------------------
+
+Building an interpreter as an on-the-fly compiler *does* generally
+make it faster than a bytecode interpreter; recent Java virtual
+machines, the CLR, and the fast Smalltalk engines he's talking about
+are all on-the-fly native-code compilers, not bytecode interpreters.
+The fact that they take bytecodes rather than source code as input is
+incidental.
+
+However, several of them are still fairly slow in absolute terms, even
+though they're much faster than interpreters.
+
+At the time that Urs Hölzle wrote his dissertation [12], the ParcPlace
+Smalltalk system (release 4.0) ran about ten times faster than a
+deliberately naïve native-code compiler for Self (see section 4.4 of
+the dissertation), but it ran still around 4-10 times slower than C++
+(see section 7.3.1).  I don't know how fast Smalltalk systems are now,
+but I have the impression that they haven't sped up much, except for
+Strongtalk.
+
+The Erlang HiPE just-in-time native-code compiler gets speedups of
+about 4 over the BEAM bytecode interpreter, but it's still about ten
+times slower than C in the "shootout" microbenchmarks.  (See the
+section below about Erlang.)
+
+Bini's Examples That Aren't Native-Code Compilers Are Slow
+----------------------------------------------------------
+
+Python, the bytecode Pascal compiler/interpreters, the BEAM bytecode
+Erlang interpreter, and bytecode implementations of Smalltalk (such as
+Squeak) are and were painfully slow for anything CPU-intensive.  I
+used the UCSD P-System on a 4MHz Z80, and I use Python and Squeak
+today, and they are all painfully slow when you're doing anything
+CPU-bound --- unless you can push the inner loops out of the bytecode
+interpreter, as with NumPy.  Typically the performance penalty over
+machine code is around a factor of 100; register-based "bytecode"
+interpreters like Wheat's, and Lua's often get the penalty down to a
+factor of 10 to 30.
+
+You can see this pattern in the Great Programming Language Shootout
+results; the default weightings mostly represent CPU-intensive tasks.
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=all&lang=all
+
+Python, For Example, Is Slow When The Inner Loop Is In Python Bytecode
+----------------------------------------------------------------------
+
+If you look at the Python results, the tests where it was less than
+ten times slower than the C version are, with two exceptions, exactly
+the ones where the inner loop of the test was performed in C.
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=all&lang=python&lang2=gcc
+
+chameneos: tests thread rendezvous speed;  
+cheap-concurrency: tests coroutine creation speed; Python is faster
+    than C here;  
+k-nucleotide: largely tests string hashing speed (note Python is 9x
+    slower than C in this test);  
+nsieve: the "inner loop" here is essentially a NumPy-like array operation:  
+
+            a[i + i::i] = (0,) * (m // i - 2 + (not not m % i))
+
+regex-dna: the inner loop is in the sre regex engine, which is in C  
+pidigits: the inner loop is in gmpy, the Python binding to the GNU
+    Multiple Precision library, which is in C  
+reverse-complement: the inner loops are in string.translate and reversing a 
+    list, which are done in C  
+partial-sums: this appears to be an exception; a straightforwardly written
+    iterative Python solution is only six times slower than the similarly
+    straightforwardly iterative C solution, doing a bunch of floating-point.  
+sum-file: the entire program contains no iteration in Python bytecode;
+    the inner and only loop consists of four primitives implemented
+    in C: sum, itertools.imap, int, and iter(sys.stdin).  
+
+Python uses "generator" objects for the cheap-concurrency test; these
+are implemented in the CPython interpreter as normal function
+activation records [[which presumably have some name]] rather than
+full threads.  But the C version of the test uses full POSIX threads.
+A C version that used user-level "green threads" or "fibers" would
+probably do a little better, but it would still have to allocate a
+whole stack for each thread, rather than running them all on the same
+stack.  The nearest C equivalent is probably Adam Dunkels's
+"protothreads".
+
+I hypothesize that the "inner loop" in the chameneos case is actually
+in the underlying POSIX thread library, since the Python version is
+only 50% slower than the C version.
+
+I don't know why the partial-sums test is so close.
+
+On the tests where Python does worst, the Python program is 100-250
+times slower than the corresponding C program; these are generally the
+tests where the Python version is most similar in structure to the C
+version.  See, for instance, "recursive" (279x), "n-body" (163x), or
+"mandelbrot" (117x).
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=recursive&lang=all
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=nbody&lang=all
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=mandelbrot&lang=python&id=3
+
+The large amount of variability between Python's best and worst
+results is mostly accounted for by variation in how much of the
+benchmark's inner loop is inside of some extension module or primitive
+implemented in machine code, and how much is actually executed by the
+bytecode interpreter.
+
+Useful resources for comparing language implementation performances in
+this manner include Doug Bagley's original Great Programming Language
+Shootout from 2001 [10], the shootout.alioth.debian.org "Computer
+Language Benchmarks Game" version thereof, the Win32 version thereof
+at http://dada.perl.it/shootout/ , and Kernighan's "Timing Trials"
+paper [9].
+
+Erlang Used to be Really Slow When it Was a Bytecode Interpreter
+----------------------------------------------------------------
+
+Erlang today can use a native-code compiler called HiPE.  The first
+versions of HiPE compiled bytecode to native code; current versions
+compile Erlang source to native code.  HiPE sped up various Erlang
+microbenchmarks by factors of up to about 4 over the BEAM bytecode
+interpreter. [4] (Of course, some microbenchmarks hardly sped up at
+all.)
+
+Many people think Erlang is still fairly slow; in the shootout
+microbenchmarks, even with HiPE, it tends to come in about 10x slower
+than C.
+> http://shootout.alioth.debian.org/gp4/benchmark.php?test=all&lang=hipe&lang2=gcc
+
+OCaml's Bytecode Interpreter Is Considerably Slower Than Its Compiled Code
+--------------------------------------------------------------------------
+
+Although I previously saw speed ratios of only about a factor of 4 in
+some code, eyeballing numbers from the Win32 Shootout suggests that
+ocamlopt-generated native code is more typically 20-100 times faster
+than bytecode run by its bytecode interpreter.
+> http://dada.perl.it/shootout/ocamlb.html
+> http://dada.perl.it/shootout/ocaml.html
+
+OCaml's Native-Code Compiler Is Considerably Simpler Than Its Interpreter
+-------------------------------------------------------------------------
+
+This is kind of an interesting case, because both the native-code and
+bytecoded implementations of OCaml were implemented by a small team
+and are fairly compact.  In Bini's post, he asserts, "Granted, a naive
+implementation of a bytecode engine will not perform well. But that is
+true for a compiler too."
+
+David A. Wheeler's SLOCCount 2.26 tells me that the "bytecomp" and
+"byterun" subdirectories of OCaml-3.09.2 contain 12683 lines of C (in
+"byterun") and 8816 lines of ML (in "bytecomp"); I believe these
+21.5KLOC represent the whole bytecode interpreter.  (The parser,
+type-checker, standard library, etc., is shared with the native-code
+compiler.)
+
+SLOCCount also tells me that the "asmcomp" and "asmrun" subdirectories
+contain 9457 lines of ML, 3910 lines of assembly, and 1077 lines of C,
+for a total of about 14.5KLOC.  This includes backends for i386, ARM,
+AMD64, Itanium, PowerPC/POWER, SPARC, MIPS, HP-PA, and Alpha; the
+backends other than the i386 backend total about 2200 lines of ML and
+3400 lines of assembly, so you could reduce that to about 10KLOC for a
+single CPU architecture.
+
+In short, the native-code compiler for OCaml is about half the size of
+its interpreter, and so is presumably much more "naive", in the sense
+that it required much less effort to implement.  (SLOCCount estimates
+three person-years, compared to five for the interpreter.)  But it
+still performs one to two orders of magnitude better than the bytecode
+interpreter.
+
+Although Bini anticipates this criticism by referring to OCaml's
+"extremely stringent type requirements" and calls it a
+"bondage-tightly typed language", this point generalizes beyond OCaml.
+
+It's true that OCaml's semantics require much less type-checking and
+dynamic dispatching than Java, Python, or Ruby, and the overhead of
+type-checking in these more-dynamically-typed languages can be
+substantial compared to the overhead of dispatching bytecodes, which
+makes the savings of not dispatching bytecodes less noticeable.  But
+the next few sections show that the performance advantages of
+native-code compilation are not limited to static languages like
+OCaml; indeed, the performance benefits Bini attributes to the use of
+bytecode are actually due to the use of native-code compilation.
+
+On-The-Fly "JIT" Compilers Don't Need Bytecode
+----------------------------------------------
+
+In Bini's post, he asserts:
+
+    ...Java and the CLR family of languages use bytecodes because it
+    gives the runtime system the opportunity to dynamically change the
+    machine code running based on statistics and criteria found out
+    during runtime. ... This is not possible in a clean compilation to
+    machine code. Java would never have had the performance it has now
+    if it weren't for the bytecodes.
+
+This is simply mistaken.  There are on-the-fly machine-code compilers
+that work from source code instead of bytecode.  SBCL and the current
+HiPE compiler are examples.  There are some advantages to compiling
+directly to machine code from source code rather than compiling from a
+bytecode format intended for interpretation; typically the translation
+to bytecode erases a lot of information that is helpful to
+optimization.
+
+Bytecode is a Bad Input Format for On-The-Fly "JIT" Compilers
+-------------------------------------------------------------
+
+As one of the HiPE papers [4] explains:
+
+    A new feature, described further below, is that the HiPE compiler
+    can compile directly from Core Erlang [a restricted subset of
+    Erlang]. When used in this way, the compiler compiles a whole
+    module at a time, and performs global analyses and optimizations
+    which are significantly more difficult to perform (and thus not
+    available) in the traditional mode [which compiled from the BEAM
+    bytecodes].
+
+The GCC Java compiler, GCJ, can compile either Java source of Java
+bytecode into machine code for many different processors.  In the
+past, it could do some optimizations when compiling from Java source
+that it couldn't do when compiling from Java bytecode [6].  However,
+apparently, now it can do essentially the same set of optimizations
+for Java bytecode [5] [7] --- it just took more work --- and GCJ is
+switching to the Eclipse Java frontend for parsing Java, starting with
+GCC 4.3 [8].  In this case, the standard bytecode permits successful
+independent development of successive links in the toolchain.
+
+The above notes are about traditional all-at-once or "ahead-of-time"
+compilers, rather than the piecemeal profile-directed-optimizing
+compilation used by good Smalltalk implementations, Self, and HotSpot.
+There are some differences: JIT compilers generally have to run faster
+than ahead-of-time compilers.  I don't believe this negates my point;
+although parsing code takes some time, the compiler can maintain a
+"bytecode" parsed intermediate representation of the program without
+supporting it as an *input* format, and you can just as well cache an
+AST.  (Also, bytecode-like linear quadruple and stack-machine
+intermediate representations in compilers are losing mindshare these
+days to other alternatives like CPS and GCC's tree-SSA.)
+
+In general, optimizing an intermediate representation (such as a
+bytecode format) for high-speed interpretation tends to make it worse
+for dynamic machine-code generation, and vice versa.  Good formats for
+dynamic machine-code generation tend to contain most or all of the
+information in the original source code; good formats for rapid
+interpretation erase as much of that information as possible.
+
+Self pioneered the techniques of profile-based optimization,
+specialization, and type feedback that Bini refers to above, and which
+make it possible for current Java JIT compilers to do a reasonably
+good job, despite the dynamic nature of the Java language.  Self's
+bytecode format was little more than an RPN tokenized version of the
+source code, with blocks separated into their own bytecode objects;
+quite different from the Smalltalk-80 bytecode format, in which
+control structures are generally already inlined, and with special
+bytecodes for instance variable access, local variable access, and
+common method names.
+
+More recent efficient bytecode-VM designs like Lua's are
+register-based rather than stack-based, which again, makes
+interpretation faster, but dynamic compilation more difficult.
+
+I don't know for sure why Microsoft's architects chose to make the CLR
+bytecode-based, but my guess is that it's a weak method of source-code
+obfuscation.  Some of their customers would have balked at shipping
+source code to their "assemblies", the way they have to do if they're
+written in Perl or Erlang, and so they would have continued using Java
+or shipping blobs of x86 machine code instead.
+
+Java Compilers That Don't Use Bytecode Produce Comparable Code
+--------------------------------------------------------------
+
+Bini's statement, "Java would never have had the performance it has
+now if it weren't for the bytecodes," is mistaken for another reason,
+other than merely that other programming languages.  As mentioned
+above, GCJ can compile Java from source code to machine code without
+an intermediate bytecode step; so clearly the use of bytecode is not
+crucial to whatever performance GCJ-compiled code achieves.  So what
+does it achieve?
+
+In many cases, despite not using specialization or profile-directed
+feedback (which are easier to do in JIT compilers than in
+ahead-of-time compilers like GCJ), GCJ-compiled programs run around
+the same speed as JIT-compiled programs.  The only systematic set of
+benchmarks I've found, from 2004, shows GCJ-compiled programs running
+a little less than half as fast as the same program in the 1.4 or 1.5
+IBM or Sun JDK. [11]
+
+There is also a variety of anecdotal evidence from real applications;
+some of it shows programs running a little faster with GCJ, and some
+of it shows them running a little slower.  I haven't been able to find
+anything comparing the performance of GCJ 4.x, which was supposed to
+have a lot of new optimizations, to anything else, or a comparison of
+Java 6 to any version of GCJ.
+
+As far as I know, GCJ does not yet take advantage of type feedback
+from the compiled program, which could put it at a substantial
+performance disadvantage to a JIT compiler.
+
+* "Performance measurements: Java and C++", by Jean-Marc Vanel, 2003
+> http://jmvanel.free.fr/perf/java-cpp.html
+
+* "Compiling Java with GCJ", by Per Bothner, 2003-01-01, published in
+  Linux Journal, says, "Truthfully, running a program compiled by GCJ
+  is not always noticeably faster than running it on a JIT-based Java
+  implementation; sometimes it even may be slower ... GCJ is often
+  significantly faster than alternative JVMs, and it is getting faster
+  as people improve it. ... Running the Kawa test suite using GCJ
+  vs. JDK1.3.1, GCJ is about twice as fast..."
+> http://www.linuxjournal.com/article/4860
+
+* "comparison between native gcj and bytecode", mailing list post by
+  Erik Poupaert, 2003-01-05, to Prof. Laurie Hendren, posted to
+  sablecc-list, saying, "There are reasons to believe that gcj already
+  beats the JDK with regards to performance."
+> http://www.sable.mcgill.ca/listarchives/sablecc-list/msg00898.html
+
+* "Performance comparison", mailing list post by Norman Hendrich,
+  posted to java@gcc.gnu on 2002-07-29, showing his program running
+  with GCJ at 72% of its JDK 1.3.1 speed and 47% of its JDK 1.4.0
+  speed
+> http://gcc.gnu.org/ml/java/2002-07/msg00121.html
+
+* "Linux Number Crunching: Benchmarking Compilers and Languages for
+  ia32", by Scott Robert Ladd, 2003-01-04, in which he benchmarked
+  some computational astronomy code to measure floating-point
+  performance; GCJ's best speeds were within 10% of the best 1.3 and
+  1.4 JIT JVM speeds (faster than the JIT VMs on one machine, slower
+  on the other), but roughly three times slower than the Intel C++ and
+  Fortran compilers.
+> http://web.archive.org/web/20040803034751/http://www.coyotegulch.com/reviews/almabench.html
+  An incomplete updated version (missing the results!) is online at
+> http://www.coyotegulch.com/reviews/number_crunching/
+
+There are Valid Reasons to Use Bytecode, Just Not Speed
+-------------------------------------------------------
+
+Bytecode can be considerably more compact than machine code, source
+code, or even gzipped source code, as a distribution format, and it
+uses dramatically less memory than abstract syntax trees, machine
+code, or source code.  Bytecode interpreters are considerably more
+portable than native-code compiler backends.  Finally, it's a lot
+easier to hack single-stepping and other debugging facilities into a
+bytecode interpreter than to implement them for even one CPU/OS
+combination, let alone the whole range of CPU/OS combinations a
+particular language implementation might need to support.
+
+These can all be valid reasons for choosing a bytecode-interpreter
+architecture for your language implementation rather than a
+native-code-compiler architecture, although they're not nearly as
+strong now as they were in the past (say, when Pascal was being
+developed, and there were literally dozens of incompatible CPU
+architectures in common use, some with several operating systems.)
+But performance is not a valid reason for this.
+
+I wrote a kragen-tol post with more detail about this in March. [2]
+
+Someone might argue that a machine-code compiler is inherently more
+complex than a bytecode interpreter, but I don't think that's
+necessarily true.  The OCaml interpreter/compiler comparison above is
+one data point.  As another, in 2003, I hacked together a machine-code
+"compiler" from parse trees for arithmetic expressions, using gcc to
+actually generate the machine code, in just a few hours [3].  But I
+don't have enough experience building machine-code-generating backends
+to say for sure.
+
+Several of Ola Bini's Statements are Dubious
+--------------------------------------------
+
+Bini ends his post, "So please, stop spreading this myth. It is NOT
+true and it has NEVER been true."
+
+I think the myth he refers to is that bytecode interpreters are slow.
+But as shown both by his post and this note, pure bytecode
+interpreters are indeed considerably slower than native machine code.
+While native-code compilers that compile from bytecode can produce
+fast code, that's not because they use bytecode as an input format;
+that's because they're native-code compilers, often highly-tuned
+native-code compilers that use run-time profiling and type feedback
+information, and native code can run pretty fast.  Even
+naively-generated native code rarely runs as slow as bytecode in a
+bytecode interpreter.  (See section 4.5 of Urs Hölzle's dissertation
+[12]; the "non-inlining compiler" of Self-93 was 2600 lines of C++,
+one-fifth the size of the OCaml bytecode interpreter, and Hölzle
+argues that bytecode interpretation would be hard-pressed to do
+better.)
+
+But Bini originally said, "[Rubinius] is byte code based. This means
+it's easier to handle performance."  It's a pretty ambiguous statement
+(easier than what? what does "handle" mean?) but I think this note has
+adequately outlined the degree to which the obvious interpretations
+are false.  While there are slower language implementation techniques
+than bytecode interpreters available, such as those used by bash or
+Tcl 7, they aren't in wide use.
+
+Rubinius may well achieve excellent performance, or it may not, but
+its use of bytecode is not particularly relevant to that goal.
+
+References
+----------
+
+[0] "Can Bytecodes Perform Well?", by Ola Bini, 2007-09-24, on his
+blog
+> http://ola-bini.blogspot.com/2007/09/can-bytecodes-perform-well.html
+
+[1] flippant comment on Ola Bini's blog post "Rubinius is Important",
+by Kragen Javier Sitaker
+> http://ola-bini.blogspot.com/2007/09/rubinius-is-important.html#comment-2698114255651946754
+
+[2] "OCaml vs. SBCL, and various other interpreters", Kragen Sitaker,
+posted to the kragen-tol mailing list on 2007-03-12
+> http://lists.canonical.org/pipermail/kragen-tol/2007-March/000852.html
+
+[3] "compiling Python arithmetic expressions to machine code", Kragen
+Sitaker, posted to the kragen-hacks mailing list on 2003-02-14
+> http://lists.canonical.org/pipermail/kragen-hacks/2003-February/000364.html
+
+[4] "All you wanted to know about the HiPE compiler (but might have
+been afraid to ask)", by K. Sagonas, M. Pettersson, R. Carlsson,
+P. Gustafsson, and T. Lindahl, July 2003, 7 pp.
+> http://user.it.uu.se/~kostis/Papers/erlang03.pdf
+or
+> http://www.erlang.se/workshop/2003/paper/p36-sagonas.pdf
+linked from
+> http://www.erlang.se/publications/publications.shtml
+
+[5] Mailing list post "Reconsidering gcjx", from Tom Tromey to the
+java@gcc.gnu and gcc@gcc.gnu mailing lists, posted 2006-01-26; in
+particular, see the part "Technical approach", which lists three
+optimizations previously available only with the .java front end.
+> http://gcc.gnu.org/ml/gcc/2006-01/msg01034.html
+
+[6] Question 4.2 in the GCJ FAQ, "Can GCJ only handle source code?",
+most of which answer is written by Per Bothner; the page says it was
+last updated 2007-08-19.
+> http://gcc.gnu.org/java/faq.html#4_2
+
+[7] Mailing list post on the thread "Reconsidering gcjx", from Tom
+Tromey to the java@gcc.gnu and gcc@gcc.gnu mailing lists, posted
+2006-01-29, in which he talks about losing "a small optimization
+related to String "+" operations".
+> http://gcc.gnu.org/ml/gcc/2006-01/msg01095.html
+
+[8] GCJ news item from 2007-01-08: "We've merged the gcj-eclipse
+branch to svn trunk... This new code will appear in GCC 4.3."
+Currently this is on the GCJ home page:
+> http://www.gnu.org/software/gcc/java/index.html
+But eventually it will probably move to the "Less Recent GCJ news"
+page:
+> http://www.gnu.org/software/gcc/java/news.html
+
+[9] "Timing Trials, or, the Trials of Timing: Experiments with
+Scripting and User-Interface Languages", by Brian W. Kernighan and
+Christopher J. Van Wyk, 1998
+> http://cm.bell-labs.com/cm/cs/who/bwk/interps/pap.html
+
+[10] Doug Bagley's Great Programming Language Shootout is now no
+longer available from Doug's site, but it can be found on the Internet
+Archive:
+> http://web.archive.org/web/20040805144133/www.bagley.org/~doug/shootout/index3.shtml
+
+[11] "Performance Comparison of Java/.NET Runtimes (Oct 2004)", by
+Kazuyuki Shudo, 2005-11-20
+> http://www.shudo.net/jit/perf/
+
+[12] "Adaptive Optimization for Self: Reconciling High Performance
+with Exploratory Programming", by Urs Hölzle, August 1994, his
+doctoral dissertation.
+> [[??? XXX]]
+Linked from the Sun Self Research Papers page:
+> http://research.sun.com/self/papers/papers.html
+
+[13] [[Chambers ]]
+
+Notes from Hölzle's dissertation:
+
+        Thus, we believe that type feedback is probably easier to add
+        to a conventional batch-style compilation system.  ... As
+        mentioned above, static compilation has the advantage that the
+        compiler has complete information since optimization starts
+        after a complete program execution. ... On the other hand, a
+        dynamic recompilation system has a significant advantage
+        because it can dynamically adapt to changes in the program's
+        behavior.
+
+(section 5.6, p. 42, "Adding type feedback to a conventional system")
+
+        The combination of SOAR's software and hardware features was
+        very successful when compared with other Smalltalk
+        implementations on CISC machines: with a 400 ns cycle time,
+        SOAR ran as fast as the 70 ns microcoded Xerox Dorado
+        workstation and about 25% faster than the Deutsch-Schiffman
+        Smalltalk system running on a Sun-3 with a cycle time of about
+        200 ns. However, as we will see in Chapter 8, the optimization
+        techniques used by the SELF compiler greatly reduces the
+        performance benefit of special hardware support.
+
+(section 2.5.4.2, p. 11; SOAR is a non-dynamic native-code compiler
+running on a customized version of the Berkeley RISC II processor)
+
+Chambers's dissertation mentions some stuff about Dorado comparative
+performance:
+
+        The definition of Smalltalk-80 specifies that source code
+        methods are translated into byte codes, the machine
+        instructions of a stack machine. Originally, Smalltalk-80 ran
+        on Xerox Dorados implementing this instruction set in
+        microcode [Deu83]. Subsequent software implementations of
+        Smalltalk-80 on stock hardware supplied a virtual machine that
+        interpreted these byte codes in software. Needless to say this
+        interpretation was quite slow [Kra83].
+
+Kra83 is:
+
+      [Kra83] Glenn Krasner, editor. Smalltalk-80: Bits of History,
+      Words of Advice. Addison-Wesley, Reading, MA, 1983.
