@@ -267,7 +267,7 @@ class Note:
 
         subtitle = ley(div(self.author(), ', ', self.date_string(),
                            **{'class': "metadata"}))
-        return html.replace('</h1>', '</h1>' + subtitle)
+        return html.replace('</h1>', '</h1>' + subtitle, 1)
 
     def author(self):
         for subj, verb, obj in self.bundle.triples():
