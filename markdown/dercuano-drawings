@@ -3,7 +3,8 @@ images of any kind is sort of annoying.  My actual, paper notebooks
 have a little line-drawing “icon” for each note, maybe 10 millimeters
 square, but often some kind of graphic would help a lot both with
 visual appeal and with comprehensibility.  But my total byte budget of
-some 5MB makes this challenging.
+some 5MB, so that Dercuano remains easily downloadable in full, makes
+this challenging; I need a way to make very compact graphics.
 
 This is related to `dercuano-calculation` and
 `dercuano-formula-display`.
@@ -64,17 +65,13 @@ resulting image files are dozens of kilobytes each.
 
 ### No bloated SVGs ###
 
-It’s important that whatever I choose be compact, because Dercuano
-needs to remain easily downloadable in full.
-
 The Web standard format for line drawings is SVG — even hand computers
 running iOS support it now.  SVG is super cool; it supports
 alpha-blending, Bézier curves, gradients, arbitrary affine transforms,
+some degree of abstraction and reuse,
 and text.  You can do a lot in very few bytes of SVG, and it’s a lot
 more readable and debuggable than PostScript, my pre-SVG favorite.
-The standard example is probably something like this 78-byte triangle,
-which is perhaps an especially good example because it renders
-incorrectly in old versions of Firefox:
+The standard example is probably something like this 78-byte triangle:
 <svg width="30" height="40">
 <path d="M 10,10 L 20,20 10,30" fill="red"/>
 </svg>
@@ -87,66 +84,95 @@ incorrectly in old versions of Firefox:
 And I *have* used SVG for diagrams, for example in file
 `mechano-optical-vector-display`:
 
-<div><svg width="128" height="128"><!-- This is a diagram. -->
+<svg width="128" height="128" class="diagram m">
 <use xlink:href="#burst" transform="translate(128 60.24)" />
 <path class="beam" d="M128,60.24 L60,60.24 l-121.1,-992.5" />
 <path class="mirror" d="M90.51,128 A90.51,90.51 0 0,0 0,37.49 v90.51" />
 <path class="arrow" d="M20,57.49 a70.51,70.51 0 0 1 50.51,50.51" />
 </svg>
 <!-- SVG for definitions of common things used in embedded SVGs. -->
-<svg><defs>
+<svg style="display: none" class="m"><defs>
 <marker id="v" overflow="visible" orient="auto">
   <path d="M-8,-4 0,0 -8,4" />
 </marker>
 <marker id="vv" overflow="visible" orient="auto">
   <path d="M-8,-4 0,0 -8,4 M4,-5 12,0 4,5" />
 </marker>
-<symbol id="burst" overflow="visible">
+<symbol id="burst" overflow="visible" class="m">
 <path d="M0,0 l-16,-16 16,16  -16,16 16,-16  -16,-8 16,8
          -16,8 16,-8  -8,-16 8,16  -8,16 8,-16" class="beam" />
 </symbol>
 </defs></svg>
 <style>
-path { stroke: black; stroke-width: .5px; fill: none }
-.beam { stroke: red }
-.mirror { stroke-width: 0; fill: #ccc }
-.arrow { marker-end: url(#v); marker-start: url(#vv) }
+svg.diagram { margin-left: auto; margin-right: auto; display: block }
+.m path { stroke: black; stroke-width: .5px; fill: none }
+.m .beam { stroke: red }
+.m .mirror { stroke-width: 0; fill: #ccc }
+.m .arrow { marker-end: url(#v); marker-start: url(#vv) }
 </style>
-</div>
 
 The source code for that looks like this, which is somewhat verbose
 but arguably not unreasonably so.
 
-    <div><svg width="128" height="128"><!-- This is a diagram. -->
+    <svg width="128" height="128" class="diagram m">
     <use xlink:href="#burst" transform="translate(128 60.24)" />
     <path class="beam" d="M128,60.24 L60,60.24 l-121.1,-992.5" />
     <path class="mirror" d="M90.51,128 A90.51,90.51 0 0,0 0,37.49 v90.51" />
     <path class="arrow" d="M20,57.49 a70.51,70.51 0 0 1 50.51,50.51" />
     </svg>
     <!-- SVG for definitions of common things used in embedded SVGs. -->
-    <svg><defs>
+    <svg style="display: none" class="m"><defs>
     <marker id="v" overflow="visible" orient="auto">
       <path d="M-8,-4 0,0 -8,4" />
     </marker>
     <marker id="vv" overflow="visible" orient="auto">
       <path d="M-8,-4 0,0 -8,4 M4,-5 12,0 4,5" />
     </marker>
-    <symbol id="burst" overflow="visible">
+    <symbol id="burst" overflow="visible" class="m">
     <path d="M0,0 l-16,-16 16,16  -16,16 16,-16  -16,-8 16,8
              -16,8 16,-8  -8,-16 8,16  -8,16 8,-16" class="beam" />
     </symbol>
     </defs></svg>
     <style>
-    path { stroke: black; stroke-width: .5px; fill: none }
-    .beam { stroke: red }
-    .mirror { stroke-width: 0; fill: #ccc }
-    .arrow { marker-end: url(#v); marker-start: url(#vv) }
+    svg.diagram { margin-left: auto; margin-right: auto; display: block }
+    .m path { stroke: black; stroke-width: .5px; fill: none }
+    .m .beam { stroke: red }
+    .m .mirror { stroke-width: 0; fill: #ccc }
+    .m .arrow { marker-end: url(#v); marker-start: url(#vv) }
     </style>
-    </div>
 
 However, you can probably kind of tell from reading that that it was
 pretty slow to write, and from looking at it that the workflow doesn’t
 really support rapid iteration to get it to look good.
+
+What you can’t necessarily tell from looking was that when I added
+that diagram to this document, it broke the triangle example higher
+up, so I hacked it not to interfere, and then I had to spend some time
+debugging incompatibilities between Firefox and Chromium about when
+they applied certain styles (arguably a bug in Firefox).
+
+#### SVG’s abstraction capability is very limited ####
+
+That diagram exploits SVG’s capabilities for reducing duplication to
+the maximum, to the point that I had to bring in code from three
+separate parts of its source document to use it here (and then, as I
+said, hack them so they wouldn’t break other SVGs).  It uses a
+stylesheet with overrides to specify how lines, arrows, and areas
+should be drawn, and it uses SVG’s `<marker>` and `<symbol>`
+facilities to define graphic elements that can be used many times in
+the same drawing or across many drawings.
+
+But those facilities, though complex, expensive in terms of syntactic
+overhead, and hard to debug, are still very limited.  You can reuse a
+`<symbol>` in different places, for example, but not with different
+line widths or colors.  (In theory I think you can, but it doesn’t
+fucking work, at least in Firefox.)  You can apply the same style to
+different pieces of text or different paths, but as far as I can tell,
+you can’t instantiate a rectangular component at different widths in
+different places, other than by stretching the whole component,
+including its line widths.  The kind of simple constraint satisfaction
+we routinely apply to HTML with the CSS box model is entirely outside
+of our reach in SVG.
 
 #### WYSIWYG SVG editors produce insanely bloated output ####
 
@@ -249,7 +275,7 @@ graphics.  But in Dercuano much of the time a dynamic,
 interactively-responsive graphic would be better, and only marginally
 harder to write.
 
-### d3 may be a good option ###
+### d3 may be a good option, but not for illustrations ###
 
 d3.js is a JS library for dynamic data-driven graphics which generates
 SVG at runtime using the DOM.  One of the minified copies of d3.js I
