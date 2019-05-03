@@ -1,0 +1,321 @@
+Darius Bacon has suggested writing a software system that is a “book
+written in itself”: a book-length hypermedia literate program which is
+fully self-sustaining, all the way down to hardware, and accessible to
+any interested reader.
+
+“Self-sustaining” means that the book contains full compilable source
+code for itself, for a compiler with which it can be compiled, and for
+a computer on which to run it.
+
+Comparison to other related projects
+------------------------------------
+
+In a way, this is a project analogous to Knuth’s magnum opus, The Art
+of Computer Programming, in that it has to cover a very broad spectrum
+of computer applications — minimally: hardware design, compilers,
+filesystems, operating systems (also known as kernels), garbage
+collection, dynamic dispatch, windowing systems, font design, and
+typographical layout; but possibly also including text editors, video
+and audio codecs, data compression, database query evaluation, HTML
+parsing, constraint systems, type inference, theorem proving, SAT
+solving, cryptography, full-text indexing, games, numerical methods,
+SPICE-like electrical simulation, CNC fabrication, and OCR (to be able
+to scan its own text).
+
+Other similar projects are the “NAND to Tetris” book, formally known
+as _The Elements of Computing Systems_; and Charles Petzold’s _Code_;
+the Thwaites Toaster Project; the Dave Gingery “Build a Machine Shop
+from Scratch” series; the Primitive Technology series on YouTube; the
+1978 port of Smalltalk-76 to the portable 8086-based NoteTaker
+computer, known as Smalltalk-78, which weighed in at 200 kilobytes;
+Project Oberon; Plan 9; the VPRI STEPS program to rebuild a full
+personal computing environment in twenty thousand lines of code; and
+the biological cell.
+
+### Differences from TAOCP ###
+
+The project has two enormous differences from TAOCP and some smaller
+differences.
+
+First, it’s much less ambitious in scope — TAOCP seeks to provide an
+overview of all known solutions to a problem, telling the story of
+their historical development and mathematically analyzing the
+limitations and advantages of each solution; the Book-In-Itself need
+ony provide one solution.  For example, TAOCP’s volume 3 is “Sorting
+and Searching”, which covers nothing more than sorting and various
+kinds of table lookup (in trees and hash tables) for 800 pages.  The
+Book-In-Itself might include a single kind of hash table, or it might
+need three or four different kinds of hash tables for bootstrapping or
+efficiency reasons.  It probably needs sorting; a single
+implementation of Heapsort is likely adequate.  In any case, it’s
+unlikely to spend more than three pages on sorting and searching.  
+
+So this reduces the project scope by a factor of 300.
+
+Second, it’s much more ambitious in scope — TAOCP’s scope is limited
+to software, and even more so, to generally applicable algorithms.
+You aren’t going to find a filesystem implementation, a gate-level CPU
+design, or a text layout engine in TAOCP; although its author found it
+necessary to design his own font design system, his own fonts, and his
+own text layout system for TAOCP, those are described in other books.
+
+This probably increases the project scope by a factor of 10.  This
+multiplies out to about 30× reduction.  Since TAOCP has taken 50 years
+so far and may be done in another ten or so, this suggests that the
+Book-In-Itself should take about two years of work.
+
+Smaller differences are that the Book-In-Itself is almost certain to
+be written by lower-quality authors; it’s likely to be a team effort,
+rather than an individual effort; and, simply in order to be feasible,
+it’s likely to suffer from Dirac-like levels of terseness.
+
+### Differences from “NAND to Tetris” ###
+
+The NAND to Tetris book (_The Elements of Computing Systems: Building
+a Modern Computer from First Principles_, 320 pages, 2005, Nisan and
+Schocken) describes a computer system, starting from NAND gates and D
+flip-flops, moving up through sequential logic, the design of a
+Harvard CPU called “Hack”, assembly language, bytecode interpretation,
+a simple recursive-descent compiler for a “high-level” language called
+“Jack”, an “operating system”, and some video games.
+
+This is thrilling, and additionally the authors have separately
+published a series of exercises and computer software to guide readers
+through the implementation of the entire system themselves, rather
+than simply providing them with working code.
+
+Unfortunately, some aspects of the system are sort of fake, and some
+others are overcomplicated:
+
+- the “operating system” is just a set of device drivers and doesn’t
+  provide multitasking or a filesystem;
+- the “high-level” language Jack doesn’t provide garbage collection,
+  function pointers, or even dynamic dispatch, and its compiler emits
+  bytecode for a stack machine implemented in software rather than
+  machine code;
+- the hardware definition language seems to have been designed by
+  software people so soft they don’t know what dynamic RAM is, don’t
+  know the difference between a chip and a printed circuit board, and
+  have never seen a RISC instruction set;
+- the hardware doesn’t have virtual memory, interrupts, any I/O
+  devices other than a screen and keyboard, or any way to modify its
+  program memory;
+- the tokenizer and parser output XML;
+- although they have infix expression parsing, it doesn’t handle
+  operator precedence;
+- there is this entire unnecessary bytecode virtual machine;
+- the absence of a filesystem prevents you from running the compiler
+  under the “operating system”;
+- the whole system is so slow that students are never expected to run
+  the whole thing at once, always using a provided efficient
+  implementation (written in Java) of the layer below the one they’re
+  working at.  Their Pong game is 400 lines of code and compiles to
+  twenty thousand lines of assembly.
+- although this is subjective, all in all, the book has a somewhat
+  leaden and uninspired feel; even the authors describe Jack as
+  “clunky”.  After each chapter, one is left with the sad feeling that
+  the functionality of the system at that point is surprisingly weak,
+  given its complexity, and the forlorn hope that it will get better
+  in the next chapter.
+
+By contrast, the Book-In-Itself will not rely on separately provided
+software; it will use more tasteful design choices to get surprisingly
+powerful functionality instead of surprisingly weak functionality; and
+it will be efficient enough to run its entire software stack
+unmodified on a CPU emulated in software on a modern CPU.
+
+One gets the idea, for example, that Jack’s syntax is “clunky” in part
+by the authors not wanting to introduce backtracking, perhaps because
+they don’t know about it, although they published their book three
+years after Bryan Ford’s thesis came out.
+
+### Differences from Petzold’s _Code_ ###
+
+Where NAND to Tetris is somewhat too theoretical, idealized, and
+plodding, Petzold’s _Code_ (1999) goes into nitty-gritty detail, but
+doesn’t teach you enough to build a working system.  It’s considerably
+more hardware-focused than NAND to Tetris, which is sort of
+unfortunate, since Petzold’s hardware knowledge is a bit weak.
+
+On page 304, for example, you have the pinout of the 2102 one-kibibit
+MOS SRAM chip, state of the art in the 1970s.  At times Petzold seems
+to be trapped in the 1970s, too; he claims that TTL is faster than
+MOS, which stopped being true about 15 years before he published this
+book.
+
+But the book includes a lot of detail that’s hard to find coverage of
+elsewhere outside of much more specialized books, including things
+like DIP switches, ripple-carry adder circuits made of relays, Samuel
+F.B. Morse’s hobby of making daguerreotypes, the PARC visit inspiring
+Macintosh, bit-shift operators in C, the atomic number of lithium, the
+PostScript format, Java bytecode, how the resistance of tungsten
+varies with temperature, CP/M filesystem and memory layout, the
+dynamic range of the CD-DA PCM format, tri-state MOS outputs, GNU and
+Linux, circuit diagrams of master-slave edge-triggered D flip-flops,
+the Sieve of Eratosthenes, redundancy in the design of UPC codes (and
+their detailed decoding algorithm), the vector graphics display
+screens at SAGE, the Memex, the ALGOL committees, binary-coded
+decimal, IBM extended ASCII code pages, telegraph relays, the RTF
+format, Siskel and Ebert movie ratings, LZW compression in the GIF
+format, the number of electrons in a coulomb, Sutherland’s Sketchpad,
+the process by which Louis Braille went blind, the number of fingers
+usually possessed by cartoon characters, the comedic etymology of
+“WYSIWYG”, the number of pins on the 8087, the IEEE-754 floating point
+format, DX-encoding on 35-mm film canisters, Grace Hopper’s career
+trajectory, the frequencies used by 300-baud FSK modems, the pricing
+of 10-gauge hookup wire at Radio Shack, George Boole’s ancestry, ANSI
+cursor-addressing escape sequences, the 8080 instruction set and
+assembly syntax, Longfellow’s poem about Paul Revere, Morse code,
+Radio Shack relay part numbers, NTSC sync pulse voltage levels,
+logographic “contractions” in Braille, the rise of the IDE starting
+from Turbo Pascal, Altair BASIC, the hardware floating-point encodings
+of the IBM 704, examples of Ohm’s law, the failed GUI VisiOn, MIDI
+sound cards and the structure of MIDI commands, transcendental
+function approximation using Taylor expansions, and so on.
+
+In short, it goes into enough detail that you can actually learn
+things from it — it’s not at the Wired-article level of pseudo-
+informative flimflam — but it’s far from presenting a complete design
+for a working computer, much less a healthy software ecosystem.
+
+The Book-In-Itself will have to omit most of the flashy, entertaining
+historical detail, but will include a complete system.
+
+### Differences from the Thwaites Toaster Project ###
+
+Thomas Thwaites mined mica and metal ore from mines and plastic from
+garbage dumps; he made a wooden mold to shape the plastic; he smelted
+the metal; he refused to travel by air or use CNC mills.  After nine
+months of work and US$1800 of expenses, he had an nearly functional
+toaster.  Unfortunately, aside from looking terrible, it burned out
+after a few seconds of operation, because his metallurgy wasn’t up to
+snuff when it came to making oxidation-resistant alloys.
+
+Thwaites complicated his life significantly by deciding to use steel
+and plastic for his toaster.  His choice of Constantan for the heating
+elements was probably unavoidable, but I suspect that making most of
+the toaster from copper would have worked significantly better.  (To
+be fair, his mentor Professor Cilliers informed him of this at the
+beginning of the project.  Steel and plastic were a hair-shirt for
+Thwaites.)  He made his life harder still by insisting on using the
+obsolete bloomery process to smelt the iron, then lowering its carbon
+content by remelting it in his microwave.
+
+The Book-In-Itself starts at a layer above where the Toaster Project
+ended: it presupposes the capacity to make complex physical artifacts,
+including megahertz-class logic circuits with tens of thousands, if
+not millions, of components.  However, given that capacity, the
+Book-In-Itself is intended as a complete design that can execute
+*itself*, rather than just a story of a personal quest, perhaps a
+story that could inspire another person to undertake their own quest.
+
+Moreover, a possible extension of the software core of the Book-In-
+Itself is an automated manufacturing module, capable of fabricating
+the hardware artifacts automatically, given suitable materials.  This
+may or may not be included, depending on time and experiences.  It
+would likely enable the Book-In-Itself to fabricate not only more
+instances of itself, but also to fabricate toasters — perhaps a
+*reductio ad absurdum* of Lincoln’s axe-sharpening dictum.
+
+### Differences from the Dave Gingery series ###
+
+Dave Gingery, and later his family, have published a series of books
+on how to build a metalworking shop from scrap materials, including
+techniques like hand scraping flat surfaces, sand casting of metals in
+a charcoal foundry, and lathe turning.
+
+The books are unreadable without an existing background in the
+techniques they discuss; if you don’t know the names of the parts of a
+lathe, you aren’t going to get very far in understanding Gingery’s
+explanation of how to build one.
+
+Unlike most of the other similar projects, the results in the Gingery
+books have been successfully replicated by several people, some of
+whom have documented their experiences on YouTube.
+
+As with the Thwaites project, the Gingery series stops at a level of
+abstraction below where the Book-In-Itself begins, but Gingery
+succeeded in producing competent industrial machinery — not quite from
+scratch, as Thwaites aspired to, but from scrap materials.  (Gingery
+had the advantage of being an experienced machinist rather than a
+24-year-old second-year postgraduate design student.)  But the
+relationship is rather similar: the Book-In-Itself cannot be built
+without the ability to construct complex artifacts, going even beyond
+what the Gingery books can produce, but perhaps it could include
+software modules for producing machine-shop equipment, given access to
+the right materials.
+
+### Differences from the Primitive Technology series ###
+
+An anonymous or pseudonymous man in the rain forest in Australia is
+undertaking an even more ambitious project than Thwaites’ Toaster: he
+is constructing a series of artifacts made entirely with materials and
+tools available in nature.  The process is meticulously documented in
+a carefully edited YouTube video series and a blog.  So far, he has
+created several stone axes, a stone adze, a ceramic-firing kiln, some
+ceramic pots, a ceramic tiled roof, two houses (one with a hypocaust),
+a woodshed, some wicker baskets, bow and push drills, a bow and arrow,
+charcoal, and a fenced sweet potato patch.  He aspires to smelt iron.
+So far he has not mentioned any plans for electrical appliances.
+
+This project consists of the levels of abstraction underpinning the
+Gingery project, and points out one of the reasons the Thwaites
+project was so difficult: Gingery used existing industrial materials
+and tools, while Thwaites attempted to abjure them.  Within Gingery’s
+constraints, a toaster would be entirely feasible — perhaps a project
+of a day or two, maybe a week, certainly not nine months.  But once
+you’re mixing your own Constantan, you’re playing at a much higher
+level of difficulty.
+
+However, the Primitive Technology series has a purity that parallels
+the purity of the Book-In-Itself: its author apparently begins with no
+tools, not so much as a steel pocketknife, and thus begins his project
+by banging rocks together to get split-cobble cutting edges.
+Similarly, the Book-In-Itself depends — in theory — on no hardware or
+software outside of the book itself; once you have the capability to
+make machines of almost any kind with tens or hundreds of thousands of
+parts, you need no further information-processing facilities to bring
+up a complete computing environment.
+
+There’s a crucial distinction here: the Book-In-Itself will be “self-
+sustaining”, in the sense that it can easily replicate itself, and
+modified versions of itself, once it’s running; but only optionally
+will it be “self-bootstrapping” in the way the Primitive Technology
+series is — that it’s easy to get it running starting from a minimal
+basis.  A self-sustaining system is written in itself; a self-
+bootstrapping system is written in something that already exists.
+
+There are two basic approaches to adding bootstrapping to a
+self-sustaining system: you can write two versions of the
+bootstrapping core, one implemented in the system’s own language and
+another written in some already-implemented language; or you can write
+the bootstrapping core in the intersection between the language
+implemented by the system and a language implemented by something
+else, which may be a subset, a superset, or an extended subset of what
+the system implements.  In either case, by positing different base
+layers to bootstrap from, you can get very different results
+
+In the more fundamental layers explored by Gingery, Thwaites, and the
+Primitive Technology series, a self-sustaining system might consist of
+a lathe; a small blast furnace, like the kind used in China in late
+antiquity (around the Qin era); a charcoal-generating kiln employing
+metal cans; a woodland, harvested using steel axes; a smithy, with its
+hammer, tongs, anvil, and hearth; a concrete grindstone, mounted on
+bearings cut on the lathe; a ceramic-firing kiln for making refractory
+bricks; a cement kiln for making new grindstones; and mines for fire
+clay, quartz sand, iron ore, and limestone.  But bootstrapping that
+system from stone, mud, and trees is likely to involve additional
+tools and materials, such as stone axes and perhaps facilities for
+smelting tin and copper to make bronze tools.
+### Differences from Smalltalk-78 ###
+
+### Differences from Project Oberon ###
+
+### Differences from Plan 9 ###
+
+### Differences from the VPRI STEPS program ###
+
+The STEPS target of 20,000 lines of code is about 300 pages.
+
+### Differences from the biological cell ###
+

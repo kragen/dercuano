@@ -1,0 +1,329 @@
+I was reading a book on digital signal processing (the highly readable
+if occasionally inaccurate and somewhat outdated _Guide to Digital
+Signal Processing for Scientists and Engineers_
+<http://www.dspguide.com/>), and it seemed to me that the available
+types of digital filters leave a lot to be desired.
+
+FIR filters are the most popular because you can design them by
+Fourier-transforming your desired frequency response to get an impulse
+response, then windowing the impulse response to get a finite-size
+convolution kernel.  Windowing with the popular Blackman or Hamming
+windows only screws up your frequency response slightly.  The trouble
+is that your convolution kernel may be dozens to hundreds of samples
+wide, so you end up doing dozens to hundreds of multiply-accumulates
+if you compute the convolution in the time domain; and to do it in the
+frequency domain, you need to do the FFT, which also involves
+typically dozens of multiply-accumulates per sample.
+
+IIR filters are technically a superset of FIR filters, but people
+usually design them by transforming well-known analog filters (like
+the classic Butterworth or Bessel filters) into the discrete domain,
+which is very limiting.  Additionally, the typical design technique
+using the Z-transform requires that the filter itself be linear and
+stateless, with each output sample being a linear combination of the P
+previous input samples and the Q previous output samples.
+
+In passing, the moving-average filter was mentioned as being much
+faster to compute, since it requires only an addition and a
+subtraction per sample, optimal for suppressing noise while preserving
+edge sharpness, and producing a good approximation of convolution with
+a Gaussian when iterated.
+
+So some ideas occurred to me, which might or might not be good ones,
+but I thought I'd write them down anyway.
+
+Square-wave filters
+-------------------
+
+The discrete Fourier transform transforms your given samples onto a
+basis space of orthonormal sinusoids, enabling you to, among other
+things, measure the amplitude of individual frequencies, or multiply
+them by a desired frequency response curve before transforming them
+back into the time domain with an inverse discrete Fourier transform
+(a filter).
+
+But many other sets of orthonormal basis functions are possible: the
+Hadamard–Walsh functions, unit impulses (which yields the identity
+transform), an infinite variety of wavelets, windowed sinusoids (the
+short-time Fourier transform), the Gabor basis function (the Gabor
+transform happens to be a special case of the STFT and also, I
+believe, the wavelet transform), and so on.
+
+The Hadamard–Walsh functions are particularly interesting because
+there's an O(N log N) algorithm to compute the Hadamard or Walsh
+transform, using only addition and subtraction, because the basis
+functions have the range {-1, 1}, with no fractions, and are related
+to each other in a particular way that enables the fast Hadamard
+transform to work.
+
+But most of the Hadamard–Walsh functions are not particularly close to
+being sine waves, so they are of limited usefulness if you want to
+filter particular frequencies.
+
+On the other hand, if you have a square wave of some frequency f, it's
+pretty strongly correlated with a sine wave of frequency f with the
+right phase, and it's perfectly uncorrelated with most other sine
+waves.  However, it does have a largish correlation with the odd
+harmonics of the original sine wave, with frequencies 3f, 5f, 7f, and
+so on; its correlations with them are 1/3, 1/5, 1/7, etc., of the
+original.  (So far this is just the standard Fourier analysis of a
+square wave, seen from the perspective of the square wave.)
+
+This same property means that a comprehensive set of square waves is
+not an orthogonal basis, since some of its elements are correlated, if
+imperfectly, and thus not orthogonal.  This, in turn, means that you
+can't simply transform a signal into a weighted sum of square waves by
+correlating it (i.e. taking the dot product) with each square wave.
+
+But suppose you just want to compute the energy in a given time span
+at a given frequency f?  You could take the correlation with a square
+wave sq(f, t) of frequency f and subtract off the other square waves
+until you've approximated a sine to your sampling interval:
+sq(3f, t)/3 + sq(5f, t)/5 + sq(7f, t)/7, etc.  If you can low-pass
+filter the signal before you do this, even crudely (say, with a
+moving-average or simple exponential filter), then you can probably
+quit pretty early.
+
+(You probably want to do this twice, once for sq(f, t) and its
+"harmonics", and once for sq(f, t + 1/2f) and its "harmonics", so you
+can catch a wave that's out of phase.)
+
+Why should you care when the DFT is already O(N log N)
+multiply-accumulates?  Because you can do this faster than O(N log N),
+without multipliers, and without using memory to store the samples, if
+you don't want too many frequencies.
+
+If you only want a *single* square wave correlation, of course, you
+can simply add or subtract each sample to the total as it comes in,
+according to whether sq(f, t) is 1 or -1 at that moment.  But doing
+that for M square waves means doing M additions or subtractions per
+sample.  Instead, use a sum table, also known as a summed-area table
+or integral image: s[t] = sum(x[0:t]), where 0:t includes 0 but not t,
+so sum(x[t0:t1]) = s[t1] - s[t0].  So if your square wave is 1 from
+sample t0 to sample t1, you can add s[t1] - s[t0] to your running sum;
+and if it's -1 from sample t1 to sample t2, you can add s[t1] - s[t2].
+You might as well add 2s[t1] on the negative-going transition at t1 in
+the first place, and later subtract 2s[t2] at the positive-going
+transition at t2, and so on.  And you don't need to actually do the
+doubling at the time; you can wait until you're inspecting the final
+sum before remembering that you need to double it.
+
+This, of course, doesn't require that you actually store the sum
+table, just that you compute the values in it.  This requires one
+addition per sample, plus one addition or subtraction per square-wave
+transition.
+
+If you decide to do this calculation for all the N square waves that
+would correspond to the sinusoids needed for N samples, the waves will
+have numbers of transitions ranging linearly from 0 to N, with an
+average of about N/2, so you'd end up doing N/2 additions or
+subtractions per sample --- definitely worse than Hadamard–Walsh (as
+long as N/2 > lg N, which is true for N>4) and possibly worse than the
+DFT, depending on how much multiplies cost you.  But maybe you need
+less than lg N square waves, or maybe the ones you want are of
+lower-than-average frequency.  Most of the high-frequency square waves
+here will have substantial phase noise induced by quantization which
+will degrade their performance anyway.
+
+You might be able to avoid doing some of this work by taking advantage
+of the fact that it's duplicate work in the case of harmonics.
+Consider the square wave with period 30, which means it has two
+transitions every 30 samples.  The square wave with period 10 has six
+transitions every 30 samples, but two of them are the same as the
+period-30 one; that is, you could compute both the period-10 and
+period-30 square waves with only 6 transitions, rather than 8.
+Similarly, the period-6 square wave has 10 transitions in this period,
+but shares the two of the period-30 wave, so you could compute all
+three with only 14 transitions, rather than 18.  I'm not sure how
+practical this is; it reminds me of the wheel optimization for probing
+possible composites in the Sieve of Eratosthenes.
+
+A difficulty is that, of course, the difference between square waves
+and sine waves has more energy below the Nyquist frequency, or any
+given filter cutoff frequency, for lower-frequency waves.  But perhaps
+you can do better.  The procedure I described above for correlating
+with the square waves is equivalent to integrating the input signal,
+once, and correlating it with a train of alternating positive and
+negative impulses, the derivative of the square wave.  The integral of
+a square wave is a triangle wave, which is much closer to being a sine
+wave, and the integral of a triangle wave is a wave made of parabolas,
+which is a piecewise second-order approximation to a sine wave, and
+actually has almost all of its energy in that frequency; and you can
+iterate the procedure N times to get an Nth-order approximation of a
+sine wave.
+
+So perhaps you could integrate the input signal N times, making an
+Nth-order sum table (materialized or virtual), and correlate that with
+your square waves, or rather, your impulse trains.  One potential
+difficulty is that this corresponds to a pretty heavy-duty low-pass
+filter, and so it will be necessary to introduce a corresponding
+high-pass filter at each stage, if nothing else to prevent any initial
+DC offset, or any introduced later as a constant of integration, from
+causing the procedure to diverge entirely.  A difference in frequency
+of one octave will show up as a difference in magnitude of 2 after one
+stage of integration, of 4 after two stages, of 8 after three stages,
+and of 16 after four stages.  Of course, in a sense, that's exactly
+what we *want* it to do; but roundoff error could be a problem very
+quickly.
+
+Magic sinewave filters
+----------------------
+
+Don Lancaster has been writing about a set of functions he calls
+"magic sinewaves", which are periodic functions with the range
+{-1, 0, 1} that approximate sinewaves, with the purpose of improving
+power electronics by replacing simple PWM with lower-distortion
+waveforms.  Of course, they have very substantial power outside the
+desired frequency --- the same as a PWM waveform, I think --- but the
+idea is that if you push that power to a high enough frequency, it's
+much more practical to filter it, using an analog filter with a slower
+rolloff and physically smaller components.
+
+You can also use this idea in reverse: take your input signal and
+correlate it with a magic sinewave, rather than a real sinewave, thus
+avoiding multiplication entirely.  For accurate results, you need to
+prefilter the signal to eliminate the high harmonics, but you can do
+this with a simple, easy-to-compute filter, such as a moving-average
+filter.
+
+Parallelizing IIR filters
+-------------------------
+
+Parallelizing an M-sample FIR filter is easy: split your input into
+windows that overlap by M samples, filter each one independently, and
+concatenate the results.  But how can you parallelize an IIR filter?
+
+Consider the sum table, which is a simple IIR filter; it amounts to
+convolving a step function with your input.  It's simple and efficient
+to calculate a sum table serially, but how could you parallelize it,
+since the last output value depends on every value before it?
+
+I think I've written about this before on kragen-tol, but the answer
+is basically that it's easy, because addition is a monoid; this is the
+approach taken by lookahead carry in digital logic, too.  If you break
+your input into four equal segments 0:t1, t1:t2, t2:t3, and t3:n, and
+compute the sum table s0[a:b] for each segment independently (in
+parallel), you can then use the final sum of each segment to adjust
+the sums of the other segments, again independently and in parallel:
+s[0:t1] = s0[0:t1], while s[t1:t2] = s[t1] + s0[t1:t2], s[t2:t3] =
+s[t2] + s0[t2:t3], and s[t3:n] = s[t3] + s0[t3:n].  You can apply this
+division of the process recursively (or with a branching factor of
+other than 4, although a branching factor of more than √n is unlikely
+to be an improvement) to get an O(log N) time algorithm.
+
+(This is the well-known "parallel prefix sum" problem.)
+
+*General* IIR filters are impossible to parallelize.  But the IIR
+filters in common usage are purely linear and dependent on a limited
+amount of past history, so you can do the same thing: filter each
+segment independently, then add in the linear contribution from the
+prefix to its left.
+
+Factoring FIR kernels approximately into sparse FIR kernels
+-----------------------------------------------------------
+
+Convolution with a Gaussian is potentially computationally expensive.
+But N iterations of a moving-average filter give you a piecewise
+Nth-order approximation of a Gaussian, and the moving-average filter
+is really cheap to compute.
+
+In general the expense of convolving with a FIR kernel in the discrete
+time domain is expensive in proportion to its *support*, that is, the
+number of points where it's nonzero.  But what if you could factor a
+256-point FIR kernel into a convolution of two 16-point FIR kernels?
+You could compute it four times faster.  That's doable in at least
+some special cases; the Gaussian mentioned above is an example
+(although the moving average has a recursive algorithm that's more
+efficient than just doing it as a FIR convolution in the time domain),
+since actually iterating just about any FIR kernel enough times will
+give you a Gaussian (e.g. [1, 1], whose iterative convolution
+generates the rows of Pascal's triangle; but I suspect that [1, 0, 0,
+0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1] might be a better
+compute/quality tradeoff for larger Gaussians).  But consider these
+examples:
+
+* Exact factorization of a finite comb: a comb of N equally-spaced
+  impulses can be factored into one P-impulse kernel for each prime
+  factor P of N.  For example, a 16-impulse comb can be factored into
+  four two-impulse kernels, with the impulses at distances 1, 2, 4,
+  and 8 times the spacing of the impulses in the desired comb; or a
+  20-impulse comb can be factored into two two-impulse combs and a
+  five-impulse comb.  (In the special case of a composition of two
+  two-impulse combs, it's probably advantageous to preconvolve them
+  into a single four-impulse comb.  The optimum number of impulses per
+  kernel, to keep multiply-accumulates to a minimum, is 3.)
+
+* Exact factorization of exponential decay: for N points, compose
+  log(N) two-point FIR kernels whose points are spaced at powers of 2,
+  whose first point is 1 and whose other point is exponentially
+  decayed from 1 according to its spacing.  This happens to be exact.
+  This is sort of stupid, though, because you can compute exponential
+  decay even more efficiently with an IIR filter.
+
+* Approximation with a sum of equal-width Gaussians: use one sparse
+  kernel with an impulse indicating the center and amplitude of each
+  Gaussian, then one or more FIR kernels, or the moving-average
+  technique, to convolve the result with the desired Gaussian.
+
+* Exact factorization of a periodic signal: factor into a kernel
+  representing a single period and a comb kernel (itself perhaps
+  factored as above) with one impulse for each period, in order to
+  copy each period into its desired place.  If the period is itself a
+  repetition of the same signal twice, but once inverted, you can use
+  an additional kernel with a 1 and a -1 impulse to halve the number
+  of points.  Composed with a Gaussian window, this should give you a
+  fairly efficient way to do FIR bandpass filters.
+
+* Approximate Gaussians --- although this is not the right way to do
+  it, convolve(convolve(convolve(convolve([1, 1,1], [1, 1, 1]), [1, 0,
+  1,0, 1]), [1, 0, 1, 0, 1]), [1, 0, 0, 1]) is quite close to
+  convolve(convolve(convolve([1,1,1,1,1], [1,1,1,1,1]), [1,1,1,1,1]),
+  [1,1,1,1,1]), requiring 14 additions rather than 20.  (The recursive
+  algorithm using a fourth-order moving average, though, requires only
+  8.)
+
+* The well-known "convolution by separability" technique used in image
+  processing, in which you factor a separable kernel into a vertical
+  component and a vertical component, is a special case.
+
+Is there a general technique to find such an approximate factorization
+into sparse kernels for any desired impulse response?  Here's one
+guess: tabulate the frequency responses for some "basis set" of sparse
+kernels, then use a greedy algorithm to iteratively pick the ones that
+best suppress the largest difference between the frequency response of
+your current set of filters and the frequency response you want.
+
+There's a paper this year from Aimin Jiang and Hon Keung Kwan on the
+subject that I haven't read, using weighted least squares (WLS); but
+it sounds from the abstract like they're talking about approximating
+one FIR filter kernel with another, sparser one, not factoring one
+into possibly several.
+
+How small do these factors need to be?  The competition is FFT
+convolution, which, if I understand correctly requires computing a
+DFT, pointwise complex multiplication, and computing an inverse DFT.
+Each DFT requires N lg N butterflies, each of which requires one
+complex multiplication and two complex additions or subtractions.  One
+complex multiplication requires four real multiplications.  So we have
+2 × 4 × N lg N real multiplications, or 8 lg N real multiplications
+per point, plus some other overhead work which is mostly proportional.
+FFT convolution isn't worthwhile unless lg N is at least 6, at which
+point you're paying 48 real multiplications per point (which is why it
+isn't useful for smaller N); if lg N is 7, 8, 9, or 10, you're paying
+56, 64, 72, or 80 real multiplications per point.
+
+Probably close to the best you can do for a filter kernel with N-point
+support is 3 log₃N multiply-accumulates per point, which is only
+slightly lower than 2 lg N, although in some cases maybe you can get
+by without the multiplications.  2 lg N is substantially less than
+8 lg N, and furthermore the N you use in the FFT is going to be around
+two or three times the size of the kernel, so there's some hope that
+this algorithm could maybe do a reasonable job
+
+IIR: the undiscovered country
+-----------------------------
+
+Basically we know that IIR filters can always be more computationally
+efficient than FIR filters, sometimes dramatically; but we don't have
+a good theory of how to design them.  There are probably a lot of
+tasty morsels hiding in IIR-space.

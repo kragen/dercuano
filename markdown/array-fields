@@ -1,0 +1,27 @@
+If you have some underlying field like GF(2) you might think you could
+derive an infinite variety of other fields from it by way of taking
+arrays of some finite size which operate elementwise.
+
+For example, GF(2) is just bits, using AND as multiplication and XOR
+as addition; considering the field axioms, these are associative,
+commutative, have identity, distribute (a & (b ^ c) = (a & b) ^ (a &
+c)) and have inverses (each element is its own inverse, trivially so
+in the case of AND: 1 & 1 = 1), so that’s a finite field.  You might
+think that you could extend this elementwise to “bitvectors” (not in
+the sense of a vector space, just in the sense of arrays of bits) but
+this fails when we get to the inverse: AND with a “bitvector”
+containing zeroes is information-destroying, so there can be no
+inverse.  In the single-bit case, we get to escape by pleading
+division by zero, but not in the multibit case.
+
+So “bitvectors” of some size form a commutative ring with unity, but
+not a field.
+
+There *is* a field of size 2⁸, though.  It’s GF(256), which is not
+just ℤ/256ℤ, arithmetic modulo 256, as you might think — that’s,
+again, just a commutative ring with unity, since there are plenty of
+pairs of numbers that multiply to zero, like 2·128, so not every
+member has a multiplicative inverse.  No, in some sense it *is* a
+vector of 8 bits, but I don’t understand the construction of the
+operations; it’s some kind of construction with monic irreducible
+polynomials.
