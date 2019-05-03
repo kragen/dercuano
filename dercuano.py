@@ -297,6 +297,13 @@ class Note:
 
         return output_stat.st_mtime <= source_stat.st_mtime
 
+    # For classify.py
+    def read_words(self):
+        with open(self.source_file) as f:
+            for line in f:
+                for word in re.findall(r'\w+', line):
+                    yield word.lower()
+
 
 def markdown_replacing_links(bundle):
     def replace(s):
