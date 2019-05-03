@@ -4,8 +4,18 @@ than being like an advertising brochure.  (When I started writing
 this, the only CSS thing I’d done was give it a max-width to keep the
 lines from being 2000 pixels long.)
 
+But what does a book look like?  What does a good web page look like?
+
 Medium
 ------
+
+Marcin Wichary of Medium wrote an article entitled, “Crafting link
+underlines on Medium,” in which he talks about how to get link
+underlines to work.  He describes a CSS hack using background images
+“synthesized *via*” gradients, and also describes a further hack using
+a white CSS text shadow to make it clear descenders, which they
+apparently don’t actually use — but Gwern does something like this,
+see [below](#gwern).
 
 I looked at Medium to see how they’re doing things.  They set the
 article title and article text in a serif font (falling back to
@@ -33,9 +43,16 @@ The body text is set in a single column with a max-width of 700
 pixels, which works out to 33 ems.  It’s centered with `margin: foopx
 auto` at the appropriate level of nesting; inline images are also
 centered but in a wider column, so they can reach the margins on a
-small screen.  Despite using a serif font like a real book, they use a
+small screen (Wichary pompously dubs this “our signature full-bleed,
+blurred images” in his post).
+Despite using a serif font like a real book, they use a
 ragged right margin, at least in Chrome — possibly a concession to the
 lack of hyphenation.
+
+At times they use thin spaces around their em dashes, as I do.
+
+Medium goes to some trouble to use hanging punctuation, like
+Gutenberg, but it only works sometimes.
 
 Font files
 ----------
@@ -77,6 +94,46 @@ letter-spacing, so enabling justification in CSS gives you wildly
 varying word spacing, which looks shitty.  So if you’re targeting web
 browsers you need to suck it up and accept ragged right margins.  Or,
 if you’re sufficiently eccentric, ragged left or ventilated prose.
+
+The rigors of five and a half centuries of metal type printing,
+concurrent with the birth of capitalism, salutary as they have been
+for human attempts at civilization, have not been kind to typography.
+The aesthetic experience of reading has been compromised by first one
+and then another vulgar commercial innovation — lining numerals,
+sans-serif fonts, copyright, typewriter fonts, banner ads, paywalls,
+product placement — while the limitations of metal type have been
+embraced as virtues by generations of typographers.  Rubrication is no
+longer red, but black, and color is indeed omitted almost entirely;
+swashes are rare flourishes; illustrations are separated from text by
+rigid rectangular borders and even omitted altogether; drop caps and
+other initials are abjured or relegated to extreme rarity, perhaps one
+per thousand pages; border ornamentation is minimal when it is present
+at all; marginalia are omitted; justification of lines can only be
+done by altering spacing rather than stretching glyphs; letters are
+present only in one to four sizes rather than a full variety; etc.
+
+The major overall limitation, really, is that in movable-type
+printing, things cannot overlap.  Swashes cannot overlap other letters
+or margins; words cannot protrude into margins; text blocks cannot
+overlap illustrations; descenders of one line cannot overlap ascenders
+of another, creating a pressure toward greater and greater x-heights,
+destroying much of the beauty of minuscule; diacritics cannot overlap
+multiple letters; and only through the hacks of kerning and ligatures
+could we even get reasonable spacing for most letter combinations
+involving capitals and “f”.
+
+To be sure, these last centuries have brought beneficial innovations
+as well.  The ample use of whitespace to improve readability,
+beginning with division into paragraphs; boldface for scannability;
+the elimination of scribal abbreviations, and especially the
+abominable Tironian notes, which saved precious parchment at the price
+of promoting ignorance among the people; the improved calligraphic
+quality of commonplace fonts over all but the best scribal
+calligraphy; photographic printing; four-color halftoning; data plots,
+and especially the work done by Tufte to improve them; algorithmic
+rendering; the modern language of mathematical formulas; hyperlinks;
+simulation; animation; interactivity; but most of all, mechanical
+reproducibility.
 
 ### _T<sub>E</sub>X: the Program_ ###
 
@@ -275,8 +332,8 @@ entirely on glossy paper, although it’s yellowed a bit in the ensuing
 60 years; the purpose is again fine halftoning, but this time only in
 black and white.
 
-Its body text is set in a serif font in justified paragraphs with what
-T<sub>E</sub>X calls “French spacing” — about twice as much space
+Its body text is set in a serif font
+in justified paragraphs with about twice as much space
 after periods and colons as between words.  The paragraphs
 occasionally have figures centered in the middle of them; they never
 flow around figures, and they are all indented, by about three or four
@@ -335,7 +392,8 @@ The pages are, unusually, in landscape orientation, and seem to have
 been bound on a short edge; the ratio is about 5 parts length to 3
 parts height.  Although the typography is somewhat inconsistent, often
 varying in the body text size from page to page, it is mostly set in
-two columns, with French spacing (plus spaces inside quote marks), but
+two columns, with extra spacing separating sentences
+(plus spaces inside quote marks), but
 headings and most of the abundant illustrations span both columns.
 Occasionally body text also spans both columns, typically for very
 short sections.  Boldface is used liberally, for all the headings and
@@ -404,7 +462,8 @@ are indented (by about one em), even the first, and justified with
 generous hyphenation, and line spacing is somewhat loose.  Margins are
 very narrow (on p. 377 the operator scanned their finger, and much of
 the material near the spine is lost to the Scribe’s glass join).
-Spacing is French, and quotes seem to be concatenated apostrophes,
+There is extra spacing between sentences,
+and quotes seem to be concatenated apostrophes,
 perhaps with extra whitespace inside of them.  There are places where
 letter-spacing is compromised for the sake of justification, as on
 p. 62.
@@ -603,7 +662,8 @@ excitability:
 > years in wide-mouthed bottles or pots, covered over with bladder. 
 > For *use*, a little is dissolved in water.
 
-Spacing is French, to the extent of using thin spaces before the
+There is extra spacing betwee sentences,
+and it also uses thin spaces before the
 colons and abundant semicolons and following open double- and
 single-quotes, as in “do the ‘ important’ at”.
 
@@ -682,12 +742,19 @@ attracting bees:
 
 The book uses a number of ideograms that are no longer in use,
 although perhaps surprisingly, Unicode has them.  Its rendering of “%”
-uses a horizontal bar, and many recipes are given with lower-case
-j-terminated Roman numerals in scruples (written as “℈”, as in “℈iv”),
-drachms (written “ʒ”), and ounces (written “℥”).  This is explained on
-p. 561.  Thus “ʒij” means “two [troy] drachms”, which is to say, a
-quarter of a troy ounce (a quarter of “℥j”), or 7.78 g in modern
+uses a horizontal bar, and many recipes are given in apothecaries'
+weight, using lower-case
+j-terminated Roman numerals, in scruples (written as “℈”, as in “℈iv”),
+drachms (written “ʒ”; now often called “drams”,
+though using that spelling now
+implies you’re talking about avoirdupois drams),
+and ounces (written “℥”).  This is explained on
+p. 561.  Thus “ʒij” means “two [apothecaries’] drams”,
+which is to say, a
+quarter of an apothecaries’ ounce (which was the same as the troy ounce)
+or 7.78 g in modern
 units.
+The Roman numerals here also represented ½ with “ss”.
 
 ### _The Mechanism of Weaving_ ###
 
@@ -712,7 +779,8 @@ times) the first paragraph after a heading, whose first word is
 instead rendered with small caps.  In one unusual case on p. 250, the
 section heading begins a sentence completed in the body text; the same
 thing happens with a subsection heading on p. 311.  Paragraphs are not
-separated by extra leading.  Spacing is French, including thin spaces
+separated by extra leading.  There is extra spacing between sentences,
+and thin spaces
 before semicolons and colons and inside double quotes.  Hyphenation is
 sparse, and word spacing is consequently somewhat uneven.
 
@@ -749,6 +817,17 @@ course, the multiplication sign × is always monoline and never has
 serifs.)  You could argue that sans-serif is playing a role here
 similar to the role played by typewriter text in modern texts about
 programming.
+
+(This book was printed in 1894.  Sometime between 1890 and 1898, the
+Berthold Type Foundry released Akzidenz-Grotesk, one of the “German
+sans-serifs” that started appearing toward the end of the 19th
+century, and the first one to become popular.  But it was intended for
+use in advertising rather than running text.  Wikipedia tells me that
+“Egyptian”-style letters — meaning primitive monoline sans-serif
+letterforms modeled after surviving inscriptions from classical Egypt
+and Italy — became popular for advertising signs in England in the
+late 1700s.  Caslon released his “Two Lines English Egyptian” font in
+1816, but it is only known from specimen books.)
 
 Tables have ruled borders, ruled column separators, and a rule between
 the headers and the table body, with rules interrupted where they
@@ -797,14 +876,187 @@ potato-chip cutaways are used to suggest round shafts; in one place a
 line alternating short and long dashes indicates the line above a
 center of rotation; hatches up to a line suggest a solid surface.
 
+### First Folio _The Tragedie of Othello_ ###
+
+Looking at [this scan from Shakespeare’s First folio from
+Wikipedia](https://en.wikipedia.org/wiki/File:Othello_F1.jpg), which
+is set in a Humanist roman and italic, I see vertical and horizontal
+rules around the whole page.  The play’s title is split across two
+page-width lines: “THE TRAGEDIE OF”, in large roman type with large
+but somewhat uneven letter-spacing, and below “Othello, the Moore of
+Venice”, in smaller type.  The body text is set in two columns with an
+additional rule between them, mostly with a ragged right margin due to
+the iambic pentameter of the text, but justified where the text runs
+to longer lines.  There is a act/scene title running across both
+columns, “Actus Primus.  Scœna Prima.” between horizontal rules, and
+on the facing page, “Scene Secunda” is in the same italic font, with
+column-wide horizontal rules above and below.  Italics are used to
+distinguish characters’ names and, strangely enough, nationalities.
+Spaces are somewhat uneven, but generally there is extra space after
+sentence-ending periods, and spaces appear before colons, semicolons,
+and question marks, though sometimes they are omitted entirely around
+colons and commas.  Occasionally spaces occur inside parentheses and
+occasionally not outside.  There is no boldface and of course no
+filthy sans serif.
+
+Hyphenation is occasionally used.  The spelling and lettering is as
+you’d expect for the 17th century: i/j, u/v, ſ/s are alternate forms
+of the same letters governed by position, and ligatures include ff,
+ſt, ct, ſh, ſſ.  (I don’t actually see any “j”s, but I assume they
+would occur if a word ended in an “i”.)  On one occasion, perhaps to
+save a bit of space, “my” is spelled “ỹ”.  Most nouns and occasionally
+adjectives are capitalized.
+
+“THE TRAGEDIE OF” is about four times the point size of the body text,
+and “Othello, the Moore of Venice” about twice the point size of the
+body text.  “Actus Primus.”, etc., is about 1.4× the point size of the
+body text.  The first paragraph is begins with an ornamental capital
+“N” from Rodorigo’s opening line, “NEuer tell me,I take it much
+vnkindly”, which is about three and a half lines tall.
+
+These titles have a bit of extra leading above and below: the play
+title has about half a line above, half a line below its second line,
+and almost a whole line below its lower line.  At times stage
+directions are centered in a column, in italics, with a line of
+leading above and below; other times they are simply italics on a
+normally spaced line.  No extra leading is used between lines of body
+text; each time a new character speaks, it begins a new indented
+paragraph, again set tight with no extra leading.  There are 66 lines
+per column (not counting catchwords) at the normal line height.
+
+Wikipedia tells me that the First Folio has a page height of 320 mm.
+About an eighth of that (≈40mm) is a margin at the bottom of the page,
+and about another sixteenth (≈20mm) at the top, so only about 260 mm
+holds those 66 lines, so the line height is about 3.9 mm, or 11
+PostScript points.  Just as in _Tick, Tock_, about 9–12 words fit into
+a column, when the lines aren’t being broken to fit into iambic
+pentameter.
+
 Wikipedia
 ---------
+
+Wikipedia regrettably uses almost exclusively sans-serif type.
+Figures are very frequent, and almost always floated right, with
+captions below in the regular body text style.  My tables of contents,
+like Gwern’s, are directly modeled on MediaWiki’s.  (I don't remember
+if UseModWiki had them.)
 
 Wikipedia has `border-bottom: 1px solid #a2a9b1` to underline its
 `<h1>`s and `<h2>`s.  (The rule applies to other headings, but for them
 it’s overridden with a `border-bottom: 0`.)  This is not entirely
 unobtrusive, but it’s less obtrusive than horizontal rules in black
 ink typically are in books.
+
+They also have navigational links in the left, top, and bottom margins
+of the article; these margins are a somewhat darker background color.
+Category links are at the bottom of the article.  Since these margins
+take up a lot of screen real estate, Wikipedia uses a totally
+different style on hand computers.
+
+Wikipedia tables have a variety of formats, but commonly
+(class="wikitable") they are captioned above in bold (and not
+numbered), have uniform-width rules around them, separate both rows
+and columns with rules, and use a darker background (#f8f9fa) than the
+surrounding text’s #fff — darker still for the headers (#eaecf0),
+which are bold and centered; they have substantial padding `(padding:
+0.2em 0.4em`) in the table cells.
+
+<a name="gwern">Gwern</a>
+-------------------------
+
+Gwern’s website is set in a serif font (body text and headers too)
+with justified paragraphs, indented where they follow other paragraphs
+(`p+p { text-indent: 2.5em }`); headings with some extra leading; drop
+caps (in some cases, like
+[magnesium](https://www.gwern.net/nootropics/Magnesium), quite
+elaborate ones); no leading between paragraphs; and browser-provided
+hyphenation.  Some of the headings use small caps (with
+`font-feature-settings: 'smcp'`), though this varies by epoch; others
+use caps.  He mostly uses old-style numerals (`font-variant-numeric:
+oldstyle-nums`).  These would be unremarkable choices for a book, but
+on a web page they seem radical.  There is more leading above headings
+than below.  He’s also using quite a number of less book-like choices:
+right-aligned second-level headings (underlined in black) (though
+several of the books I’ve looked at have some right-aligned headings),
+darker backgrounds with borders for blockquotes, underlined links,
+bulleted lists with four-pointed star bullets, varying gray levels in
+text, letter-sized logotype icons inserted into text, looser line
+spacing (line-height: 1.5), relatively long line length (50 ems or
+so).
+
+His `<h3>`s are a bit outdented (as well as bold and all-caps), and
+his `<h4>`s are also outdented, which could in theory make them stand
+out when scanning visually.
+
+Generally there is an abstract of a few hundred words beneath the
+metadata, next to the table of contents (see below), in a
+double-bordered gray box, before the article proper begins.
+
+When he has nested blockquotes, the inner one has an even darker
+background than the outer one, which is achieved with a `blockquote
+blockquote` rule rather than alpha-blending.  (It would appear that
+his blockquotes actually alternate in color.)
+
+He’s also using the hack mentioned earlier for underlining links:
+`text-decoration: none` to disable the normal underline, then a
+background image synthesized from gradients, with 12 overlaid white
+text-shadows to make holes in the underline around descenders.
+
+Unlike Wikipedia and Medium, he puts his category links at the top of
+the article, after a brief summary paragraph in italics (a summary
+rather like the extended titles in Victorian-era books, more than
+100-word abstracts of modern research papers).
+
+Often Gwern captions his figures below in bold, with
+syntax-highlighted source code above (generally R with ggplot,
+sometimes Haskell, sometimes CSV); the source code plays the role of
+equations, but it is not centered; instead it is formatted as is
+conventional for source code, except on a light grey (#fafafa)
+background with a box around it (and limited in height, with
+scrollbars for overflow).  On the occasions when he does use
+equations, they are typically done with MathJax (including its fonts:
+MJXc-TeX-math-Iw sure gives nice italics, and it seems to be 19K), and
+when they are not inline, they are centered with 1.25 ems of leading
+(`margin: 1.25em auto`), which I think may be MathJax’s default.  (See
+file `dercuano-formula-display` for my thoughts on what to do for
+this.)
+
+In the rare case where Gwern has tables, they are very fancy indeed,
+with an italic centered caption at the top with heavy rules above and
+below (matching a heavy rule at the bottom of the table) with half a
+line or so of leading, bold column headers with sorting buttons in
+them (switching from black-on-white to text-shadowed white-on-blue
+when activated), alternating light-gray and white row backgrounds with
+a smaller font size, and about half a line of leading above and below
+data rows (`padding: 7px 10px`) except in very long tables, and a
+short gap (≈2px) in the gray background between columns.  Additional
+mouseover handlers add dotted outlines to table rows and light-blue
+background to table headers.  The sorting (and probably the
+mouseovers) is done with something called tablesorter.js via jQuery.
+The only real imperfections are that the sorting defaults to
+ascending, the table headers can scroll out of view, and numeric
+columns are left-aligned (but correctly sorted numerically!)  He’s
+using `font-variant-numeric: tabular-nums` but I think I’d prefer the
+old-style numbers.
+
+For headers and body text, he uses Source Serif Pro (by Frank
+Grießhammer, licensed under the SIL OFL by Adobe in 2014; it’s 72
+kilobytes, though that seems to be just ASCII and an accent or two,
+and it’s just the Roman; the italic is another 38K, and there are
+seven more variants), falling back to Baskerville or Libre
+Baskerville; for source code, Liberation Mono, falling back to
+Consolas or even Courier.  The roman Source Serif Pro is very nice,
+but its italic is insufficiently italic for my tastes, more like a
+oblique/italic hybrid.  Actually, I’m not totally sure his italic font
+doesn’t vary from article to article.
+
+His tables of contents are similar to mine, but he flows the text
+around them, and uses varying text weights, sizes, and colors to
+distinguish importance levels — outline numbers are in light grey,
+text in a lighter grey.  He does use sans-serif fonts for the table of
+contents.
+
+Eccentrically, he adds a light gray background to `<q>`s.
 
 Firefox default styles
 ----------------------
@@ -853,6 +1105,10 @@ That worked nicely!  And 22 pixels (which Firefox is indeed
 interpreting as 22 of the literal screen pixels) is still only 10
 points on my screen, and I still get 25 or 30 lines in the browser
 window, so the larger size doesn’t compromise readability.
+
+A possible tweak might be to add 10% (I don’t know, 0.03em or so) of
+letter-spacing to body text to reduce the number of words per line,
+since at 43em it’s a bit longer than I think is ideal.
 
 Looser letter spacing
 ---------------------
