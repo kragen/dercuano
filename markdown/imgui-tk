@@ -1,0 +1,215 @@
+I wrote this example Tk program last night as an example showing how
+easy Tk makes GUI development:
+
+    scale .a -variable x -orient horizontal
+    entry .b -textvariable x
+    label .c
+    pack .a .b .c -side top
+    proc updatec {a b c} {global x; .c configure -text [expr 1.0 / $x]}
+    trace add variable x write updatec
+
+(This leaves out the long and winding incremental road to getting it
+to work, which is a strong point of Tcl: it’s interactive, everything
+is a string, and everything gives you helpful error messages.  Just
+that the language semantics is a shambles.)
+
+I think you could quite reasonably do this same application with an
+IMGUI framework in C, and maybe it would even be less code, because
+you don’t have separate component states.
+
+Something like this, maybe:
+
+    static int x;
+    ig_scale(ig_int_model(&x)); ig_horizontal();
+    ig_entry(ig_int_text_model(&x));
+    float r = 1.0 / x;
+    ig_label(ig_float_text_model(&r));
+
+And yeah, it’s actually about 25% less code than the Tk version.
+
+The idea for the layout is that the framework does a pass over the UI
+definition function before the drawing pass to find out what sizes
+everything is requesting and how they’re connected together.  (It also
+does a pass over the UI definition function for each event, using the
+layout from the previous frame.)  Then it computes the new layout and
+does a final pass to paint everything.
+
+Tk lets you pack things on all four sides of your window, which allows
+you to avoid introducing frames in many cases.  I don’t think that’s
+necessary here; you just need horizontal boxes and vertical boxes, for
+which you need to be able to `ig_hbox()` or `ig_vbox()` to start a new
+nested box, or `ig_end()` to end one of them.  Additionally we can
+provide a default tabular setup, where adjacent sibling hboxes or
+vboxes have their inner items aligned by default — you can add an
+extra level of nesting to avoid this if necessary.
+
+The `ig_*_model` functions wrap a raw pointer to the relevant type in
+a model struct that is passed by value to the widget function in
+question; presumably it contains a getter, a setter, and a userdata,
+although you could imagine that for strings it might have slicing
+functions or something.
+
+Things like layout options can be provided with things like the
+`ig_horizontal()` call above; at runtime it will error if the current
+object doesn’t have an orientation (like scales and scrollbars do).
+
+The full set of configuration options for a Tk scale widget is as
+follows:
+
+> activeBackground background bigIncrement borderWidth command cursor
+> digits font foreground from highlightBackground highlightColor
+> highlightThickness label length orient relief repeatDelay
+> repeatInterval resolution showValue sliderLength sliderRelief state
+> takeFocus tickInterval to troughColor variable width
+
+You could imagine providing these with named member initializers in a
+struct, but that requires an extra line of code to declare the struct
+and doesn’t work well for options like `scale -to`, whose default is
+100 but for which 0 is a valid value.  So probably supplying them with
+functions (some of which perhaps take struct or multiple arguments) is
+better.
+
+However, if those functions are to come after the widget name, as they
+should, then the actual layout or painting must happen after the
+widget function itself returns — it must be deferred.  That also means
+that these option functions can’t change the function’s return value,
+which is relevant for, e.g., tab property pages or menu items, which
+really benefit from being able to return a boolean.
+
+How Dear ImGui does it
+----------------------
+
+For that matter, buttons also benefit from being able to return a
+boolean:
+
+            if (ImGui::Button("Button"))
+                clicked++;
+
+Dear ImGui has a `SameLine()` function which lays out the following
+text (or presumably other widget) on the same line, rather than a
+separate line, as per default.  A possible hbox-oriented alternative
+would be a `ig_endl()` function which ends the current hbox and starts
+a new one.  This is still more modeful, but it avoids having multiple
+mechanisms for the same purpose, and it avoids needing 5 `SameLine`
+calls to get 6 things into an hbox.
+
+(Dear ImGui also has a horizontal mode.)
+
+This treenode thing is a thing I really like about Dear ImGui:
+
+    if (ImGui::CollapsingHeader("Configuration")) {
+        if (ImGui::TreeNode("Configuration##2")) {
+            ImGui::CheckboxFlags("io.ConfigFlags: NavEnableKeyboard", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableKeyboard);
+
+Radio buttons share a model and specify a value:
+
+            static int e = 0;
+            ImGui::RadioButton("radio a", &e, 0); ImGui::SameLine();
+            ImGui::RadioButton("radio b", &e, 1); ImGui::SameLine();
+            ImGui::RadioButton("radio c", &e, 2);
+
+Dear ImGui requires a PushID/PopID call in loops:
+
+            for (int i = 0; i < 7; i++)
+            {
+                ImGui::PushID(i);
+                …
+                ImGui::PopID();
+            }
+
+It identifies clickable widgets with an “ID stack”, which I guess is
+sort of like a pathname; windows and tree nodes push onto the ID
+stack.  Within a window it normally uses the button (or whatever)
+label and hashes it, so there are hacks you have to use if you want to
+animate the label or whatever; the `"Configuration##2"` in the example
+above is one such hack — the 2 isn't displayed, but forms part of the
+ID.  As a result, you need to call `TreePop` to end a treenode.
+
+Within the implementation of treenodes, to find out if the treenode is
+open, TreeNodeBehaviorIsOpen fetches from `window->DC.StateStorage`:
+
+        is_open = storage->GetInt(id, (flags & ImGuiTreeNodeFlags_DefaultOpen) ? 1 : 0) != 0;
+
+...
+
+        if (toggled)
+        {
+            is_open = !is_open;
+            window->DC.StateStorage->SetInt(id, is_open);
+        }
+
+StateStorage is a per-window sorted ImVector of key-value pairs, where
+the values are unions.  It’s amusing to me that the id is hashed with
+a CRC32 of the string, but then they don’t bother to use a hash table
+to store it, instead resorting to binary search; but they expect to do
+insertions, as opposed to updates, quite rarely.  Still, you’d think
+that would favor cuckoo hash tables rather than binary search.
+
+The ID construct results in weird things where clicking on one button
+will activate another one, and so forth.  Presumably it could result
+in a case where this happened even if the buttons had different IDs
+just because of a hash collision.
+
+A convenient thing about Dear ImGui is that most (all?) of the
+widgets take printf format strings and varargs.
+
+Dear Imgui labels everything with its ID string by default, since for
+usability you probably want to know what you’re setting anyway.
+
+Perhaps the other thing to beat in this space is REBOL’s Visual
+Interface Dialect: <http://rebol.com/docs/view-guide.html>.  An
+example from <https://en.wikipedia.org/wiki/Rebol>:
+
+    view layout [text "Hello world!" button "Quit" [quit]]
+
+Or in REBOL R3-GUI:
+
+    view [text "Hello world!" button "Quit" on-action [quit]]
+
+Examples from <http://rebol.com/docs/easy-vid.html>:
+
+    style yell tt 220 bold underline yellow font-size 16
+    yell "Hello"
+    yell "This is big old text."
+    yell "Goodbye"
+
+    vtext bold "Wild Thing" effect [gradient 200.0.0 0.0.200]
+
+Here %. is the current directory:
+
+    vh2 "File List:"
+    text-list data read %.
+    button "Great!"
+
+Here a “pair” specifies geometry:
+
+    button 200 "Big Button"
+    button 200x100 "Huge Button"
+    image %palms.jpg 50x50
+    image %palms.jpg 150x50
+
+A file filtered to purple provides the backdrop for a button, behind
+the “Button” text:
+
+    button "Button" %palms.jpg purple
+
+This action assigns `value` to a refinement of another widget and then
+invokes `show` on the widget:
+
+    slider 200x16 [p1/data: value show p1]
+    p1: progress
+
+At least in R3-GUI, the layout is tabular:
+<http://www.rebol.com/r3/docs/gui/panels.html> explains that this has
+four columns:
+
+    view [
+        panel 4 [
+            button "First"
+            button "Second"
+            button "Third"
+            button "Fourth"
+            button "Fifth"
+            button "Sixth"
+        ]
+    ]
