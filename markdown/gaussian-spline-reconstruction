@@ -1,0 +1,83 @@
+You can get a very good approximation of the Gaussian function by
+convolving several box or simple-moving-average filters, in the same
+way that you get a good approximation of it with a spline, in a way
+that I don’t quite know how to name right now, but which is exactly
+equivalent to convolving several box filters.
+
+From a computational perspective, notable features of this procedure
+include that box filters require no multiplications, require a very
+small number of operations per sample (only two additions and a
+subtraction, plus a FIFO buffer of the size of the box), and can be
+computed exactly with integer math in which the intermediate results
+overflow, as long as the final result does not.  XXX is that even
+true?  WTF
+
+Precisely converting discretely sampled signals back into bandlimited
+continuous signal involves convolving them with the sinc function (the
+Fourier transform of the unit pulse) which is inconvenient because it
+decays very slowly, meaning that doing the convolution directly (in
+the spatial domain) requires summing weighted contributions from quite
+far away to get reasonable accuracy.  If you just do a zero-order
+hold, turning the sampled curve into stairsteps, you are in effect
+convolving the modulated Dirac comb that is your discretely sampled
+signal with a unit pulse, thus filtering its frequency response with a
+sinc spectrum, which is disastrous for frequencies above about half
+Nyquist.
+
+One approach to reconstruction filtering is to use Nth-order splines
+that pass through y=1 at x=0 and have zeroes at all other integers.
+(These are sometimes called cardinal B-splines, by analogy to the sinc
+“sinus cardinalis” function, but that terminology is arguably wrong
+and at least confusing.)  These have very compact support, and they
+approach sinc in the limit where N → ∞.  But they definitely require
+multiplication.
+
+Derivatives of the Gaussian include the so-called Mexican Hat wavelet,
+Ricker wavelet, or Marr wavelet, which is its negated second
+derivative.  This is vaguely close to sinc: it has a big round bulge
+in the middle with a zero on each side of it, then local minima, and
+then it asymptotically approaches zero as it goes to infinity.
+
+I have this idea that the second derivative of the convolution of a
+signal with the Gaussian is equal to the convolution of the signal
+with the second derivative of the Gaussian, because both
+differentiation and convolution with something are linear
+time-invariant transforms.  But now I’m not sure if that’s true.
+
+The Mexican Hat Wavelet page on Wikipedia says, “In practice, this
+wavelet [in multiple dimensions] is sometimes approximated by the
+difference of Gaussians function, because the DoG is separable.”  If
+this is true (it’s not backed up by the reference given) then it seems
+like a better way to convolve things with that wavelet in most cases
+would be to use the procedure I’ve outlined above to approximate the
+convolution using the Gaussian-then-differentiate approach.
+Convolving five box filters gives you a quartic approximation of a
+Gaussian; its second derivative is then a quadratic approximation of
+the Mexican Hat Wavelet.  Note that this entire computation requires
+no multiplication.
+
+Higher derivatives might also be useful, as they oscillate more times
+and hit more zeroes before dying out; they are the Hermite functions
+multiplied by the Gaussian.  Their zeroes aren’t really in the right
+places, but that error might not be large enough to matter; H₄ has
+zeroes at ±sqrt((3±sqrt(6))/2)), which is about ±0.523 and ±1.650.
+That doesn’t oscillate nearly fast enough to be a good approximation
+for sinc.  The higher-order Hermite polynomials’ roots have a similar
+problem: their zeroes are roughly evenly spaced, while sinc has an
+double wide space at x=0 where there would normally be a root.
+
+These derivatives do, however, look very much like delicious
+zero-phase FIR narrow bandpass filter kernels, which are more or less
+like the Gabor kernel.  So they may not be that useful for signal
+reconstruction, but maybe they could be very useful for narrow
+bandpass signal processing!
+
+I thought maybe it was just as bad for reconstruction that the
+higher-order Gaussian derivatives vanished very quickly, but maybe
+that’s just an unavoidable artifact of a reasonable degree of
+locality, which is not an altogether bad thing.
+
+(I got a lot of this information from
+<http://bmia.bmt.tue.nl/people/bromeny/MICCAI2008/Materials/05%20Gaussian%20derivatives%20MMA6.pdf>,
+which even mentions the use of Gaussian derivatives as bandpass kernel
+filters.)

@@ -1,0 +1,234 @@
+Polynomial-spline FIR kernels by integrating sparse kernels
+===========================================================
+
+I think I have a method for reducing the computational expense of a
+large and interesting class of FIR filters by an order of magnitude or
+so, but I haven't tried it out yet, and it seems like the kind of
+thing people would have tried by now, so it probably either won't work
+or is already known.
+
+In my case, this questionable insight came out of, among other things,
+considering how to write timesheet software using functional reactive
+programming, sweating through the night in the Buenos Aires heat wave
+and blackouts, and considering whether it's possible to approximate
+dense FIR kernels by convolving multiple sparse FIR kernels together.
+
+I've tried to write this with some humor, although I think the result
+is basically that I sound insane.  Hopefully that provides some
+entertainment.  Don't take it too seriously.
+
+Background
+----------
+
+(This section is basically me regurgitating shit from Wikipedia and
+dspguide.com, so feel free to skip it if you know DSP.  Or, better
+yet, read it and correct me.)
+
+FIR filters are common tools in DSP because they can easily be
+designed to get zero-phase high-performance filters: you take the
+inverse FFT of your desired frequency response, giving you the impulse
+response, which you window to give it compact support without fucking
+up the frequency response too much, and that gives you the weights for
+your filter.  (Not the only method, but a common one.)
+
+However, in many cases, you end up needing tens, hundreds, or even
+thousands of multiply-accumulates per sample.  As a result, we often
+use IIR filters to get better efficiency, even though we don't have a
+general theory of how to design IIR filters.
+
+### The moving-average filter ###
+
+The moving-average filter is a special case of a FIR filter: all the
+weights within its support window are equal, so its impulse response
+is a pulse, like one cycle of a square wave.  It's used for a couple
+of reasons: (1) it's optimal in minimally degrading time-domain step
+response while rejecting high-frequency noise, and (2) it's highly
+efficient.
+
+If you implement it in the general FIR fashion --- multiplying each of
+the last N input samples by a weight, then adding them --- it's not
+any more efficient than any other FIR filter with the same support.
+But you can implement it much more efficiently than that, because
+composition of time-invariant linear operators is commutative.
+
+Specifically, the impulse response of the moving average filter is the
+integral (or prefix sum) of a very sparse kernel: a single positive
+impulse at the beginning of the window, and a single equal negative
+impulse at the end.  Integration (or prefix sum) is a time-invariant
+linear operator, as is convolution with a given kernel.  So what you
+do is that you first convolve the input signal with the derivative (or
+finite forward difference) of the desired impulse response, which
+requires only two multiply-accumulates per sample, since that
+derivative is so sparse; then you integrate (or prefix-sum) the
+result of the convolution; and the commutative property guarantees you
+that the result is the same.  So you get by with two MACs and an
+addition per sample.
+
+(Actually, because the two impulses are equal in magnitude, you can
+wait until the very end of the process to multiply by the weight,
+giving you three additions/subtractions and a single multiply per
+sample.  Sweet.)
+
+### Polynomial splines ###
+
+A spline is when you approximate a function by breaking it up into
+chunks along the X-axis and approximate each chunk with a different
+polynomial.  Typically the polynomials produce the same value at the
+points where they join up, the "knots", which is to say, the spline is
+at least continuous, and usually has a continuous derivative too.
+(Normally you have the constraint that a spline made out of Nth-order
+polynomials has continuous derivatives up to order N - 1.)
+
+Typically you can get a pretty good approximation of an analytic
+function with second- or third-degree polynomials, and without all
+that many of them.  This is a lot less computation than using a
+high-order approximating polynomial, and as a scrumptious bonus, it
+also avoids Runge's phenomenon.  So this is actually the approach used
+by a lot of math libraries these days.
+
+(This suggests that the Difference Engine could have been quite a bit
+smaller if equipped with a facility to reload the highest-order
+difference from a table periodically, at knots; it could perhaps have
+used three or four columns instead of eight.)
+
+Efficiently approximating FIR kernels with splines
+--------------------------------------------------
+
+The standard efficient method for computing the moving average filter
+can be generalized to a wide class of FIR kernels, producing a worse
+but still very substantial computational speedup.
+
+### Step function OTFs ###
+
+A moving average filter is of the family of step functions: piecewise
+constant functions.  That's why its derivative (or forward difference)
+has such sparse support.
+
+But you could in principle compute a convolution with any piecewise
+constant OTF by convolving with the derivative and then integrating.
+
+### Step functions and splines ###
+
+If you integrate a piecewise-constant function, you get a continuous
+piecewise-linear function; if you integrate that, you get a continuous
+piecewise-quadratic function with a continuous derivative; and if you
+integrate that, you get a piecewise-cubic function with continuous
+zeroth, first, and second derivatives.  Which is to say, you get a
+polynomial spline.
+
+If it happens that your desired impulse response can be approximated
+by an Nth-order spline with a small number of points, then you can fit
+that spline to it; take the N+1th forward difference to get a sparse
+kernel; apply that sparse kernel to your input data; and integrate its
+output N+1 times to get the filtered output.
+
+For each sample, this requires one multiply-accumulate per spline knot
+plus N+1 additions for an Nth-order spline.
+
+### Desired frequency response containing no low frequencies ###
+
+This section is incomplete.
+
+This is going to suck if your desired impulse response is very wiggly,
+though, because I think that in general (certainly with a second-order
+spline), you'll need two knots for each oscillation.  If the
+wavelength of your oscillations is only like six or eight samples,
+then you're not going to be saving much.
+
+I think, based on basically no experience, this kind of wiggliness
+often shows up because you're trying to put together a high-pass or
+bandpass filter, and so all your low frequencies are zero.  Which is
+to say, your desired frequency response is the convolution of an
+impulse at some high "base frequency" with some window function giving
+the shape of the frequency response above that frequency.
+
+If you shift the window function down closer to zero, you'll reduce
+the wiggliness a lot, and you'll be able to get by with a lot less
+knots.
+
+So what good is that?  You'd have to somehow shift the signal down in
+frequency, and then back up.  RF circuitry does this kind of
+downconversion all the time by just multiplying the high-frequency
+signal by a reference signal at a nearby frequency, thus producing sum
+and difference frequencies[1], typically much lower (either near zero,
+"baseband", or in some lower but still RF band, "intermediate
+frequency").  This is easy enough to do (it requires one multiply per
+sample, not even a multiply-accumulate).  But I have the impression
+that this kind of downconversion and upconversion requires high-pass
+or bandpass filtering before and after, which seems to be begging the
+question, so I suspect this may be making the problem harder rather
+than easier.  (Maybe you can use an inverted low-pass filter for your
+high-pass filtering?  That shouldn't run into the wiggliness problem,
+although you want to do the inversion separately from the spline
+approximation.)
+
+[1] If this is puzzling, remember the sum and difference identities
+from trig class.  Or re-derive them from Euler's Formula.
+
+Anyway, if you somehow manage to frequency-shift your input signal
+down to baseband, then you can use a much less wiggly filter kernel on
+it, and then multiply it by a carrier wave to upconvert it back to its
+original frequency.
+
+### Another incomplete approach for kernels containing no low frequencies ###
+
+Another possibly valid approach for wiggly kernels: note that N cycles
+of a sine wave are the convolution of a comb filter with N impulses
+spaced one cycle apart with a kernel consisting of a single cycle of
+the sine wave.  You can thus convolve a kernel consisting of N cycles
+of a sine wave with your signal (as if that were a useful thing to do,
+but bear with me) by first convolving it with the comb filter, then
+with the single cycle, for an almost N-fold reduction in computation
+if the number of samples per cycle is large, or an almost
+samples-per-cycle-fold reduction if N is large.
+
+If you want instead to shape the sine wave with some kind of envelope,
+you could make each impulse in the comb a different height, but that
+is going to give you discontinuous derivatives and totally fuck up
+your frequency response; those discontinuous derivatives are almost
+like impulses in their wideband-noise nature.  You can do better by
+making your second kernel be, rather than a *single* cycle, *two*
+cycles, but windowed with a triangular window.  This way, in between
+the comb points, you're linearly interpolating between two sine waves
+with different amplitudes.
+
+Getting back to the wiggly kernel, I think you can approximate it as
+such an amplitude-modulated sine wave, with the frequency of the sine
+being the "base frequency" I mentioned earlier.
+
+So how does this save you work over the spline approach?  Well, I
+think you can use the spline approach to do the N-points modulated
+comb filter in a lot less than O(N) work by round-robining among a
+bunch of different intermediate signal buffers, one for each cycle per
+sample.  But I haven't worked out the details yet, so I'm not sure it
+will work.
+
+Related work
+------------
+
+I wrote the above while my internet connection was off, so I couldn't
+search to see if anybody had already done this.
+
+B-spline image interpolation might appear to be related, but it is
+different.  This is a common algorithm for image interpolation
+(upsampling, resolution enhancement) aka cubic B-spline interpolation,
+where you construct a bicubic B-spline patch between adjacent pixels
+in order to approximate the values between the pixels.  It turns out
+that you can do this by applying a FIR filter to the image; that is to
+say, the interpolated pixels of the upsampled image are a linear
+function of the neighborhood pixels of the original image, even though
+the splines are nonlinear.  This, approximating the ideal image with a
+spline, is a very different concept from approximating the FIR kernel
+itself with a spline.
+
+"Kernel B-Splines and Interpolation", by Bozzini, Lennarduzzi, and
+Schaback, 2005, appears to be about a variant of the image
+interpolation problem (interpolating an unknown function between some
+set of known points).
+
+There's a substantial body of theory interpreting sampled signals as
+ways of representing splines rather than bandlimited sums of
+sinusoids; the methods mentioned above belong to that theory.  The
+approach I'm discussing here does not, I think, belong to that family
+of methods, but I'm not very familiar with the theory of spline image
+processing.  So maybe it's in there somewhere.

@@ -1,0 +1,186 @@
+These are notes on the original 8086 eForth model, eForth 1.0 by
+Bill Muench and C. H. Ting, 1990.
+
+The assembly-language parts of eForth are:
+
+- the colon header on each colon word: NOP; CALL DOLST
+- the $NEXT macro: LODSW; JMP AX
+- the boot code ORIG, 14 instructions
+- The following 31 primitive FORTH words; their instruction counts
+  include $NEXT where applicable:
+
+        ;   BYE		( -- )
+        ;		Exit eForth.
+                1 instruction.
+
+        ;   ?RX		( -- c T | F )
+        ;		Return input character and true, or a false if
+        ;		no input.
+                16 instructions.
+
+        ;   TX!		( c -- )
+        ;		Send character c to the output device.
+                8 instructions.
+
+        ;   !IO		( -- )
+        ;		Initialize the serial I/O devices.
+                2 instructions.
+
+        ;   doLIT	( -- w )
+        ;		Push an inline literal.
+                4 instructions.
+
+        ;   doLIST	( a -- )
+        ;		Process colon list.
+                6 instructions.
+
+        ;   EXIT	( -- )
+        ;		Terminate a colon definition.
+                5 instructions.
+
+        ;   EXECUTE	( ca -- )
+        ;		Execute the word at ca.
+                2 instructions.
+
+        ;   next	( -- )
+        ;		Run time code for the single index loop.
+        ;               i.e. FOR-NEXT, usually known as DO-LOOP.
+                9 instructions.
+
+        ;   ?branch	( f -- )
+        ;		Branch if flag is zero, sometimes called _IF or
+        ;		(IF)
+                9 instructions.
+
+        ;   branch	( -- )
+        ;		Branch to an inline address, sometimes called
+        ;		_ELSE or (ELSE).
+                3 instructions.
+
+        ;   !		( w a -- )
+        ;		Pop the data stack to memory.
+                4 instructions.
+
+        ;   @		( a -- w )
+        ;		Push memory location to the data stack.
+                4 instructions.
+
+        ;   C!		( c b -- )
+        ;		Pop the data stack to byte memory.
+                5 instructions.
+
+        ;   C@		( b -- c )
+        ;		Push byte memory location to the data stack.
+                6 instructions.
+
+        ;   RP@		( -- a )
+        ;		Push the current RP to the data stack.
+                3 instructions.
+
+        ;   RP!		( a -- )
+        ;		Set the return stack pointer.
+                3 instructions.
+
+        ;   R>		( -- w )
+        ;		Pop the return stack to the data stack.
+                4 instructions.
+
+        ;   R@		( -- w )
+        ;		Copy top of return stack to the data stack.
+                3 instructions.
+
+        ;   >R		( w -- )
+        ;		Push the data stack to the return stack.
+                4 instructions.
+
+        ;   SP@		( -- a )
+        ;		Push the current data stack pointer.
+                4 instructions.
+
+        ;   SP!		( a -- )
+        ;		Set the data stack pointer.
+                3 instructions.
+
+        ;   DROP	( w -- )
+        ;		Discard top stack item.
+                3 instructions.
+
+        ;   DUP		( w -- w w )
+        ;		Duplicate the top stack item.
+                4 instructions.
+
+        ;   SWAP	( w1 w2 -- w2 w1 )
+        ;		Exchange top two stack items.
+                6 instructions.
+
+        ;   OVER	( w1 w2 -- w1 w2 w1 )
+        ;		Copy second stack item to top.
+                4 instructions.
+
+        ;   0<		( n -- t )
+        ;		Return true if n is negative.
+                5 instructions.
+
+        ;   AND		( w w -- w )
+        ;		Bitwise AND.
+                6 instructions.
+
+        ;   OR		( w w -- w )
+        ;		Bitwise inclusive OR.
+                6 instructions.
+
+        ;   XOR		( w w -- w )
+        ;		Bitwise exclusive OR.
+                6 instructions.
+
+        ;   UM+		( w w -- w cy )
+        ;		Add two numbers, return the sum and carry flag.
+                9 instructions.
+
+That's 157 instructions worth of primitives in all, in 31
+primitives, plus 14 more instructions in the boot code.  The
+rest of the system is written in Forth.  It would be about 31
+fewer instructions if there were a central NEXT instead of an
+indirect jump on the end of each word.
+
+I don't have an assembler that can assemble it or a disassembler
+that can disassemble the compiled version, but if it's similar
+to Bill Muench's updated “8086 eForth ITC16i 971014.1”, there
+should be about 4.3 bytes per instruction, which would make this
+a 675-byte kernel of an interpreter.  (That later Forth also has
+CHAR+, CHAR-, CHARS, CELL+, CELL-, CELLS, and REDIRECT as
+primitives, but omits lower-case next.)
+
+The 161 high-level FORTH colon definitions in EFORTH.SRC are
+another 3078 words of text (according to wc) and so are probably
+about another 6000 bytes.  There's an 8814-character span of
+NULLs in the middle of the .COM file, which totals 15600 bytes,
+leaving 6786 bytes that might be meaningful; this is pretty
+close to my estimate of 6675 bytes.  (Which leaves out the user
+variables and so on.)
+
+If we use token threading, 3078 words of text are probably
+closer to 3000 bytes, but the token table is another 1024 bytes.
+
+To implement the I/O stuff on Forth on Linux, we’d probably want
+to implement a “syscall” word in machine language taking up to 6
+arguments (because we need select() for ?RX, and it takes five
+arguments) that makes an up-to-5-argument system call.
+Apparently the parameters go into %ebx, %ecx, %edx, %esi, and
+%edi, in that order, according to my disassembly of select.o
+from my libc.a.
+
+In a direct-threaded system, there’s a few bytes extra penalty
+for colon definitions --- probably five.
+
+“unnecessary” primitives here include:
+        “next” (the lowercase looping one) R> 1- >R I 0= (IF)
+        R@  R> DUP >R or  : R@ R> R> TUCK >R >R ;
+        over  : over >R DUP R> SWAP ;
+
+That is, it would be possible to avoid defining them as
+primitives.
+
+The 24 different instructions used are NOP, CALL, LODSW, JMP,
+MOV, CLI, STI, INT, CLD, IRET, XOR, JZ, OR, JNZ, PUSH, POP, CMP,
+XCHG, JC, SUB, ADD, CWD, AND, and RCL.

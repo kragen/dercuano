@@ -1,0 +1,94 @@
+This post argues that learning low-level stuff is a waste of time:
+<http://www.fluidinfo.com/terry/2008/06/18/embracing-encapsulation/>
+
+But I don't think that the low-level stuff is frozen in time; it
+changes too.  There was a time when a better C compiler would only
+help the few people working on Unix at Bell Labs, but today it can
+improve performance (or security, or debuggability, or whatever) for
+all of that high-level stuff built on top of C.  So the people working
+on high-level stuff kind of act as a multiplier for the people working
+on low-level stuff.  Which is why Intel and AMD and ARM etc. can spend
+as much effort as they do designing CPUs.
+
+More and More People Work at the Low Level
+------------------------------------------
+
+I wonder how the amount of effort that goes into making CPUs and other
+electronics for computers has changed over the years.  Intel alone has
+[something like 100 000 employees][intel], and essentially all of them
+is focused on the lowest levels of computers: processors, motherboard
+chipsets, flash memory, and so on.  [AMD has another 16 500
+employees][amd], and other top semiconductor companies (Toshiba,
+STMicroelectonics, TI, Samsung Electronics, Freescale (24000),
+Infineon, Sanmina-SCI, and so on) add several hundred thousand more
+people.
+
+Back in 2000, the [EE Times reported][eet] that the "embedded software
+tools market" was US$670 million (estimated at US$500 per seat) and
+the electronic design automation market was four times that, or US$2.7
+billion (estimated at US$100 000 per seat).  More recently [CIOL
+reported almost twice that size][ciol], and [EE Times Asia reported
+192 000 total semiconductor design seats in 2004][eet2004], although
+the article was published on April Fool's Day, 2005, plus 537 000 FPGA
+and PCB design seats:
+
+> A "seat count" report issued by Gartner Dataquest in January
+> showed that there were only about 56,000 ASIC design seats in
+> 2004, a number that's expected to decline to 39,000 by 2008. The
+> total number of semiconductor design seats was pegged at 192,000
+> for 2004, with a CAGR of just 1.3 percent until 2008.
+> 
+> In contrast, the report cited 537,000 FPGA and PCB design seats in
+> 2004, growing at a 2.9 percent CAGR. Granted FPGA and PCB
+> designers don't spend as much money as IC designers, but there are
+> a lot more of them. And there are tough problems that could prove
+> very lucrative for vendors that have solutions. For example, FPGA
+> designers need to look at power and signal integrity, and PCB
+> designers are having a hard time getting IC packages to work on
+> boards.
+
+So it seems that the number of people working at the very lowest
+levels --- the hardware levels --- has been gradually increasing over
+the last several years, and has already reached a really remarkable
+number.
+
+[amd]: http://www.amd.com/us-en/Corporate/AboutAMD/0,,51_52_484,00.html "AMD at a Glance"
+
+[eet]: http://www.eetimes.com/news/design/columns/tool_talk/showArticle.jhtml?articleID=17406429
+
+[ciol]: http://www.ciol.com/Semicon/SemiSpeak/Interviews/EDA-healthy-and-growing-in-India/16608107122/0/
+
+[intel]: http://www.networkworld.com/news/financial/intel.html "Intel company profile"
+
+[eet2004]: http://www.eetasia.com/ART_8800362966_480100_NT_c8b580ac.HTM "Is Today's EDA World Too Provincial?, 2005-04-01, by Richard Goering"
+
+Changing the Low Level is Getting Easier
+----------------------------------------
+
+To write software for CP/M, you would write it in 8080 assembly, or
+maybe Z80 or 8085 assembly if you were willing to limit your userbase,
+and used the BIOS and BDOS functions for I/O and file management.  You
+could use C or FORTH, but they had big drawbacks.  Porting software in
+8080 assembly even to MS-DOS on an 8086 was a pain, and porting it to
+a 68000 basically required rewriting it, or buying or writing a slow
+8080 emulator on the 68000.
+
+If you write software in C, it's only a bit more effort to make it
+portable and compile it for many different CPU architectures.  Alll of
+the tens of thousands of packages in Debian Linux are routinely built
+for eleven different CPUs: the Alpha, the Opteron, the ARM (big and
+little-endian), the HP PA-RISC, the Intel 386, the Itanic, the 68000,
+the MIPS (big and little-endian), the PowerPC, the IBM System/390, and
+the SPARC.  All of the 6400 packages in NetBSD run on all of its
+[supported 16 CPU architectures][netbsd].  Some individual software
+packages written in C have been ported to even more; GCC, for example,
+runs on something like 30 CPU architectures.
+
+[netbsd]: http://www.netbsd.org/ports/ "Hardware supported by NetBSD"
+
+This kind of portability has the advantage that you can switch CPU
+architectures and keep using the same software --- and the hardware
+exists only to support the software, anyway, just as the software
+generally exists only to support human activities carried out with it.
+
+This still leaves the problem of 

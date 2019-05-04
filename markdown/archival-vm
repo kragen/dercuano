@@ -1,0 +1,110 @@
+Software has a very variable lifetime.  There are a few programs
+written in the 1970s that are still in use today, some 40 years later:
+many Unix utilities (including vi, now nvi), BRL-CAD, SPICE, Maxima,
+TeX, Smalltalk, and so on.  There are many programs from the 1980s
+that are still in use today, 30 years later: much of X-Windows,
+MS-DOS, GNU Emacs, GCC, other GNU utilities, LaTeX, parts of Microsoft
+Windows, and so on.
+
+In many of these cases, little of the original code remains; 30 or 40
+years of maintenance have changed it considerably.
+
+In order for our programming efforts to become part of the
+intellectual heritage of humanity, rather than be forgotten, they
+apparently need to be continually maintained. blah blah blah.
+
+Urban Müller’s BF, inspired by Wouter van Oortmerssen’s False, is a
+virtual machine design with eight instructions that you can implement
+in half an hour in a page of code.  It’s probably close to the
+simplest virtual machine design that you can write real programs for;
+Linus Åkesson has written a Game of Life for it in a bit under four
+kilobytes.  People have compiled text adventures and fractal renderers
+to it.
+
+Unfortunately, BF is a terrible machine to program for.  It has no
+subroutine-call mechanism, limited ability to index into memory, and
+limited arithmetic; straightforward implementations are exponentially
+inefficient, and even advanced implementations can be inefficient.
+
+I’d like an archival virtual machine meeting the following
+requirements:
+
+1. within an order of magnitude of BF in difficulty to implement —
+   which is to say, less than five hours and ten pages of code;
+2. within an order of magnitude of native code in performance when
+   implemented in that way;
+3. within an order of magnitude of native code in programming
+   difficulty, say, with an assembler;
+4. with high probability that a reimplementation from the
+   specification will be compatible.
+
+A simple reading of #1 suggests that the VM should have as few
+instructions as possible, and shouldn’t have more than about 80
+different instructions, but really it depends a great deal on how
+complex the instructions are.  Some instructions can be implemented in
+a single line of code in the VM, while others might require a page of
+it.
+
+A simple reading of #2 suggests that you need to keep your
+interpretation overhead down to no more than about, say, 9
+instructions per virtual machine instruction.  Unfortunately, this is
+really difficult!  Threaded-code systems like Forths do manage to do
+it in about 5, at the expense of needing to compile to threaded code
+first, and of things like type-checking and bounds-checking.  
+
+We also need to ensure that the VM’s instruction set is sufficiently
+expressive that you don’t need three VM instructions to do what one
+native-code instruction could do.  Forths often suffer from this; it's
+easy to need to do `OVER OVER -` where a single subtract instruction
+would suffice on a three-address machine.
+
+The [Chifir virtual machine][0], designed to run an emulator for the
+Smalltalk-72 virtual machine, has one register and 15 three-address
+instructions:
+
+1. jump (PC ← M[A])
+2. conditional jump (if M[B] = 0, then PC ← M[A])
+3. store program counter (M[A] ← PC)
+4. move (M[A] ← M[B])
+5. load (M[A] ← M[M[B]])
+6. store (M[M[B]] ← M[A])
+7. add (M[A] ← M[B] + M[C])
+8. sub (M[A] ← M[B] - M[C])
+9. mul (M[A] ← M[B] × M[C])
+10. div (M[A] ← M[B] ÷ M[C])
+11. mod (M[A] ← M[B] % M[C])
+12. cmp (M[A] ← M[B] < M[C] ? 1 : 0)
+13. nand (M[A] ← ~(M[B] & M[C]))
+14. refresh the screen
+15. block until a character is available from the keyboard and store it in M[A]
+
+[0]: http://www.vpri.org/pdf/tr2015004_cuneiform.pdf
+
+Requirement #3, that it not be too much of a pain to program, also
+exerts pressure in favor of a large, expressive instruction set.
+
+Requirement #4, like #1, exerts substantial pressure on simplicity,
+but also runs strongly counter to including facilities like division
+(what do you do on division by zero?), floating-point arithmetic,
+signed integer arithmetic, and possibly other accesses to memory
+during the same instruction as a memory write (what order do they
+happen in?).  All of these provide dangerous opportunities for
+implementations to diverge.
+
+The Ethereum Virtual Machine has an interesting feature that could
+help to ameliorate some of these tensions: its registers (in its case,
+on a stack) are 256 bits, 32 bytes.  You could imagine a virtual
+machine with similarly wide registers, but with SIMD instructions,
+like 3DNow, SSE and NEON; in some cases, not only would this allow a
+single instruction to do the work of several native instructions, it
+would allow the programmer to omit writing an explicit loop.
+
+Another way to ameliorate these tensions somewhat is to combine
+several different operations into a single instruction.  For example,
+if we have a register that always contains 0, another that always
+contains 1, and a third that always contains -1, then a single
+three-register A += B*C instruction (known as MAC or sometimes FMA)
+provides ADD, SUB, MUL, and clear-register as special cases; if the
+instruction works in complex cases, it is guaranteed to work in simple
+cases as well.  Similarly, A ^= B&C provides AND, XOR, NAND, ANDNOT
+(BIC), and NOT as special cases.

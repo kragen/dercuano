@@ -1,0 +1,213 @@
+I've been thinking for a while about how to reduce the number of
+motors needed in a robot, because motors are the only mechanical part
+you can't reasonably 3-D print (or resin-cast, or laser-cut, or made
+with other easily-accessible means of automated fabrication), and
+they're also kind of heavy, expensive, and unreliable.
+
+Also, in some cases, it makes sense to use an internal-combustion
+engine rather than an electric motor to supply mechanical power to the
+robot, because it can use fuel, which stores energy two orders of
+magnitude more densely than batteries do, thus allowing two orders of
+magnitude more autonomy.  Where a battery-powered quadcopter can fly
+for 15 to 25 minutes, a gasoline-powered one of similar design could
+reasonably expect to fly for hundreds of hours; but internal-
+combustion engines don't currently scale down nearly as small as
+electric motors without serious loss of efficiency.  Boston Dynamics'
+spectacular designs typically use pneumatic actuators powered by what
+sounds like a two-stroke internal-combustion engine, but I haven't
+investigated in more detail.
+
+Armatron
+--------
+
+When I was a kid, I had a robot arm from Radio Shack called Armatron.
+It had six degrees of freedom: two rotations at the shoulder, rotation
+at the elbow, two rotations at the wrist, and opening and closing a
+gripper; but it had only a single motor, which ran continuously at a
+fixed speed as long as the robot was turned on.  The two twistable
+joysticks mechanically engaged the various degrees of freedom with the
+motor or a brake, and through a set of slip-clutches, the force
+through each degree of freedom was limited to the small forces that
+the cheap nylon parts could handle easily without risk of breakage.
+It was a toy, but mechanically, it was a beautiful design.
+
+It's not obvious that this is directly applicable to the problem of
+designing an electrically controlled robot, because you'd still need
+some kind of mechanical actuator for each of the degrees of freedom —
+but now to operate the joystick rather than to directly actuate.  This
+is a big improvement in a sense; you can get by with solenoids or very
+small motors.
+
+Below, though, I revisit this problem, with a camshaft-based solution.
+
+Turtlebot
+---------
+
+Consider the problem of a Roomba-like turtle robot, a horizontal disc
+with driven left and right wheels, plus maybe some idler wheels to
+keep stable.  If you mount a pen in the middle of it, as with the
+original Logo turtle robots from the 1970s, you can draw any
+continuous shape on the floor just by alternating between turning in
+place and moving forward.  You don't even need to turn both
+directions or move backwards.
+
+In particular, you can draw smooth lines at any angle, without being
+able to independently control X and Y actuators.
+
+You can straightforwardly achieve this with two motors, one on each
+wheel.  But it occurred to me, thinking about this, that a single
+reversible motor would also work.  It would drive, say, the left wheel
+directly, and the other wheel through a sort of mechanical full-wave
+rectifier, such that the other wheel always turns the same direction
+regardless of which direction the motor is turning.  You could achieve
+this by driving the shaft of the wheel through two sprag clutches that
+freewheel in the same direction, one driven in the same direction as
+the motor (perhaps directly by the motor's shaft), and the other
+driven in the opposite direction, perhaps through a bevel gear between
+it and the first ring.
+
+(You can 3-D print or, I think, even laser-cut a reasonable
+approximation to a sprag clutch in two or three relatively simple
+flexible parts, if you're not too worried about maximizing torque per
+volume.)
+
+With this simple mechanical arrangement, the right wheel always drives
+forward, while the left wheel can go either forward, to move the
+robot, or backward, to turn it.  So a single reversible motor should
+enable you to draw any figure, limited by your control system (I've
+argued elsewhere that closed-loop feedback is now cheap enough that we
+should apply it in almost every case now) and the very small backlash
+of your rectifier mechanism.
+
+RepRap and 3-D printers
+-----------------------
+
+A different problem from the turtlebot is the 3-D printer, which
+typically needs four degrees of movement freedom — in a case like the
+RepRap Prusa Mendel, you have two parallel Z motors suspending the X
+motor via triangular-thread allthread bars as linear actuators, the X
+motor moving the print head via a belt drive, a reversible extruder
+motor on the print head itself pushing the filament into the hotend,
+and a Y motor moving the heated bed via the same kind of belt drive as
+the X motor; a total of five motors with four degrees of freedom.  The
+motors used are heavy, expensive NEMA 23 stepper motors, which are
+uncommon enough that it's hard to salvage them from e-waste, even
+though e-waste is full of motors.  And, of course, printing such a
+motor on the RepRap is far beyond its current capabilities.
+
+(Ganging together multiple smaller motors to drive a single shaft is
+probably the right response to the problem of having only smaller
+motors easily available.)
+
+I've thought (and I wasn't the only one) that you could dispense with
+the Z stage if, say, you replace the Y actuator with a circular θ
+actuator, and goes up a Z step every time the θ actuator makes a full
+revolution.  The biggest problem with this is that, with the
+straightforward approach where the Z movement is directly controlled
+by one or more screw threads that revolve 1:1 with the θ actuator, you
+go up by an entire thread pitch.  1mm is the finest thread pitch
+commonly available in Allthread rods.  But a 1mm Z-step is a very
+large step.  0.35mm and 0.25mm are more common layer thicknesses,
+providing more acceptable surface finishes, avoiding the need for
+extreme plastic feedrates, which would require a much larger hotend
+and extruder motor, as well as suffering more from heat-induced damage
+to the plastic's chemical structure and slumping before cooling.
+Gearing down the θ rotation by 10× would be sufficient to solve this
+problem.
+
+That reduces the machine from five motors to, say, three.  If we are
+willing to limit the horizontal planar scan to a single fixed pattern,
+where we don't get to choose the direction of movement at each "pixel"
+but only how much material to deposit there, then we can gear the θ
+movement to the X movement, which probably should also become
+circular.  This dramatically reduces the efficiency of the device and
+worsens surface finish, but with a sufficiently small build volume,
+perhaps it could be acceptable anyway.  Essentially we have gone from
+a 3-D plotter to a raster 3-D printer, although with a funny circular
+scan pattern.
+
+And now we have only two motors to control independently.
+
+If we are to recapture the horizontal surface-finish and a shadow of
+the efficiency we got with our vector plotter, we could perhaps use
+the turtlebot approach: have a single motor alternate between
+determining the direction of motion, while stationary, and determining
+the speed of motion.  In the RepRap context, this will cause some ooze
+problems, as the hotend's plastic extrusion rate is more or less a
+low-pass-filtered version of the extrusion motor's movement.  (Thus
+oozebane and similar techniques in current FDM slicers depend on
+briefly reversing the extruder motor.)
+
+How would this work?  So far all the things I've thought of are
+ridiculously complicated and depend on analog mechanical computation
+devices called "integrators" "integration", which turn the position of
+their input into the rate of motion of their output, thus numerically
+(or analogically) approximating the computation of a definite
+integral.  There are several different types that work by different
+mechanisms.  In the mechanical computation context, integrators are
+notoriously sensitive devices, but I suspect that closed-loop control
+could fix that problem in this context.  The [famous Navy film about
+fire-control computers][0] goes into some detail about the relevant
+mechanisms.
+
+[0]: http://youtu.be/s1i-dnAH9Y4 "MN-6783a, MN-6783b, US Navy"
+
+However, mechanisms that are ridiculously complicated when you have to
+cut all of their parts out of metal, with dimensions accurate to five
+significant figures, might no longer be ridiculously complicated when
+you can 3-D print them and compensate for their dimensional errors
+using closed-loop digital control.
+
+That leaves us with two motors: one to control the X-Y (or rather θ-φ)
+scanning, bringing along Z for the ride, and another on the extruder.
+Can we get rid of the extruder motor?
+
+Well, if we always extrude at a constant speed, perhaps through some
+kind of a gravity feed, we could control the amount deposited in each
+location by varying how rapidly we pass over it.  But this seems
+relatively impractical, especially with materials like plastic, which
+is light and therefore hard to gravity-feed and can be usefully
+deposited through a very small orifice.  (The orifice is almost
+inevitably smaller than the filament extruded, because the plastic
+swells upon being released from the orifice.)
+
+For a machine to produce sand paintings, on the other hand — perhaps
+even very vertical sand paintings with "magic sand" — it might work
+perfectly.
+
+Camshafts and Armatron revisited
+--------------------------------
+
+Another thing we often want is a large number of very simple
+actuators, such as valves which can be either open or closed, or pens
+that can be either up or down.  If we can accept intermediate
+glitches, we can achieve this by driving all of the actuators on a
+camshaft where the cams are the different bits of a binary code, and
+the rotational positions of the camshaft are the different codes; the
+followers read off the various bits of the code for the current
+position.  Many traffic lights in Buenos Aires, for example, work this
+way, with the cam followers actuating electric switches.
+
+In the general case of N actuators, your camshaft needs to be able to
+distinguish among 2^N rotational positions, although by using Gray
+codes, the minimum width of a cam lobe can be twice that, and the
+overall number of bit changes can be minimized to the 2^N minimum.  In
+some cases, not all possible codewords are necessary.
+
+This, again, can be driven by a single motor that turns in one
+direction to select the set of actuators to be activated, and then in
+the opposite direction to provide mechanical power that is routed
+through them.  (For example, pumping hydraulic fluid through a set of
+open valves, or driving a set of engaged gears.)
+
+In particular, this is a possible solution to the Armatron problem:
+you have six pairs of mutually exclusive actuators, or equivalently
+six three-position actuators, so we need 3⁶ = 729 distinct positions
+of the camshaft, which is a bit much; but it's probably adequate to be
+able to engage two or three of the joints at a time, rather than all
+six, which reduces the number of combinations dramatically.  (I'm too
+lazy to calculate the case for up to three joints right now, but you
+can see that 2C6 = 6×5/2 = 15 pairs of joints, each of which can be
+engaged in 4 ways for a total of 60, plus six individual joints
+engaged in two directions for 12, plus all idle for 1, brings us down
+from 729 to 73 camshaft orientations, which is eminently feasible.)

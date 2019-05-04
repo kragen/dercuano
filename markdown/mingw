@@ -1,0 +1,401 @@
+So MinGW originally was part of the GNU-Win32 project, aka Cygwin.
+Cygwin provides a Unix environment inside of Microsoft Windows, on top
+of Win32; I used to use it a lot when I used Windows NT at work.
+Cygwin includes a full GCC compiler suite and everything, but the
+executables it produces depend on the Cygwin DLL to provide the POSIX
+API.
+
+MinGW, the "Minimalist GNU-Win32", instead let you use GCC to build
+applications that are written to use the Win32 API instead of the
+POSIX API.
+
+This was all very well, but not of much use to those of us who used
+free operating systems like Linux and therefore didn't have an
+implementation of the Win32 API at hand.
+
+But gradually, over the years, WINE got better and better, and now it
+implements the great majority of the Win32 API (although not enough to
+run the great majority of Win32 programs).  And Linux's flexible
+binary format support makes it relatively transparent.
+
+So now, on my Debian Stable system (that is, "etch", which is mostly
+from 2006), I can do this:
+
+    kragen@thrifty:~/notes$ cd ~/devel
+    kragen@thrifty:~/devel$ cat > hello.c
+    #include <stdio.h>
+    int main(int argc, char **argv) {
+        printf("hello, %s\n", argc > 1 ? argv[1] : "world");
+        return 0;
+    }
+    kragen@thrifty:~/devel$ i586-mingw32msvc-gcc hello.c -o hello.exe
+    kragen@thrifty:~/devel$ ./hello.exe 
+    Invoking /usr/lib/wine/wine.bin ./hello.exe ...
+    hello, world
+    Wine exited with a successful status
+    kragen@thrifty:~/devel$ ./hello.exe Win32
+    Invoking /usr/lib/wine/wine.bin ./hello.exe Win32 ...
+    hello, Win32
+    Wine exited with a successful status
+    kragen@thrifty:~/devel$ 
+
+(I have both mingw32 and wine installed.)
+
+Some GDI Hello Worlds
+---------------------
+
+I googled up some Win32 tutorials, got some code that almost ran, and
+hammered it into shape and got this, which I can compile and run:
+
+    // Win32 GDI hello world program, slightly modified to compile in C
+    // (C9x), without MSVC, not be formatted like total ass, and add some
+    // obscenities, by Kragen Javier Sitaker
+
+    // But the original is written by RoD@cprogramming.com, to whom I am
+    // greatly indebted for sharing his knowledge of Win32 (despite my
+    // complaints about the formatting); it is available at
+    // <http://www.cprogramming.com/tutorial/opengl_first_windows_app.html>
+
+    // I compile and run it on my Linux box with MinGW and WINE as follows:
+    // kragen@thrifty:~/devel$ i586-mingw32msvc-gcc -Wall hi.c -lgdi32 -o hi.exe
+    // kragen@thrifty:~/devel$ ./hi.exe
+
+    #include <windows.h>
+
+    // event handler
+    LRESULT CALLBACK WndProc(HWND hWnd,
+                             UINT message,
+                             WPARAM wParam,
+                             LPARAM lParam)
+    {
+      PAINTSTRUCT paintStruct;
+      HDC hDC;                      // device context
+      char *string = "Hello, World!"; 
+
+      switch(message) {
+      case WM_CREATE:               // window is being created
+        return 0;
+      case WM_CLOSE:                // window is closing
+        PostQuitMessage(0);
+        return 0;
+      case WM_PAINT:                // window needs update
+        hDC = BeginPaint(hWnd, &paintStruct);
+        SetTextColor(hDC, (COLORREF)0x00FF0000);  // blue
+        // (150, 150) is more or less the middle of the 400x400 window
+        TextOut(hDC, 150, 150, string, strlen(string));
+        EndPaint(hWnd, &paintStruct);
+        return 0;
+      default:
+        break;
+      }
+
+      return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
+    int APIENTRY WinMain(HINSTANCE hInstance,
+                         HINSTANCE hPrevInstance,
+                         LPSTR lpCmdLine,
+                         int nCmdShow)
+    {
+      HWND hWnd;
+      MSG msg;
+      WNDCLASSEX windowClass = {    // What a fucking pain in the ass.
+        .cbSize = sizeof(WNDCLASSEX),
+        .style = 0,
+        .lpfnWndProc = WndProc,
+        .cbClsExtra = 0,
+        .cbWndExtra = 0,
+        .hInstance = hInstance,     // handle to the application itself
+        .hIcon = LoadIcon(NULL, IDI_APPLICATION),
+        .hCursor = LoadCursor(NULL, IDC_ARROW),
+        .hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH),
+        .lpszMenuName = NULL,
+        .lpszClassName = "MyClass",
+        .hIconSm = LoadIcon(NULL, IDI_WINLOGO),
+      };
+
+      if (!RegisterClassEx(&windowClass)) return 0;
+
+      // What shithead thought it was a good idea to write a function with
+      // ten positional parameters?
+      hWnd = CreateWindowEx(0,                    // extended style
+                            "MyClass",            // class name
+                            "A Real Win App",     // app name
+                            WS_OVERLAPPEDWINDOW | // window style
+                            WS_VISIBLE |
+                            WS_SYSMENU,
+                            100,100,              // x/y coords
+                            400,400,              // width,height
+                            NULL,                 // handle to parent
+                            NULL,                 // handle to menu
+                            hInstance,            // application instance
+                            NULL);                // no extra parameters
+      // XXX probably should use ShowWindow, not WS_VISIBLE
+
+      if (!hWnd) return 0;
+
+      // main message loop
+      for (;;) {
+        // XXX probably should call GetMessage, not PeekMessage
+        // XXX and look for <= 0 return value to exit loop
+        PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE);
+        if (msg.message == WM_QUIT) return msg.wParam;
+        // Translate and dispatch to event queue
+        TranslateMessage(&msg); 
+        DispatchMessage(&msg);
+      }
+    }
+
+That builds and runs.  A little later I found this much smaller Win32
+"hello, world" in what looks like a much more competent tutorial:
+
+    // http://www.winprog.org/tutorial/start.html
+
+    #include <windows.h>
+
+    int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
+        LPSTR lpCmdLine, int nCmdShow)
+    {
+        MessageBox(NULL, "Goodbye, cruel world!", "Note", MB_OK);
+        return 0;
+    }
+
+That builds and runs too.
+
+For some reason, `winedump` reports that they belong to "subsystem 0x3
+(Windows CUI)" rather than "subsystem 0x2 (Windows GUI)".  I found
+that I could fix this by using the `-Wl,--subsystem,0x2` option on the
+GCC command line.  This also keeps Windows XP from opening a console
+window for it.
+
+Upsides
+-------
+
+Most obviously, you can write, test, debug, and compile programs for
+Win32 so that you can run them on Win32-only machines.
+
+Also, you get fantastic stack dumps when you crash.  Here I've deliberately
+introduced a null pointer write to demonstrate:
+
+    wine: Unhandled page fault on write access to 0x00000000 at address 0x4012df (thread 0009), starting debugger...
+    Unhandled exception: page fault on write access to 0x00000000 in 32-bit code (0x004012df).
+    Register dump:
+     CS:0073 SS:007b DS:007b ES:007b FS:0033 GS:003b
+     EIP:004012df ESP:0069fc30 EBP:0069fc88 EFLAGS:00010246(   - 00      -RIZP1)
+     EAX:00000000 EBX:7ebbe83c ECX:00000000 EDX:00401280
+     ESI:00000000 EDI:00010024
+    Stack dump:
+    0x0069fc30:  0000000f 00000000 00403000 00000000
+    0x0069fc40:  7b8a7fe0 0069fcec 7b884bfb 7ebbe83c
+    0x0069fc50:  00160690 00000006 00010024 0000000f
+    0x0069fc60:  00000000 00000000 00000860 00000000
+    0x0069fc70:  00000000 00000008 000001ba 7b88481f
+    0x0069fc80:  00010024 00000001 0069fcb8 7eb9a6aa
+    fixme:ntdll:RtlNtStatusToDosErrorNoTeb no mapping for c0000119
+    Backtrace:
+    =>1 0x004012df WndProc+0x5f(hWnd=0x10024, message=0xf, wParam=0x0, lParam=0x0) [/home/kragen/devel/hi.c:34] in hi (0x0069fc88)
+      2 0x7eb9a6aa WINPROC_wrapper+0x1a in user32 (0x0069fcb8)
+      3 0x7eb9ae0b in user32 (+0x9ae0b) (0x0069fcf8)
+      4 0x7eb9eb5a CallWindowProcA+0x5a in user32 (0x0069fd38)
+      5 0x7eb69218 DispatchMessageA+0x148 in user32 (0x0069fd78)
+      6 0x004014c6 WinMain+0x15f(hInstance=0x400000, hPrevInstance=0x0, lpCmdLine=0x1157b8, nCmdShow=0xa) [/home/kragen/devel/hi.c:95] in hi (0x0069fe38)
+      7 0x004015f7 in hi (+0x15f7) (0x0069feb8)
+      8 0x004011d9 __mingw_CRTStartup+0xc9 [/home/ron/devel/debian/mingw32-runtime/mingw32-runtime-3.9/build_dir/src/mingw-runtime-3.9/crt1.c:226] in hi (0x0069fee8)
+      9 0x00401223 in hi (+0x1223) (0x0069ff08)
+      10 0x7b86eeab in kernel32 (+0x4eeab) (0x0069ffe8)
+      11 0xb7dfa7a7 wine_switch_to_stack+0x17 in libwine.so.1 (0x00000000)
+    0x004012df WndProc+0x5f [/home/kragen/devel/hi.c:34] in hi: movb	$0x78,0x0(%eax)
+    34	    *nullptr = 'x';
+    Modules:
+    Module	Address			Debug info	Name (48 modules)
+    PE	400000-48e000	Stabs           hi
+    ELF	7b800000-7b919000	Export          kernel32<elf>
+      \-PE	7b820000-7b919000	\               kernel32
+    ELF	7bc00000-7bc83000	Deferred        ntdll<elf>
+      \-PE	7bc10000-7bc83000	\               ntdll
+    ELF	7bf00000-7bf03000	Deferred        <wine-loader>
+    ELF	7ccdf000-7cce4000	Deferred        libxfixes.so.3
+    ELF	7cce4000-7cced000	Deferred        libxcursor.so.1
+    ELF	7cced000-7cd09000	Deferred        imm32<elf>
+      \-PE	7ccf0000-7cd09000	\               imm32
+    ELF	7cd09000-7cd0c000	Deferred        libxrandr.so.2
+    ELF	7cd0c000-7cd14000	Deferred        libxrender.so.1
+    ELF	7cd14000-7cd17000	Deferred        libxinerama.so.1
+    ELF	7e517000-7e73a000	Deferred        savage_dri.so
+    ELF	7e73a000-7e741000	Deferred        libdrm.so.2
+    ELF	7e741000-7e7ab000	Deferred        libgl.so.1
+    ELF	7e7ab000-7e7b0000	Deferred        libxdmcp.so.6
+    ELF	7e7b0000-7e89c000	Deferred        libx11.so.6
+    ELF	7e89c000-7e8aa000	Deferred        libxext.so.6
+    ELF	7e8aa000-7e8c2000	Deferred        libice.so.6
+    ELF	7e8c2000-7e8cb000	Deferred        libsm.so.6
+    ELF	7e8cb000-7e958000	Deferred        winex11<elf>
+      \-PE	7e8e0000-7e958000	\               winex11
+    ELF	7ea27000-7ea47000	Deferred        libexpat.so.1
+    ELF	7ea47000-7ea72000	Deferred        libfontconfig.so.1
+    ELF	7ea72000-7eadc000	Deferred        libfreetype.so.6
+    ELF	7eadc000-7ec13000	Export          user32<elf>
+      \-PE	7eb00000-7ec13000	\               user32
+    ELF	7ec13000-7ec77000	Deferred        msvcrt<elf>
+      \-PE	7ec20000-7ec77000	\               msvcrt
+    ELF	7ec77000-7ecbd000	Deferred        advapi32<elf>
+      \-PE	7ec80000-7ecbd000	\               advapi32
+    ELF	7ecbd000-7ecc8000	Deferred        libgcc_s.so.1
+    ELF	7edad000-7ee66000	Deferred        gdi32<elf>
+      \-PE	7edc0000-7ee66000	\               gdi32
+    ELF	7ef8e000-7ef99000	Deferred        libnss_files.so.2
+    ELF	7ef99000-7efa3000	Deferred        libnss_nis.so.2
+    ELF	7efa3000-7efb9000	Deferred        libnsl.so.1
+    ELF	7efb9000-7efc2000	Deferred        libnss_compat.so.2
+    ELF	7efc2000-7efe7000	Deferred        libm.so.6
+    ELF	7efe9000-7efec000	Deferred        libxau.so.6
+    ELF	7efec000-7f000000	Deferred        libz.so.1
+    ELF	b7c93000-b7c97000	Deferred        libdl.so.2
+    ELF	b7c97000-b7dc8000	Deferred        libc.so.6
+    ELF	b7dc8000-b7dda000	Deferred        libpthread.so.0
+    ELF	b7ddb000-b7de0000	Deferred        libxxf86vm.so.1
+    ELF	b7df3000-b7f04000	Export          libwine.so.1
+    ELF	b7f06000-b7f1d000	Deferred        ld-linux.so.2
+    Threads:
+    process  tid      prio (all id:s are in hex)
+    0000000a 
+            0000000c    0
+            0000000b    0
+    00000008 (D) Z:\home\kragen\devel\hi.exe
+            00000009    0 <==
+    Wine exited with a successful status
+
+It even disassembled of the instruction that it crashed at.
+
+Downsides
+---------
+
+There are also some downsides.
+
+For example, I have a little SDL display hack, and since SDL runs on
+Win32, in theory I ought to be able to compile it for Win32 with MinGW
+and run it in WINE.  But I don't have a Win32 version of SDL, any idea
+of how to compile one, or any idea of where to install it so that
+MinGW can find it; these problems would be easier if I were actually
+using Visual Studio on Microsoft Windows XP or something, since lots
+of other people would have solved them already.  They're really,
+really easy for the platforms Debian focuses on:
+
+    kragen@thrifty:~/devel$ apt-file search SDL.h
+    gambas-doc: usr/share/gambas/help/ArticleSDL.html
+    iceape-dev: usr/include/iceape/websrvcs/nsIWSDL.h
+    icedove-dev: usr/include/icedove/websrvcs/nsIWSDL.h
+    libsdl1.2-dev: usr/include/SDL/SDL.h
+    libxul-dev: usr/include/xulrunner/websrvcs/nsIWSDL.h
+    pike7.6-reference: usr/share/doc/pike7.6-doc/html/reference/ex/predef_3A_3A/SDL.html
+    plib1.8.4-dev: usr/include/plib/puSDL.h
+    plib1.8.4-pic: usr/include/plib/puSDL.h
+    kragen@thrifty:~/devel$ apt-get install libsdl1.2-dev
+
+And after doing that, you can compile your SDL program.
+
+And, of course, most of the conveniences we glibc users have grown
+accustomed to just aren't there in Win32; it's really an environment
+designed for C++, not C.
+
+The first "hello, world" above produces an executable of over 200kB,
+or almost 600kB with `-g`, but that's mostly debugging symbols;
+`strip` reduces that to just over 7kB, and `-Os` plus `strip`.
+
+And, although GDB knows how to read `hello.exe`, it doesn't really
+know how to debug it:
+
+    kragen@thrifty:~/devel$ gdb hello.exe
+    GNU gdb 6.4.90-debian
+    Copyright (C) 2006 Free Software Foundation, Inc.
+    GDB is free software, covered by the GNU General Public License, and you are
+    welcome to change it and/or distribute copies of it under certain conditions.
+    Type "show copying" to see the conditions.
+    There is absolutely no warranty for GDB.  Type "show warranty" for details.
+    This GDB was configured as "i486-linux-gnu"...Using host libthread_db library "/lib/tls/i686/cmov/libthread_db.so.1".
+
+    (gdb) b main
+    Cannot access memory at address 0x280
+    (gdb) r
+    Starting program: /home/kragen/devel/hello.exe
+    add-symbol-file-from-memory not supported for this target
+    Warning:
+    Cannot insert breakpoint -2.
+    Error accessing memory address 0x280: Input/output error.
+
+    (gdb) delete 1
+    No breakpoint number 1.
+    (gdb) delete -2
+    negative value
+    (gdb) c
+    Continuing.
+    Warning:
+    Cannot insert breakpoint -2.
+    Error accessing memory address 0x280: Input/output error.
+
+    (gdb) r
+    The program being debugged has been started already.
+    Start it from the beginning? (y or n) y
+    Starting program: /home/kragen/devel/hello.exe
+    add-symbol-file-from-memory not supported for this target
+    Warning:
+    Cannot insert breakpoint -3.
+    Error accessing memory address 0x280: Input/output error.
+
+    (gdb) q
+    The program is running.  Exit anyway? (y or n) y
+
+(In theory there's also `winedbg --gdb` which works OK when I `winedbg
+--gdb winemine.exe` but not when I try to run it on my `hello.exe`.)
+
+Finally, although Win32 has some good points, mostly it is a tacky
+piece of crap, and not that much fun to program against.  It's roughly
+as bad as Xlib.
+
+Other Win32 Tutorials
+---------------------
+
+theForger's/Brook Miles's/forgey's win32 tutorial is fantastic:
+<http://www.winprog.org/tutorial/start.html>
+
+Another copy of it:
+<http://www.vczx.com/tutorial/win32-tutorial/message_loop.html>
+
+RoD's fairly incompetent and sloppy tutorial, which additionally is
+full of patronizing content-free text:
+<http://www.cprogramming.com/tutorial/opengl_first_windows_app.html>
+
+Another one, on "Application Creation", verbose and full of errors (I
+count nine errors in the 12 paragraphs before the second heading, and
+it seems to continue at almost one error per paragraph thereafter; my
+god, it's comedically awful --- you might actually know less about
+Win32 after reading this than before):
+<http://www.functionx.com/win32/Lesson01b.htm>
+
+This one isn't too terrible, but it still contains a few errors and
+some voodoo code; I haven't finished it:
+<http://www.mdstud.chalmers.se/~md7amag/code/wintut/wtpart1.html>
+
+Others I haven't had the chance to read:
+<http://www.cprogramming.com/snippets/show.php?tip=6&count=30&page=0>
+<http://source.winehq.org/WineAPI/LoadLibraryExA.html>
+<http://www.reactos.org/generated/doxygen/d9/d22/ldr_8c-source.html>
+<http://www.mpcforum.com/archive/index.php/t-133031.html>
+<http://www.piotrbania.com/all/protty/p63-0x0f_NT_Shellcode_Prevention_Demystified.txt>
+<http://members.fortunecity.com/blackfenix/dongles.html>
+<http://www.codeproject.com/KB/winsdk/cwin32error.aspx>
+<http://msdn.microsoft.com/en-us/library/994a1482.aspx>
+<http://www.definitivesolutions.com/sourcecode/GenericAtl.cpp>
+<http://www.codeguru.com/forum/archive/index.php/t-362322.html>
+<http://www.simplesamples.info/MFC/UDPSendReceive.php>
+<http://www.winehq.org/pipermail/wine-patches/2002-May/002495.html>
+<http://www.google.com/search?hl=en&safe=off&client=iceweasel-a&rls=org.debian:en-US:unofficial&q=+site:www.winehq.org+GetLastError+message>
+<http://mail.python.org/pipermail/python-list/2000-June/039309.html>
+
+Conclusions
+-----------
+
+So, although we've come a long way, Debian isn't yet really the
+environment of choice for developing Win32 programs; but it's at least
+barely possible to do so.  I think we're actually a lot further along
+for .NET stuff than for Win32 stuff.

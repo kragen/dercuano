@@ -25,6 +25,11 @@ def format_when(filename, start, end):
                                     filename, date(end))
 
 def date(time_t):
+    if time_t == 1232577326:
+        # This is the timestamp of my initial Git commit of the notes
+        # repo on, I think, inexorable.  (It might have been on a
+        # laptop, but it was probably inexorable.)
+        return '2007+to+2009'
     struct_tm = time.localtime(time_t)
     return '%04d-%02d-%02d' % (struct_tm.tm_year,
                                struct_tm.tm_mon,

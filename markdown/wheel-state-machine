@@ -1,0 +1,303 @@
+An extremely simple electromechanical state machine
+===================================================
+
+As I was walking out my door earlier tonight to get an empanada, I
+noticed that the keys had left a mark by brushing against the paint on
+the door, and I thought, wow, I can make pretty intricate patterns in
+brass entirely by accident this way.  Wouldn't it be awesome if we
+could somehow just *draw* a computer as a two-dimensional pattern on
+paper and have it work?
+
+And it occurred to me that it *is* actually practical to simply draw a
+state transition table and have a simple electromechanical machine
+implement the state machine you specified.  Here's the idea.
+
+The idea (here)
+---------------
+
+Suppose you want to implement an arbitrary finite-state machine with a
+minimum number of "active" electronic elements (things like vacuum
+tubes or transistors).  Here's an interesting approach, sort of
+inspired by Shamir's TWINKLE.
+
+You maintain your current N-bit state in N flip-flops with
+complementary Q and /Q outputs; typically each flip-flop requires one
+or two vacuum tubes, or a locking relay, or two to six transistors,
+depending on your logic family and other details.  You hook up the Q
+and /Q outputs to lamps: these days, you would surely use laser diodes
+or other LEDs, but in the 1940s timeframe where this scenario makes
+the most sense, you'd have to use something else, maybe neon lamps.
+The lamps give you a matrix of N rows of two lamps, one of which is on
+at any given time.
+
+A reasonable value for N here might be 3 to 20.
+
+Now you put these lamps close to a strip of paper.  The lamps reflect
+diffusely off the paper and illuminate the environment.  If there are
+dark blots on the paper under an illuminated lamp, that will diminish
+the overall illumination reflected from the lamps.
+
+With a lens per lamp --- not necessarily a very good lens --- you can
+do this trick with the lamps some distance from the paper.  The idea
+is that each lamp just illuminates a corresponding spot on the paper.
+
+Suppose the paper is a vertical strip, divided into rows of two
+squares, one square for each lamp; and just as one of the two lamps in
+each row is lit, one of the two squares in each row is light, while
+the other one is dark.  Now the illumination reflected from each row
+is the XOR or XNOR of a bit of our state and the corresponding bit on
+the paper.  If we slide the paper vertically, the illumination will
+fluctuate with time as the Hamming distance between the current state
+and the selected subset of the bit pattern on the paper varies.
+
+Now, instead of sliding bits of paper around, we can wrap this strip
+of paper around a rotating drum.  As the drum rotates, the number of
+matching bits on these two tracks of the drum will vary, and so will
+the reflected light.  It will reach a minimum when every lamp is
+illuminating a black area.
+
+How small is that minimum?  Asphalt has a visible-light albedo of
+0.04; I think carbon black is a little darker than that.  Polished
+aluminum has a reflectance of about 0.95, although I think it gets a
+little worse when unpolished.  But basically we can have a contrast
+ratio of about 20 or 25 between black and white on paper without doing
+anything exotic.  That means that if you have 5 bits and all 5 of them
+match, you'll have about 0.04 × 5 = 0.2 of the light from one bit;
+while if only 4 match, you'll have 0.04 × 4 + 0.95 × 1 = 1.11 of the
+light from one bit, about 4½ times as much.  So this is an easily
+detectable event: the ratio between a perfect match and a near match
+is about a factor of 4.  You should be able to detect this event with
+a photodiode or even an electric eye.
+
+Suppose that an adjacent track of the drum carries another pattern of
+bright and dark squares, containing desired new states for your
+flip-flops.  If you have more lamps and photodetectors close to it,
+one per bit, they can read the pattern without leaking much light into
+the environment.
+
+Now, as the drum turns, the apparatus searches for a matching state on
+the drum; when the reflected light level falls to a minimum, it knows
+it has found it, and it loads the specified new state into the
+flip-flops from the other track.  It's probably desirable for the
+"pattern" bits being matched on the track to be somewhat short, so
+that the new-state bits are well centered under their detectors by the
+time the detector fires, as follows:
+
+     Q /Q  newstate
+    --     ##
+       --
+       --  ##
+    --     ##
+
+You probably do need a mechanism that prevents a misaligned match:
+say, N-1 bits of one pattern and 1 bit of the following one.  One way
+is to have an extra framing "bit" that is always illuminated on both
+sides, marking the paper dark on both tracks:
+
+     Q /Q  newstate
+    --     ##
+       --
+       --  ##
+    --     ##
+    -----
+
+Alternatively, you could just space the rows unevenly, or even leave a
+fractional-row-sized space between patterns.
+
+The (N+1)×3 arrangement described above is just one of many
+possibilities.  You could just as well put all the bits on one track,
+and the lamps in a line; or you could put each bit in a separate
+track, producing 3N tracks and one bit-height per pattern, which is
+probably the highest-performance option; here we have three
+transitions:
+
+    Q1 /Q1 Q2 /Q2 Q3 /Q3 Q4 /Q4 Q1' Q2' Q3' Q4'
+    --        --  --     --     ##  ##  ##
+    --        --  --         -- ##  ##  ##  ##
+    --        --     --      -- ##  ##
+
+Simple latches, without edge-triggering, probably suffice for the
+flip-flops, because each transition will be either to the same state
+or to a different state.  If it's to the same state, it's idempotent,
+so it's harmless to execute it continuously until the marks pass; and
+if it's to a different state, then it will execute until the lamps
+display enough of the new state that the light level rises above the
+level that triggers the state-transitioning logic.  You just have to
+be careful that the transition is sufficiently well-established that
+all the bits have changed as they should, and none is left in a
+metastable state.
+
+Further variations
+------------------
+
+* The natural approach to arranging the patterns on the drum is just
+  to put them in numerical sequence, evenly spaced around the drum, so
+  that you execute about two transitions per revolution.  But you can
+  also repeat them so that some transitions have the opportunity to
+  execute many times, and so that transitions that happen in sequence
+  are placed in sequence, and of course you can repeat the entire
+  sequence of transitions.  Furthermore, you can use the drum position
+  as an additional, less flexible state variable, so that the entire
+  state machine cycles through different transition graphs.
+
+* Of course, one or more of the bits used to select the pattern can
+  actually be an input, rather than a stored bit.  You probably want
+  to make sure the input doesn't change while you're using it to
+  choose your next state; you can sample-and-hold it, or use an actual
+  edge-triggered flip-flop, if it can change state arbitrarily.
+
+* It's possible to encode "don't care" bits by coloring both sides of
+  the pattern bit, potentially reducing the number of patterns
+  dramatically.
+
+* If you have both "new Qi" and "new /Qi" bits on the paper, you may
+  be able to simplify the transitioning logic to simply illuminating
+  them when the reflected "pattern" light falls below the threshold.
+  That is, the nonlinear element that switches between retaining the
+  existing state and adopting a new one can be simply the power supply
+  of the lamps illuminating these bits.
+
+* If you have both "new Qi" and "new /Qi" bits as described above, you
+  have the additional option of *not* switching some bits, allowing
+  them to retain a memory independent of the state transition being
+  executed; this can allow a dramatic reduction in the number of
+  transitions by, among other things, allowing you to preserve "don't
+  care" bits, and allowing different subsets of the state
+  independently.
+
+* Your state variables don't need to be binary --- they can have more
+  than two stable states.  Indeed, ternary variables will give you
+  slightly more states for patterns of the same size, and may be more
+  convenient to work with; and quaternary variables (one-hot out of
+  four) will give you patterns of the same size, but half the lamps
+  illuminated, and so they may be easier to do the threshold logic
+  with.
+
+* You can use a tape or disc rather than a drum for a more compact
+  machine.
+
+* For a better contrast ratio and fewer materials, you can use punched
+  or drilled holes rather than marks.
+
+* You could use the state where all of the bits are *reflected* (or
+  transmitted) instead of all *absorbed* as the trigger state, but I
+  figured that was probably harder, since the difference between
+  almost-all-bits-reflected and all-bits-reflected will be, say, 10%
+  to 33%, which will be harder to discriminate reliably than the 350%
+  or more between almost-all-bits-absorbed and all-bits-absorbed.
+
+* Rather than using diffuse reflection and absorption, you could use
+  specular reflection of collimated light and diffuse reflection.  For
+  example, if you're using something like a hard disk platter, a
+  scratched or etched spot in its surface will scatter light at
+  random, while an untouched spot will produce a collimated reflected
+  beam from a collimated incident beam.
+
+* If you have an additional hardware budget, you could of course
+  replace the pattern tracks and the light detector with a counter
+  circuit and digital comparator, leaving only the new-state tracks
+  and a timing mark for restarting the counter.
+
+* If you do the whole thing in a hard vacuum, you could use electron
+  beams instead of light, which might make it faster, depending on
+  your light source.  You'd have to use an unlubricated bearing to
+  spin the drum if you were doing this on Earth.
+
+* Of course you can connect some of your state bits to control some
+  other device, such as a memory, which would then provide some of the
+  input bits.
+
+What this gets you
+------------------
+
+If N=4 plus one bit of input, this should give you an arbitrary
+sixteen-state state machine for the cost of somewhere around five to
+forty active elements, depending on what they are; and its speed
+should be limited to something like one transition per sixteen times
+its lamps' response time.  That is, if your indicator lamps respond in
+100ns, you should be able to do an arbitrary transition in 1600ns.
+This is dependent on actually testing a pattern every 100ns; at
+5400rpm and a radius of 4cm, your patterns will need to be about 2
+microns across, which means your lamps' illumination spots will need
+to be about that size too, and you might need to make sure they were
+aligned to within that precision, too.  200 microns is probably more
+practical if you want to be able to construct the thing without
+resorting to a microscope, and you can probably spin a 40-cm-radius
+drum at 5400rpm, practically speaking, giving you a microsecond per
+candidate phase transition.
+
+The great disadvantage of this approach is that the state machine's
+real-time performance is fairly poor, so it can't interface directly
+with things like delay lines unless they're very slow indeed.
+
+### A potential 1920s realization using only neon glow lamps ###
+
+I think that if you accept some further slowdown, although not quite
+to the level of magnetic relay logic, you can build it with a couple
+of 1920s neon glow lamps for each flip-flop.  I haven't really played
+with the things, but I think that this topology gives you a flip-flop:
+
+                              A
+                              |
+                    _( NE-2 )_|__/\/\/\__
+                   / (  L1  )      R1    \
+    VCC           /                       \__
+    +___/\/\/\___/                        / |
+          R3     \                       /  |
+                  \__( NE-2 )____/\/\/\_/   |
+                     (  L2  ) |    R2      _|_
+                              |            /// GND
+                              B
+
+If "VCC" is above the striking voltage of the lamps (say 110 volts),
+then either L1 or L2 will ionize and start to conduct at about three
+milliamps; at this point the voltage across it will drop, to about 70
+volts IIRC, and if enough of the remainder is dropped across R3, the
+other lamp will not ionize.  You can measure the voltage at points A
+and B to see which lamp is conducting; the other one will be at zero
+volts.  And if you apply a sufficient positive voltage at A (anything
+from about 50 volts up to not too far above "VCC"), you can get L1 to
+stop conducting if it's conducting beforehand, ensuring that L2 is
+conducting afterwards; and likewise for B.
+
+This might avoid the need for separate indicator lamps, but NE-2s are
+pretty small, dim, and red, so your light detector has to be pretty
+good.  However, there are other neon glow lamps that work the same way
+that produce more light.  In extreme steampunky cases, you could
+perhaps even use a carbon arc lamp, which displays more or less the
+same bistable negative-resistance behavior that neon glow lamps do, so
+much so that the Pearson arc oscillator used it to power an RF
+oscillator circuit.
+
+This flip-flop can be extended to multiple branches; as I sort of
+mentioned before, three alternatives gives you slightly better
+efficiency than two; six lamps in two three-branch circuits of this
+type can encode nine alternatives, compared to eight if they're
+grouped into three two-branch circuits.
+
+So how do you connect a high voltage to A or B when one of the
+next-state bits gets illuminated?  In today's world you'd probably
+amplify a signal from a photodiode to trigger a triac or SCR or
+something.  But using neon lamps?  They're slightly light-sensitive,
+and in their negative-resistance region, capable of amplification, so
+theoretically this ought to be possible, but I don't know enough of
+the details.
+
+You do have the advantage that the light from the "new state" bits can
+be as strong as you like (although only 20 or 25 times stronger than
+their dark counterparts), since you're just turning the light source
+off when you're not transitioning to a new state, so let's suppose
+that we can do it with three resistors and two neon lamps for each of
+A and B.  That means each of our N=4 bits of state consists of 6 lamps
+and 9 resistors, for a total of 24 lamps and 36 resistors; our bit of
+input requires perhaps two lamps and two or three resistors.
+
+That leaves only the problem of detecting the darkness that triggers
+the transition and firing up the transition circuits.  I'll guess
+arbitrarily that that will need five more lamps and eight more
+resistors, for a total of 29 lamps and 44 resistors.
+
+It's also feasible to use electromechanical relays, of course.  Modern
+mercury-wetted reed relays can run up to 40kHz.  But they can't detect
+light; for that you need an electric-eye vacuum tube at least, if not
+an avalanche gas tube.

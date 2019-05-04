@@ -1,0 +1,208 @@
+Suppose you want to make springs out of tool steel, which may not be
+the best possible choice but is close to feasible at least.  (Normal
+people use music wire, apparently.)
+
+<http://www.matweb.com/search/datasheet.aspx?matguid=5abd35ce6bd64254b6db980b83683f27&ckck=1>
+says that AISI type A2 tool steel (which can be hardened by
+air-cooling after heating) has a modulus of elasticity of 203 GPa, a
+[shear modulus][0] of 78 GPa estimated from the elastic modulus
+(presumably with E = 2G(1 + ν), where E is Young’s modulus, G is the
+shear modulus, and ν is Poisson’s ratio), and a density of 7.86 g/cc.
+Unfortunately this doesn’t supply the strength data that we need to
+figure out when it will break.
+
+[0]: https://en.wikipedia.org/wiki/Shear_modulus
+
+<http://www.matweb.com/search/datasheet.aspx?matguid=8188603e5f954e53b479aaa4b07cdffb>
+is a page about particular brand of A2 tool steel, giving its yield
+stress as 1580 MPa, its ultimate tensile strength as 2050 MPa, and its
+modulus of elasticity as 203.4 GPa, with a 1% elongation at break.
+(This makes sense because 2050 MPa is about 1% of 203 GPa.)
+
+<https://en.wikipedia.org/wiki/Shear_strength> says that in steels,
+the shear yield stress is about 0.58 of the tensile yield strength
+(this is called the von Mises yield criterion, and apparently applies
+to ductile materials in general?)
+
+This suggests that the shear yield stress of A2 should be about (* .58
+1580) = 916 MPa, at which point it’s distorted at a slope of (/ .916
+78) = 0.0117, or 1.17%.
+
+Let’s consider the case of twisting a cylindrical torsion bar made of
+this material, say 1 m long, 200 mm diameter, and 1 mm thick, thin
+enough that we can mostly ignore the difference in radii between inner
+and outer walls, but thick enough that it won’t collapse as we twist
+it.  Twisting it by 1.17% means a twist of 11.7 mm over that meter
+length, which is 0.117 radians of twist.  The cross-sectional area
+there is about 1 mm · 200 mm · π ≈ 628 mm².  At the yield stress of
+916 MPa, this cross-sectional area generates (\* 916 628) = 575248 N of
+force, which is almost sixty tons.  (We could convert this to a torque
+by multiplying by the 100 mm radius, but we don’t need to.)  Building
+linearly to that force over 11.7 mm of travel distance gives us (\*
+575248 .5 .0117) = 3365 J of energy stored in the bar.
+
+What’s the energy density of that?  The metal occupies 0.628 ℓ of
+volume, so that’s (/ 3365 .628) = 5358 J/ℓ.  At 7.86 g/cc or kg/ℓ,
+that’s (/ 5258 7.86) = 669 J/kg.  This is close to, but larger than,
+the 300 J/kg cited in
+<https://en.wikipedia.org/wiki/Energy_density_Extended_Reference_Table>.
+
+If we were somehow able to stress the metal in tension instead of
+torsion, we’d get to 1580 MPa at an elongation strain of (/ 1.58 203)
+= 0.0078 or 0.78%, or 7.8 mm, at a force of (\* 1580 628) = 992240 N,
+and an energy of (\* 992240 .5 .0078) = 3870 J, which is better, but
+only by 15%.  (/ 3870 .628) = 6162 J/ℓ; (/ 6162 7.86) = 780 J/kg.
+
+Nested torsion tubes in series offer the opportunity to exploit this
+entire 669 J/kg energy capacity; normal coil springs only manage about
+two thirds of it, and springs such as garage door torsion springs that
+are stressed in bending rather than tension or torsion only get to
+half of the tension number.  You need some space in between the tubes,
+and some mass in the coupling between the tubes at the ends, but those
+can be very small numbers.  So 5kJ/ℓ should be a totally reachable
+energy density in practice.
+
+Unfortunately, these specific energies are substantially lower than I
+want for the compact application I have in mind, in which I
+would like to hold several hundred to several thousand joules in a
+spring weighing under 200g, then release it in submillisecond
+timescales.  200g · 669 J/kg = 134 J, barely acceptable.
+
+I should investigate whether spring steels, beryllium copper, or
+nitinol can provide larger energy capacities.  Apparently ASTM A228
+music wire is a common spring material, as are SAE 1074 and 1075
+steels, while AISI 1095 steel (ASTM A684) is used for more demanding
+applications.
+
+The speed of sound in a material is √(K/ρ), where K is the relevant
+modulus of elasticity and ρ is the density of the material.  In this
+case, for transmission of shear, sqrt(78 GPa/7.86 (g/cc)) comes out to
+3150 m/s.  This means that it takes 317 μs for a movement to travel a
+meter through the spring; the suggested meter-long torsion bar won’t
+be able to respond faster than that.  You can, in effect, fold up the
+spring and nest it inside itself into a series of nested torsion
+tubes, which in theory won’t affect either the response time of the
+spring or its rate.  You can decrease the spring rate (i.e. increase
+the compliance) by using thinner-walled tubes, up to a point where the
+spring buckles and collapses; but, if you do that while keeping the
+energy capacity and mass constant, you have to increase the response
+time proportionally.
+
+If your torsion spring is a single tube of constant diameter, it is
+useful to give it a constant thickness as well; otherwise, the thinner
+part will fail before the thicker part is fully charged.  This is
+because the torque is constant along the entire length of the tube,
+but that torque translates into different stresses at different
+thicknesses.  Once you start nesting the tube inside of itself in
+series, you still have the constant torque, but now you have different
+radii in different parts of the spring, which translates to different
+tangential forces inversely proportional to the radii; this means that
+the wall thicknesses also need to be inversely proportional to the
+radii in order to keep the stress constant through the entire spring.
+
+This has the problem that once the radius is small enough, the inner
+and outer radii start to differ significantly, which means that the
+stress on the inside radius of the tube is significantly lower than
+the yield stress.  For example, the 1mm-thick 20mm-wide tube in the
+example above, in which the stress is below optimal by only 10% on the
+inner wall, could be put in series with a 10mm-wide 5mm-thick
+tube — which is no tube at all, but merely a rod!  It has no torsional
+stress at all at its center.
+
+The upshot of all of this is that you can get arbitrarily fast
+reaction times only at the cost of arbitrarily high forces or
+arbitrarily low energy capacities per spring.
+
+What about Dyneema?  If it has an ultimate tensile strength (and also
+yield stress!) of 2.5 GPa and a Young’s modulus of 100 GPa, and we
+somehow stress it in tension instead of torsion, then that same
+628 mm² cross-section rope of it would hold up to 1.57 meganewtons,
+about 160 tons; if it were 1 m long and stretched by 2.5%, or 25 mm,
+then we’d have 19.6 kJ stored, 31.25 kJ/ℓ.  And it would weigh only
+609 g, so it’s 32.2 kJ/kg.
+
+In energy density per kg, that’s *48 times better than* the steel
+spring.  Per liter, it’s only about six times better.  And that’s
+without getting into weird effects like rubber’s hyperelasticity or
+nitinol’s pseudoelasticity which I worry might convert their
+theoretically higher energy capacities into delusions at these time
+scales.  According to ARL’s tests
+<http://www.dtic.mil/get-tr-doc/pdf?AD=ADA606636> Dyneema is capable
+at least of absorbing energy at these moduli at a kilostrain per
+second.
+
+<http://www.sciencedirect.com/science/article/pii/S1877705811005649> 
+
+This suggests that maybe nylon would be an even better place to look
+for spring energy density!  It’s not as strong as Dyneema, but it has
+a dramatically lower modulus, and I think it also avoids the weird
+pseudoelasticity thing where the “elastic” energy gets lost as heat.
+<http://www.engineeringtoolbox.com/engineering-materials-properties-d_1225.html>
+claims that nylon 6/6’s density is 1.15 g/cc, its tensile modulus is 2
+to 3.6 GPa, its tensile strength is 0.082 GPa.  Dividing, that gives
+it 24% (or more) elongation at break; 24% .082 GPa/2 = 9.8 kJ/ℓ.
+That’s not as good as Dyneema, but it’s still volumetrically better
+than most steels, and a *lot* better per mass, at 8.6 kJ/kg.  Nylon
+springs would easily meet the 200g limit I’m trying for:
+200 g 8.6 kJ/kg = 1.7 kJ.  In fact, you could probably get by with
+100g or 50g.  And nylon is a *lot* cheaper than Dyneema still.
+
+The √(K/ρ) speed of tensile sound in nylon, by these numbers, should
+be 1318 m/s, only four times its speed in air, and low enough that you
+can only get 1300 mm of nylon spring to respond in a millisecond.
+However, this should be plenty of time.  I really only need a
+millisecond or so; 100μs response time is more than adequate, and I
+have in mind for the entire spring to be under 100mm long.
+
+Disappointingly, it seems that nylon is indeed hyperelastic and
+behaves much more stiffly at high strain rates;
+<http://scholarbank.nus.edu.sg/bitstream/handle/10635/37891/PhD%20Thesis,%20Habib%20Pouriayevali%20(%20Mechanical%20Dep)%20HT081385J.pdf?sequence=1>
+and
+<http://www.sciencedirect.com/science/article/pii/S1877705811005649>
+show the results of H. Pouriayevali with respect to the issue, showing
+that his nylon sample compressed 30% under a 50 MPa strain under
+quasi-static conditions, but at strain rate of -3203 per second, it
+had only compressed 2% at that same strain (which I suppose means he
+reached it in 6 μs).  At a more moderate strain rate of -980 per
+second, it had compressed some 8% at that strain, in, I suppose, about
+80 μs.  The dissertation also, alarmingly, says that nylon “is notably
+rate-dependent and exhibits a temperature increase under high rate
+deformation”, but it turns out that he’s talking about like five
+kelvins for fairly large strains like 21%.
+
+Pouriayevali’s 6-6 nylon samples failed in quasi-static tension at
+strains which appear to have been around 1.0, 1.2, and 1.4, with
+stresses around 80 or 100 MPa, which seems improbably rubbery, but
+fairly plausible strength.  He reports a quasi-static elastic modulus
+of 958 MPa at small strains, but as the graphs show clearly, this
+drops precipitously at higher stresses.
+
+This stiffness varying with strain rates presumably means you have
+high hysteresis losses in nylon, more usually known as “vibration
+dampening ability”.
+
+However, I’d probably be fine with >50% losses, as long as I can get
+the rest of the energy out in well under a millisecond.  12% strain in
+a millisecond is a strain rate of 120 strains per second, which may be
+low enough that nylon will have low losses.
+
+Pouriayevali did do lower-rate experiments under tension.  His
+lowest-rate dynamic tension experiment involved an impact of 150
+strains per second, reaching some 30 MPa and 5% strain; the
+quasi-static condition had only 20 MPa at that same 5% strain.  That
+means that if you stretched your nylon by 5% at 150 strains per
+second, you’d’ve put in 30 MPa \* 5% / 2 = 750 J/ℓ, and then if you
+unloaded it slowly, you’d only get out 20 MPa \* 5% / 2 = 500 J/ℓ.  In
+this case I propose to do essentially the reverse: load it slowly,
+then unload it quickly.  It looks like this will probably be in the
+neighborhood of that 50% efficiency.
+
+(Actually the stress-strain curves aren’t very linear, and they’re
+actually maybe a bit closer together than that makes it sound.)
+
+In chapter 5 of his dissertation, Pouriayevali fits numerical models
+to the properties of the nylon which seem to suggest something like
+10% or 20% energy losses at 150 strains per second when extended to
+larger strains, with actually much lower losses at higher strains, up
+to 0.6.  Also, the stresses at higher strains are more nearly
+constant, which should ease design substantially.

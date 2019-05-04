@@ -1,0 +1,83 @@
+Springs apply a force that increases as they are deformed from their
+equilibrium form.  To compensate for this, old clocks and crossbows
+use the horological fusee to compensate.
+
+But, in electronics, to compensate for the similarly variable voltage
+from batteries and especially from supercapacitors, we use buck
+converters instead.  Buck converters periodically dump a pulse high
+voltage into an inductor, which ramps up current rapidly in response,
+and then ramps down (perhaps more slowly) when the high voltage is
+disconnected.  The roughly constant but oscillating current through
+the inductor is used to charge a capacitor, whose voltage oscillates
+slightly as the current rises above and falls below the current drawn
+by the load in parallel with it.  The voltage on the capacitor is used
+to control the pulse width.
+
+The mechanical equivalents of inductors and capacitors are springs and
+masses, but there is a duality; interchanging current and voltage, and
+inductance and capacitance, you get a new circuit that functions
+similarly.
+
+In this case the particular analogy I was thinking of was attempting
+to maintain a constant but smaller force (analogous to voltage).  If
+force is voltage, then velocity must be current, right?  Because the
+thing you multiply force by to get power is velocity.  So the
+component analogous to a resistor would be a dashpot, as expected:
+velocity proportional to force.  The component analogous to an
+inductor, with the force proportional to the derivative of velocity
+(acceleration), must be a mass.  And so a capacitor must be a spring,
+with the velocity proportional to the derivative of force, which is to
+say, the position is proportional to the force.  So far, it all checks
+out.
+
+So periodically we allow velocity to flow briefly from the mainspring
+to a mass, such as a flywheel, for example through a freewheel clutch
+mechanism (analogous to a diode).  Then we use this flywheel to
+energize a spring, such as a torsion bar, connected to a load.  The
+torsion bar is maintained at a roughly constant but slightly
+oscillating torsion as the flywheel is accelerated by the mainspring,
+then left to slow down under the influence of that torsion bar or
+whatever.  And then we use the total force in that spring to control
+the duty cycle with which energy is dumped into the flywheel, by
+applying and removing a brake (a clutch, really, connected to a fixed
+shaft that cannot rotate) from the driving side of the freewheel.
+
+It's easy to imagine two rotating actuators, one attached to the
+flywheel and the other attached to the load, whose difference measures
+the spring force in the torsion bar, like the pointer of a torque
+wrench.  And you could imagine these two things engaging and
+disengaging the clutch once per revolution.  You probably want those
+revolutions to be pretty slow, like under 1 Hz, to get acceptable
+clutch life.  You could achieve this either with a large flywheel or
+by gearing down the relative motions of these timing devices.
+
+So this gives you an efficient, if probably unreliable, kind of
+continuously variable transmission, with a built-in governor that
+produce a constant output force (torque), regardless of how fast the
+output is rotating, as long as the input force is equal or greater.
+
+As an alternative feedback mechanism, you could control the duty cycle
+of the clutch to obtain a constant output velocity rather than a
+constant output torque, for example using a centrifugal fly-ball
+governor.
+
+If we run this the other way around, we have a mechanical boost
+converter instead.  In this configuration, the input shaft is allowed
+to freely spin up a flywheel, which is at times not connected to any
+load.  Periodically, however, a clutch is engaged, connecting the
+flywheel to a freewheel which winds up a spring.  A second freewheel
+keeps the spring from unwinding while the drive clutch is disengaged.
+
+When the clutch is engaged, the flywheel can decelerate much faster
+than the input drive, providing much greater force.  If the force
+required is much greater than the force provided by the input, the
+clutch will be disengaged most of the time, while if it is almost the
+same, the clutch will be engaged most of the time.
+
+All of these contrivances seem to me perhaps foolish compared to the
+reality of continuously variable transmissions achieved by existing
+methods.
+
+In the world of hydraulics, the boost converter is well known in the
+form of the hydraulic ram; I suspect that pursuing the analogy further
+is likely to be fruitful.

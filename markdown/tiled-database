@@ -1,0 +1,344 @@
+The Problem: Writing With One Access Pattern, Reading With Another
+==================================================================
+
+So I was talking to someone today about a network monitoring database
+problem I'd run into previously.  A lot of network monitoring systems
+store many gigabytes of historical data about, say, bandwidth used per
+device, in order to support queries later on.  Common queries include
+things like:
+
+- what was the bandwidth used on device X in every five-minute
+  interval over the last week?
+- what was the aggregate bandwidth used by each of the devices in
+  such-and-such a group?
+- what were the five devices that used the most bandwidth over
+  such-and-such a period?
+
+It's nice to have queries like these be answered very quickly, but
+existing tools like Postgres and RRDTool don't seem to perform very
+well.
+
+To be concrete, suppose that you have 100 000 devices, and you poll
+each one for input bytes, output bytes, input packets, output packets,
+input errors, and output errors once every minute.  Each of these
+numbers may get too big to record in 32 bits, so it's good to use 64.
+So that's 8 * 6 * 100 000 = 4.8 megabytes per minute, or 7 gigabytes
+per day, or 200 gigabytes per month.
+
+Disk Model
+----------
+
+My standard model of a disk is that a disk is something that takes
+8-10ms to start reading or writing at a random spot, and then reads or
+writes at 40MB/sec as long as it's reading or writing sequentially.
+Some disks (or disk arrays) are five times faster (bandwidth-wise) and
+some are five times slower, and most have faster seeks under some
+special circumstances, but that's generally the right ballpark.
+
+An interesting number that comes out of this is the bandwidth-delay
+product, which is about 10ms * 40MB/s = 400kB.  If you're alternating
+between reading or writing a chunk of some fixed size, and seeking to
+a new location, this is the chunk size at which you spend only half of
+your time seeking.  Reading or writing in chunks much smaller than
+this means the disk spends most of its time seeking; reading or
+writing in chunks much larger means the disk spends most of its time
+transferring data.
+
+Bandwidth varies between disks more than seek time, so bandwidth-delay
+products vary quite a bit.
+
+Approaches to Solving It
+------------------------
+
+The usual way of dealing with this is to use RRDTool, which stores
+each counter for each device in a separate file, and thins out old
+data so as to keep a fixed upper limit on the total number of samples
+in any one file.  RRDTool makes queries about one or a small number of
+devices quite fast, but updating of a large number of counters is
+slow, since each one is in a different file.
+
+Because the data is so large, it's a bit expensive to keep it all in
+RAM, so it would be nice if both updates and queries had reasonable
+locality of reference.  If you're updating 7 gigabytes of RRDTool
+files (11520 bytes per counter, to store 1-minute data for a day), you
+pretty much have to read and then write 7 gigabytes of data, which is
+going to take at least three minutes on a single disk; but we're
+hypothesizing that the actual amount of new data being written is
+maybe 4.8 megabytes.  So the RRDTool approach imposes largish costs on
+mass updates due to poor locality of reference.
+
+You could go to the other extreme and optimize for writes: write all
+the new counter data in one big 5-meg blob.  But then reading the 1440
+one-minute samples for a single counter over a day's time requires
+1440 disk reads, 5 megabytes apart, and perhaps 10 seconds.  This is
+not acceptable either.
+
+My Proposed Solution: Tiling
+----------------------------
+
+This points at a solution I had suggested in "r-tree indices for
+database table clustered indices",
+http://lists.canonical.org/pipermail/kragen-tol/2004-January/000748.html
+which is to sort of divide the data into "tiles" of, say, 64 minutes
+by 1024 counters, each occupying a contiguous half-megabyte.  We can
+assume (for now) that getting from any tile to any other tile requires
+a random disk seek.  So if you're recording six new 64-bit readings
+for each of 100 000 devices, those 600 000 readings get broken up into
+600 groups of 1024, and each of those 600 groups gets written into a
+separate tile.  If each requires a separate seek, this should take
+about six seconds instead of six minutes.  And if you're reading the
+1440 one-minute samples for a single counter over a day's time, those
+will be spread across 23 tiles, so will require about 1/2 second.
+
+That's an improvement, but there are several more directions of
+optimization possible: side files, tile ordering, thinned data, and
+grouping counters by type.
+
+Side Files
+----------
+
+First, we can initially append updates to a "side file" instead of
+sending them directly into their final locations, then eventually copy
+the data to the tiles where it will ultimately live.  To start with,
+every query must read the entire side file, so you don't want it to
+get too big, and it cuts the theoretical write bandwidth of the
+database by a factor of three or four, since every update must first
+be written to the side file (with metadata), then read from the side
+file and written again to a new location.
+
+But now writing 600 000 readings --- 5 megabytes without the metadata
+that tells what they are, and perhaps 10 megabytes with it --- takes a
+quarter of a second instead of six seconds, which seems like it's
+better than an order of magnitude speedup.  However, the eventual
+writes to the tiles will still take time, but as explained below, we
+can accumulate several updates for each tile, and deliver them in the
+same number of seeks.
+
+If we batch up four updates in the side file before flushing them out
+to the tiles, the side file will get to 40MB, which is maybe one
+second of disk bandwidth.  Copying it to the 600 tiles will take a
+second and a half of bandwidth and 600 seeks, so about 7-8 seconds to
+do the copying and 8-9 seconds in all --- about 30% of the total disk
+traffic the four updates would need without the side file.  (This
+copying can be done incrementally rather than all at once, which
+allows you to batch up eight updates in the side file at a constant
+size of 40MB, or four at a constant size of 20MB.  That's assuming
+it's practical to reorder stuff in the side file as some of it gets
+flushed out.)
+
+A 40MB side file would take about a second to read off the disk, and
+in the absence of any disk buffering, every query would require that
+additional second.  (The assumption is that since it's ordered by the
+time at which the updates were made, queries won't have particularly
+good locality of reference.)  This would be a good reason to keep the
+side file small.
+
+But, actually, you can probably keep the side file in RAM until it's a
+quarter of a gigabyte or more, which in this scenario would allow it
+to batch up roughly 500 full tiles --- and that's getting close to the
+point of diminishing returns, where maintaining a bigger side file
+doesn't actually save you any more disk seeks.  Keeping the side file
+in RAM means that your queries don't suffer from this additional
+second of disk access time, although they may still have to access the
+data.
+
+So, in this limit, if you buffer up all the new readings in memory,
+while also appending them to a side file (in case of a crash), and
+then writing them out to 600 new tiles when those tiles are full, then
+every 64 minutes, you write out 600 megabytes of data to the side file
+(sequentially --- about 15 seconds) and 300 megabytes of new tiles
+(with seeks in between, so 3 seconds of seeks and 7 seconds of data
+traffic, for 10 seconds of disk traffic).  That's 25 seconds, or a
+little under half a second of disk traffic per update.
+
+So the very approximate time taken for an update, including the
+amortized time to eventually write it to the tiles:
+* Without side files: 6 seconds
+* With a 40MB batchy side file: 2 seconds
+* With a 40MB streaming side file: 1 second
+* With an in-memory batchy 300MB side file: 0.5 seconds
+
+Tile Ordering
+-------------
+
+So far, we've proceeded on the pessimistic assumption that all the
+tiles were a whole random seek apart.  But, actually, they have to be
+laid out on disk in some sequence or other, so some of them will
+actually be sequential with one another.  For example, we could lay
+out most or all of the tiles for a particular group of counters
+(mostly) sequentially on disk, while tiles for different times are
+laid out in different parts of the disk.
+
+This doesn't make anything worse than our previous assumptions, but it
+can make them better.  In particular, the 23 tiles in which a single
+counter can be found throughout a single day will generally be a
+single 10-megabyte read rather than 23 half-megabyte reads, so will
+take 1/4 second instead of 1/2 second to read.  An entire week will
+take almost 2 seconds.
+
+This optimization can't help by more than about a factor of 2 over the
+above design because I picked the tile size to guarantee that we don't
+spend more than half of our time seeking in the worst case.  If you
+make the tiles a bit smaller, you can improve the results for reading
+in the direction the tiles are contiguous in, at the expense of reads
+and writes in the other direction.  For example, if we make our tiles
+32 minutes by 512 counters, then they will be an eighth of a megabyte
+each, and reading the 1440 points for a single counter over a day will
+require reading 45 tiles totaling 6 contiguous megabytes, or about
+0.16s, rather than 0.25.  But reading a full column (say, to find out
+which devices used the most bandwidth over a certain period of time)
+would then require reading 1200 discontiguous tiles, for 1200 disk
+seeks (about 10 seconds) and 150 megabytes (about 4 seconds), for a
+total of about 14 seconds, rather than 600 disk seeks and 300
+megabytes, for a total of about 12 seconds.  (See below about grouping
+counters by type to improve this.)
+
+Thinned Data
+------------
+
+You probably want to add additional tiles containing subsets of the
+data --- perhaps a data point for each counter every five minutes, or
+every half-hour, or every hour, or every day.  If you want to graph
+the performance of a particular network device for an entire month,
+you probably don't want more than 1000 or 2000 data points, and a data
+point for every 20 minutes adds up to 2000 data points in a month.
+
+This way, you can have, say, 2016 points of five-minute data for a
+week, in a sequence of 32 contiguous tiles --- 16 megabytes, or 0.4
+seconds of disk traffic --- so that you can generate weekly graphs
+quickly.  Monthly or yearly graphs are an even bigger savings.
+
+The thinned data will be small compared to the full-size dataset, so
+its size probably isn't that important.
+
+RRDTool erases the full-resolution data after making up thinned
+versions, so that the database always remains the same size.
+
+Grouping Counters By Type
+-------------------------
+
+In the section about tile ordering above, I mentioned that figuring
+out which devices used the most bandwidth over a certain period of
+time would require a really unreasonable query time, since it requires
+reading all the tiles for two particular times --- the beginning and
+the end of that period.  There are about 600 tiles covering each of
+those times, totaling about 600 megabytes, which takes 15 seconds of
+disk I/O, plus 1200 disk seeks (10 seconds more), if you need to
+read them all.
+
+But the reason we have 600 000 counters is that we're recording 6
+different counters per device.  Most queries, like the one suggested
+above, probably only touch one or two of the counters --- so if each
+tile only contains one kind of counter, we can improve this
+substantially.
+
+If the desired results are available in a single counter type, we only
+need 200 tiles.  Furthermore, if we have a thinned data set that
+happens to place the ends of the period in question in the same column
+of tiles, then we only need 100 tiles.  This means we only need to
+read 50 megabytes of data and seek 100 times, so we can do the query
+in a little over 2 seconds instead of 25.
+
+Queries that need data from every type of counter are very rare.
+
+Delta-Compression
+-----------------
+
+As proposed above, each counter has 64 values in a particular tile,
+which total 512 bytes if they're 8 bytes each.  But most of the time,
+we can probably get away with an 8-byte initial value and a sequence
+of changes from the previous value, each of which will usually be 8,
+16, or 32 bits.  (0 is probably the most common value.)  If they're 16
+bits on average, then we could fit about four times as many values
+into the same half-megabyte block, which means that everything needs a
+lot less I/O bandwidth and many fewer seeks.
+
+In particular:
+- we only need 1.2 megabytes per minute of writes, or 1.7 GB per day,
+  or 51 GB per month;
+- each tile can hold 128 minutes of 2048 counters;
+- the updates for each timestamp get written to 300 tiles;
+- the 1440 one-minute samples for a single counter are spread over 12
+  tiles, which can be read in 0.11 seconds if they're contiguous;
+- the 300 tiles currently being updated can live in an in-memory side
+  file of 150 megabytes maximum or 75 megabytes steady-state (assuming
+  steady-state is possible); this is assuming we keep things
+  compressed in RAM as well;
+- writing out those 300 tiles (every 128 minutes) takes 4 seconds of
+  write bandwidth and 3 seconds of seeks, or about 0.05 seconds
+  (amortized) per update, plus the time to write to the disk version
+  of the side file, which may still be bulky.
+- thinned data will probably comprise a larger fraction of the file,
+  since its deltas will be larger;
+- reading 100 000 counters at each of two timestamps will probably
+  require reading 50 tiles, which will be 25 megabytes of data, so it
+  should be possible to find out which devices used the most bandwidth
+  over some arbitrary period in under a second of disk time.
+
+Further Redundancy
+------------------
+
+If you could afford it, then instead of tiling, you could just store
+the data twice --- once such that all the data for each counter is
+mostly contiguous on disk (i.e. broken up into chunks mostly bigger
+than the bandwidth-delay product), and again such that all the data
+for each timestamp is mostly contiguous on disk.  Side files would
+batch updates as before to allow efficient updates.
+
+This would allow queries that only care about a few timestamps or a
+few counters to run with very little I/O, and delta-compression of
+counter data might be feasible for the contiguous-by-counter data; it
+probably isn't feasible for the contiguous-by-timestamp data.
+
+Network Bandwidth Requirements
+------------------------------
+
+If you were doing this monitoring using SNMPv2, you could probably do
+a bulk-get from each of, say, 10 000 devices, once a minute, and get
+back a 1000-byte-or-so response from each one.  That's 10 megabytes
+per minute, or 1.3 megabits per second in each direction.  You can get
+that kind of performance from ARCNet, or 1978-era Ethernet, or
+802.11b, or old 4Mbps Token Ring cards that cost US$5 on eBay in 1997.
+I'm assuming you can poll switches or routers or something, one per
+ten devices, rather than having to talk to all 100 000 network devices
+directly.
+
+An SNMP library that can handle talking to 10 000 agents within a
+minute --- perhaps 200 or 300 at any given time, if you have a
+reasonable timeout --- may be a little more difficult to come by.
+It's not technically very difficult to do, but you have to design your
+SNMP library to do it, and not require a separate thread for each
+concurrent request.
+
+In Summary
+----------
+
+It should be inexpensive to log and query several vital statistics of
+each device on a large corporate network with a single five-year-old
+laptop, maintaining historical data with hourly granularity
+indefinitely, using the following techniques.
+
+Batch updates in memory, logging them in a file, flushing them to disk
+when necessary.
+
+Each datum is addressed by a tuple (countertype, deviceid, timestamp).
+I recommend storing data in physically contiguous tiles of around half
+a meg (times or divided by four) addressed by tuples (tilerow,
+tilecol), where tilerow is a function of countertype and deviceid and
+tilecol is a function of timestamp, such that data from different
+countertypes are assigned to different tilerows, and each tilecol
+corresponds to a contiguous interval of timestamps adjacent to the
+intervals its neighboring tilecols correspond to.  Then, tiles of the
+same tilerow and consecutive tilecols should be stored consecutively
+on disk most of the time.
+
+Variable-length delta-compression of the data for a particular counter
+within each tile should provide very substantial benefits in
+responsiveness.
+
+Data must be stored redundantly in two ways:
+- the file of logged updates eventually becomes redundant with the
+  data stored in the tiles;
+- thinned-out data tiles contain selected timestamps from other tiles
+  to facilitate queries that cover longer time intervals.
+

@@ -1,0 +1,323 @@
+(2015-05-29)
+
+It should be possible to “perform in-memory computations on large,
+even decentralized clusters in a fault-tolerant manner”, as Apache
+Spark does, using [Vesta][3]-like build-step isolation, but with the shell
+usability of `redo`, using a `git-annex`-like blob backend, thus
+expanding the applicability of Spark-like computational structures far
+beyond the data center.
+
+[3]: http://www.vestasys.org/
+
+This requires substantial explanation.
+
+Spark
+-----
+
+[Apache Spark][0] is a system for making high-performance,
+fault-tolerant clusters easy to use, by generating and managing things
+Spark calls RDDs:
+
+> [A]n RDD is a read-only, partitioned collection of records.  RDDs
+> can only be created through deterministic operations on either
+> (1) data in stable storage or (2) other RDDs.…an RDD has enough
+> information about how it was derived from other datasets (its
+> *lineage*) to *compute* its partitions from data in stable storage.…
+> in essence, a program cannot reference an RDD that it cannot
+> reconstruct after a failure.
+
+[0]: https://www.cs.berkeley.edu/~matei/papers/2012/nsdi_spark.pdf
+
+This sounds terribly similar to `make` and software source control and
+build systems, doesn’t it?
+
+redo
+----
+
+In 2010, [Avery Pennarun implemented Dan Bernstein’s `redo`
+design][1], which is a simpler approach to what `make` does.  If you
+want to build a file named `foo.o`, you run `redo foo.o`, and `redo`
+will run the shell script `foo.o.do` if it exists, or otherwise
+`default.o.do` if it exists, or otherwise `default.do`, searching up
+the filesystem hierarchy.  This `.do` file is expected to put the
+desired contents of `foo.o` into an output file whose name is passed
+to it.
+
+[1]: http://apenwarr.ca/log/?m=201012#14
+
+A minimal useful `default.o.do` might say
+
+>     redo-ifchange "$2".c; cc "$2".c -o "$3"
+
+The first command there is a recursive invocation of `redo`, which
+tells `redo` that this output file is going to depend on `foo.c`, so
+it had better make sure `foo.c` is up-to-date before continuing.  This
+dependency is recorded for later.  (`redo-ifchange` takes multiple
+arguments to build dependencies in parallel.)
+
+A more complete `default.o.do` would take `#include` dependencies into
+account.
+
+`redo` does have a couple of limitations.  One is that it doesn’t
+handle multiple output files, like those from `yacc`, very well.
+Another is that it is purely local; it doesn’t have a cluster mode,
+although you may be able to use `distcc` to get some of that
+yumminess.
+
+ccache
+------
+
+[ccache][] is a build accelerator specific to C, C++, and Objective-C.
+It hashes your source code, include files, compiler (well, typically
+just its size, mtime, and name), command-line options, etc., with MD4,
+and stores the compiler’s output (including e.g. warning messages) in
+an on-disk cache in, normally, your home directory; future
+recompilation attempts whose inputs haven’t changed will just reuse
+the previous compiler output.
+
+[ccache]: https://ccache.samba.org/manual.html
+
+In theory, this means that you could get most of the benefits of
+`make` for C and especially C++ programs by just wrapping your
+compiler in `ccache` inside your build script; rerunning the build
+script would rehash all your source files, copy the object files into
+your current directory, and then relink the executable.  Depending on
+what you’re compiling, this might be almost instantaneous, or it might
+be very slow.
+
+Because Unix provides `ccache` with no reliable way to get a secure
+hash of the source files from the filesystem, it has to read them in
+their entirety to figure out whether they have reverted to an old
+version.  I tried it just now on my netbook on a tiny three-kilobyte
+GLUT program, and it ended up reading about a megabyte of `.h` files
+in order to figure out that it could safely reuse the 2.7kB `.o` file
+from a previous compilation, taking 39 milliseconds in all, even
+though it made only about 365 system calls.
+
+Database indexes
+----------------
+
+Suppose I do this:
+
+    sqlite> create table foo (x varchar, y varchar);
+    sqlite> create index foox on foo (x);
+    sqlite> insert into foo values (3, 4);
+    sqlite> insert into foo values (4, 5);
+
+`foox` is the name of an index, which is a sorted copy of a column `x`
+of table `foo` with rowids.
+
+Now, if I do a query on `foo` like `select * from foo where x = 3;`,
+this query can use the index `foox` to find the relevant rows.  (In
+fact, in SQLite3, `explain` tells me it does, even when there are only
+two rows in the table.)
+
+For this to work properly, `foox` has to be updated every time I
+insert a new row into `foo`.  But this is tricky!  If I have a million
+rows in `foo` and I add a new one whose `x` value is close to the
+minimum of the `x` values, then if `foox` is simply stored as a
+vector, the database might have to move a million values down by one
+in order to make room for the new `x` in its proper sorted order.
+There are several solutions to this, but the typical one (and what
+SQLite does) is to store your index in a B-tree, which allows you
+insert in the middle of it relatively efficiently.
+
+A different approach, and more or less the one Lucene uses, is to
+accumulate your updates in a small “side file” until there are a lot
+of them, and then apply all of those updates at once to generate a new
+sorted `foox`.  Until `foox` has been replaced with the new version,
+every query to `foox` must also check the side file to see if there
+are updates it’s interested in; this can be made more efficient by
+sorting the side file, at which point you may begin to desire to have
+a side file for the side file.
+
+The database index is data that depends on the table, and it needs to
+be possible to incrementally and transparently recompute that data
+when the table changes.  This is the same kind of automatic
+recomputation problem that Spark, `make`, and `redo` attempt to solve.
+
+Vesta
+-----
+
+[Vesta][] is a source-control system integrated with a build system;
+it versions your whole build environment, and it runs each build step
+in an isolated chroot environment where it can only access data via
+Vesta, which functions as an NFS server.  This ensures that the build
+step is only accessing a particular version of the source file, of the
+compiler, etc., and that Vesta can correctly record these dependencies.
+
+[Vesta]: http://www.hpl.hp.com/techreports/Compaq-DEC/SRC-RR-177.pdf "DEC SRC RR-177"
+
+Unfortunately, Vesta was proprietary for many years before finally
+being released publicly, at which point its authors stopped
+maintaining it; it had its own purely-functional programming language
+that you were required to use to describe the build process for your
+system; because its build scripts were written in that same language,
+building it from source required having a running instance of Vesta;
+and, since access was provided via an NFS-server interface, you had to
+have root (at a time before it was commonplace and easy to run virtual
+machines in VirtualBox, QEMU, or EC2) to try it.  Vesta was used in
+production by DEC’s Alpha processor design team for a couple of years,
+but perhaps because of obstacles like those mentioned above, it never
+achieved wide usage, even within DEC or Compaq.
+
+git-annex
+---------
+
+[git-annex][] does not do any dependency management.  Instead, it
+manages an efficient, decentralized, redundant immutable blob store
+with decentralized, replicated, eventually-consistent metadata, built
+on top of git.  It uses symlinks to permission-read-only files to
+provide normal filesystem access to the immutable blobs without going
+to the lengths of implementing its own filesystem, as Vesta does; this
+is usually enough to prevent you from accidentally corrupting your
+local copy of the blobs, and if you do corrupt one copy of a blob, you
+can still restore it from a remote repository.
+
+[git-annex]: https://git-annex.branchable.com/walkthrough/
+
+Spark, simplified and made flexible
+-----------------------------------
+
+Spark has the lineage and determinism stuff unnecessarily coupled to a
+bunch of stuff about keeping Java objects in memory and partitioning
+and records, which seems like it is somewhat extraneous, although
+apparently Java does kind of need that in order to run efficiently.
+(You’d think java.nio.MappedByteBuffer would have largely eliminated
+this problem, but apparently not.)  Spark’s ability to “perform
+in-memory computations on large clusters in a fault-tolerant manner”
+does not depend in any way on Spark’s knowledge of the internal
+structure of partitions (that they contain records) nor of Spark’s
+knowledge of which partitions are associated together to form an RDD.
+All Spark needs to know to recreate a chunk of data is really how to
+redo the computation that created that chunk, and how to recreate the
+inputs that went into that computation.
+
+However, unlike `redo`, in-memory computations on large clusters
+definitely need to be able to produce multiple output chunks, or
+partitions or whatever.  And, if those chunks are stored in
+distributed memory on a cluster, it’s probably a good idea to send the
+computation to where the data is.
+
+Also, the granularity of the computation is likely larger than what
+`redo` has to deal with, which means that the system has more latitude
+to do computations and heavy-duty setup than in `redo` or `make`.  It
+could run an A* search, for example, to choose among possible
+alternative plans.
+
+So here’s what I propose.  Build steps nest.  Build steps run in a
+contained environment, like what lxc provides, or if that’s not
+possible, a directory full of symlinks to read-only files from a
+git-annex-like chunk store.  When you launch a build step, which you
+can do from the Unix command line, you explicitly list its input
+files, including the script for the build step, which causes them to
+appear in its contained environment.  When it terminates, it leaves
+behind an output directory.  All of the input and output files, as
+well as the directories containing them, are stored in a distributed
+chunk store, and their provenance is recorded in a distributed,
+replicated metadata store; this is very similar to git-annex.  Build
+steps are presumed to be deterministic, and they are isolated from
+their environment to the extent possible, which reduces their
+nondeterminism.  So, if you invoke a build step for which the system
+already has the results cached, it will retrieve those results from
+the chunk store.  And the system may invoke the build step on a remote
+machine, if that's where the data is, and then replicate the results
+onto your local machine.
+
+[Lxc/virt-sandbox might impose some 200ms launch overhead on build
+steps][virt-sandbox], but that should probably be okay.  If it’s not,
+Debian has [fakechroot][], which is an extremely efficient way to use
+a wrapper library to fake out some system calls to trick programs into
+thinking they don’t have access to the whole filesystem.
+
+[virt-sandbox]: http://www.h-online.com/security/news/item/Sandbox-applications-quickly-with-KVM-or-LXC-1429268.html
+[fakechroot]: http://linux.die.net/man/1/fakechroot
+
+This allows you to write your build script as a shell script, which
+can invoke other scripts, possibly in a loop, and use their results.
+Once you have run your build script, which will usually be
+instantaneous, you can be sure that all of the build results are
+present.
+
+When a build step invokes a subordinate build step, it names the input
+files it wants to provide to the subordinate step using the filenames
+it knows them by, and optionally put them at a particular place in the
+child’s namespace; but the system invoking the subordinate step uses
+their immutable blob hashes in the hash keys, not the filenames known
+by the parent build step.  This means that the same build step,
+running the same commands identically many times in different
+contexts, can invoke a sub-build-step that does different things.
+
+The top-level build script might also snapshot other parts of the
+firesystem, copying them into the blob repository, in order to make
+them available to subordinate build steps.  For example, substantial
+parts of /lib and /usr/lib may be necessary.
+
+(It would be nice to use [sysdig][] or strace or something to figure out
+what files are actually being accessed, without having to write a
+filesystem.)
+
+[sysdig]: https://sysdig.com/sysdig-vs-dtrace-vs-strace-a-technical-discussion/
+
+Lazy concatenation and merging
+------------------------------
+
+Ideally you could concatenate several chunks into a single big output
+file in a purely virtual way, i.e. without actually copying the data.
+
+Performance back-of-the-envelope
+--------------------------------
+
+I have an 800-gigabyte stock-market data set.  If this were split into
+chunks of some 64 megabytes, it would be about 12500 chunks.  If I
+generate another 200 gigabytes of derived data from that, it will be
+another 3125 chunks.  If each of those chunks derived from, say, 400
+input chunks, the SHA-1s of all of those chunks (the lineage) would be
+8 kilobytes; all the metadata together would be 25 megabytes.
+Incrementally replicating 25 megabytes of lineage data will be no
+problem.
+
+Small-memory performance
+------------------------
+
+One of the interesting things about MapReduce is that any algorithm
+that can be expressed with it can be implemented with a small number
+of sequential passes over the data, so you can use it to improve
+locality of reference as well as for fault-tolerant cluster-scalable
+computation.
+
+Although this approach is not nearly as extreme as MapReduce in that
+way, it may also have some virtue in that direction, since it
+encourages you to break up your computation into small pieces that
+consume a few small inputs and produce a few small outputs; in cases
+like the Spark reimplementation of the Pregel programming model, this
+may involve “transposing” an algorithm, separating things that were
+previously together and bringing together things that were previously
+separate.  If you were to run only one build step at a time, you might
+be able to improve your in-memory performance dramatically.
+
+Additions 2016-06-22
+====================
+
+Well, it’s been a year and still nobody has done the above, so I guess
+I should do some work on it.  What does a minimal executable version
+of it look like?
+
+Maybe you have these pieces:
+
+- a content-hash-addressable store which distinguishes between source
+  data and cached data;
+- a caching service which maps hashes of (deterministic) commands to
+  hashes of their output;
+- an execution service which returns the results of commands, either
+  from cache or by computing them;
+- a container to run commands in which grants them access only to read
+  the data in their manifest and to produce an output tree;
+- an ability for commands to delegate their output tree to further
+  commands.
+
+Do you really need all of those?  What does the interface to creating
+output files look like?
+
+Maybe a first step would be to think about what distributed MapReduce
+in this context looks like.

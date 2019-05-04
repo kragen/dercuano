@@ -1,0 +1,89 @@
+This is a bad idea that has occurred to me before, and I want to write
+down why it’s bad so that it can stop occurring to me.
+
+The problem to solve
+--------------------
+
+The problem to solve is to increase the capacity of two-pass external
+sorting, in which you ingest a large input file on one pass over the
+data, storing it on disk, and then emit it, sorted, during a second
+pass over the data, reading it from the disk.  We’re counting disk I/O
+here rather than, say, key comparisons, because the disk I/O is
+usually the slow part.
+
+The main limitation of two-pass external sorting is that, in two
+passes, you can only sort files that are about twice the size of your
+RAM, times the size of your RAM, divided by your disk’s
+bandwidth-latency product.  So if your (spinning-rust) disk transfers
+data at 50 megabytes per second and has 9ms random-access latency,
+your bandwidth-latency product is 4.5 megabytes.  If you have 4.5
+gigabytes of RAM, then you can sort files up to about 2000 times the
+size of your RAM — 9 terabytes — in two passes.  If you have 9
+gigabytes of RAM, you can sort up to about 8000 times the size of your
+RAM — 72 terabytes — in two passes.  So the critical size is quadratic
+in the size of your RAM, inversely proportional to the disk’s access
+latency, and apparently perversely, inversely proportional to the
+disk’s bandwidth.
+
+(The apparent perversity here is only apparent; increasing the disk’s
+bandwidth won’t actually make two-pass external sorting slower.  It
+just won’t make it faster.)
+
+We can model SSDs in this model as disks whose bandwidth-latency
+product is on the order of 1-4 kibibytes, which is five orders of
+magnitude better than spinning rust.  Unfortunately, this does not
+increase the amount of data you can sort by five orders of magnitude,
+because your SSD probably isn’t bigger than ten terabytes.  It might
+make more sense to model the CPU-RAM-SSD system as “CPU and RAM” from
+the point of view of the disk, thus probably enabling you to sort
+files up to the size of your disk in two passes.
+
+How two-pass sorting works
+--------------------------
+
+Simplest method: fill RAM with unsorted data, sort in RAM, write to a
+new temporary file on disk, repeat until input is consumed; now read
+these N sorted files and read them all concurrently, merging them
+together to produce the output.
+
+Optimization: maintain in-RAM data in a bin-heap, and each time you
+write out a record, read in a new record to replace it, adding it to
+the bin-heap if possible.  This doubles the size of your initial
+sorted files on average for randomly-ordered input data, and does much
+better than that if the input is sorted or nearly so.
+
+Backwards alternative: partition keyspace into N roughly-equal-weight
+disjoint partitions, and open N temporary output files.  Deal input
+records into the appropriate file as they come in.  Once input is
+exhausted, sort and output each of the N temporary files in order.
+
+The efficiency limitation on the number of concurrently open files is
+that you need some buffer space in RAM for each open file in order to
+batch the I/O into operations big enough to use most of the disk’s
+bandwidth.  When the buffer space gets smaller than the bandwidth-
+latency product, the disk spends most of its time seeking.
+
+If you do more passes, you can increase the sortable data size
+dramatically.  Back in the magtape days, apparently many-pass sorts on
+three or more tape drives were common.
+
+The bad idea
+------------
+
+I keep thinking that there should be a way to make two-pass external
+sorting able to sort a data file *cubic* in the size of your RAM.
+
+The basic idea is that you have N² temporary files: you write to N of
+them at a time during input (“column-wise”), and read from N of them
+at a time during output (“row-wise”).
+
+Why is this idea bad?  Well, are these temp files going to be sorted
+or not?  If they’re not sorted, then you need to sort them before you
+can merge N of them together, which means you need to fit N of them
+into RAM at once during output if you’re going to avoid making a third
+pass over the data.  If they are sorted, then they have to get that
+way somehow, which means that you need to fit N of them into RAM at
+once during input.
+
+So as far as I can tell, this approach just doesn’t work, and there’s
+no way to make it work.

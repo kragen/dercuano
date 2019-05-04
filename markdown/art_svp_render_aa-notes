@@ -1,0 +1,249 @@
+I've been trying to puzzle out the libart2 API for antialiased
+rendering in `art_svp_render_aa.h`.  I think I understand it now.
+
+Basically, the problem it's trying to solve is that rendering a bunch
+of antialiased shapes that share borders is kind of a pain.  
+
+The Alpha-Blending Approach
+---------------------------
+
+Rendering one antialiased shape is pretty straightforward: you just
+alpha-blend the edges with whatever the background happens to be at
+the moment.  Rendering multiple antialiased shapes that are supposed
+to share borders, well, you end up with these "cracks" where the
+background shows through, as follows.
+
+Suppose you have a black background and two light gray polygons, say
+80% white and 90% white, and we're looking at three adjacent pixels,
+A, B, and C.  If the border between the two polygons falls neatly
+between, say, B and C, then A is 80% white, B is 80% white, and C is
+90% white.  No problem.
+
+But suppose the border runs down the middle of B.  Now A is still 80%
+white and C is still 90% white, and ideally you'd like B to be
+somewhere in between, say 85% white.  But with the alpha-blending
+approach, here's what you get.  First, you render the 80% white
+polygon, which takes B (currently at 0%) and alpha-blends 80% white
+into it with a 50% alpha corresponding to its 50% coverage of B,
+leaving B as (B * (1 - 50%) + 80% * 50%) = 40% white.  Then, you
+render the 90% white polygon, which also covers B to a 50% extent, and
+so B gets ((B = 40%) * (1 - 50%) + 90% * 50%), or 65%.  65% is not
+between 80% and 90%.  B's color ought to be composed half and half of
+the two polygons' colors, but instead it's composed of three-eighths
+of each of their colors and one-quarter the background color.
+
+This is, for example, the approach the `<canvas>` tag in Firefox and
+Safari take, and it results in transparency artifacts whenever you try
+to do 3-D rendering on top of it.
+
+Other Approaches
+----------------
+
+There are other simple approaches you can take.  You can decline to do
+antialiasing, or you can do antialiasing by rendering non-antialiased
+to a much larger pixel buffer and then downsampling.  You can randomly
+sample one or several points inside each pixel rather than just using
+the center point.  And `art_svp_render_aa` has a different approach.
+
+`art_svp_render_aa`
+-----------------
+
+The most transparent function in `art_svp_render_aa.h` is the following:
+
+    void
+    art_svp_render_aa (const ArtSVP *svp,
+                       int x0, int y0, int x1, int y1,
+                       void (*callback) (void *callback_data,
+                                         int y,
+                                         int start,
+                                         ArtSVPRenderAAStep *steps, int n_steps),
+                       void *callback_data);
+
+An ArtSVP is a "sorted vector path", which is the kind of thing you
+reduce everything else to in libart as the last step before you try to
+render it into pixels.
+
+An ArtSVPRenderAAStep is this:
+
+    struct _ArtSVPRenderAAStep {
+      int x;
+      int delta; /* stored with 16 fractional bits */
+    };
+
+So I made an ArtSVP from an ArtVpath representing a diamond between
+(160, 0), (240, 120), (160, 240), and (80, 120), and I called
+art_svp_render_aa with a callback that just dumped out the arguments
+it got, scaling the delta argument down as suggested by the comment
+(and scaling down the 'start' argument in the same way).  The results
+looked like this:
+
+    y=0 start=0.5 n_steps=3
+      x=159 delta=-85
+      x=160 delta=-1.52588e-05
+      x=161 delta=85
+    y=1 start=0.5 n_steps=5
+      x=158 delta=-21.25
+      x=159 delta=-212.5
+      x=160 delta=-1.52588e-05
+      x=161 delta=212.5
+      x=162 delta=21.25
+    y=2 start=0.5 n_steps=4
+      x=158 delta=-170
+      x=159 delta=-85
+      x=161 delta=85
+      x=162 delta=170
+...
+
+    y=25 start=0.5 n_steps=6
+      x=142 delta=-21.25
+      x=143 delta=-212.5
+      x=144 delta=-21.25
+      x=176 delta=21.25
+      x=177 delta=212.5
+      x=178 delta=21.25
+...
+
+
+And so on until the last scan line in the region.  It happened that
+the x-coordinates were roughly where the boundaries of my shape were
+on those scan lines.
+
+It turns out that libart wants your Vpaths to be counterclockwise, and
+that's why the values are negative; and the start value is 0.5 to make
+rounding work properly.
+
+So this gives you a sort of map of how inside the shape each pixel is.
+The start value tells you how inside the shape you are at the start of
+the scan line, with 0.5 being "completely outside" and 255.5 being
+"completely inside", and the ArtSVPRenderAAStep items tell you where
+the degree of insideness changes along that scan line.  You'll notice
+that, except on the first line where the scan line kind of gently
+touches my shape, the negative numbers always total to 255, as do the
+positive numbers, because each scan line goes all the way into the
+inside-out shape (once) and all the way back out of it.
+
+So this is sufficient to do antialiased rendering of a single shape in
+the dumb alpha-blending approach explained at the top: the start and
+delta values give you your alpha, although on kind of a funny scale.
+Maybe this is how `art_rgb_svp_alpha` works; I don't have access to the
+libart source at the moment.  But you can do it like this:
+
+    struct alpha_blending_shape_info {
+      art_u8 *buffer;
+      art_u8 r, g, b;  /* foreground! */
+      int x0, x1;
+      int rowstride;
+      enum { even_odd_rule, art_rgb_svp_alpha_rule, interesting_rule } rule;
+    };
+
+    // callback for art_svp_render_aa for the antialiased polygon rendering
+    void alpha_blending_shape_callback(void *callback_data, int y, int start,
+                                       ArtSVPRenderAAStep *steps, int n_steps) {
+      struct alpha_blending_shape_info *info = callback_data;
+      int value = start;
+      int x = info->x0;
+      int ii = 0;
+      int new_x, alpha;
+      for (;;) { // N + 1 fills for N steps
+        new_x = (ii < n_steps) ? steps[ii].x : info->x1;
+        switch (info->rule) {
+        case even_odd_rule:
+          alpha = 256 - abs((((unsigned)value >> 16) % 512) - 256);
+          break;
+        case art_rgb_svp_alpha_rule:
+          // same winding rule as art_rgb_svp_alpha.  if I were literate I
+          // would probably know what it's called.
+          alpha = abs(value >> 16);
+          if (alpha > 255) alpha = 255;
+          break;
+        case interesting_rule:
+          // This shows more clearly what's going on under the covers with value.
+          alpha = value >> 18;
+          break;
+        }
+        if (alpha) {
+          art_rgb_run_alpha(info->buffer + y * info->rowstride + x * 3, 
+                            info->r, info->g, info->b, alpha, new_x - x);
+        }
+      if (ii >= n_steps) break;
+        x = new_x;
+        value += steps[ii].delta;
+        ii++;
+      }
+    }
+
+The Iterator Interface
+----------------------
+
+But there are other functions in `art_svp_render_aa.h` as well:
+
+    ArtSVPRenderAAIter *
+    art_svp_render_aa_iter (const ArtSVP *svp,
+                            int x0, int y0, int x1, int y1);
+
+    void
+    art_svp_render_aa_iter_step (ArtSVPRenderAAIter *iter, int *p_start,
+                                 ArtSVPRenderAAStep **p_steps, int *p_n_steps);
+
+    void
+    art_svp_render_aa_iter_done (ArtSVPRenderAAIter *iter);
+
+Those look like a classic iterator pattern in C.  First you have a
+function to initialize the iterator; then you have a function to step
+the iterator and get some output values from it (although no way to
+tell when it's exhausted); and a function to discard the iterator when
+you're done.
+
+And, as you'd expect, it turns out you can reimplement
+`art_svp_render_aa` on top of the iterator interface as follows:
+
+    void svp_render_aa(ArtSVP *svp, 
+                       int x0, int y0, int x1, int y1,
+                       void (*callback) (void *callback_data,
+                                         int y,
+                                         int start,
+                                         ArtSVPRenderAAStep *steps, int n_steps),
+                       void *callback_data) {
+      ArtSVPRenderAAIter *iter = art_svp_render_aa_iter(svp, x0, y0, x1, y1);
+      int y;
+      int start;
+      ArtSVPRenderAAStep *steps;
+      int n_steps;
+      for (y = y0; y < y1; y++) {
+        art_svp_render_aa_iter_step(iter, &start, &steps, &n_steps);
+        callback(callback_data, y, start, steps, n_steps);
+      }
+      art_svp_render_aa_iter_done(iter);
+    }
+
+And it seems to work the same as the original.  (I wish I had the
+source of libart handy; I imagine it's not very different.)
+
+But this iterator interface is useful because it allows you to iterate
+through the scan lines of several different shapes, possibly in
+different colors, in parallel.  Which means that you can calculate,
+for each boundary pixel, what percentage of it is occupied by each
+shape.  So you can get results without cracks between them in the case
+where the shapes share some border, unlike the alpha-blending
+approach, but without using a humongous amount of memory or processor
+time, as in the supersampled-rendering approach.
+
+However, the interface still doesn't tell you whether a pixel is 50%
+occupied by shape A and 50% occupied by shape B because the two are on
+opposite sides of a shared border that runs through the middle of the
+pixel, or because shape A has a diagonal border running from upper
+left to lower right, while shape B has a diagonal border running from
+lower left to upper right, both through the center of the pixel.  So
+at least one of those two cases will be rendered incorrectly.  Perhaps
+more seriously, if you have two shapes in different colors but with
+the same border, the straightforward way of using this information
+will give you a jaggy border where the color of the bottom shape leaks
+through.  I think you can avoid these cases by cleverly manipulating
+the geometry of the shapes so that they do not overlap before you try
+to render them.
+
+Additionally, I'd think that if you were using it this way, you would
+want some kind of iterator in the x direction over the various
+ArtSVPRenderAAStep[]s that describe the scanline you're currently on.
+But there doesn't seem to be such an iterator facility defined in
+libart.

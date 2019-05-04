@@ -1,0 +1,241 @@
+I have this idea for a vastly more effective and efficient heat
+exchanger.
+
+The basic issue is that heat exchangers have a tradeoff between
+thermal resistance and fluid resistance.  Ideally you want to drive
+both of these parameters as far as possible toward zero, but thinner
+tubes or turbulence mean less thermal resistance and more fluid
+resistance, while thicker tubes or laminar flow mean less fluid
+resistance and more thermal resistance.
+
+Consider recuperator-type heat exchangers, which use two separate
+fluids, typically in a countercurrent configuration.
+
+I suspect you may be able to cut this Gordian knot using fractal
+geometry like that of the lungs.  The idea is to perform almost all of
+the heat exchange along a very convoluted (wrinkly) fractal surface
+whose Euclidean dimension is 2 but whose Hausdorff-Besicovitch
+dimension is nearly 3.  This surface is full of tiny capillaries, and
+it separates two volumes from each other, which we can denominate the
+“arterial” and “venous” volumes.  These spaces are not themselves
+empty; each one contains two separate, non-communicating sets of
+branching passages which branch down to the capillaries.  In one of
+these sets of passages, one fluid passes from the arterial space to
+the venous space; in the other, a potentially separate fluid passes
+from the venous space to the arterial space.
+
+Each of these two spaces looks a lot like a cauliflower, with a
+branching tree structure (or rather two of them) of passages feeding a
+very rough surface.
+
+The two sets of passages are separate and do not mix, but they
+intertwine progressively more intimately until, at the capillary
+boundary, they are separated only by very thin walls.  Nearly all of
+the heat is transferred during the passage through the capillaries,
+and nearly all of the fluid resistance is also due to this passage
+through these thin capillaries; the passages in the arterial and
+venous spaces are so much wider than the capillaries that they offer
+relatively little resistance.  But, because the surface through which
+the capillaries pass is so enormously convoluted, the total
+cross-sectional surface area of the capillaries is immense, allowing
+the fluids to pass with relatively little resistance.
+
+You could imagine the convoluted membrane filling, say, 80% of a
+one-liter volume with a 50-μm thickness penetrated by many
+10-μm-diameter capillaries some 10 μm apart.  Roughly estimating, this
+gives you 16 m² of membrane pierced by 4 m² of capillary
+cross-sectional area dived among 40 billion capillaries, 2 m² for each
+of the two fluids.  A flow rate of 500mℓ/s amounts to 250 microns/s
+through these capillaries; that is, the fluid spends about 200ms in
+the capillary, during which time it is in somewhat more intimate
+thermal contact with the other fluid 20μm away through the capillary
+wall than it is with its own predecessor or successor fluid 50μm away
+through the capillary.
+
+(Branching to 20 billion capillaries involves some 34 levels of
+branching if they are binary.)
+
+The cross-section through which the heat must travel by conduction is
+some twenty times (5× length, 4× four directions if the capillaries
+are in a checkerboard through the membrane) the cross-section of the
+capillaries themselves, so 40 m².  Aluminum has a thermal conductivity
+of some 205 W/m/K; multiplying that by 40m²/10μm gives us 820 MW/K,
+which is a dramatically enormous number.
+
+Some [random online pipe pressure drop calculator] tells me that,
+given .000000000025 l/s (25 pℓ/s, 250 microns/s * 10 microns * 10
+microns), pipe diameter of 0.010 mm, pipe roughness of 0.001 mm, and
+pipe length of .000050 m, the flow should be laminar and the pressure
+drop should be 0.05 millibar if the fluid is water.  That’s 5 Pa or a
+column height of 0.5 mm of water.  God only knows if it’s using some
+approximation or other that isn’t valid at these scales, but it’s
+somewhat reassuring.
+
+[random online pipe pressure drop calculator]: http://www.pressure-drop.com/Online-Calculator/
+
+These two figures together suggest that you should be able to pump
+considerably larger amounts of heat and fluids through this heat
+exchanger.  If we consider a 5 kelvin loss acceptable, then maybe we
+can deal with 4100 MW in our one-liter heat exchanger.  Water can hold
+perhaps 100kcal/kg; that gives us 9800 kg/s, which is 9800 ℓ/s, which
+would be 4.9 m/s through the 2m² of capillaries, which amounts to 0.49
+microliters per second per capillary.  Entering this into the same
+calculator provides me with an answer of 999.83 millibar, or 10.2
+meters of water column height, which is to say, one atmosphere.
+
+If we take this seriously, it would seem that we can probably
+nanofabricate a 4-gigawatt water-based countercurrent heat exchanger
+with a 5-kelvin temperature drop, with only one atmosphere of pumping
+pressure, in a single liter.  I find these numbers so outlandish that
+they are hard to take seriously, but I wonder how close we could
+really get.
+
+(In some cases you might have a much lower heat capacity per unit
+volume, for example with air, and desire a much lower delta
+temperature, like 5 millikelvins.  I think this is also achievable.)
+
+Previous work
+-------------
+
+Apparently Lingai Luo wrote a book on this in 2013, “Heat and Mass
+Transfer Intensification and Shape Optimization”; they proposed doing
+this in 2001.  In 2002, Yongping Chen and Ping Cheng wrote a paper,
+“Heat transfer and pressure drop in fractal tree-like microchannel
+nets”, surveying the existing work and proposing a two-dimensional
+coolant duct structure for cooling semiconductor ships.  They have 275
+citations in Google Scholar, and since then there has been a lot of
+work in convection in porous and complex structures, including a [2004
+book by Bejan], Lorente, and others.  It contains this remarkable
+passage:
+
+> Tree-shaped flows in balanced counterflow are a prevailing flow
+> structure in subskin vascularized tissues (Weinbaum and Jiji, 1985;
+> Bejan, 2001). The purpose of the intimate thermal contact between
+> the streams in counterflow is to minimize the leakage of heat (an
+> enthalpy current) along the counterflow, from the warm end to the
+> cold end. The counterflow provides thermal insulation in the flow
+> direction: this insulation effect has its origin in the minimization
+> of thermal resistance in the direction perpendicular to the streams
+> (Bejan, 1979b, 1982). This special feature, and the fact that the
+> streamwise leakage of heat vanishes as the thermal contact between
+> streams becomes perfect, is the reason why the balanced counterflow
+> is the best arrangement from the point of view of minimizing heat
+> transfer irreversibilities.
+
+Unfortunately, although he arranges his flows dendritically, Bejan’s
+work does not seem to contemplate distributing the capillaries
+themselves over a fractal surface, although he alludes to lungs at
+some point.
+
+He also describes our lungs:
+
+> The alveoli act as the primary gas exchange units of the lungs. It
+> is estimated that an adult has approximately 600 million alveoli
+> with a surface area for gas exchange of about 75 m², which are
+> perfused by more than 2000 km of capillaries (see Section 6.2). ...
+> In order to optimize its function (see Section 4.11), the airway
+> tree exhibits 23 levels of bifurcations after the trachea (Weibel,
+> 1963).
+
+[2004 book by Bejan]: http://dspace.uevora.pt/rdpc/bitstream/10174/5475/1/Porous%20and%20complex%20flow%20structures.pdf
+
+Note that this 75 m² in a few liters is comparable to the exchange
+area I described above for the heat exchanger.
+
+That topology-optimization guy in Scandinavia has been using topology
+optimization to design heatsinks using CFD simulation of convection.
+Understandably, they come out dendritic.
+
+Luo’s book is about “process intensification”, which she defined in
+2001 as “enhancement of the density of flux transferred between two
+phases through an interface”, which covers the heat-exchanger thing
+above as well as many other possibilities.  Its chapter 4 is all about
+heat exchangers, and it says:
+
+> Microchannel heat exchangers usually have a surface area density
+> above about 10,000 m²·m⁻³ (Shah 1991). One typical example in nature
+> is the human lungs, as a very high performance ultra compact heat
+> and mass transfer system which have a surface area density of about
+> 17,500 m²·m⁻³.
+
+The numbers I postulated above work out to about 80,000, so it isn’t
+too far from what people were already achieving in 1991.  A Karlsruhe
+project got 18000 MW/m³ by these techniques, with a pressure drop of 4
+bar (400 kPa), a 10-kelvin temperature jump, and a residence time of
+about 2ms, while my calculations above suggested you should be able to
+get 4 terawatts/m³ (i.e. 4,000,000 MW/m³), which suggests that my
+calculations are perhaps a bit optimistic but not entirely out of the
+ballpark.  The Karlsruhe device, however, did not use a fractal
+geometry, and it used crossflow rather than counterflow.
+
+Luo also points out that for microchannel heat exchangers you probably
+don’t actually want to use a highly conductive material, because it
+conducts heat longitudinally in the wrong direction.  You’d be better
+off with a highly insulating material, something silly like
+polyethylene!  And this is far more important for the kinds of
+geometries I'm considering.
+
+Luo does at some point start using fractal designs for her multi-scale
+distributors, but never for the capillary-bearing surface itself.  She
+proposes a multi-scale branched tree structure, but don’t give
+performance figures.  She does cite da Silva et al. 2004 (“Constructal
+multi-scalar tree-shaped heat exchangers”) and Zimparov et al. 2006
+(“Constructal tree-shaped parallel flow heat exchangers”).  The
+designs in Zimparov’s and da Silva’s papers are basically the same as
+the Chen and Cheng 2002 paper: essentially planar trees.
+
+Luo’s Chapter 7 shows the optimization of the distributor/collector
+network from chapter 3 (which is basically the same as Chen and
+Cheng’s) using cellular automata to improve flow, but never leaving
+two dimensions.
+
+Sun, Huang, and Zhang did a paper in 2015 where they did a CFD
+analysis of the Chen and Cheng planar fractal heat exchanger.
+
+Poltorak applied for a US patent in 2012 (publication 20120285660 A1,
+application US 13/106,640) which is more about branching heatsinks
+fractally to keep them from whistling.  He’s now formed a patent troll
+company to extort money with his patent, called Fractal Heatsinks Inc.
+But this is not really relevant.
+
+Other applications other than recuperator-type heat exchangers
+--------------------------------------------------------------
+
+Although heat exchangers themselves are very important — a perfect
+heat exchanger makes compressed-air energy storage 100% efficient, for
+example — there are other possible uses of this geometry.
+
+Luo’s book mentions a number of applications of “process
+intensification” beyond just heat exchangers, and Luo’s and Bejan’s
+books both go into some detail on mass transfer in lungs and kidneys.
+But in fact this kind of broccoli-like design can be used for a
+variety of other things as well:
+
+- If you have just a single fluid, this kind of design provides a more
+  efficient regenerator-type heat exchanger, although the advantage
+  there over the traditional designs is smaller.  You can use it with
+  modern microencapsulated phase-change materials to get unprecedented
+  regenerator performance.
+- Catalytic chemical processes can, in some cases, benefit from mixing
+  reagents uniformly and intimately as they pass over a catalyst.
+  This design provides that possibility; the only missing piece is to
+  run both fluids in a co-current direction and join their
+  capillaries.
+- Non-catalytic chemical processes, too.  Consider feeding fuel
+  (e.g. propane) and oxidizer (e.g. oxygen) through the two sets of
+  passages at a controlled rate, mixing and heating evenly at the
+  surface and producing a controlled hot blast of oxidation products
+  on the other side.
+- If some substance like water can diffuse through the walls between
+  the capillaries, this design can work for mass transfer as well as
+  heat transfer.
+- If the substance you’re transferring heat to is water, you can
+  flash-boil it and get a steam explosion.  A .22 LR pistol puts about
+  75 J of kinetic energy into its bullet in about 2 ms, a power of
+  about 40 kW.  The case on its cartridge is 15.6 mm long by 5.7 mm
+  diameter, about 400 mm³.  That works out to about 94 GW/m³
+  (94 MW/ℓ), so even the Karlsruhe heat exchanger mentioned above, at
+  18 GW/m³, is only a factor of five below the power density of a
+  handgun cartridge, modulo the Carnot limit.  This means you can
+  totally make a steam-powered gun that’s competitive in size and
+  power to explosive-powered guns.

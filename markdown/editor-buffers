@@ -1,0 +1,285 @@
+A text editor buffer is a potentially very large mutable string which
+you may want to make persistent, in the sense of storing to disk.  One
+engineering problem, a less serious one than it once was, is how to
+implement this data structure efficiently, given that it needs to
+efficiently support arbitrary insertion and deletion, string search
+near the cursor, reading the region near the cursor, and moving the
+cursor to previous (or arbitrary) positions.
+
+Text editor buffers also often contain associated metadata, including
+“markers” that you can efficiently jump the cursor to, which stay with
+the text they are attached to even when there are insertions and
+deletions elsewhere in the buffer.  This means it is not sufficient to
+merely store an integer offset into the buffer as a marker; you must,
+at least, update that offset when there are insertions or deletions
+before it.  There may be a pretty large number of markers, like, one
+per 16 bytes or so.  You probably also need to be able to find the
+markers in a region of the buffer, like, for the purpose of storing
+line numbers.  (Emacs markers only offer a subset of this
+functionality, because other primitives offer the other parts of it.)
+
+This is also a reasonable description of the functionality a
+filesystem must provide, except that filesystems often do not support
+insertion and deletion in the middle of files efficiently.  Nearly
+all, however, support appending to the end of files.
+
+You could imagine a software system that elided these distinctions to
+some degree — where all your data was, conceptually, in a single
+sequence, into which you could insert data at any location, and which
+you could search through with impunity.  Maybe you could even make it
+more efficient than current systems.
+
+A byte array
+------------
+
+The simplest data structure here is simply a contiguous byte array,
+reallocated when growing is needed.  This used to be unusably slow,
+but now [CPUs can `memmove()` 5 gigabytes per second][0], so now
+you’re doing OK up to about 100 megabytes without doing anything
+special — you can `memmove()` 100 megabytes after every keystroke with
+barely detectable latency.
+
+[0]: http://nadeausoftware.com/articles/2012/05/c_c_tip_how_copy_memory_quickly#Benchmarkresultsndashcompiledwithoptimizations
+
+Gap buffers
+-----------
+
+A refinement of the raw byte array approach is the “[gap buffer][1]”
+approach, used by Emacs, where you leave a gap in the middle of the
+array where the cursor is.  Moving the cursor (or, rather, inserting
+or deleting text in a new location) involves moving the gap, or rather
+moving text from one side of the gap to the other, but inserting or
+deleting text at the gap generally just involves adjusting the gap
+size.  This means you only have to `memmove()` the 100 megabytes after
+every thousandth keystroke or whatever.  (At the moment, my Emacs
+buffer gap is 1737 bytes.)  This is [quite fast][2], and it’s [from
+the at least 1970s][3] (and may date back to Expensive Typewriter),
+although in the 197s0 it was 80 kilobytes instead of 100 megabytes
+that you could move without the user getting annoyed.
+
+[1]: http://www.gnu.org/software/emacs/manual/html_node/elisp/Buffer-Gap.html
+[2]: http://scienceblogs.com/goodmath/2009/02/18/gap-buffers-or-why-bother-with-1/
+[3]: http://www.finseth.com/craft/#c6.4.3
+
+As usual with things that are amortized cheap but occasionally
+expensive, you can make gap movement incremental at the cost of more
+memory usage and complexity.  You need to keep track of a set of edits
+pending integration into the buffer (because the gap hasn’t reached
+them yet), move the gap incrementally towards those edits (during idle
+time and during each keystroke), and include special cases in anything
+that *reads* the buffer to check the edits-pending-integration.
+Nobody does this, because instead they break things up into smaller
+pieces:
+
+A single level of indirection
+-----------------------------
+
+Supposing that your 100 megabytes or whatever are not enough (I have
+16 gigabytes of RAM on my laptop, and plenty of files bigger than
+that).  The next thing to try is to divide the buffer into a linear
+sequence of pieces, managed with, say, an array of pointers, or an
+array of structs.  (For example, each piece’s struct might contain a
+start pointer, a gap start offset, a gap end offset, and a total
+length.  On a 64-bit machine, it would be reasonable for the first to
+be 8 bytes and the others to be 4 bytes, for a total of 24 bytes with
+padding.)
+
+This is basically what the STL deque class does.  It’s also the
+approach taken by Finseth’s editor Mince.
+
+How many pieces to use?  The general rule for this kind of thing is
+that you can reduce things that take O(N) work to O(√N) by dividing
+them into O(√N) pieces, so that the indirection table is about the
+same size as the pieces.  In this case, if you have, say, a
+128-gibibyte buffer, you could divide it into 2-mebibyte pieces, and
+there will be 65536 of them, and so your array of piece descriptors
+will take up about 1.5 mebibytes.  This means that moving the buffer
+gap in any one of the pieces will take at most (2 mebibytes /
+5 gigabytes per second) ≈ 0.4ms; moving a piece will take the same;
+and splitting a piece additionally involves inserting into the middle
+of that 65536-item array, which could take up to another 0.3ms or so.
+So the worst case is 0.7ms, and the average case (assuming the gap
+moves randomly) is half of that.
+
+This is more or less the optimum piece size for this size of buffer.
+If you use smaller pieces, like 1 mebibyte, then moving the gap in a
+piece or splitting a piece will take less time, but updating the
+indirection array will take more time — a total of 0.8ms worst-case in
+that case.  If you use larger pieces, like 4 mebibytes, updating the
+indirection array will take less time, but splitting the piece or
+moving it will take more time — a total of about 1ms worst-case in
+this case.  Both of these numbers are worse than 0.7ms, but the
+threshold where this starts to matter to interactive response is where
+it becomes a significant fraction of a 17ms screen refresh.
+
+Probably splitting pieces is much less common than moving the buffer
+gap a long way, so you might want to use somewhat smaller pieces in
+the interest of improving average-case response at the expense of
+worst-case response.
+
+You can, of course, divide smaller buffers into smaller pieces.
+
+If you’re dealing with on-disk data instead of in-RAM data, you have
+to deal with both lower data rates and high latency.  Reading or
+writing 2 mebibytes of data on spinning rust takes about 35ms, and
+seeking to it takes another 8ms or so, so the piece-splitting
+operation mentioned above that takes 0.7ms in RAM might take 90ms on
+spinning rust.  Worse, some disks are bigger than 128 gibibytes.
+
+To deal with that kind of horror without nosing up into
+human-detectable operation times, we need to do better than O(√N).  We
+need O(log N), and for that we need multiple levels of indirection:
+
+B-trees, or multiple levels of indirection
+------------------------------------------
+
+B-trees are usually explained as an N-ary version of balanced binary
+search trees, a kind of ordered dictionary that’s more amenable to
+sequential access than red-black trees and whatnot.  But you can also
+use them for things that are just plain sequences.  Each child pointer
+carries with it the total length of the sequence below it, so that you
+can index through the child pointers of a node until you find the
+pointer that contains the position you’re interested in.
+
+How many levels do you need?  For spinning-rust usage, you probably
+want your B-tree nodes to be around half a mebibyte (so that you don’t
+waste most of your time waiting for the head to seek to them); if your
+pointers and sizes are 40 bits, then a node holds about 48000
+pointers, for about 23.4 gibibytes of child nodes, or 1.17 tebibytes
+of grandchild nodes.  So basically with *two* levels of indirection
+you can get anything in two seeks and insert anywhere in three seeks
+and a mebibyte and a half.
+
+For in-RAM usage, like for a traditional editor buffer, you probably
+want a lower branching factor and correspondingly deeper tree.  For
+example, if we take our node size to be nominally 512 bytes and
+pointers to be 8 bytes, then our nodes have 64-way branching, or
+32-way if they include the child weights.  128 gibibytes of buffer is
+256 mebi-leafnodes, so you have up to five levels of branching, and
+about 1/31 of your RAM is taken up by internal nodes.
+
+The leafnodes could still, if you wish, use buffer gaps.  But it’s no
+longer essential.  Copying up to 512 bytes after every keystroke (and
+updating up to six ancestor weights) is not very expensive.
+
+For more usual buffer sizes, you need less levels of indirection.  8
+megabytes is only 16 kibi-leafnodes, so 528 internal nodes in a
+three-level tree suffices.
+
+Compressed RAM
+--------------
+
+With the increasing gap between RAM speed and CPU speed, and the
+advent of new very-high-speed compression algorithms like LZ4, it’s
+becoming reasonable to compress in-RAM data that isn’t immediately
+being used; it’s often faster to spend the CPU to decompress it than
+it is to take the locality hit of copying it from main memory.
+
+Ropes
+-----
+
+You’ll note in the discussion about on-disk data structures that there
+was little discussion of locality of reference for writing, no
+discussion of fragmentation, and no discussion of crash recovery.  We
+blithely assumed that updating in place presented no problems.
+Similarly, in the discussion of updating ancestor weights in RAM,
+there was no discussion of concurrency.  And undo, of course, was
+taken for granted.
+
+In practice, of course, these problems are ubiquitous.  One way to
+solve them (at the cost of unpredictable memory usage) is to *never
+modify data in place*: instead, always write new copies of the data,
+and eventually garbage-collect the old data once it’s no longer used.
+This makes your data structures “persistent” in the
+functional-programming sense — you can reference their old state
+simply by keeping a reference to it, which makes undo quite
+simple — and allows you to choose where to write the updates to, which
+helps with fragmentation and write bandwidth.  This is the approach
+behind the NetApp WAFL, behind Ousterhout’s Berkeley LFS, and also
+behind the “[rope][5]” data structure from Xerox PARC’s Cedar, which
+made its way into the SGI STL in a reference-counted form.
+
+[5]: http://scienceblogs.com/goodmath/2009/01/26/ropes-twining-together-strings/
+
+If you strictly follow these rules for B-trees, every byte you insert
+or delete involves creating a whole new set of treenodes up to the
+root.  In our 128-gibibyte-buffer-with-six-levels-of-treenodes case,
+this is 3 kibibytes of data — plenty fast enough for keystroke
+response, but 3072 times bigger than the keystroke being written.
+It’s going to give your garbage collector a headache, even though it
+won’t trip any write barriers.  There are a variety of different ways
+of solving this, including [zippers][4].
+
+[4]: http://scienceblogs.com/goodmath/2010/01/13/zippers-making-functional-upda/
+
+The standard rope approach to this is to use unbalanced binary trees
+rather than B-trees, so that you only need a couple of small treenodes
+gluing together the parts of your buffer you aren’t editing with the
+new string you’re inserting.  This way you need, say, 40 bytes of
+freshly allocated data to record each new keystroke, instead of 3072.
+
+One of the simplest approaches, though, is to batch up a pending
+update until it’s big enough to be worth it.
+
+Update logs
+-----------
+
+In transaction processing, this is sometimes called a “side file”: you
+log the inserts, updates, and deletes in a small file “to the side of”
+your main database.  Any query must take care to ensure that its
+results take the changes in the side file into account, which
+typically involves traversing the side file sequentially; or you can
+maintain an updated version of the relevant part of the database in
+non-immutable memory.
+
+This is more or less the approach that WAFL originally took to keep
+its disk write bandwidth manageable: it would buffer changes (in
+battery-backed RAM) until the once-per-second timer fired and it wrote
+a snapshot to disk.
+
+In the case of a text editor, it would seem that a gap-buffer
+representation for the particular part of the buffer you’re currently
+modifying should enable modification to proceed with very high
+efficiency; once the modifications are complete and you move
+elsewhere, they could be recorded in new B-tree nodes.
+
+Markers
+-------
+
+All of the above, however, disregards the problem of markers.  If you
+have 128 gibibytes of text in your editor buffer, you might have 8
+gibi-markers.  It’s no good if adding a character to your 512-byte
+leafnode is efficient if that requires you to increment 4 billion
+markers!
+
+It’s not obvious how to solve this problem scalably.  But there is a
+way.
+
+If you take the Mince approach, an array of separate 2-mebibyte
+gap-buffer pieces, maybe you could associate a separate marker table
+with each piece, containing the marker’s physical position in that
+piece.  This requires up to 65536 lookups to find a marker, and
+updating up to 131072 marks when the gap moves.  (You’d probably want
+to doubly-index the marker table so that you can usually update
+fewer.)  These sound like ridiculous numbers, but they’re probably in
+the same ballpark as the cost of moving the gap normally.
+
+In a mutable B-tree, though, there’s a much more interesting
+possibility.  Suppose a mark stores the addresses of all six of the
+nodes on its path down from the root, plus the byte offset into the
+leaf node.  A mutation to nodes on that path might alter the offset
+within the node at which the pointer to the child is found, but it
+won’t alter the value of that child pointer, so the mark remains
+valid.  Only if the leaf node is mutated, or if a node it traverses is
+split so that the child is no longer present, will the mark need
+updating.  And we could index the marks by these addresses so that we
+can find the marks that need updating when we’re splitting a node.
+
+We could go further, though.  Suppose every node has a parent pointer.
+Now, the mark can simply consist of a pointer to the leaf node that it
+points into and an offset into that leaf node, and that leaf node can
+have a list of marks associated with it.  No mutations higher in the
+tree will require updating the mark; updating the leaf node may
+require updating the mark, but finding it is easy.
+
+This is THE SOLUTION to the scalable editor buffer problem.

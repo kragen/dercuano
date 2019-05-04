@@ -1,0 +1,223 @@
+I have moved in with Nuria Pucci.  I am writing this reclining on a
+foam mattress on the floor of my new bedroom.  
+
+I’ve paid the rent until the end of the month.  I don’t yet know how
+to access the internet connection or flush the toilet; in the morning
+I will see if I can take a shower.  I need a Gatorade bottle for
+emergency urination, since there’s only one bathroom.
+
+I have a minimal amount of stuff here now: a sleeping bag, a sheet, a
+pillow, Tuga, some food, melatonin, my netbook.  I need to move the
+rest ASAP.
+
+The room is roughly cubical with a side of some four meters, for a
+total volume of 64m³ or 64kℓ.  There are no bookshelves or curtains as
+such.  I suspect I can put bookshelves up.
+
+It’s almost 2 AM, and Nuria is running the microwave and playing the
+guitar.  So I will need earplugs, too.
+
+It’s cold
+---------
+
+The room contains about 64kg of air, which has a specific heat of
+about 1 J/g/K = 1 kJ/kg/K.  Raising the temperature of these 64kg of
+air from its current 10° up to a comfortable 20° thus requires about
+640kJ.  As I operate at about 100 W, this would take about two hours.
+
+However, the walls are presumably concrete (0.9 J/g/K) or gypsum
+plaster (1.1 J/g/K), and will probably absorb most of the heat I put
+into the air — if they don’t simply conduct it outdoors.  The walls
+weigh a great deal more than 64kg, although the speed at which the
+heat penetrates them will depend on how much of their mass is engaged.
+
+This suggests that hanging fluffy curtains on the walls and perhaps
+something similar on the ceiling might make the room a great deal more
+comfortable.
+
+If I were to fill a 20ℓ bucket with hot water (4.2 J/g/K) at 50°, in
+cooling down to 10°, it would release 160kJ.  Thus, four such buckets
+would be needed to bring the room’s air up to a comfortable
+temperature.
+
+### Phase-change heat reservoir ###
+
+A eutectic mixture of Glauber’s salt and sodium chloride melts at 18°,
+with a heat of fusion of 286 kJ/kg, and so it would be adequate to
+bring the temperature up to there; a slightly smaller amount of sodium
+chloride would melt instead at 20°, slightly less sharply.  2.2
+kilograms of such a mixture in its liquid form would suffice to supply
+the same heat as all four buckets of water.
+
+If we were to scale up such a system by a factor of 20, we would have
+a reservoir of 44 kg of phase-change material (30 ℓ at 1.46 g/cc) with
+12.6 MJ of phase-change heat capacity; we could also choose a
+different phase-change temperature.  A glazed flat-plate solar heat
+collector with a water-ethanol mixture pumped through it could provide
+the heat input; a thermosiphon-driven heat exchanger inside the room,
+mounted above the reservoir, would silently release the heat into the
+air when a valve was opened, at which point it would drive convective
+air circulation through a “chimney” above the heat exchanger.
+
+Running this system for four hours at night would provide 870 watts of
+heating, which is probably plenty.  It could perhaps be charged over a
+longer period of time during the day; if it only had a single hour to
+charge in, it would need 3.5 kWt of sunlight; with a 50%-efficient
+glazed flat-plate collector, that’s about 7 m².
+
+The standard chimney draft calculation is
+
+    Q = C A √(2 g H ΔT/T)
+
+where Q is the draft flow rate, A is the cross-sectional area of the
+chimney, C is a discharge coefficient of about 0.7, g is the
+gravitational acceleration, H is the height, ΔT is the temperature
+difference across the chimney wall, and T is the temperature outside.
+
+Let’s say A = 0.01 m², H = 3 m, T = 288 K, ΔT = 5 K; then our flow
+rate is 7ℓ/s, at which rate sucking all 64kℓ of air through the system
+would take about 2½ hours, which is a bit too slow.  Correcting to
+0.05m², we suck all the room’s air through the heater every 30
+minutes, which is acceptable; this amounts to a round chimney duct of
+some 250 mm in diameter.
+
+44 kg of Glauber’s salt at the wholesale price of US$130/tonne would
+cost US$5.72, currently about AR$80.
+
+The 30 liters would need to have plumbing run through it rather
+thoroughly in order to be able to freeze all of the salt during the
+heat-evolution part of the cycle.  Wikipedia says that sodium chloride
+has a thermal conductivity of 6.5 W/m/K at 289 K, but I’m not sure how
+to apply that information to figure out how closely the pipes need to
+be spaced.
+
+Well, kind of.  Let’s say the pipes are spaced 50 mm apart, so the
+heat has to travel 25 mm from a pipe to reach the last liquid salt.
+If you slice 30 ℓ into 50 mm slices, the surface area of the slices is
+0.6 m², or 1.2 m² on both sides.  The coolant is presumably halfway
+between the air temperature, which might be 18°, and the salt’s
+freezing temperature, which might be 22°, so you have a gradient of
+only 2 K on average over those 25 mm: 80 K/m; multiplying the surface
+area in, you get 96 K m.  That’s 624 W, which is probably acceptable.
+If the pipe spacing were smaller, you would have proportionally more
+layers and less distance to the last liquid, so the power goes as the
+inverse square of the pipe spacing.
+
+Spacing zero-thickness pipes 50 mm apart throughout a 30 ℓ volume in a
+square pattern would require 12 m of pipes.  (I’m not sure how much it
+affects the surface area of the last or nearly last liquid salt, or
+whether that matters.)  You can do slightly better by using a
+hexagonal pattern, but then again, you will do slightly worse because
+the coils have to bend in order to fill the whole space.  So this is
+probably about right.
+
+I’m not sure if it matters to the heat transfer into the salt whether
+you run the pipes in parallel or purely in series.
+
+12 m of 5mm-diameter pipe holds 236mℓ of coolant, almost exactly one
+US cup, which is a comfortingly small number for the most hazardous
+part of the system.  If it had the specific heat of water, with that
+same 2° ΔT, it would transfer about 2.0 kJ of heat each circuit; this
+is too small, because at 870 W, it would have to make a circuit of the
+entire reservoir every 2.3 seconds, 5.3 meters per second.  That’s far
+too fast, but it might be bearable if you can run a lot of pipes in
+parallel instead of in series.  Just in case, though, it’s probably
+better to think in terms of 10mm-diameter pipe, 940mℓ of coolant,
+7.9 kJ, and 9.1 seconds of reservoir transit time.
+
+We probably need turbulent flow for maximum heat transfer power, so we
+want the Reynolds number in the pipes to be over 4000; but not too
+much over 4000, because we lose efficiency.  If Re = vD/ν, solving for
+v, we get v = ν Re / D.  If D = 10mm, ν = 1 cSt = 1 mm²/s, and Re =
+4000, then v = 0.4 m/s; at 9.1 seconds of reservoir transit time, this
+suggests we’d need to split the reservoir coolant into branches of
+about 3.6 m each.
+
+400 mm/s seems like a lot to expect out of a thermosiphon.  How can we
+fix that?  If the pipes were thinner, we would need an even higher
+velocity to hit Re = 4000, which seems counterintuitive; for example,
+at 5mm, we need 0.8 m/s.  But that really is the way it works: thicker
+pipes, where viscosity matters less, are more prone to turbulence.  So
+apparently the cure is to use thicker pipes still in order to get
+turbulent flow at a lower speed.
+
+Let’s say we go to 20mm diameter, at which point we can afford 36
+seconds of reservoir transit time, because the coolant holds 32 kJ,
+because there are 3.8 liters of it.  Now we get turbulent flow at 0.2
+m/s, at which speed we would transit all 12 meters of pipe serially in
+60 seconds, so we still do better if we split the pipe into two
+parallel runs.
+
+How much pressure do we need to get to 0.2 m/s in 12 meters of 20mm
+pipe, though?
+
+The Darcy-Weisbach equation says
+
+    Δp = f L ρ v² / (2 D)
+
+where f is the Darcy friction factor, L is the length of the pipe, ρ
+is the density of the liquid, v is the velocity as before, and D is
+the diameter as before.
+
+Unfortunately, I don’t have a Moody diagram handy to figure out what f
+should be.  The Haaland equation, a simple approximation to the
+recurrent Colebrook equation, says:
+
+    1/√f = -1.8 log₁₀ ((ε/D/3.7)¹·¹¹ + 6.9/Re)
+
+where ε is the surface roughness and D is the diameter, as before.
+The relative roughness ε/D here should be about 0.01 to 0.001, so that
+part of the sum could work out to be as high as .0014, or much lower;
+6.9/4000 is about .0017.  So our logarithm here is about -2.5 to -2.8,
+so 1/√f ≈ 4.5 to 5, so f should be in the neighborhood of 0.04 or
+0.05.  [Later I checked this against a Moody chart and, yes, .045 to
+.055.] 
+
+The original Colebrook equation says
+
+    1/√f = -2 log₁₀ (ε/D/3.7 + 2.51/(Re√f))
+
+Just checking here, Re√f ≈ 800, ε/D/3.7 ≈ .0027, 2.51/800 ≈ .0031, the
+logarithm is about -2.2, and yes, that means 1/√f ≈ 4.5.
+
+Back to the Darcy-Weisbach equation, we have f = 0.04, L = 12 m, ρ = 1
+g/cc, v = 0.2 m/s, D = 20 mm, which works out to 480 Pa of head loss.
+Or only 240 Pa if we split it in half.  That’s 0.03 psi, which kind of
+sounds reasonable, but it’s 24.5 mm of water head, which seems like it
+might be hard to get out of a thermosiphon.
+
+This all depends on the thermal coefficient of expansion of water,
+which notoriously falls to zero at 4°, then goes negative.  Mixing
+ethanol into the water might help with this, both because it serves as
+antifreeze and because its own TCE is very large, much larger than
+water’s.  Wikipedia [[Thermal expansion]] claims that water’s
+volumetric coefficient is 207 ppm/K at 20°; if we have a 2 K
+difference between the hot side and the cold side of the thermosiphon,
+then we have 414 ppm.  That would mean we needed 59 meters of height
+to get our thermosiphon to siphon at 240 Pa with only 2 K difference.
+
+So, no, you won’t get turbulent flow through the heat exchanger from
+the thermosiphon.  That’s too much to ask from a poor little bedroom
+thermosiphon.
+
+What will happen in reality if you have, say, 1 m of thermosiphon
+height?  (We’re running out of height here in the bedroom...)
+
+414 ppm of a meter is 414 microns, which works out to about 4 Pa.
+Let’s solve Darcy-Weisbach for v:
+
+    Δp = f L ρ v² / (2 D)
+    Δp 2 D / f L ρ = v²
+    v = √(Δp 2 D / f L ρ)
+
+So in this case we have Δp = 4 Pa, D = 20 mm, f we don’t know but for
+laminar flow it’s 64/Re, L = 6 m, ρ = 1 g/cc.  But wait, actually L
+depends on how many pipes we put in parallel through the reservoir; it
+might be 500mm if we put 24 parallel pipes there instead of two.  Or
+250mm if we put 48 pipes in.  We were only going with two in order to
+try to get turbulent flow.
+
+I think that shows that we can get almost arbitrarily high heat
+transfer powers out of almost arbitrarily low coolant volumes by
+putting the coolant through lots of pipes in parallel.  But I’m not
+going to finish the calculations tonight.

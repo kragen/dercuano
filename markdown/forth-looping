@@ -1,0 +1,386 @@
+Warning!  None of the code I wrote for this post is tested, so it
+probably has bugs.
+
+Warning!  This message is almost entirely concerned with micro-
+optimizations for obsolete languages, obsolete CPUs, and CPUs that
+never shipped, and I don't even know very much about them.
+
+Forth Definite Looping Constructs
+---------------------------------
+
+I remember reading some years ago about how Chuck Moore tries to avoid
+use of the "DO...LOOP" construct these days.  In
+http://www.ultratechnology.com/moore4th.htm he says:
+
+    Some of the people who don't like Forth might take to this. In 20
+    blocks of code I have no conditional statements or loops.  Good
+    Forth minimizes the number of conditional statements. The minimum
+    is zero.  I can say
+
+    : 5X X X X X X ;  : 20X 5X 5X 5X 5X ;
+
+    This is just as good as a loop. When running through memory the
+    code should compare an address to terminate rather than use a loop
+    count.
+
+(Attributed to Chuck Moore's 1997 Silicon Valley FIG presentation:
+http://www.ultratechnology.com/color4th.html)
+
+This struck me as crazy, since it makes the program considerably more
+opaque.
+
+(In http://www.ultratechnology.com/1xforth.htm from 1999 he says he
+prefers tail-recursion to other looping constructs, and much of that
+is actually on display in the 1997 presentation as well.)
+
+Moore has been working on top of his stack-based MuP21 and F21 CPUs
+since the early 90s, or at least pretending to by emulating them with
+assembler macros on Pentiums, which run a lot faster.  These chips
+implement something like Forth operations as their native instruction
+set.  But the run-time semantics of LOOP are not among their primitive
+operations; instead there are JZ (T0), which jumps if the top-of-stack
+is zero (excluding its carry bit), and JCZ (C0), which jumps if the
+carry bit on the top-of-stack is zero.  (On these chips, each register
+on the stack drags along its own carry bit.)
+
+I've been implementing a toy Forth system myself this week, and I got
+to LOOP, and you know, it's a little bit complicated.  My
+implementation was something like 19 words in length.  In view of
+Moore's overriding desire to get stuff done with a minimal amount of
+resources, his avoidance of LOOP no longer seems quite so
+incomprehensible.
+
+So first I'll explain what I wrote, and then I'll show the much better
+solution from F-83.
+
+What I Wrote
+------------
+
+        defbytes _loop          # twiddles return address
+        # ( -- ) ( R: X limit-1 limit -- X+1 ) in end-of-loop case
+        # ( -- ) ( R: X counter limit -- X-N counter+1 limit ) in normal case
+        # N is stored at X (in the instruction stream after
+        # the call to _loop)
+        # XXX we need a way to sign-extend characters; it's
+        # confusing to write a positive number for a backward
+        # jump.
+        ## Also, this is way too long.
+        .byte b_rpop, b_rpop, b_add1, b_rpop, b_twodup, b_xor
+        .byte b_branch_on_0,7, b_rpush, b_rpush # not done yet, so jump back
+        .byte                  b_dup, b_c_at, b_sub, b_rpush, b_exit
+        .byte b_twodrop, b_add1, b_rpush, b_exit # done
+
+That's hopefully equivalent to this Forth:
+
+    : _loop r> r> 1+ r> 2dup xor
+        if >r >r dup c@ - >r exit then
+        2drop 1+ >r ;
+
+So it pulls its own return address off the return stack, pulls off the
+loop counter and increments it, pulls off the limit, compares the
+incremented loop counter to the limit, and if they're still not equal,
+it pushes them both back onto the stack, then fetches a jump offset
+from where its return address points and subtracts that from the
+return address before sticking it back onto the stack, then returns.
+But if they are equal, it throws them away, increments its return
+address by one to skip over the jump offset, and sticks it back on the
+return stack before returning.
+
+That's a lot of work for something that has to be done inside every
+tiniest little definite-iteration inner loop!
+
+I tried coding an assembly version, but it was complicated too, at 14
+instructions.
+
+F-83's LOOP implementation
+--------------------------
+
+The definition of LOOP from my copy of F-83 is in screen #75 of
+KERNEL86.BLK:
+
+    : LOOP 
+         COMPILE (LOOP)  2DUP 2+ ?<RESOLVE ?>RESOLVE    ; IMMEDIATE
+
+So when you say LOOP in F-83, it compiles a call to (LOOP) into the
+word you're compiling, then does some compile-time jump-resolution
+stuff.
+
+(LOOP) is in screen #11:
+
+    CODE (LOOP)   (S -- )   1 # AX MOV
+    LABEL PLOOP   AX 0 [RP] ADD   BRAN1 JNO
+      6 # RP ADD   IP INC   IP INC   NEXT END-CODE 
+
+(I found these by running F83.COM in DOSBOX and saying "view loop" and
+"view (loop)".  There's a built-in screen editor vocabulary that I
+don't really know how to use, but it brings up a screen editor on the
+definitions if you say "fix loop", at which point the word "a"
+switches between viewing the source code and the "shadow" block
+containing the comments.)
+
+I think this means the following in gas syntax:
+
+_loop:  mov $1, %ax
+        # RP is the return stack pointer, defined in CPU8086.BLK screen 5
+ploop:  add %ax, (%bp)
+        jno bran1       # jump if no overflow to "bran1"
+        add $6, %bp     # pop three items from return stack
+        # IP is the interpreter pointer
+        inc %si
+        inc %si
+        next # a macro defined as >NEXT #) JMP, which I assume means 
+        # "jump to the address >next"
+
+"bran1" was previously defined in screen 9:
+
+    CODE BRANCH   (S -- )                                           
+    LABEL BRAN1   0 [IP] IP MOV   NEXT END-CODE
+
+which I'm pretty sure means
+branch:
+bran1:  mov (%si), %si
+        next
+
+That just fetches a new address to jump to from the place the
+interpreter pointer currently points.
+
+Notice how clever this is --- the common-case path length inside
+(LOOP) is only three instructions: MOV, ADD, JNO; and then there's one
+more MOV instruction inside BRANCH before we get to NEXT.  But it's a
+little bit opaque.
+
+In "Inside F-83" (insidf83.ZIP, 312170 bytes; see Chap4, 39424 bytes)
+C. H. Ting explains:
+
+        F83 provides a solution by using three numbers on the return
+        stack to handle the indexing and looping. The number at the
+        bottom of the three is the address of the word right after
+        LOOP, providing LEAVE with the return address to terminate the
+        looping.  The second number is the loop limit, offset by 8000H
+        so that the index range from 0 to FFFFH becomes contiguous.
+        The top number is the difference between the index and the
+        limit, also offset by 8000H.  At the end of the loop, LOOP
+        increments the top number on the return stack by either one or
+        the amount specified in the case of +LOOP, and tests for
+        overflow from bit 14 to bit 15.  The overflow condition occurs
+        when the 8000H boundary is crossed from either
+        direction. Therefore, both the positive and negative
+        increments are handled correctly with a single run-time loop
+        routine.
+
+So the loop counter is one of the largest positive integers
+representable, and we increment it until it overflows.  This does
+imply a bit more work on behalf of (do) though:
+
+    CODE (DO)   (S l i -- )   AX POP   BX POP 
+    LABEL PDO   RP DEC   RP DEC   0 [IP] DX MOV   DX 0 [RP] MOV 
+      IP INC   IP INC   8000 # BX ADD   RP DEC   RP DEC 
+      BX 0 [RP] MOV   BX AX SUB   RP DEC   RP DEC   AX 0 [RP] MOV 
+      NEXT END-CODE 
+
+If I understand this, it means
+
+    _do:    pop %ax         # initial loop counter
+            pop %bx         # loop limit
+    pdo:    dec %bp
+            dec %bp
+            mov (%si), %dx  # loop end address
+            mov %dx, (%bp)
+            inc %si
+            inc %si
+            add $0x8000, %bx # loop limit + 0x8000
+            dec %bp
+            dec %bp
+            mov %bx, (%bp)
+            sub %bx, %ax    # ax := initial loop counter - (loop limit + 0x8000)
+            dec %bp
+            dec %bp
+            mov %ax, (%bp)
+            next
+
+If you're like me, when you read that code, you will shout, "What the
+fuck kind of sense does that make?" and haul out your Intel
+instruction set manual to see if maybe you've gotten the operands to
+SUB backwards or something.  But of course the code is correct.  (Skip
+the rest of this paragraph if that's already obvious to you.)  The
+quantity -(loop limit + 0x8000) is the same as -0x8000 - loop limit,
+and -0x8000 is 0x8000, one more than the largest representable
+integer.  So if the loop limit is 1, then this quantity will be
+0x7fff, which will overflow after one iteration if the initial loop
+counter is 0.  If it's 2, then it will be 0x7ffe.  And so on.  So then
+the "initial loop counter" is added to possibly reduce the number of
+iterations of the loop.
+
+I think you could write this more briefly as follows, but hey, it's
+harder to build than to criticize, right?  The one difference is that
+"pdo" now takes its parameters in %dx and %bx instead of %ax and %bx.
+
+    _do:    pop %dx
+            pop %bx
+    pdo:    xchg %sp, %bp
+            lodsw
+            push %ax
+            add $0x8000, %bx
+            push %bx
+            sub %bx, %dx
+            push %dx
+            xchg %sp, %bp
+            next
+
+Needless to say, this representation of loop state requires a little
+bit of computation to recover the loop counter in the word "I", in
+KERNEL86.BLK screen 15:
+
+    CODE I   (S -- n )
+      0 [RP] AX MOV   2 [RP] AX ADD   1PUSH END-CODE
+
+That is:
+
+    i:      mov (%bp), %ax
+            add 2(%bp), %ax
+            jmp push1
+
+"1push" is one byte earlier than "next" --- presumably it pushes %ax,
+saving one byte on each of those primitives ("CODE words") that finish
+up by pushing a result.  There's also "2push".
+
+The Carry Variant
+-----------------
+
+It seems like it would work just as well, and be somewhat clearer, to
+use the carry flag rather than the overflow flag --- so the loop is
+over when the loop counter increments up to 0.  Here's my untested
+attempt at that variant:
+
+    _loop:  mov $1, %ax
+    ploop:  add %ax, (%bp)
+            jnc bran1
+            add $6, %bp
+            inc %si         # couldn't we just lodsw?
+            inc %si
+            next
+
+    _do:    pop %dx         # initial loop counter
+            pop %bx         # loop limit
+    pdo:    xchg %sp, %bp
+            lodsw
+            push %ax
+            push %bx        # loop limit
+            sub %bx, %dx    # dx := initial loop counter - loop limit
+            push %dx
+            xchg %sp, %bp
+            next
+
+    i:      mov (%bp), %ax
+            add 2(%bp), %ax
+            jmp push1
+
+The only changes are that we JNC instead of JNOing, and we don't need
+the add $0x8000.  So in the 1 0 DO LOOP case, the thing pushed on top
+of the return stack will be -1, which will set the carry flag after
+one iteration.
+
+The Carry Approach In High-Level Forth
+--------------------------------------
+
+Suppose we wanted to implement that same approach in high-level Forth
+(although without the third address on the stack for LEAVE).  Instead
+of my ugly version:
+
+    : _loop r> r> 1+ r> 2dup xor
+        if >r >r dup c@ - >r exit then
+        2drop 1+ >r ;
+
+we could have the nicer
+
+    : (loop) r> r> 1 um+ 
+        if drop rdrop 1+ >r exit then    \ loop is done, or
+        >r dup c@ - >r ;                 \ jump back and continue loop
+
+in which the four normal-case instructions (mov add jno mov) of the
+assembly version have become nine Forth addresses: r> r> 1 um+ if >r
+dup c@ - >r.  (UM+ adds two numbers and leaves the carry on top of the
+sum on the stack.)  This is slightly shorter than the 10 we had
+before, and probably considerably more efficient, because (at least at
+the moment, in my toy Forth) many of the words in the old version are
+interpreted, while in this version, all but "1" are machine-code
+primitives.  The overall length of the thing also shortens from 19
+cells (or bytes, in my case) to 17.
+
+(do), however, gets very slightly hairier.  My current version is as
+follows:
+
+        defbytes _do            # 10 0 DO ... LOOP loops 0, 1...9.
+        ## This works by ( limit initial -- ) ( R: X -- X initial limit )
+        .byte b_swap, b_rpop, b_swap, b_rpush, b_swap, b_rpush
+        .byte b_rpush, b_exit
+
+(I'm writing the return stack effect with the top-of-stack on the
+left, which is unorthodox.)
+
+Which is like this:
+
+    : (do)  swap  r>  swap >r  swap >r  >r ;
+
+Now we want ( limit initial -- ) ( R: X -- X initial-limit limit ), so
+we have
+
+    : (do)  over -  swap  r>  swap >r  swap >r  >r ;
+
+So this approach doesn't change the total program size, but it might
+be faster.
+
+The Carry Approach Translated Into F21 Opcodes
+----------------------------------------------
+
+These "real" Forth definitions:
+
+    : (loop) r> r> 1 um+ 
+        if rdrop 1+ >r exit then
+        >r dup c@ - >r ;
+    : (do)  over -  swap  r>  swap >r  swap >r  >r ;
+
+would become something like this, in the four-instruction 20-bit words
+the F21 uses:
+
+    label (loop)  pop pop # nop 
+                  1
+                  nop + c0 nop     \ jump if no carry; IIRC need NOPs before +
+                  cont
+                  pop drop drop #  \ carry, so exit loop
+                  1
+                  nop + push ret   \ 
+    label cont    push dup A! @A   \ fetch jump offset
+                  + push ret nop   \ and return to it
+    label (do)    pop A! over com  \ save return address in A
+                                   \ no swap, must use over
+                                   \ com is bitwise not; no subtract
+                  # nop + nop      \ no increment either; must use literal?
+                  1
+                  \ now we have on data stack: limit initial-limit
+                  + over push push \ 
+                  drop A push ret  \ discard extra copy of limit, return
+
+Now, I've never written an actual F21 or even MuP21 program, so I may
+have inflated that by a factor of two or three.  (I'm not sure where
+jump targets are stored, for example, or in what format --- I assume
+as the next word --- or whether # and c0 and ret abort the instruction
+word, or whether there's a delay associated with memory references.)
+It's 14 20-bit words as I've written it, or 35 bytes, which is a
+reasonable code density --- my token-threaded Forth above makes it 27
+bytes, and it's probably a bit over 35 bytes of x86 machine code.
+
+But considering it from a speed point of view, it looks awful.  The
+common-case path through (loop) is 15 instructions, if I counted it
+correctly --- that's 30ns on a 500MHz F21.  While that compares
+reasonably with the time to do an empty delay loop on a 500MHz
+Pentium-II-class machine (my PIII Coppermine 700 runs x: loop x at
+8.6ns per iteration) it's a heck of a lot slower than straight-line
+execution.
+
+As it happens, looping is also a heck of a lot slower on my PIII.
+When I added four more instructions to that empty delay loop, it only
+slowed down by 3ns per iteration.
+
+So Chuck Moore isn't crazy after all.  He just prizes efficiency very
+highly.

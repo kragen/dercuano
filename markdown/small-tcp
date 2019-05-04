@@ -1,0 +1,160 @@
+Implementations
+---------------
+
+There are a few small TCP/IP implementations out there.  Most
+recently, the Viewpoints Research Institute "STEPS toward the
+reinvention of programming" project has just done a "TinyTCP",
+including IP and TCP. [0] Although they claim it is "well under 200
+lines of code" and provide some details about implementation
+techniques, it looks larger to me; see the section "TinyTCP" for
+details.
+
+There have been a number of small TCP/IP implementations before.  Adam
+Dunkels's 2001 "Miniweb", which is proprietary [1], supposedly
+implements a more or less working TCP, IP, and web server in about 400
+lines of C.
+
+Later, Dunkels wrote "uIP" and "lwIP", for "microIP" and "lightweight
+IP", which are complete and supposedly correct implementations of ARP,
+IP, UDP, and TCP. [2]
+
+TinyTCP
+-------
+
+I checked out TinyTCP r400 from Subversion:
+
+    svn co http://piumarta.com/svn2/idst/trunk/function/examples/tcp/
+
+In the resulting directory, I counted the number of unique source lines:
+
+    cat *.k *.st | sort -u | wc -l
+
+It counted 1270 lines of code, not "well under 200" as claimed.
+However, this includes the following (the listing is hand-annotated):
+
+    $ for x in *.k *.st; do printf "%30s " "$x"; sort -u "$x" | wc -l ; done
+                        boot.k 152 construct the default environment (C iface)
+                    net-icmp.k 25  ICMP implementation
+                      net-if.k 19  network pseudo interface
+                      net-ip.k 62  the IP implementation
+                     net-tcp.k 81  TCP packet structure
+                  quasiquote.k 53  quasiquotation as userland syntax
+                   structure.k 87  the packet structure ASCII art parser
+                        tcp2.k 78  TCP state machine, daytime, http
+                         tcp.k 47  smaller version of the above
+             Match-printing.st 74  COLA Smalltalk PEG parsing
+                      Match.st 221 more COLA Smalltalk PEG parsing
+     NetworkPseudoInterface.st 108 TUN/TAP network interface in C and Smalltalk
+                      parse.st 275 more PEG parsing
+                ParseStream.st 120 more PEG parsing
+
+So the part that specifically pertains to TCP/IP, and not a particular
+network interface, or the system as a whole, and that isn't
+duplicative, is much smaller:
+
+    $ sort -u net-icmp.k net-ip.k net-tcp.k structure.k tcp2.k | wc -l
+    311
+
+A bit over 311 lines of code.
+
+TCP Wrinkles
+------------
+
+TCP itself is defined in RFC 793, STD 7 [3], which dates from 1981.
+But a number of problems have been discovered in TCP since then and
+worked around.
+
+There's a full list of the specification documents in RFC 4614 [4]
+
+RFC 896: where the term "congestion collapse" comes from.
+
+http://64.233.169.104/search?q=cache:LGoJzUQCXH8J:www.welzl.at/research/publications/q2s-ntnu-2006-tcp.ppt+slow+start+nagle+syn+cookies&hl=en&ct=clnk&cd=10
+
+"Requirements for Internet Hosts -- Communication Layers"
+> http://tools.ietf.org/html/rfc1122
+
+"Known TCP Implementation Problems"
+> http://www.faqs.org/rfcs/rfc2525.html
+> http://tools.ietf.org/html/rfc2525
+
+Slow start.
+
+Congestion avoidance.  Increase congestion window by at most one
+segment per RTT.
+> http://tools.ietf.org/html/rfc2581 (TCP Congestion Control)
+(explains fast retransmit and fast recovery)
+
+RTT estimation: Jacobson's algorithm.
+> http://tools.ietf.org/html/rfc2988 (Computing TCP's Retransmission Timer, 2000)
+
+Jacobson, V. and M. Karels, "Congestion Avoidance and
+Control", 
+> ftp://ftp.ee.lbl.gov/papers/congavoid.ps.Z.
+
+Karn's algorithm.
+> http://en.wikipedia.org/wiki/Karn's_Algorithm
+
+SYN cookies.
+> http://cr.yp.to/syncookies.html
+> http://cr.yp.to/syncookies/archive
+
+Fast retransmit.
+
+Fast recovery.
+
+Nagle.
+
+Hard-to-predict initial sequence numbers.
+> http://www.faqs.org/rfcs/rfc1948.html
+
+Stuff To Leave Out
+------------------
+
+Miniweb optionally does slow start, but not ...
+
+SACK.
+
+PAWS.
+
+WSCALE.
+
+NAK.
+
+Path MTU discovery.
+
+ECN.
+
+Header prediction.
+
+Silly Window Avoidance.
+
+Delayed ACK.
+
+References
+----------
+
+[0] Viewpoints Research Institute Technical Report TR-2007-008, "STEPS
+Toward The Reinvention of Programming, First Year Progress Report,"
+Dec 2007; the TinyTCP work is documented in Appendix E, "Extended
+Example: A Tiny TCP/IP Done As A Parser (by Ian Piumarta)", p.44, and
+the section "A Tiny TCP/IP Using Non-Deterministic Parsing, by Ian
+Piumarta", p.17.
+> http://www.viewpointsresearch.org/pdf/steps_TR-2007-008.pdf
+
+[1] Adam Dunkels's Miniweb
+> http://www.sics.se/~adam/miniweb/
+
+[2]
+
+[3] Internet Society RFC 793, currently STD 7, "Transmission Control
+Protocol", by Jon Postel.
+> http://www.faqs.org/rfcs/rfc793.html
+
+[4] Internet Society RFC 4614, by M. Duke, R. Braden, W. Eddy,
+E. Blanton, 2006-09, "A Roadmap for Transmission Control Protocol
+(TCP) Specification Documents".
+> http://www.faqs.org/rfcs/rfc4614.html
+
+[5] Internet Society RFC 2581, "TCP Congestion Control", by Van
+Jacobson (?), 1999-04
+> http://www.faqs.org/rfcs/rfc2581.html

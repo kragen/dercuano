@@ -1,0 +1,105 @@
+Making a logic gate of a single MOSFET
+======================================
+
+If we interpret “connected to power supply” as a 1 bit and
+“unconnected to power supply” as a 0 bit, a single SPDT
+electromechanical relay can compute any of the following logic
+functions:
+
+1. Buffering and NOT, with the input signal and ground connected
+   across the winding and the power supply connected to the armature.
+   Of course this use of relays is what they were invented for and why
+   they’re called “relays”.
+
+2. AND and AND-NOT (abjunction), with a second input signal instead of
+   the power supply connected to the armature.
+
+This is in some sense very device-efficient, computing as it does two
+separate logic operations per relay.  With DPDT relays, you can
+compute even more.  This signaling scheme also permits arbitrary use
+of wired-OR, which means it’s eminently bus-compatible.
+
+Relays, being electromagnetic rather than electrostatic devices, are
+not troubled by floating inputs.  If we use a different signaling
+scheme, in which “connected to power supply” is 1 and “connected to
+ground” is 0, then the situation changes somewhat.
+
+1. Buffering connects the input signal and ground across the winding,
+   the power supply to the normally open contact, ground to the
+   normally closed contact, and the armature to the output.
+
+2. NOT is the same, but with the connections to the contacts reversed,
+   or alternatively with the input signal and the power supply
+   connected across the winding.  Making both changes converts the
+   relay back into a buffer.
+
+3. AND connects input signal A and ground across the winding, input
+   signal B to the normally open contact, and ground to the normally
+   closed contact.
+
+4. AND-NOT is the same, but with the contacts reversed, or the
+   connections to the winding reversed.
+
+5. XOR connects the two input signals to the two sides of the winding,
+   power and ground to the normally closed and normally open contacts
+   respectively, and the output to the armature.
+
+6. Reversing the power and ground on XOR gives you XNOR.
+
+7. OR can no longer be done with a wired-or; that’s a short.  But you
+   can connect input signal A and ground across the winding, power to
+   the normally-open contact, and input signal B to the normally
+   closed contact.
+
+8. I don’t see a way to build NAND or NOR as single relays in this
+   system; I think you need two separate relays to compute one of
+   them.
+
+You still want to use the other signaling scheme for buses, so you
+need a sort of level-shifter relay.
+
+CMOS logic
+----------
+
+Normal CMOS logic uses four MOSFETs per two-input NAND or NOR gate.
+Although this is very simple compared to a TTL gate, you could desire
+something more parsimonious if you’re going to build stuff out of
+discrete MOSFETs.  MOSFETs share with relays the property that when
+they are switched “on”, they have a low-resistance, electrically
+isolated, bidirectional path between the source and drain electrodes.
+Wouldn’t it be nice if you could use a single MOSFET as a
+multiple-input logic gate, rather than needing several of them?
+
+I haven’t been able to figure out a way to do this.  There are a
+few different obstacles.
+
+1. There’s nothing equivalent to the first signaling scheme, where one
+   of the bits is represented by letting the input float.  When a
+   MOSFET input is left to float, it capacitively retains whatever
+   value it had before, or possibly whatever capacitive charge is
+   induced on it by electrical fields in the vicinity.  You can of
+   course tie down all your MOSFET inputs with pullup or pulldown
+   resistors, but then you have at minimum two devices per gate, not
+   one.
+   
+2. MOSFET *outputs* are either connected to the input or left to
+   float.  That means that if you want to connect the output to one of
+   two different things (such as ground or Vdd, or ground and an input
+   signal) you need two MOSFETs, not one.
+
+3. MOSFET signaling voltages are somewhat troublesome;
+   enhancement-mode n-channel MOSFETs are turned off when the gate
+   voltage is the same as the source, and the “source” is really
+   whichever of the source and drain is more negative.  If you bring
+   the gate voltage up, it starts to allow current to flow.
+   Depletion-mode MOSFETs at first seem more promising, since you have
+   conduction until you apply a gate voltage to cut it off, but now
+   your gate voltage has to be *negative* compared to the source.
+
+I don't know if subthreshold behavior might have an answer; otherwise
+I suspect that single-MOSFET gates are not going to work.
+
+A MOSFET version of RTL, however, works quite easily, with [one MOSFET
+and up to a few resistors per gate][19].
+
+[19]: http://www.edn.com/design/analog/4440016/Single-MOSFET-circuits-gate---modulate

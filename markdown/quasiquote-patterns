@@ -1,0 +1,237 @@
+[Note added 2019: Darius Bacon is working on a pattern-matching
+dialect of Scheme called Squeam, and I may have gotten these ideas
+from talking with him about it.  It’s been long enough that I can’t
+remember for sure.]
+
+It occurred to me that if you wanted to write a tree-rewriting dialect
+of Lisp, you could use quasiquotation both for the pattern to match
+and the thing to rewrite it to.  For example, in David Andrew Kranz's
+1988 (1990?) dissertation, "Orbit: An Optimizing Compiler for Scheme,"
+he describes much of the CPS-conversion process in tree-rewriting
+rules such as the following:
+
+    (convert <atom> <cont>) => `(,<cont> ,<atom>)
+    (convert '(<proc> . <arguments>) <cont>) =>
+	(convert <proc>
+	    (lambda (p)
+	        ,(convert-arguments <arguments>
+		                    `(,p ,<cont>))))
+    (convert-arguments '() <final-call>) => <final-call>
+    (convert-arguments '(argument . rest) <final-call>) =>
+        (convert <argument>
+	    `(lambda (k)
+		 ,(convert-arguments <rest>
+				     (append <final-call> '(k)))))
+
+It seems to me that these could be written in a pattern-matching
+Scheme dialect as follows, without breaking backwards-compatibility:
+
+    (def (convert atom cont) `(,cont ,atom))
+    (def (convert (proc . arguments) cont)
+        (convert proc (lambda (p) ,(convert-arguments arguments
+						      `(,p ,cont)))))
+    (def (convert-arguments () final-call) final-call)
+    (def (convert-arguments (argument . rest) final-call)
+        (convert argument 
+	    `(lambda (k) ,(convert-arguments rest (append final-call '(k))))))
+
+(I'm using "def" as a synonym for "define" here.  Or maybe a
+pattern-matching extension thereof.)
+
+I suspect that the original syntax was not formally specified.
+
+Here are some more things specified in this style.
+
+    (def (length ()) 0)
+    (def (length (a . b) (+ 1 (length b))))
+    (def (append () a) a)
+    (def (append (a . b) c) `(,a . ,(append b c)))
+    (def (assv a ()) '())
+    (def (assv a ((a . b) . r)) `(,a . ,b))
+    (def (assv a ((x . y) . z)) (assv a z))
+    (def (delv a ()) '())
+    (def (delv a (a . b)) (delv a b))
+    (def (delv a (b . c)) `(,b . ,(delv a c)))
+    (def (eval ('var var) env) (cadr (assv var env)))
+    (def (eval ('lambda args body) env) `(,args ,body ,env))
+    (def (eval ('apply (func-args body func-env) args) env)
+        (eval body (augment-env func-args (eval-args args env) func-env)))
+    (def (eval ('if cond cons alt) env)
+        (if (is-true (eval cond env)) (eval cons env) (eval alt env)))
+
+Note the implicit pattern-matching equality tests in assv and delv.
+
+This syntax has the disadvantage that the symbol "quote" is treated
+specially, in order to support tagged things like the last bit.  I had
+considered using full quasiquote syntax, which avoids that problem,
+but it has two disadvantages: it's backwards-incompatible with
+Scheme's current syntax, and worse, it's more verbose.
+
+(It also lacks a way of requiring, in the pattern, that a particular
+item be just a plain symbol, rather than a list or an array or
+something.  You could specify, say, "unquote" or "symbol" to mean this,
+and write (symbol x) or ,x to mean "some x, which is required to be a
+symbol".)
+
+If you add special treatment for the symbol "..." to the declaration
+syntax, as in the Scheme macro system, then you get an arguably
+superior syntax for list tails with a special secret feature.
+
+    (def (append () x) x)
+    (def (append (x xs ...) y) `(x . ,(append xs y)))
+    (def (assv a ()) '())
+    (def (assv x ((x xs ...) zs ...)) `(x . xs))
+    (def (assv x ((y ys ...) zs ...)) (assv x zs))
+    (def (delv x ()) '())
+    (def (delv x (x xs ...)) (delv x xs))
+    (def (delv x (y ys ...)) `(,x . ,(delv x ys)))
+
+The special secret feature is that it generalizes to some kinds of
+restructuring:
+
+    (def (augment-env () () env) env)
+    (def (augment-env (var vars ...) (val vals ...) env)
+	 (augment-env vars vals `((,var . ,val) . ,env)))
+
+(The above definitions of augment-env, assv, and eval constitute a
+complete interpreter for a Turing-complete language.)
+
+Pattern-matching simplifies writing compilers in general.  Here's a
+compiler into the language above from a subset of Scheme:
+
+    (def (compile ('lambda vars body)) `(lambda ,vars ,(compile body))))
+    (def (compile ('if cond conseq alt)) `(if ,cond ,conseq ,alt)))
+    (def (compile (f args ...)) 
+	 `(apply ,(compile f) ,(compile-args args)))
+    (def (compile-args ()) '())
+    (def (compile-args (arg args ...)) 
+	 `(,(compile arg) . ,(compile-args args)))
+    (def (compile x) `(var ,x))  ; or (def (compile (symbol x)) `(var ,x))
+
+Here's a little recursive-descent compiler for the following grammar.
+(Our input strings here are Lisp lists.)
+
+    mul-expr  ::= atom-expr * mul-expr | atom-expr / mul-expr | atom-expr
+    atom-expr ::= <number> | <symbol> | (expr)
+    expr      ::= mul-expr + expr | mul-expr - expr | mul-expr
+
+Each parse routine takes a suffix of the whole input string, and
+returns a list of two lists: the compiled version of what it parsed,
+and the remaining suffix.
+
+    (def (compose-parser inner outer tokens)
+	 ((lambda ((inner-result leftovers))
+	    `(,(outer inner-result) ,leftovers))
+	  (inner tokens)))
+    (def (parse-atom ((expr) stuff ...)) `(,(parse expr) ,stuff))
+    (def (parse-atom (x stuff ...))
+	 `(,(if (symbol? x) `(var ,x) `(const ,x)) ,stuff))
+    (def (parse-expr stuff) (parse-expr-tail (parse-mul-expr stuff)))
+    (def (parse-expr-tail (compiled ('+ rest ...)))
+	 (op-node '+ compiled rest parse-expr))
+    (def (parse-expr-tail (compiled ('- rest ...)))
+	 (op-node '- compiled rest parse-expr))
+    (def (op-node op compiled rest inner)
+	 (compose-parser inner
+			 (lambda (parsed-rest) `(,op ,compiled ,parsed-rest))
+			 rest))
+    (def (parse-expr-tail (compiled other)) `(,compiled ,other))
+    (def (parse-mul-expr stuff) (parse-mul-expr-tail (parse-atom stuff)))
+    (def (parse-mul-expr-tail (compiled ('* rest ...)))
+	 (op-node '* compiled rest parse-mul-expr))
+    (def (parse-mul-expr-tail (compiled ('/ rest ...)))
+	 (op-node '/ compiled rest parse-mul-expr))
+    (def (parse-mul-expr-tail (compiled other) `(,compiled ,other)))
+
+That's pretty ugly!  And it doesn't even quite compile into RPN; you
+still need this:
+
+    (def (rpnify ('+ a b)) (rpnify-op '+ a b))
+    (def (rpnify ('- a b)) (rpnify-op '- a b))
+    (def (rpnify ('* a b)) (rpnify-op '* a b))
+    (def (rpnify ('/ a b)) (rpnify-op '/ a b))
+    (def (rpnify-op op a b) (append (rpnify a) (append (rpnify b) `(,op))))
+    (def (rpnify ('var x)) `(var ,x))
+    (def (rpnify ('const x)) `(const ,x))
+
+That's kind of ugly in its runtime; a cleverer implementation would
+walk the op tree from right to left, passing along an accumulator of
+ops as it went:
+
+    (def (walk ('+ a b) ac) (walk-op '+ a b ac))
+    (def (walk ('- a b) ac) (walk-op '- a b ac))
+    (def (walk ('* a b) ac) (walk-op '* a b ac))
+    (def (walk ('/ a b) ac) (walk-op '/ a b ac))
+    (def (walk-op op a b ac) (walk a (walk b `(,op . ,ac))))
+    (def (walk ('var x) ac) `((var ,x) . ,ac))
+    (def (walk ('const x) ac) `((const ,x) . ,ac))
+
+I should probably write a version that does that in a single pass.
+But first!  Something to run the pattern-matching.  
+(match pattern actual bindings).
+
+    (def (match () () vars) vars)
+    (def (match () other vars) #f)
+    (def (match ('quote x) x vars) vars)
+    (def (match ('quote x) other vars) #f)
+    (def (match ('symbol x) (symbol y) vars) (match x y vars))
+    (def (match ('symbol x) other vars) #f)
+    (def (match (ap . bp) (a . b) vars)
+	 (let ((new-vars (match ap a vars)))
+	      (if new-vars (match bp b new-vars))))
+    (def (match (ap . bp) other vars) #f)
+    (def (match (symbol x) y vars) `((,x . ,y) . ,vars))
+
+That leaves out the equality-testing logic --- in both the ('symbol x)
+and the (symbol x) cases, we need to verify that there's no existing
+conflicting binding for x.
+
+Recasting that (mostly) in a form that doesn't rely on
+pattern-matching:
+
+    (define (match pattern actual vars)
+      (cond ((null? pattern) (match-null actual vars))
+	    ((symbol? pattern) (match-symbol pattern actual vars))
+	    ((pair? pattern) (match-pair pattern actual vars))
+	    (else (error "invalid pattern"))))
+    (define (match-null actual vars) (if (null? actual) vars #f))
+    (define (match-symbol pattern actual vars)
+      `((,pattern . ,actual) . ,vars)) ; XXX doesn't check for dups
+    (define (match-pair pattern actual vars)
+      (cond ((eq? (car pattern) 'quote) 
+	     (and (equal? (cadr pattern) actual) vars))
+	    ((eq? (car pattern) 'symbol)
+	     (and (symbol? (cadr pattern)) 
+		  (match (cadr pattern) actual vars)))
+	    (else 
+	     (let ((new-vars (match (car pattern) (car actual) vars)))
+	       (if new-vars (match (cdr pattern) (cdr actual) new-vars) #f)))))
+
+And here's a fix to match-symbol that does equality testing:
+
+    (define (match-symbol pattern actual vars)
+        (let ((existing (assq pattern vars)))
+	  (cond ((not existing) `((,pattern . ,actual) . ,vars))
+		((equal? (cdr existing) actual) vars)
+		(else #f))))
+
+From there, it's a simple extension to supporting multiple patterns:
+
+    (define (match-many patterns functions actual)
+      (if (null? patterns) (error "match failure")
+	(let ((bindings (match (car patterns) actual '())))
+	  (if bindings ((car functions) bindings)
+	    (match-many (cdr patterns) (cdr functions) actual)))))
+
+Ideally we'd really like to compile the pattern-matching down to
+efficient Scheme code which does a reasonably small number of tests
+and doesn't re-examine the pattern as well as the actual, each time
+around.  I don't think I'm quite up for that yet.
+
+Unsurprisingly, this is not a new idea; Andrew K. Wright's 1996
+proposal for pattern-matching in Scheme uses a slight superset of this
+pattern syntax, with the same semantics.  (I switched to using equal?
+instead of eqv? in the above code after reading his paper.)  However,
+I think it's interesting to allow definition of new cases on existing
+functions this way, rather than shoving it off into a "match-define"
+ghetto as Wright does.

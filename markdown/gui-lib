@@ -1,0 +1,115 @@
+So I was thinking about what’s needed to make a GUI library.  You can
+get a substantial amount of it out of this piece of `propfont.c`:
+
+    /* This is sort of like a two-dimensional, dynamically-typed pointer
+     * into pixels.
+     */
+    typedef struct {
+      char *pixels;
+      int pixel_bytes, line_stride;
+    } pixel_buf;
+
+    static inline char *index_pixbuf(pixel_buf buf, int x, int y) {
+      return buf.pixels + y * buf.line_stride + x * buf.pixel_bytes;
+    }
+
+    static inline pixel_buf offset_pixbuf(pixel_buf buf, int dx, int dy) {
+      pixel_buf result = {
+        index_pixbuf(buf, dx, dy),
+        buf.pixel_bytes,
+        buf.line_stride,
+      };
+
+      return result;
+    }
+
+    static inline void fill_pixbuf(pixel_buf buf, char *ink, int w, int h) {
+      for (int x = 0; x < w; x++) {
+        memcpy(index_pixbuf(buf, x, 0), ink, buf.pixel_bytes);
+      }
+
+      for (int y = 0; y < h; y++) {
+        memcpy(index_pixbuf(buf, 0, y), index_pixbuf(buf, 0, 0), w * buf.pixel_bytes);
+      }
+    }
+
+That doesn’t give you clipping, but with those 23 lines of code, any
+function that takes a `pixel_buf` parameter can be persuaded to draw
+at any position on a BIP pixel buffer of the pixel format it’s
+expecting.  You could enhance it to track right and bottom edges of
+rectangular windows with another couple of lines of code, which would
+make `fill_pixbuf` more convenient to call in many cases.  And it’s
+going to be pretty efficient.
+
+However, if you write a windowing system on top of primitives like
+these, whether structured-mode or immediate-mode, you are probably
+going to end up with a kind of 1980s-looking window system with no
+antialiasing or transparency that’s entirely immune to hardware
+acceleration, although if you avoid overdraw, you might be able to
+manage reasonable frame rates anyway.  Nowadays, we can do better!
+
+Modern GUIs have transparency (alpha), gradients, rotation and
+distortion, filtering, béziers, antialiasing, animation, and terrible
+performance.  I think we can do better.
+
+First, both 1980s and modern GUIs almost entirely lack texture.  But
+texture is a ubiquitous attribute of actual physical objects, and
+serves to orient us to movement in a subtle way.  It also has a
+tendency to reduce the visual impact of dirt on the display or RF
+interference on the video signal.
+
+Second, both 1980s and modern GUIs are still mostly oriented toward
+paraxial rectangles, and don’t have indirect illumination (with the
+exception of drop shadows in modern GUIs on text and elevated
+windows).  This orientation robs us of a lot of the structural cues
+we’re familiar with from the physical world.  They also don’t take
+advantage of the possibility of zooming, in part because of font
+hinting and slow rasterization.
+
+Third, 1980s GUIs, modern GUIs, and web UIs all lack a great deal
+compared to traditional typesetting, from a certain point of view.
+They lack letterform variation, columnar layout and horizontal
+scrolling, reasonable hyphenation and justification, hanging
+punctuation, tactile interface, line width variation, and so on.  Of
+course, they’re dramatically better from other points of view: better
+contrast ratios, animation, interactivity, undo, generativity, and so
+on.
+
+There’s an additional, somewhat selfish question associated with all
+of this, which is that if you reimplement the standard WIMP interface,
+it’s easy for people who see it to dismiss it as unoriginal or even a
+copy of existing software with the labels filed off.  (Many internet
+commenters carelessly dismissed Biyubi Fénix as a knockoff of
+KolibriOS/Menuet, for example, apparently without looking at it.)  So
+even if you can’t do something *better*, doing something *different*
+is significant.
+
+So what might that look like?
+
+I frequently hear surprised noises when I turn on my computer with a
+full-screen shell window.  Old people sometimes mistake it for MS-DOS,
+but young adults were born around 1995, after MS-DOS was already
+obsolete.  Here in Argentina, many of them didn’t even use computers
+until after 2000.
+
+Most people have still never seen a ZUI (with the possible exception
+of Prezi), and so simple “infinite” zooming is one way to distinguish
+it.  It also lends itself to animations easily, which is in fact part
+of Prezi’s appeal.
+
+Windowing systems (and the underlying VT100 emulation) are a poor fit
+for shell commands; you have the tendency to open new windows to run
+new commands before the old one is done, but then it’s hard to find
+the old one.  A sort of notebook interface would work better, where
+you always immediately get a new prompt, and the output for previous
+commands can expand *above* your current prompt; perhaps it should be
+truncated by default, like with a dynamic `head; tail` that also
+outputs `wc`.  (If it gets too large, you might want to either block
+the process generating it or discard parts of it.)  Then you can also
+take that data and feed it to a new process, without having to
+re-execute the old one.
+
+Furthermore, in many cases alternate presentations are possible:
+numeric tables, barcharts, scatterplots; Bret Victor’s work with Dan
+Amelang has shown some of the possibilities of this kind of
+visualization, along with incremental dataflow tracing.

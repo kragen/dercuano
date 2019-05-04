@@ -6,7 +6,7 @@ many fascinating facts about the world (many of which are true, and a
 few of which are original observations), and a wide variety of
 inventive ideas about what is possible and what could be done, in
 particular ideas about how to improve the world with new hardware and
-software — a few of them workable.  I've published little of it
+software — a few of them workable.  I’ve published little of it
 previously.
 
 Disclaimer, preface, and warning
@@ -45,11 +45,14 @@ lost even what understanding I had.  Nearly every note is incomplete;
 of those that are complete, very few have been checked for correctness
 or revised for readability.  So, beware.
 
+Many of the dates are only approximate.
+
 ### Size and public-domain dedication ###
 
-On 2019-05-01 as I write this, the Dercuano tarball is 960 kilobytes
-and contains almost 400,000 words in 126 notes, about 1300 paperback pages’
-worth of text.  This is about a fifth of the total amount
+On 2019-05-04 as I write this, the Dercuano tarball is 1.2 megobytes
+and contains almost 475,000 words in 185 notes,
+about 1600 paperback pages’
+worth of text.  This is about a quarter of the total amount
 of text I have here and intend to include.  I’m still importing notes
 to add to it.
 

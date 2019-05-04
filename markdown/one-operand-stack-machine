@@ -1,0 +1,323 @@
+Zero-operand stack machines pack lots of operations per byte, since
+each instruction is only five or six bits, but typically they need
+close to twice as many fundamental operations as register machines.
+This makes register “bytecode” like that of Lua less memory-dense, but
+it has lower interpretive overhead.  The Mill CPU architecture uses a
+“belt”, a fixed-size random-access history of the last few
+instructions’ results, to eliminate the need for register machines to
+specify destination registers in most instructions, but source
+registers are still necessary.
+
+Register machines have much better code density than pure
+memory-to-memory machines like Chifir.  They don’t need a lot of
+registers to get much better code density; at eight registers you
+occasionally spill to memory, and at sixteen (like amd64) you almost
+never do.
+
+The reason stack machines use more operations is that they have to use
+extra operations to get the operands into place to operate on them.
+In the common case, the things you want to operate on are right on top
+of the stack and are only used once, but often enough, they are not.
+
+Implementations of stack machines often use registers — physical bits
+of silicon, unless you’re doing this in software on top of a hardware
+substrate that does register renaming — for the top item or two of the
+stack.  You have a “TOS” register, “top of stack”, and maybe a “NOS”
+register, for “next on stack”.  Then, at RTL, the effect of an
+operation like `+` is something like this:
+
+    TOS ← TOS + NOS
+    NOS ← pop_overflow_stack()
+
+The operation OVER, which pushes a copy of NOS, becomes:
+
+    push_overflow_stack(NOS)
+    TOS ← NOS
+
+In i386 assembly, if you use %eax as TOS, %edx as NOS, and %esp to
+point to the overflow stack, these become:
+
+    plus: add %edx, %eas
+          pop %edx
+          NEXT
+    over: push %edx
+          xchg %eax, %edx
+          NEXT
+
+In a hardware implementation, the TOS and NOS registers can be
+directly wired to the ALU, avoiding propagation delays from the
+multiplexers that would otherwise be needed.
+
+The basic idea
+--------------
+
+As an alternative to pure stack or register machines, you could
+imagine having several alternate TOS registers, each selected for the
+duration of a single instruction.  If you had four possible TOS
+registers, you would need two bits in the instruction.  Maybe that
+would eliminate a sufficiently large fraction of the five-bit stack
+operations that it would be a win.
+
+The circle midpoint algorithm as example code to try designs with
+-----------------------------------------------------------------
+
+Consider this Python implementation of (some variant of) the midpoint
+algorithm for drawing circles:
+
+    def mid(r):
+        # `e` is always x² + y² - r²
+        x, y, e = r, 0, 0
+        while x > y:
+            if e > 0:
+                e -= x + x - 1
+                assert e <= 0
+                x -= 1
+
+            yield x, y
+
+            # For efficiency you could fold this into the above update of
+            # `e` in the decrementing-`x` case.
+            e += y + y + 1
+            y += 1
+
+### On a stack machine ###
+
+If rendered more or less directly into ANS Forth, I think this comes
+out as follows:
+
+    \ `e` is always x² + y² - r²
+    variable x  variable y  variable e  variable r
+    : mid
+        dup r ! x !  0 y !  0 e !
+        begin x @ y @ > while
+            e @ 0> if
+                x @ dup + 1- negate e +!
+                e @ 0 <= assert
+                x @ 1- x !
+            then
+
+            x @ y @ yield
+
+            \ For efficiency you could fold this into the above update of
+            \ `e` in the decrementing-`x` case.
+            y @ dup + 1+ e +!
+            y @ 1+ y !
+        repeat
+    ;
+
+Now, aside from `yield` and `assert` not existing normally, and aside
+from the question of whether you should maybe refactor this into
+smaller functions and maybe store the variables in a struct or
+something, this Forth is a bit more memory-access-heavy than it needs
+to be.  It leaves both stacks empty at the end of each line.  This is
+the easiest way to write Forth, because it completely avoids the
+temptation to get tricky with what you have on the stacks.
+
+But let’s see if we can maybe make it a bit more compact by storing
+*one* of its four variables on the stack.  `e`, say.  Also, we can get
+rid of r, because we never use it except to initialize x.
+
+    variable x  variable y
+    : mid
+        x !  0 y !  0
+        begin x @ y @ > while
+            dup 0> if
+                x @ dup + 1- -
+                dup 0 <= assert
+                x @ 1- x !
+            then
+
+            x @ y @ yield
+
+            y @ dup + 1+ +
+            y @ 1+ y !
+        repeat
+    ;
+
+This is a little more compact and less memory-intense.  We can go
+further and store `x` on the stack underneath `e`, compacting further:
+
+    variable y
+    : mid4
+        0 y !  0
+        begin over y @ > while
+            dup 0> if
+                over dup + 1- -
+                dup 0 <= assert
+                swap 1- swap
+            then
+
+            over y @ yield
+
+            y @ dup + 1+ +
+            y @ 1+ y !
+        repeat
+    ;
+
+This is a little opaque for my taste, but it’s not too unrealistic.
+In Forth itself, we could go further and store `y` on the return
+stack, but in this case I’m just using Forth as an example stack
+machine that I can conveniently test code on.
+
+The above subroutine contains 39 instructions:
+
+* 9 immediate constants, 6 of which are `y` and the other 3 of which are 0;
+* 6 memory accesses, which are 2 stores to `y` and 4 fetches from `y`;
+* 2 calls to other functions (`assert` and `yield`);
+* 9 stack manipulations, which are 3 `over`s, 2 `swap`s, and 4 `dup`s;
+* 9 ALU operations, which are 2 comparisons, 4 `+`s and `-`s, and 3
+  `1+`s and `1-`s.
+* 4 control-flow instructions, consisting of two conditional jumps
+  (`if` and `while`), one unconditional jump (`repeat`), and one
+  subroutine return (`;`).
+
+How big is this?
+
+If we figure that the base instruction opcodes cost 5 bits each, the
+function calls and immediate constants cost another 16 bits each, and
+the jumps cost another 5 bits for the jump offset, then the total is
+(+ (\* 39 5) (\* (+ 9 2) 16) (\* 3 5)) = 386 bits, or 49 bytes.  (We
+could probably tweak that a bit, but it’s easy for that to amount to
+overfitting to this function; instead I would argue that this is a
+reasonable, if imperfect, estimate.)
+
+### On a two-operand register machine ###
+
+Let’s consider what it would look like in a two-operand register
+machine instead.  Suppose we have registers A, B, C, D, E, F, G, and
+H, so that we need three bits to specify a register operand; and let’s
+say that registers A and B hold the first two arguments to a function.
+Then it might look like this.
+
+    mid:    B ^= B      ; Y; sets Y to 0 with XOR
+            E ^= E
+      loop:   C := B
+              C -= A    ; X
+              JPZ done  ; jump if positive or zero
+              C ^= C
+              C -= E
+              JPZ else  ; skip the following if E > 0
+                E -= A
+                E -= A
+                E++
+                C ^= C
+                C -= E
+                C := ispz(C)  ; an instruction like i386 LAHF
+                call assert
+                A--
+      else:   C := A      ; Let’s say our VM autosaves registers; it still needs
+              call yield2 ; space for yield to maybe return at least one value!
+              A := C      ; So we manually restore A.
+              E += B
+              E += B
+              E++
+              B++
+            JMP loop
+    done:   return
+
+This is only 25 instructions, which is a lot less interpretive
+overhead (although of course what matters in that case is not how many
+instructions are in memory but how many are executed), but each of
+them is bigger.  We’re down to only two immediate constants, we still
+have three 5-bit jump offsets, and let’s suppose that our opcodes
+still need 5 bits even though we don’t need stack manipulation
+operations any more, and that the 3-bit register-number fields are
+present even in instructions like ++ and jumps that don’t need them.
+So we’re down to (+ (\* 25 (+ 5 3 3)) (\* 3 5) (\* 2 16)) = 322 bits, or
+41 bytes.
+
+(This is clashing somewhat with my experience that stack machines in
+general and Forth in particular usually have very compact code,
+but...)
+
+### On a hybrid one-operand stack machine with four TOS registers ###
+
+Now let’s suppose we have four alternate TOS registers A, B, C, and D,
+and each of the machine’s primitive operations is suffixed with the
+name of the register it uses for the top of stack.  We can assign A to
+X, B to Y, and C to E, and suppose that our argument is passed in A.
+
+To get a value onto the stack lower down, which is “shared” in the
+sense that all the levels below the top use the same stack, we can use
+dupA, dupB, and so on.
+
+I’m supposing here that yield2 takes A and an argument from the stack
+below it, and consumes them both, leaving in A whatever was below
+that, and that it is careful to preserve the other registers.  To
+preserve all those registers itself, it explicitly saves them onto the
+stack at entry.
+
+    : mid
+        dupB dupB -B  dupC dupC -C  dupD
+        begin dupA dupB dropD >D while
+            dupC 0>C if
+                dupA dropD dupD +D 1-D swapC -C
+                dupC dupC dupC -C <=C call(assert)
+                1-A
+            then
+
+            dupA dupB call(yield2)
+
+            dupB dupB +C +C 1+C
+            1+B
+        repeat
+        dropD dropC dropB dropA
+    ;
+
+That's 44 instructions, up from 39, and way bigger than 25, which is
+kind of terrible.  This is not what I expected.  But there are no more
+immediate constants, except for the call destinations.  Now it’s 44
+7-bit instructions, plus two (let’s say) 16-bit call destinations and
+three five-bit jump offsets: (+ (\* 44 7) (\* 2 16) (\* 3 5)) = 355 bits.
+Intermediate in density (though maybe that’s only because of not using
+immediate zeroes this time), but unnecessarily slow.
+
+But the code is actually kind of fucking terrible and awkward.  It’s
+easy to inadvertently clobber and super awkward to bring together two
+values in two different registers.
+
+What if we invert the idea?
+
+### On a hybrid one-operand stack machine with 1 TOS register and 4 stacks ###
+
+Let’s suppose that instead of registers A, B, C, and D, we have
+*stacks* A, B, C, and D (very vaguely similar to Bernd Paysan’s 4stack
+processor), which share a common TOS register.  Then we can store `x`
+in, say, the TOS register (saving it to A when necessary), `y` in the
+NOS of B, and `e` in the NOS of C.  Is that better?
+
+Now we can use overB or overC to access the value at the top of stacks
+B or C, or alternatively dropB or dropC if we want to discard the
+value in TOS at the same time.  dupB or dupC pushes a new value onto
+those stacks.
+
+To make our lives easier, let’s store a 0 on D.
+
+Here’s an almost certainly buggy but probably roughly correctly sized
+implementation:
+
+    : mid
+        dupA  dupA -A  dupC  dupD  dropA
+        begin  dupA overB >B while
+            dupC 0>C if
+                dupA dupA +A 1-A -C
+                dupC dupD <=C call(assert)
+                1-A
+            then
+
+            dupA dupB call(yield2)
+
+            dupB dupB +C 1+C
+            1+B
+        repeat
+        dropD dropC dropB dropA
+    ;
+
+That’s 37 instructions, all of which are 7 bits, except for the two
+calls and three jump offsets; (+ (\* 37 7) (\* 3 5) (\* 2 16)) = 306
+bits, or 39 bytes.
+
+It still feels super bug-prone, since I’m trying to figure out at
+which moments X is in TOS and when it’s on stack A.
+
+This is better than the register machine, but only by 16 bits.

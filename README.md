@@ -17,12 +17,14 @@ Status
 
 I’ve been hacking on this thing for 24 hours,
 which means that at this point it’s gone from an “afternoon hack”
-to a “weekend hack”, and now it’s looking kind of okay actually.  I have about
+to a “week-long hack”, and now it’s looking kind of okay actually.  I have about
 1200 individual notes to stick in here, totaling almost 5 megs
 compressed.  I
 am about three or four doublings away from finishing the job;
-the last doubling, adding 46 documents, took less than three hours, but
-the last doubling, adding 21 documents, took six hours,
+the last addition, adding 50 notes, took four hours, while
+the last doubling, adding 46 documents, took less than three hours,
+though
+the previous doubling, adding 21 documents, took six hours,
 though only the last hour was adding documents;
 the previous one, adding 11 documents, took three hours;
 the doubling (well, near tripling) before that
@@ -57,4 +59,8 @@ Time log
 2019-04-28 22:13 to 22:45 (½ hour): add start and end dates to notes  
 2019-05-01 00:00 to 01:00 (1 hour): add 9 more notes, tweak CSS
 2019-05-01 10:00 to 12:00 (2 hours): add 19 more notes, change sort order, add author to pages
+<<<<<<< HEAD
 2019-05-01 18:40 to 19:20 (½ hour): try to hack together a Bayesian classifier for new notes
+=======
+2019-05-04 14:00 to 18:00 (4 hours): add 50 more notes
+>>>>>>> 79c2175... Add 50 new notes

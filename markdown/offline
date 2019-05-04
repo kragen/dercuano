@@ -1,0 +1,309 @@
+What currently existing datasets would most effectively use the
+capacity of a modern laptop disk, if it was going to be disconnected
+from the internet?  What would most powerfully augment its possessor?
+
+ 8.4 GiB: Project Gutenberg 2010 DVD, 29,500 ebooks, most pre-1921 English lit  
+12.5 GiB: Debian 7.0.0 amd64 DVD images, all free software in Debian, compiled  
+34.1 GiB: Debian 7.0.0 source DVD images, the source for the same software  
+ 9.7 GiB: the articles in the English Wikipedia, an overview of all knowledge  
+13.2 GiB: StackExchange dumps, all common technical questions with answers  
+19.9 GiB: Planet.osm, a map of most of the streets and rail lines in the world  
+ 6.8 GiB: Open Library latest dump, bibliographic data on all published books  
+15.0?GiB: Freebase in Turtle RDF, a unified database about everything known  
+20.0 GiB: wikileaks-files-20100612.tar, Wikileaks Full Archive, including cables  
+________  
+139.6GiB: total
+
+<http://aws.amazon.com/datasets> lists a number of freely-available
+datasets on Amazon S3; not only can you download them directly from
+there, but you can also fire up an EC2 machine with gratis network
+access to them in order to analyze them, extract relevant parts, and
+summarize and compress.  For example, the 2.2 terabyte Google N-Grams
+corpus is available, and you could quite reasonably fire up a machine
+to fetch all the 3-grams that occurred more than 5 times and return
+them in a compressed format.  (A particularly interesting free dataset
+is the 81-terabyte Common Crawl Corpus, containing 5 billion crawled
+web pages.)
+
+<http://arxiv.org/help/oa/index> describes the arXiv Open Archives
+Initiative interface, which is suitable for bulk-downloading of all
+abstracts of the 850 000 papers in the arXiv (essentially all
+significant current math and physics papers, and a smaller but still
+significant fraction of other academic papers.)  In 2010, [the papers
+totaled 200GiB][0], but there was no bulk download interface publicly
+available.  Later, <http://arxiv.org/help/bulk_data_s3> explains that
+they are now available in S3, including both the source LaTeX and the
+rendered PDF versions.
+
+[0]: http://liblicense.crl.edu/ListArchives/1010/msg00073.html
+
+Citeseer has a bibliographic record for the majority of scientific
+publications in any field, including pointers to online versions of
+the articles where available.  They, like the arXiv, support the OAI
+for bulk downloading of this data.  There seems to be a dump from 2010
+in <http://www.cs.purdue.edu/commugrate/data/citeseer/>, which looks
+like it might be around a hundred megs compressed.
+<http://www.hrstc.org/node/33> explains how to do an OAI bulk download
+and reports that, as of 2009, it ended up as about 500MB of
+uncompressed XML.
+
+IMDB has bulk downloads available, and I guess movies are pretty
+popular: <http://www.imdb.com/interfaces>.  The data isn't free, but
+it's available for some uses.  It looks like it's a gigabyte or two.
+
+Project Gutenberg has gone from 30 000 titles to 43 000 since 2010,
+and many of the new titles and versions include illustrations, but I
+don't know where to do a bulk download of all of this data.  It has a
+substantial number of non-English books these days, too.
+
+<http://datahub.io/>, organized by the Open Knowledge Foundation, has
+a collection of already-structured datasets, but most of them are
+small and they are somewhat spammy.
+<http://www.infochimps.com/datasets> is another similar, but
+apparently somewhat better, collection.
+
+<http://dbpedia.org/About> is an effort to extract structured data
+from Wikipedia, which has substantial overlap with Freebase.  Shallow
+discussion of the relationships between the two projects can be found
+at <http://wiki.freebase.com/wiki/DBPedia> and
+<http://www.google.com/url?sa=t&rct=j&q=dbpedia%20freebase&source=web&cd=3&ved=0CD0QFjAC&url=http%3A%2F%2Fblog.dbpedia.org%2Fcategory%2Finter-linkage%2F&ei=mU_aUZqYF6iXiQKJwoCoDw&usg=AFQjCNHcf8Bti6uQcqv-aDUjwG4lg_YY7A&bvm=bv.48705608,d.cGE&cad=rja>.
+Among the interesting sub-datasets in DBpedia are "bijective
+inter-language links", "short abstracts", and "geographic
+coordinates".  I can't tell how big the whole DBpedia dataset is, but
+it looks like it should be a few gigabytes.  It also sort of looks
+like the project is faltering, since the latest DBpedia release is at
+<http://downloads.dbpedia.org/3.8/en/?C=S;O=A>, and it's a year old,
+despite their quarterly release schedule.
+
+<http://www.clearbits.net/torrents/680-california-learning-resource-network-textbooks>
+is among the interesting things on ClearBits other than StackExchange;
+it's 0.8 gigabytes of supposedly high-quality secondary-school
+textbooks in English, called the California Learning Resource Network
+Textbooks, from the California Free Digital Textbook Initiative.
+Another 0.3 gigabytes at
+<http://www.clearbits.net/torrents/158-physics-textbooks> covers
+secondary-school physics.
+
+There's a couple of attempts to put the Khan Academy in an
+offline-accessible form.  One is [Khan Academy on a Stick][1], which
+is just a 16GiB selection of 2000 English video lectures, and a
+similar set of 800 in Spanish.  A much more ambitious project is
+[KA-Lite][2], which includes exercises, progress tracking,
+multilingual subtitles, and the ability to make your own selection of
+videos; I don't have a clue how much space this stuff takes up, aside
+from the videos, but I imagine not much on the scale we're talking
+about here.
+
+[1]: http://khan.mujica.org/
+[2]: http://kalite.learningequality.org/
+
+<http://www.clearbits.net/torrents/571-fsi-mandarin-chinese---complete-course>
+is a public-domain Mandarin Chinese course in 1.6 GiB.
+
+GenBank is the NIH's annotated collection of all publicly available
+DNA sequences.  [A 200GiB 2009 snapshot of GenBank][3] is on S3.
+
+[3]: http://aws.amazon.com/datasets/2261
+
+<http://earthobservatory.nasa.gov/Features/BlueMarble/> has a
+500-meter-resolution true-color map of the earth made from MODIS
+satellite data, with month-by-month composites.  This could be a nice
+supplement to OpenStreetMap data, but I'm having a bit of a hard time
+downloading it.  Calculations suggest that in JPEG form it should be
+about 9 gibibytes, since each world coverage should be about 0.7
+gibibytes.  Now that Landsat data is open-access, and even available
+in pre-downsampled form, it should be straightforward to produce a
+higher-resolution version; if we budget 20 GiB, to be comparable in
+weight to the OpenStreetMap planet.osm data, we could manage about
+100-meter resolution.  If you were more judicious, you could skip the
+100-meter resolution on open water and use data down to Landsat's
+15-meter resolution limit in areas the OSM data shows to be dense.
+
+<http://geonames.org/> is a CC-BY collection of eight million place
+names, with coordinates, which is a lot more than you can get from
+Wikipedia.  I think it's about a gigabyte.
+
+Not all the software in Debian is adequately documented within Debian
+itself.  In particular, Debian includes no tutorial for C, as far as I
+know, although I am pleasantly surprised to find that the
+`c++-annotations` package contains a tutorial for C++ for people who
+already know C; and the RFCs that document much of what you need to
+know about networking are relegated to the "non-free" Debian
+repository, which is not included on the DVD images.  I have no idea
+how big non-free is.
+
+I think the WikiLeaks snapshot (from 2010, when they were having a
+hard time keeping the site up in the face of censorship attempts from
+the USG) includes the full Cablegate file only in encrypted form.
+After David Leigh negligently published the encryption key in a book,
+WikiLeaks re-released the full, but censored, Cablegate archive (only
+0.6 GiB) at <magnet:?xt=urn:btih:AUHKVFRXREM7DCVK54MBDBGHQNPHLG5J>.
+These leaked US diplomatidc cables have been a major primary source
+for journalists writing new articles over the last few years, as well
+as a major source of civil unrest in US "allies".
+
+A similarly important set of primary sources may be WikiSource.  The
+English Wikisource dump is currently 1.3GiB
+<http://dumps.wikimedia.org/enwikisource/20130629/> but doesn't
+include images, because Wikimedia dumps never include images.  But
+that's probably okay in this case, because most of Wikisource seems to
+be transcriptions rather than scans.
+
+What about music?
+
+* The Archive Team archive of all the MIDI files they found on
+  GeoCities, which probably covers most 20th-century US popular music
+  and a fair bit of other music (albeit in low quality), is fairly
+  tiny and contains some fifty thousand songs.  It's very likely
+  illegal, though.
+* <http://www.infochimps.com/tags/music?page=4> has some other related
+  datasets.
+* <http://cantorion.org/> has a large collection of scanned
+  public-domain sheet music, mostly classical, and collections of it
+  have been uploaded to the Internet Archive.
+* <http://discogs.com/> has a public-domain database of metadata on 35
+  million recorded tracks, with dumps at
+  <http://www.discogs.com/data/>, which are some 0.2GiB.
+* <http://freesound.org/> has a mixed CC-sampling-plus and CC0
+  database of samples for making music with, which may or may not be
+  bulk-downloadable.
+* However, there's an 8.5GB chunk of sound samples released under
+  CC-BY for OLPC at <http://wiki.laptop.org/go/Sound_samples>.
+* <http://imslp.org/> has 220 000 musical scores, mostly of
+  public-domain music, which may or may not be bulk-downloadable;
+  there's a very old torrent backup from 2008.
+* Musicbrainz I think is already incorporated in Freebase, but it has
+  rich metadata on some 12 million recorded tracks.
+* The MOD Archive had some 120 000 songs in MOD and related formats as
+  of 2007, totaling 31.2 GiB; these are somewhere in between MP3 and
+  MIDI in their level, since they include the samples.  But the MOD
+  Archive is also probably almost entirely illegal, because the
+  samples come from all over the place and were frequently copied from
+  one MOD musician to another without consent.
+* Mutopia has some 1600 public-domain musical scores which can be
+  played with MIDI or typeset with LilyPond.  I assume these can be
+  bulk-downloaded, but they're tiny.
+* Musopen has a collection of public-domain music recordings, but no
+  bulk download as far as I can tell.
+
+Some very valuable kinds of information that may not be present in any
+of the above:
+
+* Transport schedules, e.g. bus and train schedules, not to mention
+  route information (OSM has some route information);
+* Contact information for people and businesses (i.e. phone books;
+  available from, say, Yelp or Foursquare).
+* Reputation information for people and businesses (i.e. Yelp), or
+  even for pages (e.g. the freely-available page hits data for
+  Wikipedia articles, for use in ranking search results.)
+* In-depth engineering data, e.g. Machinery's Handbook, the CRC
+  Handbook, Organic Syntheses, electronics datasheets, and so on.  US
+  military MILSPECs may provide some useful data here.
+* Pricing information about pretty much anything: minerals, chemicals,
+  electronic parts, commodities, stocks, forex, household appliances,
+  foods.
+* Social graph information.  Presumably any number of spy agencies
+  have a full crawl of the social graph from Facebook, including
+  everybody's profile photos, but Facebook's terms of service forbid
+  doing this, so nobody admits to it.  But this is in the terabytes,
+  anyway, since you have at least thousands of bytes for the profile
+  picture times about a billion accounts.  If you just wanted
+  uncompressed names and graph links, without geographic or photo
+  info, it's probably on the order of 64 links (of 4 bytes each) per
+  person, total 256 bytes, plus their name, so about 200 to 300 GB.
+* Travel information, like WikiTravel: what to see when you get to
+  Córdoba, how to get there, what neighborhoods to avoid, how the
+  local taxi system works, where to stay.  WikiTravel is licensed
+  under a CC-BY-SA license that would permit this in theory, but I'm
+  not sure how to download a snapshot dump of it in practice; they
+  seem to be trying to make it difficult.  Hitchwiki might be an
+  alternative, but it seems nascent — its dump is only 15MB.
+* Cooking recipes, other than the very old ones from Project
+  Gutenberg.
+* Guides to identifying natural things, such as plants, animals,
+  rocks, and diseases.
+* Much in the way of modern how-tos.  en.wikibooks has almost 2700
+  books at the moment, and might help some; but if you want to know
+  how to fix your 1997 Ford Taurus, how to incorporate a company in
+  Argentina, how to upgrade the hard disk in your Dell Mini 9, etc.,
+  you're out of luck.  A fair bit of this kind of information may be
+  available in the public domain from the US Military, but finding and
+  organizing it will be difficult.
+* Nutritional information.
+* Public records information, such as land titles, lawsuit records,
+  invention patents, EDGAR filings, trademark filings, marriage
+  records, statute law, caselaw, or international treaties.
+
+More possibly relevant URLs:
+
+Datasets for data mining
+<http://www.kdnuggets.com/datasets/>
+
+A billion-web-page snapshot amounting to 5 terabytes
+<http://lemurproject.org/clueweb09/>
+
+<http://stackoverflow.com/questions/2674421/free-large-datasets-to-experiment-with-hadoop>
+
+The Berkeley Earth Temperature Study dataset
+<http://berkeleyearth.org/dataset/>
+
+UN treaties data
+<https://github.com/zmjones/untreaties>
+
+70 years of historical stock price data on Quandl
+<http://www.reddit.com/r/datasets/comments/1egihx/15000_stocks_x_70_indicators_x_10_years/>
+
+IRS nonprofit filing data
+<http://projects.propublica.org/nonprofits/>
+
+USDA nutrient data
+<https://github.com/thebishop/usda_national_nutrients>
+
+Social networks
+<http://arcane-coast-3553.herokuapp.com/sna/visual>
+
+Movie subtitles
+<http://www.reddit.com/r/datasets/comments/1efi20/looking_for_movie_subtitles/>
+
+<http://www.quora.com/Data/Where-can-I-find-large-datasets-open-to-the-public?share=1>
+
+Stanford Large Network Dataset Collection
+<http://snap.stanford.edu/data/>
+
+<http://lemire.me/blog/archives/2012/03/27/publicly-available-large-data-sets-for-database-research/>
+
+3D models of furniture (2.97 GB)
+<http://kickass.to/avshare-furniture-3d-models-t7291976.html>
+
+1.44 GB of 3D models
+<http://kickass.to/large-collection-of-3d-models-t1709247.html>
+
+A much smaller-scale version of this problem is: what should I put in
+my next paper notebook?  I'd like to print some things out: obviously
+my friends' phone numbers and other contact information, a map of the
+city and surrounding areas, and so on.  I can print them in reduced
+size, as long as I can still read them; I think I can distinguish 600
+pixels per inch with a magnifying glass, and ordinary laser printers
+can print that.  My current notebook is 288 pages, which is to say 144
+leaves, or 72 sheets of paper, which are roughly A5-size, one
+thirty-second of a square meter, so 2¼ square meters of paper in
+total, or 4½ square meters of paper surface.  The smallest reasonable
+ASCII font is about 6×4 pixels, which works out to 23.25 million
+characters per square meter, or about 105 megabytes of text.  If we
+use the traditional 80×66 unit for a "page", that's 19 815 pages.
+
+Now, I only want to fill a fraction of the notebook with text.  So
+what are the most useful, say, ten to thirty megabytes I could print
+out and bind into my new notebook?  The Wikipedia Vital 100 articles
+at <http://en.wikipedia.org/wiki/Wikipedia:Vital_100> might be a
+reasonable thing to include, for example.  Ten articles chosen from
+there by random clicking are Fire (12 pages), Crime (16 pages),
+Biology (18 pages), Human sexuality (38 pages), Earth (32 pages),
+History of the World (27 pages), History of art (16 pages), Philosophy
+(33 pages), Mathematics (12 pages), and Energy (19 pages).  These sum
+up to 223 pages, suggesting that the Vital 100 in total will be about
+2230 pages.  This would be a fairly straightforward thing to include
+in the notebook in its reduced form; if we figure 56 reduced pages per
+notebook page, it would occupy about 40 pages.
+
+You might be able to do something similar with 

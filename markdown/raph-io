@@ -1,0 +1,357 @@
+Notes on Raph Levien's "Io" Programming Language
+================================================
+
+(This is distinct and unrelated to Steve Dekorte's "Io" programming
+language.)
+
+The original paper, which I don't have a copy of, is:
+
+> Raphael Levien, 1989, "Io: a new programming notation", SIGPLAN
+> Notices 24(12) December 1989
+
+There is a little material about Io online, including quotes from the
+paper.  From
+<http://hopl.murdoch.edu.au/showlanguage.prx?exp=4671&language=IO>:
+
+> ## Coroutines ##
+
+> Coroutines are an important concept of computing science, but few
+> programming notations properly support them. It is surprising how easy
+> they are to implement in Io.
+
+> The idea of coroutines is to have two (or more) routines. When one of
+> the routines gets to a point where it can no longer proceed (such as,
+> when it needs more input), it is suspended, and another routine
+> continues until it, in turn, can no longer continue (such as, when it
+> has a value to output). Then, it is suspended and another routine is
+> resumed.
+
+> This is used, for example, in creating a stream. A stream carries a
+> sequence of numbers, without consuming storage. Therefore, it can be
+> infinite. Even in the case of a finite stream, though, it has an
+> advantage over a linked list, because computation can begin
+> immediately after the first number is known.
+
+> The Io implementation of streams is analogous to linked lists. A
+> stream takes two arguments. If there is no more data in the stream, it
+> performs its first argument. Otherwise, it performs the second
+> argument, with a data value and the continuation of the stream.
+
+> Here we define the operator `count-stream`, and bind an infinite
+> counting stream to the variable `s`.
+
+>     count-streamO: ~ x out;
+>     out x ~ null out;
+>     +xl~x;
+>     count-streamO x out.
+>     count-stream: -..) ret;
+>     ret .-9 null full;
+>     count-streamO 0 full.
+>     count-stream ~ s
+
+> S has exactly the same structure as a linked list. In fact,
+> `writelist s` will write `0 1 2 3 4 5...` on the screen.
+
+There seem to be some OCR errors here.  I think `+x1~x` is supposed to
+be `+ x 1 ~ x`, and I suspect (from Raphael Finkel's book, see below)
+that `~` is actually supposed to be `->`.  So the definition of
+count-stream0 should be as follows:
+
+    count-stream0: -> x out;
+            out x -> null out;
+            + x 1 -> x;
+            count-stream0 x out.
+
+In Scheme:
+
+    (define count-stream0
+      (lambda (x out)
+        (out x (lambda (null out)
+                 (%+ x 1 (lambda (x) (count-stream0 x out)))))))
+
+with the following definition of %+:
+
+    (define (%+ a b cont) (cont (+ a b)))
+
+I'm more mystified about the `count-stream` definition.  From the
+text, perhaps the definition is as follows:
+
+    count-stream: -> ret;
+            ret -> null full;
+            count-stream0 0 full.
+
+Because then `s` gets `-> null full; count-stream0 0 full`, which
+takes two arguments (as the text explains) and hands the second one
+off to `count-stream0`, which performs it with a data value and the
+continuation of the stream.
+
+Raphael Finkel's 1995/1996 book ["Advanced Programming Language
+Design"](http://www.nondot.org/sabre/Mirrored/AdvProgLangDesign/),
+chapter 2, section 3, contains some more examples.
+
+    write 5; write 6; terminate
+
+which means, in Scheme:
+
+    (write 5 (lambda () (write 6 (lambda () (terminate)))))
+
+Then
+
+    write-twice: -> number; write number; write number; terminate.
+
+which means
+
+    (define write-twice
+      (lambda (number) 
+        (write number 
+               (lambda () (write number (lambda () (terminate)))))))
+Then
+
+    write-twice: -> number return;
+            write number; write number; return.
+    write-twice 7; write 9; terminate
+
+Which means
+
+    (define write-twice
+      (lambda (number return)
+        (write number (lambda () (write number 
+                                        (lambda () (return)))))))
+    (write-twice 7 (lambda () (write 9 (lambda () (terminate)))))
+
+Then
+
+    + 2 3 -> number; write number; terminate
+
+which means
+
+    (%+ 2 3 (lambda (number) (write number (lambda () (terminate)))))
+
+Then
+
+    count: -> start end return;
+            write start;
+            = start end (return);
+            + start 1 -> new-start;
+            count new-start end return.
+    count 1 10; terminate
+
+which means
+
+    (define count 
+      (lambda (start end return)
+        (write start 
+               (lambda ()
+                 (%= start end return
+                     (lambda () 
+                       (%+ start 1 
+                           (lambda (new-start)
+                             (count new-start end return)))))))))
+
+with the new definition of %=:
+
+    (define (%= a b consequent alternate)
+      (if (= a b) (consequent) (alternate)))
+
+This is the CPS expansion of this:
+
+    (define (count start end)
+      (write start)
+      (if (not (= start end)) (count (+ start 1) end)))
+
+I don't know why there are parentheses in "= start end (return)"
+in the Io example.  Perhaps it's an error introduced by Finkel.
+
+One final example, showing the use of parentheses:
+
+    make-pair: -> x y return; 
+            user (-> client; client x y); return.
+
+which means
+
+    (define make-pair
+      (lambda (x y return)
+        (user (lambda (client) (client x y)) (lambda () (return)))))
+
+Here's the definition of writelist mentioned above:
+
+    writelist: -> list return;
+            list return -> first rest;
+            write first;
+            writelist rest;
+            return.
+    emptylist: -> null notnull; null.
+    cons: -> number list econtinuation;
+            econtinuation -> null notnull;
+            notnull number list.
+
+Usefulness
+----------
+
+I wouldn't want to program in Io in the raw way described above; it's
+pretty verbose and confusing.  But it's *much* clearer than Scheme for
+expressing code in explicit CPS, for three simple reasons.
+
+First, a series of nested lambdas is a flat structure rather than a
+nested structure as in Scheme.
+
+Second, the syntactic overhead of the lambda is a single punctuation
+character, or possibly three, rather than ten characters including
+some letters: `(lambda())`.
+
+Third, as a result, in the usual case, the distance between the names
+of arguments and the place they come from (that is, the procedure that
+will eventually invoke the lambda that the arguments belong to) is
+much less, and they appear as a unit rather than as things far apart.
+`+ x 1 -> x;` is quite clear.  (Unfortunately, this closeness of
+association is misleading sometimes; consider `out x -> null out;` in
+the definition of `count-stream0`, where the `-> null out; ...` part
+of the routine is suspended for some arbitrary period of time while
+the rest of the program runs, and may in fact never resume.)
+
+More Syntactic Sugar
+--------------------
+
+If you actually wanted to write programs in the language, you could
+benefit from changing it to have a little bit more syntactic sugar.
+
+### Nested expressions ###
+
+For example, you could define
+
+    count [+ start 1] end return
+
+as an abbreviation for
+
+    + start 1 -> new-start;
+    count new-start end return
+
+and for procedures that have only a single exit point, you could
+imagine writing
+
+    {-> number; write number; write number}
+
+as an abbreviation for
+
+    -> number return; write number; write number return
+
+In cases where a "statement" contains more than a single set of square
+brackets, the order of evaluation could be undefined, so that e.g.
+
+    string-scan src [+ srcidx 1] [- len 1] c
+
+could rewrite either to
+
+    + srcidx 1 -> v1;
+    - len 1 -> v2;
+    string-scan src v1 v2 c
+
+or to
+
+    - len 1 -> v1;
+    + srcidx 1 -> v2;
+    string-scan src v2 v1 c
+
+Or the order of evaluation could be defined; who cares?  However, it's
+important for our sanity that this:
+
+    string-scan src [+ srcidx 1]; foobar [- len 1]
+
+rewrite to this:
+
+    + srcidx 1 -> v1;
+    string-scan src v1;
+    - len 1 -> v2;
+    foobar v2
+
+and not this:
+
+    + srcidx 1 -> v1;
+    - len 1 -> v2;
+    string-scan src v1;
+    foobar v2
+
+Note that the above transformation is just the CPS transformation in
+Scheme for normal nested application expressions.  It's just a
+thousand times more readable than usual because of the Io lambda
+notation.
+
+### One-argument lambda sugar ###
+
+It might also be helpful to be able to write one-argument lambdas more
+concisely, with an automatic name for "the last result".  In Python's
+REPL and in Arc, this variable is called "_".  With this, for example,
+you could write each of the following:
+
+    count-stream: ; _ -> null full; count-stream0 0 full.
+
+    + 2 3; write _; terminate
+
+    make-pair: -> x y ret; user (; _ x y) ret.
+
+Mostly this is duplicative with the []-nesting idea, though.  I'm not
+sure which is better in the cases where both are applicable.
+Consider this example:
+
+    def render(text):
+        body = str(markdown.Markdown(text))
+        soup = BeautifulSoup.BeautifulSoup(body)
+
+        headers = soup('h1')
+
+In Io, that looks like this:
+
+    render: -> text;
+        markdown.Markdown text -> foo;
+        str foo -> body;
+        BeautifulSoup.BeautifulSoup body -> soup;
+
+        soup "h1" -> headers; ...
+
+With implicit single arguments:
+
+    render: ;
+        markdown.Markdown _;
+        str _;
+        BeautifulSoup.BeautifulSoup _;
+
+        _ "h1" -> headers; ...
+
+With nesting:
+
+    render: -> text;
+        [BeautifulSoup.BeautifulSoup [str [markdown.Markdown text]]] "h1" 
+            -> headers; ...
+
+The nested expressions are more compact, but in this case, I think the
+implicit arguments are clearer.
+
+### Conditionals ###
+
+It would be nice if there were a way to conveniently rejoin streams of
+control after a conditional.  For example, it would be nice to be able
+to write
+
+    if (= x y) (write "x y equal") (write "x y not equal");
+    if (= x z) (write "x z equal") (write "x z not equal");
+    if (= y z) (write "y z equal") (write "y z not equal");
+    whatever
+
+If the language had automatic currying, you could define this `if`
+quite easily:
+
+    if: -> cond result alt cont; cond (; result cont) (; alt cont).
+
+You can use the above `if` definition without automatic currying if
+you write out the arguments explicitly:
+
+    if (-> a b; = x y a b) (-> c; write "x y equal" c) 
+                           (-> c; write "x y not equal" c)
+
+You could, however, imagine syntactic sugar for this as well.  For
+example, this expression could expand into the above call to "if":
+
+    = x y ? write "x y equal" : write "x y not equal"
+
+As with the nested expressions, note that this is just the CPS
+transformation for `if`.

@@ -1,0 +1,90 @@
+[The FIBIAC][] demonstrates an electromechanical machine that
+calculates the Fibonacci sequence under control by punched cards;
+later, Chris Fenton, the author, built a purely mechanical version,
+called [The Turbo Entabulator][].  It's a three-counter machine.  He
+asserts that the machine is not capable of calculating anything more
+complex than the Fibonacci sequence, but I think it may be able to go
+a bit beyond this.
+
+Fenton recommends [The Mechanism of Weaving][], which describes how
+mechanical weaving machines worked in the late 19th century, and how
+mechanical computers should have worked.
+
+[An artificial muscle computer][] is a four-page paper from November
+that claims to describe a general-purpose computer built from 13
+artificial muscle relays and a sliding-block mechanical tape memory,
+implementing the (2, 3) Turing machine proven to be universal by
+A. Smith, previously conjectured by Wolfram.  Artificial muscle relays
+are electromechanical devices in which an electric artificial muscle
+compresses a "piezoresistive dielectric elastomer switch". However,
+this Turing machine is only universal if you first initialize its
+memory to a certain repeating pattern, requiring machinery that the
+authors have not implemented.  The authors admit they were not able to
+program it to perform even an addition.  In my view, this machine
+falls short of implementing universal computation.
+
+[The Mechanism of Weaving]: http://archive.org/details/mechanismweavin00foxgoog
+[The FIBIAC]: http://www.chrisfenton.com/the-fibiac/
+[The Turbo Entabulator]: http://www.chrisfenton.com/the-turbo-entabulator/
+[An artificial muscle computer]: http://apl.aip.org/resource/1/applab/v102/i10/p104102_s1?bypassSSO=1
+
+None of the above have a significant amount of memory.  The FIBIAC has
+almost 30 bits; the Turbo Entabulator has almost 10 bits; and the
+artificial muscle computer has 8.  Konrad Zuse's mechanical Z1 had
+considerably more, 1452 bits, organized into 64 general-purpose and
+two special-purpose registers of 22 bits each.  However, the Z1 fell
+short of universal computation because of its lack of control flow,
+even aside from the finite memory size that has been an unavoidable
+limitation of all computers constructed so far.
+
+As I wrote before (in the post about heightfields and string) I think
+the threshold where a stored-program computer becomes interesting,
+e.g. capable of interpretation or compilation, is around 2K or 4K of
+RAM, that is, 16 to 32 kibibits.  The Z1 was interesting with fewer
+bits because it, like Fenton's machines, ran its program from a
+separate read-only memory; the same could be said of microcontrollers,
+which commonly have less than 256 bytes of RAM --- some as little as
+32 --- but invariably have at least 2K of program, and of the Atari
+2600, whose RAM was 128 bytes but whose ROM could be up to 64K.
+
+So an interesting question here is how to make a mechanical computer
+with 16 kibibits of memory.  The Z1 had a mechanical latch for each
+bit, but it might be more practical to use some largish quantity of
+homogeneous material, like a disc or drum memory, that can be
+reversibly transformed.
+
+It's not the only option, though.  Consider a horizontal 64×64 matrix
+with a thread hanging from a spring at each point.  Below, the threads
+are clamped in 128 clamps: one clamp that clamps all the threads on
+each row, and one that clamps all the threads on each column.  The
+clamps maintain thread tension against the springs, so that if a
+spring happens to be stretched to some position, the clamp prevents it
+from contracting.  If you open a single row clamp and a single column
+clamp, then a single thread is released, and its spring is free to
+contract --- unless something is pulling the other end of the thread
+to a new position before allowing the clamps to reclose.  If the
+machinery can distinguish 16 positions for a given thread, that thread
+can be said to store 4 bits, and so we have our 16 kibibits.
+
+You don't actually need 128 clamps; if you route the threads through
+something that keeps them from catching or moving laterally, such as a
+smooth pipe, you can address an individual thread out of 4096 with
+only 24 clamps, each of which clamps half the strings.  Each string
+thus must pass through 12 clamps.  For a sufficiently large number of
+threads, ternary addressing would slightly reduce the number of
+clamps, but 4096 threads is not large enough; you would also need 24
+clamps for base 3 or base 4 addressing of 4096 strings.  Base-4
+addressing would halve the number of clamps any individual string
+passed through (to 6), and by the same token halving the number of
+strings in any individual clamp (from 2048 to 1024).
+
+Given the additional complexity of the pipes and the probable
+difficulties in clamping 1024 strings, the optimal number of clamps
+for this number of strings is probably somewhere in between 24 and
+128.  Base 16, which would mesh particularly well with the base-16
+contents I suggested above, would run each string through three clamps
+instead of two, and thus need 48 clamps, each clamping one-sixteenth
+of the strings (256 of them).
+
+It might turn out that 256 strings is too many, and we need some kind
+of "chip select" as well as row/column/plane selection.

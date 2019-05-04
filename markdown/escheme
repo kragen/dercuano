@@ -1,0 +1,315 @@
+<style type="text/css">
+<!--
+  body {color: #000000; background-color: #ffffff;}
+  .comment {color: #b22222;}
+  .comment-delimiter {color: #b22222;}
+  .function-name {color: #0000ff;}
+  .keyword {color: #a020f0;}
+  .variable-name {color: #b8860b;}
+  .string {color: #bc8f8f;}
+-->
+</style>
+
+<link rel="stylesheet" href="http://pobox.com/~kragen/style.css">
+</link>
+
+<link rel="shortcut icon" href="http://pobox.com/~kragen/kragen-icon-small.ico">
+</link>
+
+Eur-Scheme
+==========
+
+So I was thinking about how to simplify [Ur-Scheme][] further.
+Ur-Scheme is about 1600 lines of code so far.  Something like half or
+a third of that is assembly code, represented in Scheme, mostly
+implementing the basic types (strings, conses, closures, heap
+variables, symbols, booleans, characters, nil, fixnums) and the basic
+control structures (procedure call and return, including tail-call
+elimination, closure creation, conditionals, sequences).  The
+primitives thus defined total about 1100 lines of assembly-language
+output, so they're probably somewhere around 1000 instructions.  (But
+it doesn't have a garbage collector yet!)
+
+Having these things implemented in assembly definitely helps it reach
+the reasonable performance level that it does.  But it would be nice
+to have a system that was a lot simpler and more portable, even if it
+was slower.
+
+eForth's approach
+-----------------
+
+The eForth Model 1.0 was a Forth system written to be maximally
+portable; the x86 version apparently contains 171 machine-code
+instructions in about 28 primitives, and everything else is built up
+on top of that in interpreted Forth words.  The primitives were
+something like the following set:
+
+* `lit` push a literal
+* `exit` return from an interpreted subroutine
+* `execute` call a subroutine whose value is on the stack
+* `(if)` branch if top of stack is 0
+* `(else)` branch unconditionally
+* `next` update loop counter and possibly branch
+* `!`, `@` store and fetch a cell in memory
+* `c!`, `c@` store and fetch a byte in memory
+* `rp@`, `rp!`, `sp@`, `sp!` get and set the return and operand stack
+  pointers (for e.g. exception handling)
+* `r>` pop the return stack onto the data stack
+* `>r` push the return stack onto the data stack
+* `drop` discard an item on the operand stack
+* `dup`, `over` copy the top or second stack items onto the top of
+  stack
+* `swap` exchange the top two stack items
+* `0<` test whether the top item is zero
+* `and`, `or`, `xor` bitwise operators
+* `!io` I forget what this does
+* `?rx` return true if there's input waiting
+* and there were primitives to send and receive a byte over a serial line.
+
+I don't remember how eForth accomplished rightward bit shifts
+(e.g. for division), and I don't have it handy at the moment.
+
+The Eur-Scheme Ideal
+--------------------
+
+Could we build a Scheme with a similar structure &mdash; as little as
+possible in assembly code?  Would it be simpler?
+
+Ideally we'd be able to implement not only the normal Scheme types,
+but also as much as possible of the run-time system, in Scheme, on top
+of a minimal set of machine-code primitives.  That would mean heap
+allocation, garbage collection, some parts of closure handling,
+variadic function calls, and all the types mentioned above; the basic
+system would only have to support (non-closure) function call and
+return, some conditional (I'm using `%ifeq`), and `set!`; and
+primitives for accessing memory.
+
+Two Approaches To `cons`
+------------------------
+
+The implementation of `quote` in a compiler is kind of annoying; it's
+straightforward in an interpreter or a load-and-go compiler, but in a
+compiler that might run in a different interpreter, and that generates
+an output file rather than compiling things into memory, its
+representations of data have to be compatible with those produced by
+the definition used at run-time, regardless of whether that run-time
+definition is in Scheme, C, assembly, or something else.
+
+Ur-Scheme's `pair` structure, created by `cons`, consists of three
+machine words in order: the magic number `0x2ce11ed` to identify it as
+a cons, the car, and the cdr.
+
+Here are the two definitions of `cons` from Ur-Scheme, the run-time
+definition and the compile-time definition used by `quote`:
+
+<blockquote>
+<pre>
+<span class="comment-delimiter">;; </span><span class="comment">We define a label here before the procedure prologue so that other
+</span><span class="comment-delimiter">;; </span><span class="comment">asm routines can call cons
+</span>(add-to-header (<span class="keyword">lambda</span> () (text) (label <span class="string">"cons"</span>)))
+(define-global-procedure 'cons 2
+  (<span class="keyword">lambda</span> ()
+    (emit-malloc-n 12)
+    (mov (const cons-magic) (indirect tos))
+    (mov tos ebx)
+    (get-procedure-arg 0)
+    (mov tos (offset ebx 4))
+    (pop)
+    (get-procedure-arg 1)
+    (mov tos (offset ebx 8))
+    (pop)))
+<span class="comment-delimiter">;; </span><span class="comment">Compile a quoted cons cell.
+</span>(<span class="keyword">define</span> (<span class="function-name">compile-cons</span> car-contents cdr-contents labelname)
+  (rodatum labelname)
+  (compile-word cons-magic)
+  (compile-word car-contents)
+  (compile-word cdr-contents)
+  (text))
+</pre>
+</blockquote>
+
+I've been considering a slight variation in which assembly-emitting
+routines return the location in which their result was placed.  That
+would shorten the run-time code for `cons` above to the following
+slight variation; I'm not sure if this is clearer or not, but it's
+certainly briefer, at 6 lines of body instead of 9.
+
+<blockquote>
+<pre>
+(define-global-procedure 'cons 2
+  (<span class="keyword">lambda</span> ()
+    (mov (const cons-magic) (indirect (emit-malloc-n 12)))
+    (mov tos ebx)
+    (mov (get-procedure-arg 0) (offset ebx 4))
+    (pop)
+    (mov (get-procedure-arg 1) (offset ebx 8))
+    (pop)))
+</pre>
+</blockquote>
+
+It would be ideal if the two could be generated from a single
+structure specification, but at present there are only three in-memory
+types that can be generated at compile-time: pairs, strings (which are
+variable-sized and mostly consist of bytes), and symbols (which point
+to strings).  So it's not clear that such a struct facility would be a
+net win for simplicity.
+
+Primitives for Accessing Memory: The Eur-Scheme Approach
+--------------------------------------------------------
+
+So the garbage collector, the heap allocator, and the stuff out of
+which `pair`s and `string`s and so on are constructed need to be able
+to access raw memory.  And it's important that the garbage collector
+and the heap allocator not accidentally call the heap allocator
+&mdash; you could easily get an infinite recursive loop; so their
+interface to raw memory shouldn't require heap-allocation.
+
+Perhaps the best way to do this would be to support basically a subset
+of C: allow routines to declare local variables that are just machine
+words, which can be used as pointers, are allocated on the stack or in
+machine registers, and are somehow ignored by the garbage collector
+(because they aren't necessarily Scheme values or pointers to Scheme
+heap objects).
+
+But I'm going to talk about another approach, which I think will
+probably be simpler.  You have a `pointer` data type, like the
+`string` and `pair` data types of normal Scheme, and an explicit stack
+to save and restore `pointer`s on; and a set of `pointer`s that exist
+from the time the program starts, and are therefore not
+heap-allocated.  In order to 
+
+For concreteness, there could be eight callee-saves pointers, called
+`%g0`, `%g1`, `%g2`, `%g3`, `%g4`, `%g5`, `%g6`, and `%g7`, and eight
+caller-saves pointers, called `%c0`, `%c1`, `%c2`, `%c3`, `%c4`,
+`%c5`, `%c6`, and `%c7`.  There might be other `pointer`s around.  For
+example, there might be some `pointer` constants created by the
+compiler, or `pointer` variables allocated on the heap by routines
+that aren't part of the garbage collector or memory allocator.
+
+Then we need only a set of primitives for accessing them:
+
+* `(*put! foo %p0)` store the value of a Scheme expression in `%p0`
+  and returns `%p0`.
+* `(*get %p0)` returns the value stored in `%p0` as a Scheme
+  expression value.  If the value is not, in fact, a valid Scheme
+  object, this is likely to crash the program.
+* `(*load! %p0 %p1)` fetch the value `%p0` points to in memory, stores
+  it in `%p1`, and returns `%p1`.
+* `(*store! %p0 %p1)` stores the value in `%p0` into the place in
+  memory pointed to by `%p1`, and returns `()`.
+* `(*load-byte! %p0 %p1)` and `(*store-byte! %p0 %p1)` are analogous,
+  but only load or store the single low-order byte.
+* `(*push! %p0)` and `(*pop! %p0)` save and restore `pointer` values
+  from a special `pointer` stack, which surely has some maximum size,
+  but in any case does not allocate memory from the heap.
+* `(*get-sp! %p0)` and `(*get-fp! %p0)` get the machine-level stack
+  pointer and frame pointer registers of the caller and store it into
+  `%p0`, to support stack introspection (e.g. garbage collector
+  tracing or backtrace printing.).  They return `%p0`.
+* Optionally, `(*set-sp! %p0)` and `(*set-fp! %p0)` set those machine
+  registers, and `(*get-psp! %p0)` and `(*set-psp! %p0)` get and set
+  the pointer stack pointer.  These primitives could be useful for
+  exception handling, but isn't necessary for the applications I've
+  discussed so far.
+* `(*add! %p0 12 %p1)` does pointer arithmetic, storing the contents
+  of `%p0`, plus `12`, into `%p1`, and returns `%p1`.
+* `(*add! %p0 %p2 %p1)` does the same thing, but uses the contents of
+  `%p2`.
+* `*and!`, `*or!`, and `*xor!` are analogous to `*add!`.
+* `(*unsigned-<? %p0 %p1)` returns a Scheme true or false value: true
+  if the contents of `%p0`, interpreted as an unsigned number,
+  are less than those of `%p1`, and false otherwise.
+
+These 20 or so primitives are more or less sufficient for implementing
+things like the garbage collector and high-level data structures.
+None of them are particularly complicated; here's a possible
+implementation of the body of `*load!`:
+
+<blockquote>
+    <pre>
+        <span class="keyword">mov</span> (<span class="variable-name">%ebp</span>), <span class="variable-name">%eax</span>        <span class="comment-delimiter"># </span><span class="comment">fetch argument zero, %p0 (src)
+</span>        <span class="keyword">call</span> ensure_pointer     <span class="comment-delimiter"># </span><span class="comment">error unless it's a pointer object
+</span>        <span class="keyword">mov</span> 4(<span class="variable-name">%eax</span>), <span class="variable-name">%ebx</span>       <span class="comment-delimiter"># </span><span class="comment">fetch its contents (the location to load from)
+</span>        <span class="keyword">mov</span> (<span class="variable-name">%ebx</span>), <span class="variable-name">%ebx</span>        <span class="comment-delimiter"># </span><span class="comment">fetch the pointed-to value from memory
+</span>        <span class="keyword">mov</span> 4(<span class="variable-name">%ebp</span>), <span class="variable-name">%eax</span>       <span class="comment-delimiter"># </span><span class="comment">fetch argument one, %p1 (dest)
+</span>        <span class="keyword">call</span> ensure_pointer     <span class="comment-delimiter"># </span><span class="comment">error unless it's a pointer object too
+</span>        <span class="keyword">mov</span> <span class="variable-name">%ebx</span>, 4(<span class="variable-name">%eax</span>)       <span class="comment-delimiter"># </span><span class="comment">store into its contents.
+</span></pre>
+</blockquote>
+
+Those seven instructions are wrapped inside seven more instructions
+for procedure prologue and epilogue.  This suggests that the total
+number of assembly instructions that you *need to write* to implement
+these primitives on a new CPU is somewhere around 7 * 20 = 140, plus
+the basic conditional, procedure call and return, and variable access.
+So you could probably port such a Scheme to a new CPU architecture
+with 300-400 lines of code or so, around twice the amount needed to
+port the eForth Model 1.0.
+
+Of those 150-200 instructions that you need to write, some are in
+procedure prologues and epilogues that get duplicated 20 times for
+those 20 or so primitives.  So you might end up with something like
+400-500 lines of assembly output for the primitives.
+
+Two More Approaches to `cons`
+-----------------------------
+
+Again, the nested-assembly version of `cons` looks like this:
+
+<blockquote>
+<pre>
+(define-global-procedure 'cons 2
+  (<span class="keyword">lambda</span> ()
+    (mov (const cons-magic) (indirect (emit-malloc-n 12)))
+    (mov tos ebx)
+    (mov (get-procedure-arg 0) (offset ebx 4))
+    (pop)
+    (mov (get-procedure-arg 1) (offset ebx 8))
+    (pop)))
+</pre>
+</blockquote>
+
+The "subset of C" approach might look like this:
+
+<blockquote>
+<pre>
+(<span class="keyword">define</span> (<span class="function-name">cons</span> car cdr)
+  (let-pointer ((rv (malloc-n 12)))
+    (pointer-write (indirect rv) cons-magic)
+    (pointer-write (offset rv 4) (pointer-val car))
+    (pointer-write (offset rv 8) (pointer-val cdr))
+    rv))
+</pre>
+</blockquote>
+
+The Eur-Scheme approach might look like this:
+
+<blockquote>
+<pre>
+(<span class="keyword">define</span> (<span class="function-name">cons</span> car cdr)
+  (*store! cons-magic (malloc-n 12 %c0)) <span class="comment-delimiter">; </span><span class="comment">cons-magic is a pointer constant
+</span>  (*store! (*put! car %c1) (*add! %c0 4 %c2))
+  (*store! (*put! cdr %c1) (*add! %c0 8 %c2))
+  (*get c0))
+</pre>
+</blockquote>
+
+`cons` doesn't have to save and restore the values of those `pointer`s
+because they're all caller-saves, and `cons` isn't calling anything
+else that might use them for its own purposes.
+
+I think that's a substantial improvement in both readability and
+simplicity over the current assembly version, and it's not obviously
+worse than the subset-of-C version.  This example leads me to suspect
+that defining routines in this fashion, rather than in assembly, would
+make for a considerably more concise and comprehensible Scheme system
+than Ur-Scheme.
+
+References
+----------
+
+[Ur-Scheme]: http://pobox.com/~kragen/sw/urscheme/ "The Ur-Scheme compiler"
+
+[Ur-Scheme][] is a subset-of-Scheme compiler I wrote to learn how to
+write compilers.  It compiles itself; it's reasonably fast, despite
+being safe, and very small.

@@ -1,0 +1,328 @@
+lattices, powersets, bitstrings, and efficient OLAP
+===================================================
+
+Some thoughts that occurred to me on the bus home about using
+bit-twiddling tricks to speed up lattice operations.  The original
+genesis of the idea was the old idea that it's a shame that Unix
+doesn't have "sub-users" that have the same relationship to users that
+the users have to `root`, whose name is suggestive of the idea of a
+hierarchy of users, something that was never added to Unix.  To
+implement such a thing, you'd ideally want to substitute a "user is
+equal to or has power over" check for the usual "user is equal to or
+is superuser" check, and you'd like it to be efficient enough that it
+doesn't slow down the operations it needs to guard.
+
+As it happens, the uid of `root`, 0, has a special bitwise
+relationship to other user IDs: it is, in some sense, the AND of all
+the other possible user IDs.  The AND of any uid with `root`'s uid
+will equal `root`'s uid.  It's as if each 1 bit in your uid
+represented some restriction, and `root` is the uid with no
+restrictions.  (And `nobody`, traditionally uid -1, is the uid with
+all possible restrictions, which is nicely symmetrical.  Although in
+this case this would mean `nobody` was subject to the whims of any
+user at all, which might not actually be what you want, but whatever.)
+
+So you'd substitute the check `(actor_uid & actee_uid) == actor_uid`
+for the check `!actor_uid || actor_uid == actee_uid`, which would be
+exactly as efficient; but you'd have to have some kind of magical way
+to assign uids to regular users so that you didn't accidentally end up
+with one regular user being superuser over another one, or over some
+sub-user of another one.
+
+Is there such a magical way to assign uids?  That's what this essay
+explores.  I haven't found a universal solution, but I've found some
+solutions for some interesting cases.
+
+This probably isn't actually practical for Unix kernel security
+policy, but it has other possible applications; for example, in
+databases, often the last step of query evaluation is to sift through
+a potentially large number of candidate records produced in some
+inconvenient order by index-traversal operations, filtering out the
+small number of records that actually match the query.  In particular,
+in OLAP applications, there is often no index that can reduce the
+number of records adequately.
+
+This technique is not related to bitmap indexing or compressed bitmap
+indexing.
+
+Lattices and powersets
+----------------------
+
+Any arbitrary finite lattice L is a sublattice of the powerset of some
+finite set S, with intersection and union of the powerset lattice
+being almost the meet and join operations (or vice versa, but I'll be
+using almost-intersection for meet and almost-union for join).  The
+constructive proof is something like this: optionally, take the
+transitive reduction of L, removing the redundant edges; then take the
+remaining edges to be S.  Represent each element E as the set of edges
+through which E is reachable from the minimum, that is, the union of
+all paths from the minimum to E.
+
+Clearly S might need to be about the size of L --- consider the
+worst-case scenario where your lattice is a totally ordered set.
+You'll need one new element of S for each element of L other than its
+minimum.
+
+Are there cases where S needs to be larger than L?  I'm not sure.
+
+This construction is clearly not optimal, in the sense of finding a
+smallest possible S for any L; if you have, for example, a min, a max,
+and 6 incomparable items in between, you can represent represent these
+6 items as {0, 2}, {0, 3}, {0, 4}, {1, 2}, {1, 3}, and {1, 4}, needing
+only 5 items in S rather than 6.  In cases like this, the construction
+above gives O(N) elements, while O(log N) elements is possible, as
+I'll explain below.
+
+I said "almost union" and "almost intersection".  The meet and join
+operations are not quite intersection and union, because the
+intersection and union operations may produce a powerset element that
+doesn't correspond to an element of L; in this example, intersecting
+{0, 2} and {0, 3} gives you {0}, not {} as it should.  I assert
+without even the handwaviest sketch of a proof that you can find a
+unique largest subset or smallest superset in any such case, or at
+least that you can choose your representation such that this is true,
+but I don't really care that much because mostly I'm interested in the
+poset operations rather than the lattice operations.
+
+Bitstrings and powersets
+------------------------
+
+The bitstrings of length N represent the powerset of a set of N items,
+with a 1 bit at position i representing that item i is present, 0
+representing the empty set, bitwise complement representing set
+complement, bitwise AND representing intersection, and bitwise OR
+representing union.
+
+The great advantage of bitstrings on computers is that you get a lot
+of parallelism for free; since bit-serial computers went out of style
+in the late 1950s (excepting the Clock of the Long Now) and until we
+move to FPGAs with arbitrary bit-length operands, normal computing
+hardware can take the AND, OR, or NOT of an entire word of bits as
+quickly as a single bit; depending on the hardware, this gives 8, 16,
+32, 64, 128, or even 256-way parallelism, on top of whatever you get
+out of multicore, which has been exploited to good effect in bitwise
+DES key cracking programs, among others.  (And constant-time AES-CTR
+implementations!)
+
+But you still have the problem of encoding your desired lattice into
+bitstrings that encode the desired properties.
+
+One-hot encoding
+----------------
+
+The simplest kind of lattice is one where all the elements, except the
+min and max, are incomparable; that is, the meet or join of any two
+elements that are not the min or max is the min or max.  You can
+encode this as in the naïve version above: assign each of those
+elements a unique bit position that gets 1.  For example, you can
+represent five such incomparable elements as 00001, 00010, 00100,
+01000, and 10000.  Electronics people call this "one-hot" encoding.
+
+Note that this follows the usual lexical ordering of bits.
+
+This is okay as far as it goes, but it's wasteful of space once you
+get past five elements, because it takes linearly as many bits as you
+have elements.  But for a logarithmic encoding, you can use the
+Cartesian product.
+
+Cartesian product encoding
+--------------------------
+
+If you have a a bunch of such incomparable elements, then instead of
+using a single one-hot bitstring for all of them, you can chop the
+bitstring up into chunks, two to four bits per chunk, and use one-hot
+encoding independently in each chunk.  With six bits, say, you have
+two three-bit chunks, or fields, each of which can one-hot encode
+three possibilities, so you have nine possibilities in all:
+
+    001001 001010 001100
+    010001 010010 010100
+    100001 100010 100100
+
+instead of the six you'd get with straight one-hot encoding, or the
+eight you'd get with three two-bit fields, or one four-bit field and
+one two-bit field.  It turns out that three bits per field is optimal
+in this sense, because log 3 / 3 > log 2 / 2, a little.  This way you
+can get 2 * 3^10 = 118 098 unrelated elements, plus max and min, out
+of a 32-bit word, rather than 32.  118098 is bigger than 32.
+
+In the limit as the number of bits gets big, this gives you
+log 3 / 3 bits-or-nats per bit, or 0.53 bits per bit; that is, 47% of
+the space is a tax imposed by the requirements of the representation.
+We'll see later that there's a more efficient alternative.
+
+Cartesian hierarchies
+---------------------
+
+But that's not all!  If you fill one of those fields with all 0s or
+all 1s, you get an extra min or max element for just that one field.
+In particular, if you wanted to give Unix users the ability to create
+subusers, you could assign, say, the first 18 bits to the normal
+userid, while leaving the other 14 bits set to zero.  This would give
+you 3^6 = 729 independent users, each of whom could create 2 * 3^4 =
+162 sub-users.
+
+In general, by setting all but the first N fields to all-zeroes, you
+get a sort of "Nth-level `root` user", who has authority over all the
+users whose uids start with its non-zero fields.  In an OLAP context,
+this could correspond to the first N levels of a hierarchical
+dimension: for a datetime field, for example, perhaps the first 4 bits
+indicate a year, the next 4 a month, the next 10 a date within the
+month, the next 7 an hour, the next 12 a minute, and the next 12 a
+second, 49 bits in all.
+
+Orthogonal dimensions
+---------------------
+
+As the datetime example suggests, though, once you have separate
+fields, it makes sense to query on any subset of them: perhaps you're
+more interested in what happens at 8 AM each day, rather than 8 AM on
+a particular day.  So the Cartesian-product approach gives you not
+just hierarchy but orthogonality.
+
+Groups, in the Unix security context
+------------------------------------
+
+In some cases, you could replace the notion of a "group" with a user
+that is subordinate to *multiple* users, so that any of those users
+can write to its files (a common use of groups), but it can't affect
+any of those users.  But making that work may require knowing about it
+ahead of time when you're assigning uids; unless you assign one bit
+position to each distinct user (quite doable these days, now that we
+usually have less than 64 people using a single computer) you wouldn't
+be able to construct groups containing arbitrary sets of people
+without changing their uids.
+
+In particular, you could reasonably partition the uid space into one
+or more cross-cutting hierarchies of grouping, and each group (or
+intersection of groups) would have its own "administrator" with a
+bunch of zero bits, as well as its own "group" with the corresponding
+1 bits.
+
+Gray code
+---------
+
+Consider, instead, the case of searching for other users of a
+smartphone app in geographical proximity to you.  If you tile the
+geographical area in question with imaginary tiles, you mostly want to
+find people in the same tile as you; but if you're close to a tile
+boundary, you may also want to find people in up to three neighboring
+tiles.  It would be nice to be able to do this query efficiently.
+
+If you represent the tile coordinates in Gray code, then as you move
+along either axis, at most one bit changes as you cross a tile
+boundary.  And you can calculate which one it is.  If you simply take
+the AND of the coordinates of the up-to-four tiles in your
+neighborhood, you obtain a set of bits that you can then compare to
+others' candidate coordinates.
+
+You can do Gray code in [arbitrary bases, such as base 3][0].
+
+[0]: http://virgil.gr/63 "Creating N-ary Gray codes, by Virgil Griffith, 2008-04-15"
+
+A similar approach can be used to query for temporal proximity.
+
+Binomial identifier assignment
+------------------------------
+
+As I mentioned earlier, assigning unrelated identifiers in 32 bits
+using cartesian product of one-hot fields only gets you 118098
+unrelated identifiers.  But you can get 16c32 = 601 080 390 unrelated
+identifiers by taking all the 32-bit values that have 16 1 bits and
+16 0 bits: a binomial coefficient.  If you use this approach to assign
+unrelated uids, you can use 12 bits to get 924 unrelated uids, rather
+than needing 18 bits to get 729 of them.
+
+The binomial approach thus has a dramatically lower tax than the
+one-hot and Cartesian approaches (it costs you 36% of your effective
+bits at 4 bits, 23% at 8, 18% at 12, 15% at 16, 11% at 24, 9% at 32,
+6.5% at 48, and 5.3% at 64), but at the cost of eliminating
+orthogonality and hierarchy.  It seems like the tax may asymptote to
+zero with large numbers of bits, but I'm not sure.  It definitely gets
+below 0.3% at 1928 bits, but that's already big enough to be sort of
+irrelevant.
+
+It's already more efficient at 4 bits; you can represent 6
+incomparable elements in 4 bits as 0011, 0101, 0110, 1001, 1010, and
+1100, rather than the 5 needed for a Cartesian product of one-hot
+encodings.
+
+All-or-nothing edge families
+----------------------------
+
+The efficient encoding schemes mentioned above take advantage of a
+particular property of families of edges in the transitive-reduced
+lattice to encode them more efficiently: that for any element of the
+lattice, within some subset of the edges, either none, exactly one, or
+all of the edges are on a path between that element and the infimum.
+That is, those edges are mutually exclusive --- within a certain
+sublattice, except for its supremum; and each is paired with another
+edge whose representation would be redundant.  This is what allows us
+to safely use such schemes.
+
+This suggests an approach for finding more efficient representations
+of arbitrary lattices: begin with the basic construction, then look
+for families of edges with this property.  Will it work?  Is it
+optimal?  I don't know.
+
+Hashing
+-------
+
+In database-query cases, it may be adequate to reject *most* of the
+candidate records from the index operations, rather than *all* of
+them.  In this case, you may be able to hash a larger identifier space
+into a smaller one, which you then represent with approaches such as
+the one-hot, cartesian-product, and binomial approaches mentioned
+earlier.
+
+There's a curious relationship here between binomial assignment, bloom
+filters, and approximate homomorphic processing, that I haven't fully
+explored.  For example, if many-bit binomial names are uncorrelated,
+the AND or OR of two or three of these names is likely to have several
+bits still, respectively, set or cleared; and so you should be able to
+use that combined value as a first-pass to sift for candidate matches.
+The expected number of candidate matches is probably dominated by the
+improbable case that the names cancel badly, in which case you get an
+exponential number of false positives.
+
+Query criticism
+---------------
+
+You could argue that this technique is not appropriate for query
+processing because it inflates the size of your index data: simple
+bitfields give you 1 bit per bit, while this gives you 0.53 bits (with
+Cartesian product of one-hot encodings) or between 0.64 and 0.95 bits
+per bit (with binomial assignment), all in order to allow any item to
+potentially represent, in effect, a simultaneous bitmask and value: a
+combination of a selection of a set of fields, with required values for
+those fields.
+
+But in the context of querying a database, the records, and especially
+the records' index entries, do not need to waste space (whether it's
+47% of your space, 36%, or only 5%) on something that is only useful
+in a query term.  It would make more sense, instead of testing
+`(a & b) == a`, to test `(am & b) == ar`, with a separate bitmask and
+expected result.
+
+This approach makes more sense in applications where the objects
+you're comparing really are the same kind of object, like when you
+have two Unix processes one of which wants to `ptrace` the other.
+
+CAMs
+----
+
+Content-addressable memories, which are mostly used in routers'
+routing tables and virtual memory translation lookaside buffers,
+include the `(a & b) == c` query operation as its fundamental
+operation, returning all the `b` that satisfy it.
+
+NTRU
+----
+
+Could this be useful for implementing NTRU?  I have no idea because I
+don't know how NTRU works.
+
+Credits
+-------
+
+Thanks to Darius Bacon for illuminating discussions on this essay!

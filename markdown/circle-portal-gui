@@ -1,0 +1,222 @@
+I was thinking about a zoomable, rotatable UI.  In this world, there’s
+some “world space” in which the scene graph exists, and your screen is
+an arbitrarily translated, rotated, and zoomed portal onto it,
+considered as a linear function in complex numbers: y = mx + b, where
+y is a point on the complex plane of world space, x is a point on the
+complex plane of screen space, and m and b are complex numbers that
+determine the translation, rotation, and zoom.
+
+The world plane contains only one kind of object, which is mutable:
+portals.
+
+A *portal* is a circle through which another part of the world plane
+is visible; like the screen, it consists of an (m, b) pair defining an
+arbitrary translation, rotation, and zoom, this time from the world
+plane onto itself.  However, it also has a *clipping circle*, defined
+by a center and radius outside of which it is not visible, and a
+*background color*, which is an RGBA color that it renders underneath
+everything else seen through the portal.
+
+Portals already existed (with that name) in Pad++ decades ago; in this
+system there are four differences:
+
+- they are round, not rectangular;
+- they can rotate as well as zooming;
+- nothing else exists;
+- they have a background color.
+
+There is a total order among portals in the world plane, with portals
+earlier in the order being “painted on top of” portals later in the
+order.  This may or may not result in the later portal being invisible
+because it’s been obscured by an opaque background color.
+
+Optimizations
+-------------
+
+Given the necessity to sample the world plane at pixel coordinates,
+you can do strength-reduction of the pixel-scanning operation; if Δx
+is the coordinate difference between pixels on the same row, you can
+compute mΔx and scan the pixels on the row by repeatedly adding that.
+
+To keep drawing quick, it’s probably necessary to dynamically compute
+some kind of bounding volume hierarchy, which could be made out of
+circles or not.
+
+As you move scan line by scan line down the image, you can use the
+midpoint algorithm (which incrementally updates an error accumulator
+x² + y² - r² as it changes x and y to walk along the circle) to
+incrementally adjust the start point of each circle.
+
+You can cache parts of the world plane rasterized at some resolution,
+downsampling from there.  However, it may be tricky to propagate
+updates.
+
+Making things with it
+---------------------
+
+First, of course, you can draw things by putting opaque portals on top
+of or next to each other.  Those portals don’t need to view anything
+in particular.  At its simplest, you can use opaque black circles all
+of the same size as if they were dot-matrix pixels, but you can also
+overlap a bunch of portals (either translucent or of different colors)
+to get a gradient, for example, or use two concentric circles of
+different colors and slightly different radii to get a curved line of
+some thickness.
+
+Once you have a picture somewhere, you can add portals to it elsewhere
+in order to use it in more places.  Changes you make to the original
+picture will be reflected in each of the copies.  For example, you
+could draw a letter “C” in one place, add a portal to it, and add a
+crossbar on top of the portal, transforming it into a “G”.  Further
+modifications you make to the “C” — adding a serif, for example — will
+be reflected in the “G”.  If you draw glyphs for the letters "e", "t",
+"o", and "n", you can set up a series of portals to those letters to
+spell phrases like “no note on teen tenon tent to neon noon onto no
+tone”.  The rendering of the phrase will automatically reflect
+whatever changes you make to the original letterforms.
+
+Furthermore, you can make a portal for a whole set of such pictures,
+such as an entire monospaced font, and use portals onto that portal to
+pull out individual letterforms.  Then, if you redirect the portal to
+a different set of pictures, you have achieved a change of font.  You
+could even have an area with several different font variants, such as
+plain, bold, italic, and bold-italic.
+
+This works for monospaced fonts that don’t differ too much in aspect
+ratio, and for proportional fonts that share the same font metrics,
+but it won’t work very well for changing fonts between fonts with
+different metrics, including often changing between the plain and bold
+versions of the same font.
+
+(You can make a crudely bolded version of such a font by making two
+overlapping portals to it that are shifted by less than a linewidth,
+thus thickening its lines.)
+
+By putting portals within their own target, you can automatically
+generate fractals — which of course implies that the rendering code
+needs to handle infinite recursion gracefully.
+
+User interface interaction techniques thus enabled
+--------------------------------------------------
+
+Since everything you see on the screen is a portal to “somewhere
+else”, you can provide a command to jump to that other place, at which
+point you can zoom in or out as you wish.  And you can add such a
+portal from anywhere to anywhere.
+
+More commonly, you’d like to zoom in to look at a particular portal,
+without jumping through the portal.  This should help a lot with the
+problem ZUIs have with constrained pixel displays, where things are
+almost always either too big or too small.
+
+Conversely, you can display a set of “backlinks” to a place that are
+visual thumbnails in context of places that have a portal overlapping
+that place.
+
+Because everything is a portal, in addition to jumping through it or
+moving it around, you can also drive it around the space it views,
+zooming, panning, and rotating.
+
+Probably the usual way of making a new portal should be cloning an
+existing portal, after which you can start to make changes to it.
+
+Minimal interactions necessary to use it
+----------------------------------------
+
+There are only a few basic actions:
+
+- creating new portals;
+- deleting portals;
+- changing the background color of a portal;
+- changing where a portal looks (its destination point, zoom, and
+  rotation);
+- changing where a portal appears (its location and radius).
+
+For minimality of mechanism, the viewport portal should not require
+specially-implemented commands for it.  It’s just that deleting it or
+changing where it appears are inapplicable operations.
+
+The usual map navigation actions are panning and zooming, and panning
+usually results from left-mouse dragging or finger-dragging.  It would
+maybe be kind of unfortunate if left-mouse dragging did something to
+change the world, but of course that kind of conflicts with the desire
+for the viewport portal not to be special...
+
+You might be able to get by with only jump-to rather than free panning
+and zooming: click on a portal to make it mostly fill your viewport.
+But that really only works for the viewport portal.  Ideally (for
+minimality of mechanism) the viewport portal would be much like any
+other portal.
+
+So that means that jump-to takes two different portals as arguments:
+the jump destination and the thing you want to cause to point at it
+(your “focus portal”).
+
+Even telling what you’re clicking on may be a little tricky, since you
+can be looking at a portal that is viewing a zoomed-in view of another
+portal which is zoomed into a third portal, etc.
+
+Practically speaking, you probably need to be able to copy portals so
+that you can make modified versions of them.  But you can have two
+kinds of “copy relationships” between portals: a portal can simply be
+a view of another portal, or it can be a clone of it.  It might make
+sense to start with a “create a view” command and then possibly later
+convert that into a “make a copy of the viewed scene”.
+
+At some point it may also be useful to push objects through a portal.
+
+I’m thinking that probably when you click (or double-click?) on a
+portal a halo of buttons should appear around it offering you
+different options: one to change its size, one to move it around where
+it is displayed, one to delete it.  Probably zooming and panning the
+selected portal should just be the usual mouse drag and scroll i
+
+Prototyping
+-----------
+
+I’ve talked above a bit about techniques that might be useful for an
+efficient implementation of this system.
+
+However, it should be possible to hack together a *simple*
+implementation of the system, enough to play with, much more
+easily... and so I spent a couple of hours on that in DHTML with
+`<canvas>`.
+
+Real-time responsiveness
+------------------------
+
+In the form described above, it’s possible to require an arbitrary
+amount of computation per pixel; in fact, if the pixel happens to be a
+fixed point of a portal transformation, the amount is theoretically
+infinite.  This is intolerable for real-time user interface
+responsiveness.
+
+To avoid this problem, I propose that we render portals each frame not
+from their *current* contents but from their *previous* contents,
+cached as a raster image from the previous frame.  If no previous
+contents are available, use some placeholder texture that’s easy to
+compute.
+
+In the absence of alpha-compositing, this would guarantee that it’s
+possible to calculate the screen image each frame with a single
+texture sample per screen pixel, plus some increment of work in
+updating offscreen texture buffers; if this increment is small,
+updates might take many frames to settle, while if it is large, they
+should settle quickly.  This background increment itself has the same
+real-time pixel bound as the screen update.  Normally you would expect
+the increment to be many times the size of the screen.  For example,
+the VideoCore IV used in the Raspberry Pi claims a fill rate of a
+gigapixel per second, but only 2.1 megapixels of output screen
+resolution at most (and only one megapixel by default), so it should
+be able to compute almost seven screenfuls of offscreen texture
+updates per frame in the worst case.
+
+To guarantee real-time responsiveness in the presence of
+alpha-compositing, partially-alpha-composited images should also be
+cached.  Ideally you'd do this front-to-back, inverse-painter’s-
+algorithm style.
+
+Finally, it makes sense to schedule this offscreen texture updating to
+happen *before* the screen is painted rather than after, so that
+you’ll only see lag in the case where there’s more work to be done
+than can actually be done in a single frame time.

@@ -1,0 +1,349 @@
+Maybe Counting Characters in UTF-8 Strings Isn't Fast After All!
+================================================================
+
+These are responses to [Reddit
+comments](http://reddit.com/r/programming/info/6lv0y/comments) on
+<http://canonical.org/~kragen/strlen-utf8.html>.
+
+I Think I Was Wrong
+-------------------
+
+From reading the Reddit comments, I now think that the results I got
+didn't justify the conclusion I drew, and the evidence now suggests
+that iterating over the code points in a UTF-8 string *is*
+significantly slower than iterating over the code points in an ASCII
+string.  Thanks, guys!  I should dig into it a bit more and see if I
+can learn more.
+
+It looks like my results were really skewed by using `gcc -O` instead
+of pretty much any other level of optimization.  By ill chance, I
+happened to test things on the single optimization level that would
+give the results I got.
+
+"bonzinip" writes:
+
+> crap. no one in their right mind would use lodsb on a modern
+> processor. my results are
+> 
+>     3:                   strlen(string) =   33554431: 0.013685
+>     3:                my_strlen(string) =   33554431: 0.024342
+>     3:              my_strlen_s(string) =   33554431: 0.099565
+>     3:         ap_strlen_utf8_s(string) =          0: 0.102122
+>     3:         my_strlen_utf8_c(string) =          0: 0.058268
+>     3:         my_strlen_utf8_s(string) =          0: 0.099565
+> 
+> more or less the same for all three benchmarks
+
+Well, I pointed out in the page that `lodsb` was a bad idea, even on
+an old processor; on old processors, you should use `scasb` instead,
+as `gcc -O` does. XXX aristotle used lodsb
+
+The really interesting thing about your results, though, is that
+`my_strlen` is more than *twice as fast* as any of the UTF-8 versions,
+and *four times as fast* as what the C compiler used in this case.  If
+that's the best we can do for UTF-8, then counting characters in UTF-8
+strings *isn't* fast.  It's slow!
+
+I'll try to reproduce your results; what processor are you using, what
+compiler and options, and what is the generated assembly code?
+
+"Porges" writes:
+
+> strlen is also consistently fastest for me
+> 
+>     1: all 'a':
+>     1:                   strlen(string) =   33554431: 0.019204
+>     1:                my_strlen(string) =   33554431: 0.035398
+>     1:         ap_strlen_utf8_s(string) =   33554431: 0.068897
+>     1:         my_strlen_utf8_c(string) =   33554431: 0.072316
+>     1:              my_strlen_s(string) =   33554431: 0.120852
+>     1:         my_strlen_utf8_s(string) =   33554431: 0.137072
+>     2: all '\xe3':
+>     2:                   strlen(string) =   33554431: 0.019043
+>     2:                my_strlen(string) =   33554431: 0.035056
+>     2:         ap_strlen_utf8_s(string) =   33554431: 0.068909
+>     2:         my_strlen_utf8_c(string) =   33554431: 0.071979
+>     2:              my_strlen_s(string) =   33554431: 0.120309
+>     2:         my_strlen_utf8_s(string) =   33554431: 0.154263
+>     3: all '\x81':
+>     3:                   strlen(string) =   33554431: 0.019083
+>     3:                my_strlen(string) =   33554431: 0.034908
+>     3:         ap_strlen_utf8_s(string) =          0: 0.068871
+>     3:         my_strlen_utf8_s(string) =          0: 0.069123
+>     3:         my_strlen_utf8_c(string) =          0: 0.071848
+>     3:              my_strlen_s(string) =   33554431: 0.120325
+> 
+> Edit: I should note this is -O2, not -O as in the post.
+> 
+> ... I’ve posted a followup to
+> this. <http://reddit.com/info/6m0ej/comments/>
+
+As with bonzinip's results, the UTF-8 counters are half as fast as the
+C-coded byte counters, and about one fourth as fast as `strlen`.  What
+processor is this, and what is the emitted assembly?
+
+"splidge" comments on "Porges"' post:
+
+> Yes, for me running with -O gives results similar to the original
+> post whereas -O3 gives results similar to yours.
+> 
+> In fact, running without -O gives pretty much the same results for
+> the default strlen() as -O3, with -O coming out significantly
+> slower. The other C implementations improve from no optimisation to
+> -O to -O3 as you would expect.
+
+(I don't have anything to say about this, except that it's kind of
+depressing, but I thought it was important to archive.)
+
+"rolfr" writes:
+
+> This guy's using obsolete performance measurements. Number of
+> instructions in the inner loop hasn't been important for ages; it's
+> all about the pipeline characteristics of said instructions.
+
+Yes, you are right.  I'm pretty ignorant about assembly-language
+optimization on modern processors, or, for that matter, on non-modern
+processors.  Knowing I was ignorant, I only used instruction counts as
+a heuristic and relied on observed runtime measurements for my actual
+conclusions.
+
+"Wavicle" writes:
+
+> To be fair, he bases his final conclusions on the observed runtime
+> over large strings *of the same value repeated*. Thus he trains the
+> branch predictor to always make the same optimization each time.
+
+That's a fair objection.  I wonder if it makes a large difference.
+
+The Point
+---------
+
+I didn't write that page to prove some predetermined point.  I wrote
+it to document my (our) exploration of a hypothesis of Aristotle's,
+namely that iterating over the code points in a UTF-8 string was
+approximately as fast as iterating over the code points of an ASCII
+string.
+
+Then, at the end, I listed some things I thought I'd learned in the
+process, including this #3:
+
+> Aristotle was essentially correct: the penalty for counting UTF-8
+> characters, or indexing into or iterating over the characters of a
+> UTF-8 string, is very small.
+
+As a result of this structure, the Reddit comments contained a lot of
+speculation about what "the point" of the page was, and a bunch of
+people missing it.
+
+"ochuuzu1" writes:
+
+> Also, plus, WTF: no one in their right mind would use `strlen()` in a
+> performance-critical inner loop of any real application.
+> 
+> You can tweak `strlen()` to make it run as fast as you possibly can,
+> but it will never be faster than not calling `strlen()` in the first
+> place.
+
+Of course you are right.  `strlen` is just a proxy here for the speed
+of iterating over the characters in a string, which is indeed found in
+performance-critical inner loops of many real applications.
+
+"cracki" writes:
+
+> haha. nullterminated strings are stupid. **counting** characters is
+> stupid. it costs you nothing to keep the length around.
+
+Same comment.
+
+UTF-8 as an Internal Representation
+-----------------------------------
+
+"GolemXIV" writes:
+
+> I hope that I should not have to use UTF as in memory representation
+> at all (with exceptions of course). It would be so nice if I could
+> leave UTF* to places where characters are stored or streamed.
+> 
+> UTF/UCS combining marks means that programs cannot treat one code
+> point as being the same as one unit for editing even when you use
+> UTF-4 (UTF-32). That sucks small planets when not streaming or
+> storing strings.
+> 
+> Is there string libraries on programming languages where character
+> type refers to a base character together with all the combining
+> characters that are attached to it? I would like to work with
+> vectors of character objects, not with code points.
+
+I agree that often it would be much better to have vectors, or at
+least sequences, of character objects rather than code points or bytes
+or UTF-16 bytepairs.  I don't know of any string libraries that work
+this way, but I'm pretty ignorant about Unicode, so maybe there are
+some.
+
+It's a good point that converting UTF-8 to UCS-4 still doesn't save
+you as much hassle as one might naively hope, because of things like
+combining characters.
+
+Occasionally, though, I've heard assertions that UTF-8 is very
+inefficient, because finding the Nth code point of a UTF-8 string is
+O(N).  The hypothesis I started with was that (a) iterating over the
+code points is more important than indexing them randomly and (b)
+iterating over them is as fast as iterating over ASCII bytes.  If
+that's correct, then while you might decide that UTF-8 is a bad
+internal representation for some reason or other, it shouldn't be
+because you're afraid it's slow.  And GolemXIV makes a good point that
+even in UCS-4, you can have arbitrarily many code points that display
+in a single spot on the display.
+
+"cracki" writes:
+
+> besides, it's an encoding. you're meant to decode it if you need to
+> work with the contents. hardly anybody has any excuse for not
+> expanding utf-8 to 32 bit characters in memory. then, even indexing
+> is constant time.
+
+Well, regardless of what you're *meant* to do, you should decode it if
+that leads to a system that makes people happier --- say, running
+acceptably fast while being simpler and overall easier to debug and
+modify.  A lot of times, finding a simpler way involves exploring a
+lot of ideas that sound kind of crazy, like not decoding your UTF-8.
+And most of them *are* crazy, and this one probably is too, but you
+have to explore them in order to find out.
+
+Miscellaneous
+-------------
+
+"silon" writes:
+
+> Please do not call the function strlen
+
+I didn't; I called it things like `my_strlen_utf8_s`.
+
+"bonzinip" writes:
+
+> because the string instructions are very slow and go through the
+> microcode sequencer. i would just use normal `mov` and `inc`
+> instructions.
+
+You'll notice that that's what the C version of `strlen` compiled to,
+and that it was faster than my dumb `lodsb` version and GCC's dumb
+`rep scasb` version.
+
+"bart2019" writes:
+
+> The storage of an integer is ridiculously little compared to the
+> storage of the string contents itself.
+
+I suppose that depends on how many of your strings are less than 4 or
+8 bytes, doesn't it?  I've written a number of programs nearly all of
+whose strings were that short.
+
+(That said, I basically agree that null-terminated strings are a bad
+idea.)
+
+Carl Friedrich Bolz ("cfbolz") writes:
+
+> Implementing ropes well is not trivial. A while ago I
+> [tried](http://morepypy.blogspot.com/2007/11/ropes-branch-merged.html)
+> to to implement the Python string type in such a way as to
+> internally use ropes [in] PyPy. I never managed to get ropes perform
+> significantly better than array-based strings for real-life
+> benchmarks (although I admit I didn't try anything extreme with 2GB
+> of text or so).
+
+It's true that ropes, like other clever data structures with beautiful
+big-O numbers, tend to have higher constant factors.  But I don't
+think they're all that much higher.  (I seem to recall that the SGI
+STL includes a C++ rope implementation called "cord", and the Boehm
+garbage collector includes a rope implementation called "rope"; I
+might have gotten the names backwards, though.)
+
+One of the trouble with real-life benchmarks is that people write
+real-life code to perform acceptably on the implementations they have;
+so they tend to heavily lean towards the things that were very
+efficient on the old implementation, and away from the things that you
+hope you're improving.  Dick Gabriel wrote about this back in the
+1980s in p.3, section 1.1 of [Performance and Evaluation of Lisp
+Systems](http://www.dreamsongs.com/Files/Timrep.pdf "by-nc-sa!"):
+
+> There is a range of methodologies for determining the speed of an
+> implementation. The most basic methodology is to examine the machine
+> instructions that are used to implement constructs in the language,
+> to look up in the hardware manual the timings for these
+> instructions, and then to add up the times needed.  Another
+> methodology is to propose a sequence of relatively small benchmarks
+> and to time each one under the conditions that are important to the
+> investigator (under typical load average, with expected working-set
+> sizes, etc). Finally, real (naturally occurring) code can be used
+> for the benchmarks.
+> 
+> Unfortunately, each of these representative methodologies has
+> problems.  The simple instruction-counting methodology does not
+> adequately take into account the effects of cache memories, system
+> services (such as disk service), and other interactions within the
+> machine and operating system. The middle, small-benchmark
+> methodology is susceptible to ‘edge’ effects: that is, the small
+> size of the benchmark may cause it to straddle a boundary of some
+> sort and this leads to unrepresentative results. For instance, a
+> small benchmark may be partly on one page and partly on another,
+> which may cause many page faults. Finally, the real-code
+> methodology, while accurately measuring a particular implementation
+> (namely, the implementation on which the program was developed), is
+> not necessarily accurate when comparing implementations. For
+> example, programmers, knowing the performance profile of their
+> machine and implementation, will typically bias their style of
+> programming on that piece of code. Hence, had an expert on another
+> system attempted to program the same algorithms, a different program
+> might have resulted.
+
+He goes into more detail in section 1.4.3, p. 28:
+
+> One way to measure those characteristics relevant to a particular
+> audience is to benchmark large programs that are of interest to that
+> audience and that are large enough so that the combinational aspects
+> of the problem domain are reasonably unified. For example, part of
+> an algebra simplification or symbolic integration system might be an
+> appropriate benchmark for a group of users implementing and using a
+> MACSYMA-like system.
+> 
+> The problems with using a large system for benchmarking are that the
+> same Lisp code may or may not run on the various Lisp systems or the
+> obvious translation might not be the best implementation of the
+> benchmark for a different Lisp system. For instance, a Lisp without
+> multidimensional arrays might choose to implement them as arrays
+> whose elements are other arrays, or it might use lists of lists if
+> the only operations on the multidimensional array involve scanning
+> through the elements in a predetermined order. A reasoning program
+> that uses floating-point numbers 0--1 on one system might use
+> fixed-point arithmetic with numbers 0--1000 on another.
+
+Bolz makes the same point in [his blog post on the PyPy
+ropes](http://morepypy.blogspot.com/2007/11/ropes-branch-merged.html):
+
+> Using ropes to implement strings has some interesting effects. The
+> most obvious one is that string concatenation, slicing and
+> repetition is really fast (I suspect that it is amortized O(1), but
+> haven't proved it). This is probably not helping most existing
+> Python programs because people tend to code in such a way that these
+> operations are not done too often.
+
+More to take into account:
+<http://www.reddit.com/r/programming/info/6lv0y/comments>
+the original post
+<http://www.reddit.com/info/6m0ej/comments/>
+reddit post of porges' response
+<http://porg.es/blog/counting-characters-in-utf-8-strings-is-faster>
+porges' response (George Pollard)
+<http://www.daemonology.net/blog/2008-06-05-faster-utf8-strlen.html>
+Colin Percival's response
+<http://porg.es/blog/ridiculous-utf-8-character-counting>
+George Pollard's comment on Colin Percival's approach
+<http://www.reddit.com/r/programming/info/6m5yg/>
+reddit comments on Colin Percival's approach, which includes the
+lovely comment:
+
+> What would be even more useful, would be if people attempted to make
+> a "fastest" random-access indexed lookup of a full Unicode codepoint
+> in a stream or buffer of UTF8. If that could be made speedy enough,
+> then there would be less of a need to store 16 or 32 bit codepoints
+> internally, and always need conversions.

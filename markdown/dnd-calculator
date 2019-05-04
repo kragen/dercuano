@@ -1,0 +1,86 @@
+drag-and-drop calculator for touch devices
+==========================================
+
+I wrote an RPN calculator in DHTML, and it runs on my iPhone, but it
+isn’t very usable.  One problem is that it’s misidentifying some
+keypresses (apparently shiftKey is false when you press the `*` on the
+on-screen keyboard on both Android and iPhone, but the keyCode is the
+same as `8`, and so `*` comes out as `8`, because I was too dumb to
+use a library) but it has bigger problems.  The keyboard eats up a lot
+of the screen real estate; predictive text like Swype is totally
+incompatible with instant feedback; you have to switch keyboard modes
+to get to different operators; there are no arrow keys, much less a
+Ctrl key to use with the arrow keys; and pressing the wrong key is
+common, so undoing an error needs to be extra easy.
+
+Fundamentally the issue is that command keys are a bad idea on these
+touchscreens.  They have the usual problems with command keys (they’re
+not discoverable, not selectively available and thus invisibly modal)
+but also the touchscreen offers very poor precision for keypressing.
+Instead, it’s optimized for dragging, and pointing at things.  You
+could use keys (ideally transparent ones!) for data input, but you
+probably shouldn't use them for editing.
+
+I think you can usually get about 6 rows of about 4 buttons on a
+cellphone touchscreen, so a keypress can convey about 5 bits of
+information.  But a drag stop can typically indicate a position to
+about 8 bits of horizontal precision and 8 bits of vertical precision,
+or 7 bits each easily — with the caveat that you can't see what the
+fuck is under your finger.
+
+The ideal drag-and-drop behavior of mouse-driven systems is that, when
+you start dragging a thing that can be dropped in places, the places
+it can be dropped will light up, and in some cases emerge from
+invisibility, in order for the user to be able to discover them.  Then
+you can carefully position the dragged item over the drop target and
+release it.  If a given on-screen object wants to support several
+different actions from having the same thing dropped on it, those
+different things need to be different drop targets, perhaps positioned
+in active zones around it, which can become active only when a drag is
+in progress.  Your drop action is the utterance of an RDF triple: the
+subject, perhaps, is the dragged item; the object is the object from
+which the drop target emerged; and your choice of drop target — a
+delta vector between the drop position and the object of your
+utterance — provides the verb.
+
+(Naked Objects pioneered this approach to method invocation for
+business data processing UIs.)
+
+A problem with this on a small screen is that your drop targets need
+to be damned big for you to be able to see them around your finger,
+which means you can't have very many of them.  Maybe you can
+dynamically zoom drawers or things as you drag around in order to
+effectively get more screen real estate, but man.  So much loss.
+
+One possible fix to this would be to have the “drop targets” emerge
+from the *object being dragged* rather than the stationary object;
+they can protrude in all directions from under your finger, sort of
+like a pie menu.
+
+In the calculator case, perhaps you have a number 314 and a number 100
+that you would like to combine:
+
+    314          100
+
+If you start dragging the 100 around, binary operators can begin to
+protrude from it, while the 314 lights up as a potential target:
+
+                ^ * |
+    31⃝4        - 100 +
+                , ÷ &
+
+and if you position one of those operators over the 314, it will light
+up; if you then release your touch, the two numbers can combine into a
+new formula.  You can take advantage of the precision of dragging in
+order to unambiguously select the 314 as the target; if it is embedded
+in a compound formula, that formula might magnify as you approach it
+in order to reduce collisions.
+
+Of course, if you could manage to drop the 100 directly on the 314,
+you could then pop up a pie menu of binary operators, but this seems
+both more cumbersome and less discoverable.
+
+A different approach, taking advantage of the possibilities for
+multitouch interaction afforded by modern touchscreens, would be to
+use two separate fingers for different things, instead of a single
+drag-and-drop gesture.

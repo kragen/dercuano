@@ -1,0 +1,270 @@
+Very fast FIR filtering with time-domain zero stuffing and splines
+==================================================================
+
+It just occurred to me that maybe you can use splines to do
+convolution with large-support kernels without high-frequency
+components much more efficiently than using FFTs or time/space-domain
+convolution.
+
+The underlying intuition here is that you can approximate the large
+kernel with a uniform spline of, say, second through fourth order, and
+then convolve that spline with the original data very efficiently.
+
+This uses a series of inexpensive linear discrete-time time-invariant
+processing operations, specifically sparse-kernel convolution and
+boxcar filtering (simple moving average).  But it does not fit into
+the standard FIR or IIR molds, so perhaps it’s been overlooked so far.
+It is potentially an IIR filter, but the usual description of IIR
+filters in terms of linear combinations of past input and output terms
+does not yield an efficient implementation.
+
+Splines
+-------
+
+The spline curve through knots (0, 1) and (n, 0) for all other
+integral n approaches sinc as its degree approaches infinity.
+
+XXX
+
+Sparse-kernel convolution
+-------------------------
+
+A sparse convolution kernel is one that’s zero at almost all points,
+except for a finite number of impulses.  That is, the cardinality of
+its support is finite, and small compared to the bounds of its
+support.  For example, in a discrete time domain, consider the kernel
+[-1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 -1].  It should be apparent that,
+although this kernel covers 17 samples, you don’t need 17
+multiplications per sample to convolve with it without transforming to
+the frequency domain; you only need three.  (And, in this case, even
+those happen to be trivial multiplications.)
+
+> A *recursive* version of sparse convolution, where the convolution
+> kernel is causal and its output is added to the input, is the
+> computational primitive of Karplus-Strong string synthesis, and
+> digital delay-line audio synthesis in general.
+
+In general, convolving a discrete-time signal with an N-impulse sparse
+kernel in the time domain can be done in N multiply-accumulates per
+input sample, regardless of the width of the kernel’s support bounds.
+
+In particular, the sparse kernels we will consider have impulses at
+the knots of some uniform spline; since uniform splines have regularly
+spaced knots [XXX is that the right definition?], the impulses in our
+kernel are also regularly spaced.
+
+Boxcar filtering
+----------------
+
+Boxcar filtering is convolution with a “rectangular function”, which
+is some arbitrarily scaled and shifted version of the “boxcar
+function”, which is 1 from -½ to ½ and zero elsewhere.  This filter is
+also known as the “moving average” (or, to avoid ambiguity, “simple
+moving average”), “running mean”, “rolling mean”, “box blur”, or “mean
+filter”.  This kernel and sinc are Fourier-transform duals.
+
+Boxcar filtering of a discrete-time signal is very efficient: a
+boxcar-filtered signal is just the difference between terms a fixed
+distance apart in the signal’s prefix sum (aka indefinite sum or
+antidifference), although this imposes a constant multiplication on
+you that you may wish to undo with a division.  This means that you
+can calculate an boxcar filter of arbitrary width with one addition
+and one subtraction per sample, plus a big enough intermediate FIFO to
+cover the boxcar’s length.
+
+> There’s an inherent tradeoff between preserving step response and
+> filtering out noise.  Among linear filters with a given step
+> response, boxcar filtering by itself is optimal for reducing
+> independent independently distributed additive noise; for example,
+> removing noise from a photograph while minimally fuzzing out the
+> edges.  Nonlinear filters like median filters can do better, but
+> other FIR and IIR filters can’t.
+
+[Repeated convolution of the boxcar function with itself][0] yields
+the sequence of cardinal B-splines, which are successive
+piecewise-polynomial approximations to a Gaussian.  Any uniform
+B-spline can be expressed as a weighted sum of these cardinal
+B-splines.
+
+[0]: http://www.chebfun.org/examples/approx/BSplineConv.html
+
+> That is actually a well-known technique for efficiently
+> approximating a two-dimensional Gaussian blur of an image.
+
+Efficiently approximating a spline-kernel convolution
+-----------------------------------------------------
+
+Because you can express any uniform B-spline as a weighted sum of
+cardinal B-splines, you can choose a regularly-spaced sparse kernel
+that will produce a given uniform compactly-supported degree-M
+B-spline through the knots when convolved with a fixed-width boxcar
+filter M+1 times.
+
+Since composition of convolutions is not just commutative but also
+associative, this means that convolving your original signal with the
+N-impulse sparse kernel and then with a boxcar filter M+1 times will
+precisely convolve the image with an arbitrary N-knot degree-M uniform
+B-spline.  This requires N multiply-accumulates and 2M+2 additions and
+subtractions per sample, M+1 FIFOs whose size is each the impulse
+spacing.  In floating-point, the initial sparse kernel can be
+premultiplied by a small constant to compensate for the undesired
+amplification resulting from calculating from computing the boxcar
+filters without normalization; in fixed-point, most likely a bit shift
+in between stages of box filtering will be needed.
+
+(I think this spline technique generalizes to a nonseparable
+multiple-dimensional kernel; if that is so, its computational
+advantage in two or three dimensions should be enormously greater.)
+
+This approach is a fully general optimization for linear FIR filters
+used as bandpass filters, band-stop filters, and low-pass filters.  It
+probably isn’t useful for high-pass filters, because you will
+frequencies all the way up to Nyquist in your kernel, which means that
+your spline knots are necessarily a single sample apart.
+
+However, because you can ensure that your filter (the one you
+implemented, not just the one you were approximating) is linear-phase,
+you can subtract the filtered signal from the (lagged to zero-phase or
+π-phase) original signal to achieve some limited high-pass filtering.
+
+(Note that in this case, since your sparse kernel is required to be
+even, you can use the [folded FIR filter trick][1] to cut the
+multiplications required by half again.)
+
+[1]: http://www.embedded.com/design/real-time-and-performance/4008837/DSP-Tricks-An-odd-way-to-build-a-simplified-FIR-filter-structure
+
+I am SWAGging that this means that you need a number of
+multiplications per sample comparable to the Q of your filter if it’s
+a bandpass filter, regardless of frequency.  That is, for a Q of 20,
+you might need 11, or 21, or 41 multiplications per sample, but I
+doubt that you’ll need 128 or that you can get by with 5.  This, in
+turn, means that these spline-based filters should be very competitive
+with FFT-based techniques for all one-dimensional filtering outside
+the design space where Goertzel takes over.
+
+(I thought maybe you could improve the Q further by composing the
+filter with itself, but it turns out that doesn’t work: the Q improves
+by √2, but the computation time doubles.  You have to actually include
+more signal samples under the kernel to efficiently get better Q.)
+
+### Designing the sparse kernel ###
+
+I think you can totally just take a continuous FIR kernel and sample
+it at its Nyquist frequency, i.e. multiply it by a comb filter, and
+then convolve the result with the sparse kernel of coefficients for
+the fundamental spline you’re using.
+
+Spline definitions I’m confused about
+-------------------------------------
+
+https://en.wikipedia.org/wiki/B-spline says, “Any spline function of
+given degree can be expressed as a linear combination of B-splines of
+that degree. Cardinal B-splines have knots that are equidistant from
+each other. ... A fundamental theorem states that every spline
+function of a given degree, smoothness, and domain partition, can be
+uniquely represented as a linear combination of B-splines of that same
+degree and smoothness, and over that same partition. ... A cardinal
+B-spline has a constant separation, h, between knots. The cardinal
+B-splines for a given degree n are just shifted copies of each
+other.”
+
+https://www.cs.unc.edu/~dm/UNC/COMP258/Papers/bsplbasic.pdf seems
+better.  It says splines are the linear combinations of B-splines.
+“‘B-spline’ refers to a certain spline of minimal support and,
+contrary to usage unhappily current in CAGD [computer-aided geometric
+design], does not refer to a curve which happens to be written in
+terms of B-splines.”
+
+Aha, and it explains that cardinal splines are the splines whose knots
+are at ℤ.  I thought those were “uniform splines”.
+
+Related work
+------------
+
+Unser, Aldroubi, and Eden’s delightful 1993 paper [0] pioneered the
+use of the running-sum algorithm for linear-time B-spline filtering.
+On p. 827, they explain B-spline filtering:
+
+> We propose the concept of B-spline filtering which is the process of
+> applying a filtering operator to the continuous B-spline
+> representation of a signal.  When the operator is discrete, this
+> procedure is rather trivial and does not seem to have any specific
+> advantages: due to the linearity of all operations, one may as well
+> apply the filter to the discrete signal and avoid the unnecessary
+> transformation step.  Of greater interest is the case where the
+> impulse response of the filter itself is represented by a B-spline
+> of order *p*.
+
+(By “represented by a B-spline”, they mean “represented by a weighted
+sum of B-splines”, as the equation not quoted here clarifies; Unser
+et al. regularly use "B-spline" to mean “weighted sum of B-splines”, a
+usage which de Boor deplores.)
+
+From this they derive that you can do a discrete convolution of the
+B-spline coefficients representing the signal and the filter kernel to
+get the (higher-order) B-spline coefficients of the convolution
+result.
+
+However, it appears that applying this result to a discrete signal
+requires first deriving the B-spline coefficients from the discrete
+signal by a discrete convolution with the B-spline coefficients of the
+fundamental spline, and then after computing the convolution result in
+B-spline form, converting back to discrete-signal form by discrete
+convolution with the (higher-order, and thus longer-support!) sampled
+B-spline.  This is a substantial amount of computation.  Also, the
+Unser et al. algorithm requires the signal and the filter to be
+sampled (i.e. have spline knots spaced) at the same sampling rate, so
+it is no more efficient for a filter containing only low frequencies.
+
+This restricts the applicability of the 1993 spline filtering
+algorithm.
+
+The present work improves over the Unser et al. algorithm by avoiding
+the necessity to convert the signal as well as the filter kernel to
+and from the spline representation; and, furthermore, for filter
+kernels bandlimited to low frequencies, it can approximate the kernel
+with a high-order spline with much more widely spaced knots, resulting
+in much less computation.
+
+Ferrer-Arnau et al. 2013 [1] developed a filtering algorithm which
+superficially sounds very similar to the present one: they improved
+Unser et al.’s spline filtering algorithm by an approximate FIR
+filter.  Upon further investigation, they developed a particular FIR
+filter to approximate the process of fitting a cubic spline to noisy
+data, rather than developing a spline to approximate an arbitrary FIR
+filter.
+
+Vrcelj and Vaidyanathan 2001 [2] also uses FIR filters to
+approximately transform a signal into B-spline coefficients, rather
+than using B-spline coefficients to approximate a FIR filter.
+
+CIC filters (Hogenauer 1980) are very similar indeed to the present
+work, consisting as they do of a composition of a cascade of
+running-sum filters (“integrators”), factored into a cascade of
+integrators, decimation, and a cascade of differentiators; or, for
+upsampling, a cascade of differentiators, zero-stuffing, and a cascade
+of integrators.  Hmm, XXX if you stick a FIR filter in between two CIC
+filters running at a lower rate, is it the same thing?  No; the CIC
+filter is *much more efficient*.  The recommendation to put your
+compensation filter’s cutoff below a ¼ of the first null frequency
+probably requires more FIR coefficients than I was thinking were
+necessary, but probably also applies to the present work!
+<http://www.embedded.com/design/configurable-systems/4006446/Understanding-cascaded-integrator-comb-filters>
+<https://www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/an/an455.pdf>
+
+[0] “B-Spline Signal Processing: Part I—Theory”, by Michael Unser,
+Akram Aldroubi, and Murray Eden, IEEE Transactions on Signal
+Processing, Vol. 41, No. 2, February 1993, pp.821–832, IEEE Log Number
+9205111, <http://bigwww.epfl.ch/publications/unser9301.pdf>.
+
+[1] "Efficient cubic spline interpolation implemented with FIR
+filters", by Lluís Ferrer-Arnau, Ramón Reig-Bolaño, Pere Marti-Puig,
+Amàlia Manjabacas, and Vicenç Parisi-Baradad, International Journal of
+Computer Information Sy stems and Industrial Management Applications,
+ISSN 2150-7988 Volume 5 (2013) pp. 098-105.
+<http://digital.csic.es/bitstream/10261/71847/1/IJCISIMA5_98.pdf>
+
+[2] “Efficient Implementation of All-Digital Interpolation”,
+Bojan Vrcelj and P.P. Vaidyanathan, July 19, 2001, EDICS number 2-INTR
+<http://gladstone.systems.caltech.edu/dsp/students/bojan/journ/IPtran_01.pdf>
+

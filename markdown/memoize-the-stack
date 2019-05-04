@@ -1,0 +1,73 @@
+Memoization is a fairly general technique for making pure functions
+faster to compute, particularly in the presence of incremental changes
+to input data, but it usually has to be applied judiciously.  The
+memoization runtime overhead on a function call is fairly large
+compared to a primitive function call (a bit larger than an order of
+magnitude), the space overhead of the memoized arguments and return
+values is potentially many orders of magnitude larger than that of the
+original program.  To make things more complicated, some functions are
+worth memoizing because, although they run for less than a
+microsecond, they are called many thousands of times per second, while
+others are worth memoizing because, although they are only called a
+few times per second, they run for tens of milliseconds; and,
+furthermore, if a function A does most of its work in a function B,
+and function B is mostly called by function A, it may be the case that
+either A or B is worth memoizing, but not both A and B, since
+memoizing either of them will dramatically reduce the cost of the
+other.  Finally, two functions C and D, which would seem to be equally
+worth memoizing given their respective runtime costs, might have
+vastly different memory costs to memoize, and so we might vastly
+prefer to memoize the one that will use less space.
+
+In the face of all of this uncertainty, I propose that perhaps a
+simple and reasonably effective way to figure out what to memoize may
+be to scan the stack at every minor garbage collection (a task which
+cannot be omitted from garbage collection in any case) and note the
+particular activation records currently present upon it.  If our
+activation records are in fact allocated on the heap in the nursery,
+then GCs almost cannot fail to occur regularly during ordinary
+computation, so the probability for an activation record to be present
+at garbage-collection time is a good approximation of how much
+computation time it represents.  If we then evacuate these activation
+records to the next generation, they will then be safe from minor
+garbage collection, and furthermore if we mutate them by writing a
+pointer to their eventual return value into them, the write barrier
+will shanghai the return value from the nursery into their generation
+upon the next minor collection.
+
+This, then, should provide us with a reasonably good facsimile of a
+memoization policy that retains in memory the activation records of
+calls whose past results we are likely to wish to consult once more.
+Still, it cannot yet inform us of which *functions* we ought to
+instrument with a memo-table probe, nor does it of itself organize
+them into a queryable memo table.  After all, even if dozens of
+activation records for a given function are copied out of the nursery,
+that function might be called dozens of times with different
+arguments, or dozens of millions; in the second case it may not be
+worth patching memoization overhead into the function’s preamble!
+
+But let’s suppose that we come up with some kind of approach to
+solving these problems, like the invocation counter HotSpot uses to
+decide which methods to optimize harder, sweeping the second
+generation to collect saved activation records into a table when it’s
+time to collect it, and estimating the amount of otherwise-garbage
+that each activation record hauls out of the nursery, or something.
+
+A really strange benefit of this memoization mechanism is that it can
+possibly memoize functions whose return value turned out to be very
+expensive to compute even from the very first time they are invoked,
+with no ahead-of-time indication that they will be expensive.  As long
+as they lived long enough and survived enough nursery collections,
+their return value will be properly saved, and future invocations will
+be able to use it.
+
+With a sufficiently powerful and clever memoization mechanism, you
+could replace most or all intermediate data structures in a program
+with function calls that purported to compute a value from the
+original (externally provided) inputs, and trust that if those
+functions take a long enough time to run, then their return values
+will be stored in a hash table without any explicit intervention on
+your part.  The best thing about that is that you wouldn’t have to
+worry about when to update those intermediate data structures or how
+much of them to update.  This is probably kind of a fantasy, though.
+

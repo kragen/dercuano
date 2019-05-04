@@ -1,0 +1,333 @@
+Suppose you do a powder-bed 3-D printing process where the binder you
+deposit is a flux that lowers the melting and sintering temperatures
+of the powder filler, then bake the block at a temperature high enough
+to sinter or melt the binder-modified part of the structure.  This
+might make 3D printing in new, unusual, or very inexpensive materials
+feasible.
+
+The baseline I’m coming from here is that a spool of fucking PLA on
+Amazon [goes for fucking US$23/kg.][21]  And, yeah, PLA is light and
+dimensionally stable and doesn’t require your hotend to get super hot
+(180° is enough), but it’s also pretty weak (50 MPa), and it sure
+takes a long time to come out of that teeny little hole.
+
+[21]: https://www.amazon.com/HATCHBOX-3D-PLA-1KG1-75-WHT-Filament-Dimensional/dp/B00J0GMMP6/ref=sr_1_3?ie=UTF8&qid=1467454476&sr=8-3&keywords=white+pla+filament
+
+Soda-lime glass
+---------------
+
+There are many possible binder-filler systems that could be used, but
+the one that seems most promising to me at the moment would use quartz
+sand as the filler and a mixture of sodium and calcium carbonates as
+the binder, forming soda-lime glass.  [Soda-lime glass][5] has a glass
+transition temperature of about 570°, and so sintering should be
+possible a bit below that, while unfluxed quartz melts at 1670°.  With
+1100° of headroom, it should be very easy to keep the kiln temperature
+in the range required to sinter or melt only the fluxed part, not the
+unused filler.  Indeed, it might be possible to [pit-fire][2] the
+piece, which typically reaches heats between 1000° and 1200°.
+
+[2]: http://www.ceramicstoday.com/howto/htpitfire.htm
+[5]: https://en.wikipedia.org/wiki/Soda-lime_glass
+
+The usual mixture for soda-lime glass is about 73% silica, 13% sodium
+oxide, 10% calcium oxide, and 4% other impurities.  Sodium and calcium
+carbonates, which are themselves fairly safe to handle, decompose to
+form these caustic oxides at 851° and 840°, respectively, though I
+suspect the presence of quartz will lower the required temperature.
+Sodium bicarbonate (aka sodium hydrogen carbonate), which is even
+safer to handle, decomposes to sodium carbonate starting at 50°,
+releasing water and CO₂.  All of these ingredients are safe enough
+that they are used in cooking.
+
+If calcium is omitted, the resulting “[waterglass][3]” material is
+water-soluble at high temperatures; this may not be a concern,
+depending on the application.  The potential advantage of this method
+would be that [sodium carbonate][0] and [bicarbonate][1] are
+water-soluble, up to about 5% or 10% in warm water.  However, that
+isn’t enough to properly flux the quartz, so it will have to be
+applied in solid form.
+
+[0]: https://en.wikipedia.org/wiki/Sodium_carbonate
+[1]: https://en.wikipedia.org/wiki/Sodium_bicarbonate
+[3]: https://en.wikipedia.org/wiki/Sodium_silicate
+
+You could have [a robot with a valved funnel][4] carefully dribbling
+the appropriate amount of mixed carbonates onto each layer of silica
+sand, or you could have an entire row of such nozzles.
+
+[4]: https://www.youtube.com/watch?v=YS0JtjdQQwU
+
+Soda-lime glass doesn’t start to flow freely until about 1000°, so as
+long as the temperature doesn’t get that high, the fluxed part of the
+print won’t soak into the rest of the unused filler too badly.
+
+[Lead glass][6] might be an alternative: rather than calcium, you use
+[lead(II) oxide][7] (or, with air, [galena][8] or just plain lead),
+and rather than sodium oxide, you use [potassium oxide][9], or in
+practice, [potassium carbonate][10].  Lead glass, however, is less
+viscous than soda-lime glass, which is undesirable in this case, and
+doesn’t have a lower softening point (still around 600°).
+
+[6]: https://en.wikipedia.org/wiki/Lead_glass
+[7]: https://en.wikipedia.org/wiki/Lead%28II%29_oxide
+[8]: https://en.wikipedia.org/wiki/Galena
+[9]: https://en.wikipedia.org/wiki/Potassium_oxide
+[10]: https://en.wikipedia.org/wiki/Potassium_carbonate
+
+Feldspar?
+---------
+
+The only mineral more common (and thus, I hope, cheaper) than quartz
+is feldspar, or rather, the feldspars, which melt at a wide variety of
+temperatures, [from 600° to 1200°][11].  I’m not sure what, if
+anything, to flux them with, other than quartz itself.  I guess
+[calcium-rich plagioclase can be fluxed with sodium-rich
+plagioclase][12].
+
+[11]: http://hyperphysics.phy-astr.gsu.edu/hbase/geophys/meltrock.html
+[12]: https://en.wikipedia.org/wiki/Bowen%27s_reaction_series
+
+Sodium and potassium feldspars are [traditionally used as fluxes][37]
+in pottery to vitrify silica and [boron trioxide][38], so in a sense
+this is just a slightly different angle on the soda-lime glass from
+the previous section.
+
+[37]: https://en.wikipedia.org/wiki/Ceramic_flux
+[38]: https://en.wikipedia.org/wiki/Boron_trioxide
+
+Alumina ceramic
+---------------
+
+[Alumina][32] (aluminum oxide, also known as ruby or sapphire) is the
+hardest mineral commonly used in ceramics, because the harder diamond
+and [carborundum][33] (silicon carbide) are tricky to deal with,
+[cubic boron nitride][34] is expensive (I think?), and tungsten
+carbide is about as hard as alumina, but more expensive.
+
+[32]: https://en.wikipedia.org/wiki/Aluminium_oxide
+[33]: https://en.wikipedia.org/wiki/Silicon_carbide
+[34]: https://en.wikipedia.org/wiki/Boron_nitride#Cubic_boron_nitride
+
+Alumina doesn’t melt until the truly unreasonably hot 2072°, which was
+a great difficulty in the development of the [Hall-Héroult
+process][35] that converted aluminum from a precious metal into a
+cheaper substitute for steel.  The trick that made it feasible was
+fluxing the alumina in [cryolite][36], Na₃AlF₆, so that the mix melts
+at only 1000°.
+
+[35]: https://en.wikipedia.org/wiki/Hall%E2%80%93H%C3%A9roult_process
+[36]: https://en.wikipedia.org/wiki/Cryolite
+
+So you could imagine fluxing an alumina powder bed with just enough
+cryolite to get the grains to sinter together into a glass at around
+1000°.  You can probably do this with an arbitrarily small amount of
+cryolite; it melts at 1012°, and I believe it will wet the alumina
+grains immediately and begin to dissolve them, recrystallizing or
+vitrifying upon cooling.  So the question is merely how much cryolite
+is needed to wet the alumina grains enough to form a solid mass.
+
+I don’t know how hard or strong the resulting cryolite-cemented
+alumina aggregate will be.
+
+Lead-tin solder and type metal
+------------------------------
+
+[Lead][13] melts at 327°; [tin][14] melts at 232°; but 63% lead and
+37% tin melts at 183°.  So you could flux lead filings with tin
+filings, and then heat the piece to anywhere between 183° (or even a
+bit less) and 327°.  [Lead costs about $2.20/kg; tin costs about
+$22/kg][15].  So the mixture costs about US$10/kg, which is not
+outrageous, but not cheap either. (You could probably reduce the price
+further by reducing tin content, at the cost of a higher and less
+crisp melting point.)
+
+[13]: https://en.wikipedia.org/wiki/Lead
+[14]: https://en.wikipedia.org/wiki/Tin
+[15]: http://pubs.usgs.gov/sir/2012/5188/
+
+However, lead is very dense (11.3g/cc), so a kilogram of this metal is
+not very much, and the tin-lead alloy is very soft; you can nick it
+with your fingernails.  Tin itself, at 7.4g/cc, is considerably less
+dense.
+
+Another problem with tin-lead solder is that it shrinks when it
+solidifies, resulting in a rough surface.  [Type metal][20],
+Gutenberg’s great invention, is a variant with a significant quantity
+of antimony (US$6.60/kg, melts at 630°), which prevents this shrinkage
+and improves hardness further.  The eutectic alloy is supposedly 84%
+lead, 12% antimony, and 4% tin, which works out to US$3.50/kg; it
+melts around 241°.  (The antimony-lead eutectic alloy melts at 252°.)
+
+Type metal has a [Brinell hardness][22] of around 20, which is four
+times that of lead, but one sixth that of soft steel.  This suggests
+that its tensile strength might be .36 * 9.8 * 20 = 70 MPa, a little
+better than PLA.
+
+[22]: https://en.wikipedia.org/wiki/Brinell_scale
+
+Another possible alternative is pewter, which is tin fluxed with about
+1% [copper][18] [(US$4.40/kg)][19] and 5% antimony.  This
+is considerably harder than tin because of the alloying elements, and
+I believe immune to tin pest, but it’s even more expensive.
+
+[18]: https://en.wikipedia.org/wiki/Copper
+[19]: http://www.cmegroup.com/trading/metals/base/copper.html
+[20]: https://en.wikipedia.org/wiki/Type_metal
+
+Brass and bronze
+----------------
+
+Bronze (copper, which melts at 1084°, alloyed with about 12% tin;
+bronze melts at about 950°) and brass (copper alloyed with around 40%
+[zinc][17], US$2.20/kg; zinc melts at 420°, brass a bit past 900°) are
+other possible alloys that could be shaped by this method.  Sprinkling
+12% pricey tin filings into a copper bed to lower its melting point by
+134° seems ideal.
+
+[17]: https://en.wikipedia.org/wiki/Zinc
+
+Using one metal as a binder for other metals, as in brazing
+-----------------------------------------------------------
+
+Brass is commonly used as a binder for other metals in brazing; you
+could, for example, use a powder bed of iron filings and deposit brass
+filings onto it before baking.  You could easily get most of the
+strength and cost of the final piece from the iron filings.
+
+The inexpensive metals — those less expensive than copper — are
+aluminum (US$2.20/kg), arsenic (US$2.20/kg), iron (US$0.88/kg),
+manganese (US$0.80/kg), silicon (US$2.40/kg), and zinc (US$2.20/kg);
+and we should include carbon, since iron is commonly alloyed with
+carbon (super cheap, depending on purity; [flake graphite costs
+US$1.50/kg][25]) to make steel or cast iron.
+
+Among these, zinc in particular (even without making brass by being
+mixed with copper) seems like it would be a good choice as a binder
+for an iron or steel filler, or possibly even for aluminum.  Zinc and
+aluminum form a variety of useful alloys, and apparently there’s a
+technique called “diffusion soldering” similar to this.  I’m not sure
+what would be needed to remove the aluminum-oxide layer from the
+surface of aluminum powder that has been exposed to air, though, and
+both zinc powder and aluminum powder are a bit of a fire hazard.
+
+Cast iron
+---------
+
+[Cast iron][27] melts around 1150° to 1200°, while pure iron melts at
+1538°.  Steels have intermediate melting points; mild carbon steel is
+the most common family, and [ASTM A36][28] is a typical mild carbon
+steel; it has up to 0.29% carbon and 0.28% silicon, and according to
+the [iron-carbon phase diagram][29], its melting point should still be
+above 1500°.  Cast irons typically contain 1–3% silicon and 2–4%
+carbon, although the eutectic point is at 4.3%.  At 3.5% carbon, the
+melting point is reduced to 1200°.
+
+[27]: https://en.wikipedia.org/wiki/Cast_iron
+[28]: http://www.azom.com/article.aspx?ArticleID=6117
+[29]: https://commons.wikimedia.org/wiki/File:Steel_pd.svg
+
+So, you could take a bed of ASTM A36 filings and selectively flux them
+with 3.25% carbon and 1% silicon, then heat them up to almost 1200°,
+or maybe a bit more, but not past 1500°.  The part you’ve selectively
+fluxed should sinter, and then you should be able to bake it more
+thoroughly to make a more homogeneous cast-iron part; deformation from
+the printed shape should be almost zero due to the silicon content
+forcing carbon to remain in graphite form.
+
+It might be a better idea to use a much smaller amount of carbon
+and/or silicon, so that when the powder is heated, only a small part
+of each filing around each carbon grain is melted, rather than the
+entire filing; this way, the printed part will not liquefy completely,
+and the finished part will be high-carbon steel rather than cast iron.
+
+Tungsten carbide
+----------------
+
+[Tungsten carbide][23], one of the most important industrial ceramics,
+can be made by reacting metallic [tungsten][24] with carbon at 1400°
+to 2000°; it melts around 2800°, while tungsten melts at 3422° and
+graphite sublimes at 3600°.  So you could “flux” a graphite powder bed
+[(US$1.50/kg)][25] with powdered tungsten (US$200 per “short ton
+unit”, which is 7.19 kg of tungsten, thus US$28/kg) and heat it up to
+2000° or a bit less.
+
+[23]: https://en.wikipedia.org/wiki/Tungsten_carbide
+[24]: https://en.wikipedia.org/wiki/Tungsten
+[25]: http://minerals.usgs.gov/minerals/pubs/commodity/graphite/mcs-2014-graph.pdf
+
+Alternatively, you could “flux” the graphite with [tungsten
+trioxide][26], which melts at 1473°, and heat it only to 900° to react
+it with the graphite and immediately produce the tungsten carbide.
+
+[26]: https://en.wikipedia.org/wiki/Tungsten_trioxide
+
+All of this might need to happen under pressure, I’m not sure.
+
+Alpaca: raising the melting point instead of lowering it
+--------------------------------------------------------
+
+Here in Argentina, the common alternative to stainless steel or silver
+used in silverware and whatnot is an alloy, invented by Qing China,
+called “[alpaca][30]”, from the 19th-century brand name of a German
+company; worldwide this is typically 60% copper, 20% [nickel][31]
+(US$22/kg, melts at 1455°), and 20% zinc, working out to US$7.50/kg.
+It looks like silver, it’s bactericidal like silver, and it’s strong
+and easy to electroplate with, for example, silver.
+
+The CRC Handbook of Mechanical Engineering gives the melting point of
+the ASTM B122 formulation of alpaca in its quaint folk units of
+measurement as 2030°F and its modulus of elasticity as 18 Mpsi, which
+are 1110° and 124 GPa in SI.
+
+Alpaca probably cannot be 3D-printed in the way discussed above,
+because it melts at a higher temperature than copper, zinc, or alloys
+thereof.  If you were to try selectively depositing copper and zinc
+into a bed of powdered nickel, you would have the problem that the
+product formed would be much larger than the powder it was deposited
+into.
+
+However, perhaps you could deposit powdered nickel into a bed of
+powdered 75%-copper brass, and then heat it up to about 1000° or
+1100°.  If the nickel has sufficiently diffused into the brass, the
+brass will melt and run away, leaving a solid alpaca object coated and
+perhaps permeated with liquid brass, as long as the nickel doesn’t
+diffuse too far and become too dilute to prevent melting.  This
+approach would eliminate the extra processing steps that commonly
+attend powder-bed 3-D printers: the careful brushing of the powder
+from the recesses of the solid part and extra processing steps to
+eliminate porosity from the solid part.
+
+This process may depend sensitively on grain sizes and morphologies
+and on the temperature profile of the process.  It’s necessary for the
+nickel to have diffused enough into the alpaca part to solidify it,
+and for its grains to have sintered together enough to hold together,
+before the unmodified brass becomes liquid; but if the nickel diffuses
+too far, you will lose surface detail, as some brass outside the
+desired part acquires enough nickel to keep it from melting, while
+some of the alpaca inside the desired part loses enough nickel to
+allow it to melt.
+
+[30]: https://en.wikipedia.org/wiki/Nickel_silver
+[31]: https://en.wikipedia.org/wiki/Nickel
+
+Using the alpaca approach for steel printing
+--------------------------------------------
+
+This approach should also work for printing carbon steel: by
+increasing the carbon content of the unwanted part of the metal to the
+eutectic 4.3%, it should become a low-viscosity liquid cast iron at a
+sharp eutectic melting point of 1148°, permeating the pores of the
+sintered higher-melting steel and contributing carbon to it.
+
+Adding so much carbon is not quite as trivial as it sounds, because
+the iron weighs 7.8 g/cc, while [carbon black][39] weighs only about 2
+g/cc, and [graphite][40] about 2.2 g/cc.  So 4.3% carbon by weight is
+about 15% carbon by volume, which is significant.  I think it should
+still fit into the interstices of the iron filing bed if the carbon
+particles are sufficiently smaller.
+
+(And yes, this is an even bigger problem for alpaca.)
+
+[39]: http://jszlhg.en.made-in-china.com/product/RbYmUKpHOSrh/China-Carbon-Black-N220-N330-N550-N660.html
+[40]: https://en.wikipedia.org/wiki/Graphite

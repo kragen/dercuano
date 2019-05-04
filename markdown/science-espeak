@@ -1,0 +1,366 @@
+Improving "science" in eSpeak's lexicon
+=======================================
+
+So I've been playing around with speech synthesis software tonight.
+[eSpeak](http://espeak.sourceforge.net/) looks a lot nicer than
+[Festival](http://www.cstr.ed.ac.uk/projects/festival/),
+just in that it's much easier to adjust its speed,
+correct its pronunciation,
+and play with variations: 
+whisper, different accents, pitch, word spacing, creaky voice.
+I got to thinking,
+what would a logical policy for updating its lexicon look like?
+I thought the results I came up with were interesting.
+Maybe some other people will be interested too.
+
+The problem
+-----------
+
+[eSpeak](http://espeak.sourceforge.net)
+gets "neuroscience" and "pseudoscience" wrong, 
+pronouncing them with a `[[s,i@ns]]`
+rather than a `[[s'aI@ns]]`.  
+It also gets "omniscience" and "prescience" wrong, 
+or at least pronounces them
+rather differently than I would:
+
+    $ ~/pkgs/espeak-1.37-source/src/speak -v en/en-r+f2 -s 250 -x "The 
+        science of neuroscience is not a scientific or quasiscientific
+        pseudoscience.  Conscientiously pursue omniscience and prescience."
+     D@2 s'aI@ns Vv n'3:r-@s,i@ns I2z n,0t#@ saI@nt'IfIk _:_:O@ kw,eIzaIsi@nt'IfIk sj'u:d@s,i@ns
+     k,0nsI2;'EnS@sli p3sj'u: '0mnIs,i@ns _:_:and pr'i:si@ns
+
+I would pronounce the "science" in "omniscience" and "prescience" as
+`[[S@ns]]` and put the accent on another syllable.
+
+There's a special rule for "scien" beginning a word, and for
+"conscience":
+
+    en_list:conscience       k0nS@ns
+    en_rules:       _sc) ie (n        aI@
+    en_rules:?8     _sc) ie (n        aIa2
+
+However, Jonathan Duddington has said
+he wants to keep the eSpeak distribution small,
+so he "wouldn't want to include too many unusual or specialist words".
+(See <http://sourceforge.net/forum/forum.php?thread_id=1700280&forum_id=538920>
+where he talks about why he doesn't want to import the Festival lexicon.)
+Already, `espeak-data/en_dict` is 80KB,
+which is half the size of the `speak` binary.
+
+Replacement strategies
+----------------------
+
+There are several possible strategies
+that a maintainer could adopt
+in order to improve the coverage of their special-case word files
+without letting them get large.
+Suppose
+that there is a scalar metric of "goodness"
+that can be applied independently to each special case.
+Here are three plausible strategies,
+ordered from least to most stringent.
+
+- C-: They could never remove items from the file,
+  adding new items as long as they were better
+  than the worst item in the file.
+  This will probably cause 
+  the average quality of the entries in the file
+  to gradually decline,
+  because many of the most important entries
+  were probably added early on.
+  It will eventually result in a very large file
+  with very low average quality per entry,
+  but very comprehensive coverage.
+- C+: They could keep the number of items in the file fixed,
+  adding new items as long as they were better
+  than the worst item in the file.
+  This will cause the program
+  to gradually work better,
+  but each new version will introduce regressions ---
+  words that the previous version pronounced correctly,
+  but the new one does not.
+- A: They could never remove items,
+  but add new items
+  as long as they improved the median item quality of the file ---
+  that is, as long as the new item
+  improved the program's performance
+  more than most of the items in the file.
+  This will gradually slow down and eventually stop
+  the addition of new items,
+  because that median quality will gradually increase.
+
+I am going to approximate "quality"
+with "frequency",
+on the theory that mispronouncing a rare word
+is always better than mispronouncing a common one.
+
+Note the analogy
+to Google's famous hiring policy:
+only hiring candidates who raised their average ability.
+
+Evaluating word frequencies
+---------------------------
+
+Are these "science" words significant enough to include?
+`en_list` only contains 2869 lines, maybe 2400 of which are words.
+So maybe only the top 2400 or so exceptions
+to the normal rules of pronunciation
+are currently considered for inclusion.
+
+Some time ago, I tabulated the frequencies of words 
+in the British National Corpus 
+and put the results online 
+at <http://canonical.org/~kragen/sw/wordlist>.
+It has 109557 lines,
+ordered from the most common words
+("the", "of", and "and", each occurring millions of times) 
+to the least common
+(with a cutoff of 5 occurrences,
+because most of the words with fewer
+were actually misspellings).
+
+I selected 20 lines at random from `en_list`
+with the following results:
+
+    kragen@thrifty:~/pkgs/espeak-1.37-source/dictsource$ ~/bin/unsort < en_list | head -20
+    this             %DIs          $nounf $strend $verbsf
+    barbeque         bA@b@kju:
+    con              k0n
+    ?5 thu  TIR        // Thursday
+    _:      koUl@n
+    Ukraine         ju:kr'eIn
+    peculiar         pI2kju:lI3
+    unread           Vnr'Ed        $only
+    inference        Inf@r@ns
+    José            hoUs'eI
+    unsure           VnS'U@
+    survey                         $verb
+    ë       $accent
+    epistle          I2pIs@L
+    Munich          mju:nIk
+    scenic           si:nIk
+    synthesise       sInT@saIz
+    corps            kO@           $only
+    rajah            rA:dZA:
+    transports       transpo@t|s    $nounf
+
+Where do these special cases appear
+in the British National Corpus tabulation?
+Here are some results,
+edited for readability:
+
+    kragen@thrifty:~/pkgs/espeak-1.37-source/dictsource$ grep -niE ' (this|barbeque
+       |con|thu|ukraine|peculiar|unread|inference|José|unsure|survey|epistle|munich
+       |scenic|synthesise|corps|rajah|transports)$' /home/kragen/devel/wordlist
+    22:463240 this
+    1178:7999 survey
+    5102:1441 peculiar
+    5831:1200 corps
+
+    7165:888 ukraine
+    8977:634 munich
+    9045:627 unsure
+    10552:494 inference
+
+    11134:455 con
+
+    15127:275 scenic
+    29899:82 epistle
+    31386:74 transports
+    34270:62 synthesise
+
+    37255:52 unread
+    73679:11 thu
+    74154:11 rajah
+    87737:8 barbeque
+
+The 50th-percentile among the sample of 20
+(of which two weren't words,
+and a third wasn't found)
+seems to be line 11 134
+with the word "con".
+That is,
+the exceptions in `en_list`
+are mostly drawn
+from the most frequently used
+eleven thousand words in the language.
+(Maybe words like "barbeque", "rajah", and "unread"
+should be dropped.)
+
+So under the policies "C+" and "C-",
+any word that is more common than "barbeque",
+at position 87737 in the British National Corpus tabulation,
+(or maybe some word even a bit rarer than that)
+should be added to the file.
+(Under policy "C+", 
+some word would be removed to compensate,
+raising the threshold.)
+Under the policy "A",
+the threshold would be "con", 
+at position 11 134.
+
+Unfortunately, José is missing.
+I think I excluded accented characters
+when I tabulated the frequencies initially.
+
+Anyway, that gives us a way to compare
+the "science" words:
+
+    kragen@thrifty:~/pkgs/espeak-1.37-source/dictsource$ grep -n scien[tc]
+        /home/kragen/devel/wordlist 
+    870:10597 science
+    1614:5922 scientific
+    2584:3547 scientists
+    3865:2088 sciences
+    3977:2005 scientist
+    5342:1355 conscience
+
+    13365:338 conscientious
+    16976:227 scientifically
+    25757:109 consciences
+    26015:107 conscientiously
+    27861:93 unscientific
+    37040:53 omniscient
+    44349:36 prescient
+    49031:29 neuroscience
+    49706:28 prescience
+    50457:27 scientificity
+    50587:27 omniscience
+    53155:24 scientism
+    62346:17 geoscience
+    66943:14 scientia
+    67285:14 neuroscientists
+    68176:14 conscientiousness
+    82060:9 geoscientists
+    84433:8 scientology
+    84434:8 scienter
+
+    86513:8 geosciences
+    90235:7 neurosciences
+    93073:7 biosciences
+    93074:7 bioscience
+    95039:6 scientifique
+    95591:6 pseudoscience
+    103190:5 presciently
+    103191:5 prescientific
+
+Of these, only those more common than "conscience"
+seem to deserve a place in `en_list`.
+How does eSpeak do now?
+
+    $ ~/pkgs/espeak-1.37-source/src/speak -v en/en-r+f2 -s 250 -x "Science is 
+        scientific and done by scientists, who work in the sciences.  A 
+        scientist with a conscience may be conscientious.  Those with 
+        scientifically-minded consciences will conscientiously avoid 
+        unscientific claims of omniscient beings or prescient prophets."
+     s'aI@ns I2z saI@nt'IfIk _:_:and d'Vn baI s'aI@nt#Ists
+     _:_:h,u: w'3:k I2nD@2 s'aI@nsI2z
+     a2 s'aI@nt#Ist wI2D a2 k'0nS@ns m'eI bi: k,0nsI2;'EnS@s
+     DoUz wI2D saI@nt'IfIkli m'aIndI2d k'0nS@nsI2z wIl k,0nsI2;'EnS@sli; a2v'OId
+     VnsaI@nt'IfIk kl'eImz Vv '0mnIs,i@nt b'i:;INz _:_:O@ pr'i:si@nt pr'0fIts
+
+It pronounces everything correctly
+until it gets to "omniscient" and "prescient",
+and maybe its pronunciations for those are correct,
+but at least they're not the pronunciations I would use.
+
+Under policy "A", 
+those words are not common enough to add to `en_list`,
+because they would lower 
+the average frequency of words in `en_list`
+unless you removed a less common word to compensate.
+
+Under policies "C+" and "C-",
+not only "omniscient" and "prescient" qualify,
+but so do 
+"neuroscience", "geoscience", "neuroscientists", and "geoscience",
+which eSpeak currently mispronounces.
+
+(Including all the exceptions that as rare as "prescient"
+might quadruple the size of `en_list`,
+and perhaps `en_dict` as a result,
+if arbitrary spellings were as common among rare words
+as they are among common words.
+Think of that as an upper bound.
+Including all the exceptions as rare as "neuroscientists"
+might multiply its size by seven.
+This is the downside of policy "C-",
+but it does not happen with policy "C+".
+On the other hand,
+under policy "C+",
+even "prescient" might not survive long after being added.)
+
+Recommendation
+--------------
+
+There is a better solution
+than adding a bunch of one-word special cases
+to `en_list`.
+
+Probably
+in this case
+the solution is to change the special case
+for "conscience"
+to a special case
+for "conscien..."
+and change the "scien..." rule
+to a "...scien..." rule;
+that covers all the words
+except for "omniscien..."
+and "prescien...".
+Covering those two
+takes only two more rules
+in `en_rules`,
+if it's considered worthwhile;
+but "conscience" is ten times as common
+as both of those together,
+"con" three times as common,
+but "barbeque" 18 times less common.
+
+Alternatives
+------------
+
+I think
+there is a need for a larger `en_list` and `en_rules`
+to be available,
+even if they aren't part of the standard distribution.
+eSpeak's current footprint
+for a single language
+is about 160KB for the executable
+and 80KB for the dictionary.
+But it would be useful in many cases
+even if its dictionary were 800KB
+(as perhaps it would be with the Festival lexicon)
+or 8MB.
+
+And for a better user interface
+for making changes to the dictionary,
+and especially `en_rules`,
+since currently it's hard to know
+what words you're changing the pronunciation of
+when you change `en_rules`,
+and you have to master a phonological orthography system
+to make any contribution at all.
+And then there's no `git`-like infrastructure
+for sharing your changes,
+and even learning `git`
+is a pretty big barrier to contributions.
+
+If, instead,
+you could twist a knob
+to jog back to the last mispronounced word,
+then hold down a button
+and say its correct pronunciation,
+the barrier to contributions would be much lower.
+You would need
+a reasonable phonological analysis system 
+(like in a speech-to-text system)
+to turn the spoken word into the string of phonemes.
+Then, if you could share your accumulated corrections
+with all other users of the software
+with the push of a button,
+the process of coming up with
+the tens of thousands of special cases
+would be a lot quicker.
+

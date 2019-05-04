@@ -1,0 +1,93 @@
+HTML is terser and more robust than S-expressions
+=================================================
+
+HTML is more succinct for things in its intended domain than
+S-expressions, but still has better error-detection and correction
+capabilities.
+
+S-expression fans like to say that HTML, SGML, and XML are just
+bastardized S-expression languages.  SGML partisans often respond that
+matching end-tags allow for better error-reporting and correction.
+But for typical HTML content --- mostly running text with a little bit
+of interspersed markup --- S-expressions are not only harder to
+correct, but also more verbose.
+
+Consider this partial paragraph from the Ur-Scheme web page
+<http://pobox.com/~kragen/sw/urscheme>:
+
+    <li><b>Reasonably fast.</b> It <b>generates reasonably fast
+    code</b> &mdash; when compiled with itself, it runs 2½ times
+    faster (in user CPU time) than when it's compiled with <a
+    href="http://www.call-with-current-continuation.org/"
+    >Chicken</a>, 1½ times faster than when it's compiled with...</li>
+
+Now, in traditional HTML, I could have left out the quotes around the
+URL and the ending `</li>` tag.  Consider this S-expression version:
+
+    (li (b "Reasonably fast.") " It " (b "generates reasonably fast
+    code") " " mdash " when compiled with itself, it runs 2½ times
+    faster (in user CPU time) than when it's compiled with "
+    (a :href "http://www.call-with-current-continuation.org/"
+    "Chicken") ", 1½ times faster than when it's compiled with...")
+
+Most of the markup constructs take up more characters here:
+
+    LI: '<li></li>'    (end tag could be omitted in traditional HTML)
+        '(li "")'
+    B:  '<b></b>'
+        '(b "") '
+    B:  '<b></b>'      (the second one)
+        '" (b "") "'
+    --- '&mdash;'
+        '" mdash "'
+    A:  '<a href=""></a>'  (quotes could traditionally be omitted)
+        '" (a :href "" "") "'
+
+If you look at this in a fixed-width font, you'll see that the number
+of markup characters is detectably smaller in the S-expression
+serialization of the structure, with the exception of the first two.
+I maintain that this is typical of the bulk of HTML, especially if you
+weight it by how often people write it instead of how often it gets
+sent to browsers.  You can come up with examples where that is not the
+case:
+
+    <html><head> <title>...</title>
+                 <link rel="stylesheet" href="../../style.css" />
+                 <meta http-equiv="Content-Type" content="..." />
+                 <style type="text/css">...</style></head>...</html>
+
+vs.
+
+    (html (head (title "...") (link :rel "stylesheet" :href "../../style.css")
+                (meta :http-equiv "Content-Type" :content "...")
+                (style :type "text/css" "...")))
+
+but those structure-heavy, text-light examples with long-winded tag
+names are relatively rare for people to read and write.
+
+Of course, the cost of terser syntax is often that errors are hard to
+diagnose.  Ada's `end loop`, `end if`, `end record`, and so on mean
+that if you leave out an `end` delimiter, the compiler will usually be
+able to tell you which one you left out.  At the opposite end of the
+spectrum, S-expression languages in which all the various kinds of
+`end` are spelled as `)` can only tell you when they get to the end of
+the program or to something that doesn't make sense in the current
+context.
+
+> This is not a phenomenon limited to end-delimiters.  In
+> programming languages, there are many other examples of verbosity
+> that helps to diagnose errors; for example, explicit type
+> declarations, mandatory delimiter characters (in cases where the
+> syntax would be no more ambiguous if they were removed from the
+> grammar), sequences of single-line comments, and the conventional
+> parenthesization of the arguments of fixed-arity functions ("ratio
+> square sin x square sin y" is perfectly unambiguous, after all,
+> and Forth, PostScript, Logo, and REBOL use more or less that
+> syntax.).
+
+However, in the case of HTML, the terser syntax does not make errors
+harder to diagnose; in fact, the HTML syntax permits better
+error-detection and even error-correction, because all of the end-tags
+are explicitly labeled.  (It differs from SGML in this regard; in
+SGML, you can write `<li><b/Reasonably fast./ It ...</>` and eliminate
+the redundant end-tags altogether.)
