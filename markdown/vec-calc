@@ -1,0 +1,234 @@
+My regular netbook isn't working because I left the charger at work.
+I've managed to get this old Thinkpad to boot, though installing Ubuntu
+seems to be not working (this ten-year-old CD-R is probably corrupt,
+judging from the kernel log messages), and I can't remember the disk
+encryption password I set on this machine probably nine years ago, which
+leads me to think about how much hassle is involved in even the most
+basic computing tasks.
+
+If only I had an easily bootable operating system I could fire up from
+this pendrive in a matter of seconds!  If only I could add notes to it
+from anywhere anonymously, later accepting them!
+
+I feel like my RPN calculator app may be a step in the right direction.
+In it, keys 0-9 add to the number at the current position in the RPN
+program (space works as a separator between adjacent numbers), and the
+program is executed after each edit to build up a stack of expressions
+that are then executed.  Operator keys are used to combine expressions
+into larger expressions.  The operator "," concatenates numbers into a
+vector, with the usual kind of APL broadcasting operations.  The "l" and
+"e" operators are ln and exp, respectively, enabling relatively easy
+powers and roots.  The "i" operator is the APL iota, but zero-based,
+allowing the instant construction of sequences covering some range.
+
+Vectors are automatically plotted, as well as being displayed
+numerically.  A somewhat generous estimated calculated precision is
+maintained for each number, and its display is limited to that
+precision, in order to improve the signal-to-noise ratio of the display.
+
+Alt-left and alt-right (or, for phones, $ and &) perform structural
+editing of the RPN program, moving an entire subexpression left or
+right over other instructions.  Left and right (or the parentheses)
+navigate the RPN program, showing you the intermediate value calculated
+at each node.
+
+At present it lacks even the minimal abstraction ability to use the same
+value twice.  For example, to compute the first six triangular numbers,
+you can use the sequence `6i6i1+*2/`, resulting in the expression `i 6 *
+(i 6 + 1) / 2`.  But to change this to the first 10 numbers, for
+example, you must go back and edit both of the sixes.
+
+It also lacks any kind of aggregate calculation, even summing or array
+indexing, any kind of mouse interaction, and decimal points.
+
+Abstraction
+-----------
+
+I'm increasingly coming to the conclusion that stacks are good for
+expression evaluation, but too confusing when you try to use them for
+general-purpose data storage; the position of any given value relative
+to the top of the stack is constantly changing.  So probably to reuse
+values, it's better to use registers, i.e. variables, rather than
+providing stack manipulation operators, at least in the context of
+interactive calculations.
+
+However, a set of interactions has occurred to me that seem like they
+should make abstraction by refactoring quite simple:
+
+- `#` to fetch a value recently computed, repeated to refer to less
+  recent such values; in effect this is the "introduce local variable"
+  refactoring, but with a user interface based on the Mill CPU's belt,
+  and no need to specify ahead of time which values will be reused.
+  However, once you are done wrapping a computation in a definition in
+  this way, later # operations will skip over its internal structure.
+- : when within such a definition to turn the subexpression you're
+  currently looking at into a parameter, pushing that subexpression out
+  into every place where it's invoked, turning it into a function.  If
+  you do this with the entire contents of the definition, you have
+  reversed the refactoring, and the subexpression evaporates.
+
+So, for example, in the case above about the triangular numbers, after
+having typed "6i", you could type "#", which would put the "i 6" into a
+subexpression, used twice.  Maybe this would be displayed like this:
+
+	x = i 6 = 0, 1, 2, 3, 4, 5
+	x = 0, 1, 2, 3, 4, 5
+	x = 0, 1, 2, 3, 4, 5
+
+Then, on typing "1+*2/", you would see something like this:
+
+	x = i 6 = 0, 1, 2, 3, 4, 5
+	x * (x + 1) / 2 = 0, 1, 3, 6, 10
+
+If you move the pointer back to the 6 and type ":", you are pushing the
+6 up to the level where x is invoked, making x a function; the result
+would be something like this:
+
+	x(y) = i y
+	x(6) * (x(6) + 1) / 2 = 0, 1, 3, 6, 10
+
+At this point, the two 6es have become independent (although that may
+not have been the right default).  To make them dependent again, you can
+put the cursor on the second one and type ## to fetch the first 6, then
+move right and delete the second one.  The result would be something
+like this:
+
+	x(y) = i y
+	z = 6
+	x(z) * (x(z) + 1) / 2 = 0, 1, 3, 6, 10
+
+If you go to the end and "#" it to turn the triangular-numbers
+calculation into a local subexpression, you get something like this:
+
+	x(y) = i y
+	z = 6
+	a = x(z) * (x(z) + 1) / 2 = 0, 1, 3, 6, 10
+	a = 0, 1, 3, 6, 10
+	a = 0, 1, 3, 6, 10
+
+Now it may be desirable to make z a parameter of a.  If you put the
+cursor on the first reference to z and use ":", you get this:
+
+	x(y) = i y
+	z = 6
+	a(b) = x(b) * (x(z) + 1) / 2
+	a(z) = 0, 1, 3, 6, 10
+	a(z) = 0, 1, 3, 6, 10
+
+Then you can move over to the second z and use "##" to turn it into
+another reference to b, then delete the z:
+
+	x(y) = i y
+	z = 6
+	a(b) = x(b) * (x(b) + 1) / 2
+	a(z) = 0, 1, 3, 6, 10
+	a(z) = 0, 1, 3, 6, 10
+
+If you now move the cursor onto the 6 in z and use ":", that will push
+it out into the invocations of z.  That leaves z with nothing left to
+do, so it evaporates:
+
+	x(y) = i y
+	a(b) = x(b) * (x(b) + 1) / 2
+	a(6) = 0, 1, 3, 6, 10
+	a(6) = 0, 1, 3, 6, 10
+
+(I'd also like to be able to manipulate programs the way rpn-calc
+manipulates algebraic expressions, building them up step by step with
+example values.)
+
+During the course of these edits, there are times when a function will
+compute multiple values.  For example, consider this definition:
+
+	a(b) = x(b) * (x(z) + 1) / 2
+
+The RPN program is something like this:
+
+	local b  b x  z x  1 +  *  2 /
+
+Upon introducing the second reference to b, but before deleting the z
+reference, it looks like this:
+
+	local b  b x  b z x  1 +  *  2 /
+
+That works out to these expressions:
+
+	x(b)
+	b * (x(z) + 1) / 2
+
+The question then is whether a, at that point, should be considered to
+be returning two values or merely computing x(b) and discarding the
+result.
+
+Vectorization
+-------------
+
+To a great extent, not just loops but also nested functions can be
+eliminated entirely by sufficient vectorization, so to some extent this
+is an alternative to the previous item.  Vectorization is less flexible
+but also more comprehensible.
+
+The basic idea is that variables have values that depend on
+circumstances, and you can represent pretty much any variable as a
+scalar variable that depends on circumstances.  For example, you could
+think of the altitude of land as a number, but one that depends on the
+latitude and longitude, and maybe time if you are modeling that.  The
+textual content of an editor buffer is a character-valued variable that
+depends on the position within the buffer.  The country of land is a
+categorical measurement which also depends on latitude and longitude.
+It is a sensible question what is the maximum altitude for each country,
+ranging across all the latitude/longitude pairs within that country.
+
+You could reasonably display such vectors in tables, with one table for
+each set of circumstances that a vector's values depend on.  Vectors
+depending on the same set of circumstances would be displayed in the
+same table.  The traditional way to lay out such tables is with one
+attribute per column and one row per instance, but the reverse is
+probably better in this case, with one row per formula and one column
+per instance.  As you calculated, rows would appear and disappear, with
+the formula displayed on their left followed by a sparkline.
+
+It's not totally clear to me how to mix the display of the stack results
+with table-style display.  Multiple hierarchical levels of circumstances
+are a reasonable thing to have; you could imagine using colspan cells
+within the same table to display values that depended on less than the
+whole set of circumstances, in particular including the empty set of
+circumstances: a scalar or constant.
+
+The objective is to be able to add new circumstances later, as in the
+example above in which the altitude comes to depend on time as well as
+latitude and longitude; you could also imagine it depending on the
+reference spheroid (WGS 84?) and the data source being consulted.  This
+suggests that aggregation operations (such as, for example, max) should
+specify a list of circumstances to range over all possible values of
+(and thus eliminate from the dependency list), rather than a list of
+circumstances to retain in the dependency list.
+
+Constraints
+-----------
+
+Often the calculations I'm doing are in terms of the interrelated values
+of some mathematical model.  The simplest interesting example is perhaps
+a sphere, which has a radius, a diameter, a cross-sectional area, a
+surface area, and a volume, any one of which determines all of the
+others.  More complex models may involve conditionals, piecewise
+approximations from empirical data, and more parameters --- a cylinder,
+for example, has a volume, a radius, and a length, any two of which
+determine the third, as well as other properties, of course.  It is
+desirable to express those relationships once for a given model and then
+derive an effective calculation procedure from that expression.
+
+Units
+-----
+
+It's very common for me to do calculations including measurement
+dimensions, and I wish my calculators were better at this.  I often use
+units(1) to do the calculations, but it has some shortcomings:
+
+- There's no way to define variables or functions or vectorize
+  calculations;
+- Its output display defaults to expressing things in terms of
+  fundamental units, which is often fairly confusing --- joules or volts,
+  let alone farads, are difficult to recognize in that format;
+- Often the input interpretation is surprising, and you may not notice
+  an unexpected interpretation.

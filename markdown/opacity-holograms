@@ -1,0 +1,126 @@
+> We present an algorithm and example images demonstrating a new form
+> of full-color “holography” printable on a standard laser printer
+> that supports full parallax, rather than just one-dimensional
+> parallax, like lenticular 3D and unlike traditional full-color
+> holograms and Beaty’s “scratch holograms”.  Like Beaty’s design,
+> these “opacity holograms” do not take advantage of the wave nature
+> of light, but like interference holograms, measures of their quality
+> degrade only proportional to the square root of the number of
+> encoded frames, rather than linearly as with lenticular 3D.
+
+Consider an image obscured by a grille, of the kind used for
+cryptography in the past.  The grille is an opaque sheet with holes in
+it.  When laid atop a ciphertext, a viewer sees portions of the
+ciphertext where the holes are, and the color of the grille elsewhere,
+which we will take to be black.
+
+Naor and Shamir (1994) demonstrated how to use the grille approach to
+optically perform a one-time pad encryption of a bilevel image.  The
+present author extended this algorithm to grayscale images, without
+loss of security, in a non-peer-reviewed publication in 2007.
+
+The present work demonstrates an extension in a different direction:
+discarding security entirely as an objective, it uses N random
+grilles, or equivalently N spatial shifts of the same random grille,
+to optically decode approximations of N unrelated plaintext images
+from a single encoded image, with the addition of Gaussian noise with
+a standard deviation of O(√N) added, resulting in an O(1) loss of
+intensity and contrast, and an O(√N) loss of effective resolution. XXX
+If the grille is physically mounted parallel to and a short distance
+away from the encoded image — for example, by printing them on
+opposite sides of transparency film or float glass — these spatial
+shifts can be achieved merely by viewing the assemblage from slightly
+different angles.
+
+From here on, we will speak of N grilles, one for each input image,
+and we will speak of the image as grayscale, with possible values
+ranging from -1.0 black to +1.0 white; but everything generalizes to
+the cases of RGB images and N spatial shifts of a random grille.  For
+the time being, we will take the grille’s distribution to be 25% open
+holes, a number we will call L, and 75% opaque black.
+
+The encoded image is a pixelwise sum of N different encoded subimages,
+each generated from a single plaintext image.  A given pixel in the
+encoded image from among those visible through a hole in a particular
+grille consists of the corresponding pixel of the input image, plus
+Gaussian noise from the other subimages.  If the noise has a uniform
+distribution with a mean at 0 across the entire image, then it will
+merely decrease the effective resolution of the image.
+
+How can we get the sum of the other subimages to have a spatially
+uniform zero-centered Gaussian distribution?  Consider each pixel in
+each subimage as a random variable, which with some probability shows
+through a hole in that subimage’s grille and therefore must be equal
+to the original image’s pixel, and otherwise can be chosen to have any
+value.  By the Law of Large Numbers, the sum of the corresponding
+pixels in each subimage will tend to be Gaussian with a variance that
+is the sum of the variances of the pixels in each subimage.  So we are
+faced with the task of ensuring that this sum of N-1 subimages has
+mean 0 at each pixel and has a spatially uniform variance, even though
+with some significant probability the values of the pixels in
+particular subimages are fully determined by the corresponding input
+image pixel.
+
+So, a given pixel in a given subimage might have some plaintext value,
+such as -.21, with probability L = 0.25, and be a free choice
+otherwise, while some other pixel in that same subimage might have a
+different plaintext value, such as .99, with probability 0.25, and be
+a free choice otherwise.  The problem is making the free choice such
+that the mean of both distributions is zero and the variance is equal.
+
+Getting the mean to be zero is easy: the naïve approach would be to
+always pick, for example, .07 for the first pixel and -.33 for the
+second one, when the choice is available.  But an encoded subimage
+generated using this naïve algorithm will have widely varying
+variances, and worse, they will tend to vary in a spatially coherent
+way — where the plaintext image is close to medium gray, it will add
+almost no noise to the other subimages, while where it is close to
+black or white, it will add a great deal of noise.  This will result
+in crosstalk visible in the decoded images.
+
+The simplest way of fixing this defect of the naïve algorithm is
+simply to compute the variance for each pixel, and add an additional
+N+1th subimage purely of random noise with a compensating amount of
+variance for each pixel.  (You could use a Gaussian distribution, or
+you could try to construct a distribution that will bring the
+distribution of the sum as close as possible to Gaussian.)  Another
+possible way is to use more complicated distributions in each of the
+subimages, perhaps shaped to be as close to perfectly Gaussian as
+possible, so that the Law of Large Numbers kicks in immediately.  I
+don’t know how much the higher moments of the noise distribution will
+be visible, though.  And I don’t know how much this choice matters.
+
+The final result image will, in general, have pixels outside the
+[-1.0, 1.0] range, and so will require some amount of clipping.  We
+can scale and translate its range somewhat (diminishing contrast) to
+reduce the damage from clipping.  Translating values is more harmful
+near -1.0, where it reduces contrast, than near +1.0, where it merely
+reduces brightness.  Probably the most pragmatic approach is to do a
+linear scaling such that, say, the 1st and 95th percentile values are
+mapped to -1.0 and 1.0.  XXX calculate how much damage this does and
+how it changes with the number of images.
+
+However, a bilevel output device like a laser printer cannot reproduce
+continuous grayscale; it can only produce black pixels and white
+pixels.  We would like the probability of a pixel being white to be
+proportional to its ideal whiteness, which we could do by XXX the
+usual dithering approaches, no?  But it would be nice if we could
+avoid adding still more noise, by like just thresholding at 0 or
+something, but that would probably result in undesirably nonlinear
+performance.
+
+The grille’s load factor L (25% in the above) is independent of the
+number of images, but it affects the effective resolution and the
+noise levels.  Higher load factors L will result in proportionally
+more noise (i.e. noise with a proportionally higher standard
+deviation), but also proportionally more resolution.  But the noise
+also affects the effective resolution: twice the noise requires four
+times the resolution to compensate.  It would seem, then, that the
+lower the load factor, the better, which of course is absurd, because
+it implies that the optimum is L=0, a fully opaque grid.  This is
+because the noise isn’t actually proportional to L; it’s proportional
+to L/(1-L), which, hmm, that doesn’t fix the absurd conclusion, so
+maybe that’s not it.  XXX
+
+Thinking further about L.  To maximize effective resolution, we want
+to maximize L/√(L/(1-L)).

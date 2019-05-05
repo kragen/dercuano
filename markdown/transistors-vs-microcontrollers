@@ -1,0 +1,127 @@
+I was just looking at the [ATTiny13A][] on Digi-Key, the one in an
+8-pin SOIC.  It costs 33–40¢, depending on quantity, has six GPIO
+pins, runs at anything up to 20 MHz (or 0.128, 4.8, or 9.6 MHz on the
+internal RC oscillator), and can source or sink 20 mA per output pin,
+up to a max of 60 mA across all the pins.  Its input pin bias current
+is 1 μA.  It has the usual assortment of AVR peripherals, cut down a
+bit: one 8-bit timer/counter with two PWM channels, a separate
+watchdog, a 10-bit ADC with an internal voltage reference (same speed as
+the one on ATMega328, 15ksps at max resolution), and a comparator.
+It only has a kilobyte of
+Flash and 64 bytes of RAM.  It’s 5.4 mm × 5.35 mm ×
+2.2 mm in the SOIC version.
+
+[ATTiny13A]: https://www.digikey.com/product-detail/en/microchip-technology/ATTINY13A-SN/1611-ATTINY13A-SN-ND/6829763
+
+So far this sounds like a pretty wimpy microcontroller, even if it is
+an AVR.  But I think maybe instead of comparing it to microcontrollers
+I should compare it to transistors.
+
+(Incidentally, the same chip also comes in a much smaller MLF package
+with 20 pins, which gives you 18 GPIOs instead of 6.  And the ATTiny5
+costs 17¢ now, but is limited to half the memory, 12MHz, and 8 bits of
+ADC resolution, but has a 16-bit timer — in 2 mm × 2 mm.)
+
+(And the STM32F031x4/6 comes in a WLCSP25 package that is 2.5 mm ×
+2.4 mm and has 20 GPIOs, or 18 GPIOs and an I²C interface, or 16 GPIOs
+and an SPI interface.  It can handle somewhat less current or voltage
+than the AVRs but is not at all wimpy, rather the opposite.  I think
+it costs 56¢ but I may have it confused with a larger package of the
+same chip.)
+
+For example, a 2N7002T-2 MOSFET costs US$0.51 (or down to 9.4¢ in
+quantity 1000), about 30% more than the microcontroller (again, in
+quantity 1).  It can switch 115 mA at up to 60 volts, a much higher
+voltage than the microcontroller but less than twice the current, and
+its input bias current is 0.1 μA, ten times higher.  It can do analog
+things the AVR can’t.  But you need 10 volts to turn it all the way
+on, it can only reasonably be used up to a few megahertz, and its
+biggest disadvantage is that it has only one input and one output.
+
+Depending on the circumstances, you could replace as many as six
+2N7002s (US$3) with a single ATTiny13A (US$0.40).  That’s nearly an
+order of magnitude cheaper, and it’s smaller too.
+
+But maybe it’s unfair to compare the microcontroller to power MOSFETs,
+even lightweight ones like the 2N7002.  Maybe you should be comparing
+it to small-signal transistors, like a 300MHz MMBT3904, which only
+costs 10¢ and can handle 200 mA at up to 40 V, or a 12¢ BC849, which
+is 30V and 100mA, which is good to 100MHz.  But those still cost more
+per output pin than the microcontroller.  And typically they come in a
+SOT-23 package, which is 2.9 mm × 1.3 mm × 1 mm, larger than many of
+the microcontroller packages mentioned above.
+
+It seems like if you just want to turn things on and off, even very
+fast, the microcontroller is best up to 60 mA at 5 volts — 300
+milliwatts — and perhaps 5 megahertz out, 7 kilohertz analog in.  If
+you need higher voltage, higher current, analog output, or higher
+frequency, then maybe you should go with discrete transistors or
+perhaps other ICs.
+
+This suggests a real potential niche for microcontrollers with
+open-drain GPIO outputs, which could potentially directly switch much
+higher-power loads — I suspect 60 V at 20 mA wouldn’t be unreasonable,
+and would be over a watt without dissipating any more power in the μC
+itself than an ATTiny does.  Hmm, and any I²C/TWI interface already
+has open-drain hardware... I wonder if it’s possible to take advantage
+of this?
+
+The STM32 line of microcontrollers has 5V-tolerant GPIO pins that can
+be configured as open-drain, but the datasheet warns not to try to run
+them over 5.5V, and gives Vdd+4V as the “absolute maximum”.  So 60 V
+is probably unwise.
+
+An interesting question is how you design things to make this
+potential advantage real.  What kind of software do you run on the
+microcontroller?  How much autonomy do you give it?  How do you divide
+up the functionality of a complex device among different
+microcontrollers?
+
+A difficulty with these super tiny devices with 4 or 6 GPIOs is that
+you don’t have much left over for communication.  An ATtiny48, by
+contrast, has 24 or 28 GPIOs (depending on the package), and three of
+them suffice for SPI at 3 Mbps.  In between 21 remaining GPIOs, you
+could plausibly charlieplex 441 LEDs, which would be a pretty decent
+chunk of transistors, or run 10 tiny DC motors in an H-bridge
+configuration.  These packages, not counting the DIP, range from 7 mm
+square to 4 mm square.
+
+****
+
+Other possible chips are reasonable alternatives to microcontrollers.
+There are I²C GPIO extenders, for example, and there are op-amp chips,
+and there are shift registers, and maybe you could use JTAG.  The
+LM7321 op-amp comes in a SOT-23 (1.75 mm wide, 3.05 mm long, not
+counting the pins) or dual in a 8-pin VSSOP (3 mm square) or SOIC.
+
+An amusing possible alternative is to use some kind of voltage
+regulator — Horowitz & Hill suggest treating an LM317 as a cheaper
+alternative to the LM395 “protected transistor”, with “-1.2 V
+base-to-emitter voltage and 50 μA pullup base current,” and mention
+using 7805s in a similar way despite their annoyingly large
+base-to-emitter voltage.  But you should also be able to use a buck or
+boost converter in this way, generating a sort of class-D amplifier.
+
+GPIO extenders include the Microchip MCP23008, which Digi-Key
+classifies as “[Interface — I/O Expanders][0]”, a category with 1643
+chips in it.  These are mostly SPI and I²C with 8 or 16 pins and can
+sink or source a few tens of mA.  They tend to cost about
+50–100¢. Examples include the 129¢ TI TCA9534APWR, a 400kHz I²C
+16-TSSOP (4.4mm square) with 8 push-pull GPIOs that runs anywhere from
+1.65–5 V; the 144¢ Semtech SX1502I087TRT, a 400kHz I²C 20QFN (3mm
+square) with 8 push-pull GPIOs of 8mA source, 24mA sink capacity at
+anywhere from 1.2 to 5.5 V; and the 150¢ TI TCA9535PWR, a 400kHz I²C
+24TSSOP (4.4mm) with 16 push-pull GPIOs of 10 mA source, 25 mA sink at
+anywhere from 1.65 to 5.5 V; the MCP23008-E/ML, a 113¢ I²C 20QFN (4 mm
+square) with 8 push-pull GPIOs of 25 mA source or sink at anywhere
+from 1.8V to 5.5V; and the obsolete 5MHz SPI NXP PCA9701D,112, with 16
+input-only pins, in a 7.5mm 24-SOIC.  (All prices from Digi-Key in
+quantity 1.)
+
+The thing to notice here is that the price per GPIO here is 16¢, 18¢,
+9.4¢, 14¢, and ∞¢, respectively.  While this is reasonable compared to
+the price of a whole discrete transistor, it compares unfavorably with
+the price of GPIOs on a full-fledged microcontroller.  And the size,
+too, compares unfavorably.
+
+[0]: https://www.digikey.com/products/en/integrated-circuits-ics/interface-i-o-expanders/749

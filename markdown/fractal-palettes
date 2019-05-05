@@ -1,0 +1,117 @@
+The most conventional way to plot the Mandelbrot set and similar
+fractals is to compute the “escape time” for each pixel (the number of
+iterations needed for the point to exceed some “bailout value” beyond
+which we can be sure there is no return) and use it as an index into a
+cyclic one-dimensional “palette” of colors.  For example, if it takes
+a given pixel 331 iterations to exceed the bailout value, and our
+palette is of 256 colors, we draw that pixel as color #75 from that
+palette.
+
+8-bit color
+-----------
+
+In the early-1990s days of 8-bit color like VGA and cgsix, this
+approach had some very significant virtues.  These devices required a
+number of compromises.  Redrawing a whole high-resolution screen
+involved more memory bandwidth than our graphics cards could manage
+during a video frame (typically 13.9 ms rather than the modern 16.7
+ms); full-screen video games like Doom and Quake typically ran at
+reduced resolution, and video, when it was possible at all, typically
+played in a postage-stamp-sized window.  And, although they could
+typically display 262,144 different colors, they could only display
+256 of them at a time, so that the framebuffer could be only 8 bits
+deep; full-color images needed to be dithered down to 256 colors for
+display.  Many algorithms were devised to formulate optimal palettes
+for approximating a given image and dithering to those palettes with
+different tradeoffs between CPU usage, spatial sharpness, color
+fidelity, and crawling artifacts in video; we still see these today in
+animated GIFs.  A few demos changed palette entries while the screen
+was being painted in order to get 256 colors per scan line instead of
+256 colors per screen, but this technique required very tricky timing,
+and perhaps as a result never saw general use.  Mozilla (later renamed
+“Netscape”), which had to display more than one image at a time,
+settled on dithering all images to a standard 216-color palette (6
+levels of red, 6 of green, 6 of blue) and so WWW pages that wanted to
+avoid this extra dithering would use only these “web safe” colors.
+
+It’s perhaps worth mentioning that DRAM cost US$40 per megabyte from
+about 1992 to about 1996, due to a price-fixing cartel among RAM
+manufacturers during this time, so a 1280×1024 framebuffer required
+US$50 worth of RAM if it was 8 bits deep, a number which soared to
+US$150 for 24 bits, and that’s not even including a second buffer for
+page-flipping double-buffering.  So only specialized high-end video
+cards like Targas and the ones in Silicon Graphics machines offered
+24-bit color (“TrueColor”) or even the 16-bit “TrueColor” that is now
+universal on hand computers (“cellphones”).
+
+The escape-time-indexed-palette approach provided a few great
+benefits, some of which are specific to the hardware of the time:
+
+1. It ensured that the image used only 256 colors, so no dithering was
+   needed; the display hardware could display the image natively.
+
+2. It allowed “color cycling”, in which the screen was updated by
+   altering the hardware palette (once per frame) rather than
+   repainting pixels into the framebuffer — functionality TrueColor
+   cards couldn’t match.  Color cycling as such involved cyclicly
+   permuting the entries in the palette.  The famous Amiga
+   bouncing-ball demo used a form of color cycling to fake real-time
+   high-resolution 3-D on hardware that couldn’t come close to doing
+   it for real; updating the palette was also a common technique to
+   smoothly fade images to black.
+
+3. It gives you a whole orthogonal dimension of expressivity for
+   fractal images.  You can put a color gradient in part of the
+   palette, followed by a sharply contrasting color starting a
+   different gradient, or a sequence of sharply contrasting colors, or
+   colors alternating between two gradients.  These techniques can
+   produce very different images when applied to the same mapping from
+   pixel coordinates to escape times, emphasizing some aspects of the
+   image while soft-pedaling other parts.  Furthermore, you can apply
+   all of this instantly to an already-completed image — an enormous
+   advantage on hardware where even a simple Mandelbrot took several
+   seconds to render.
+
+4. In many cases, it produced large areas of solid color, which
+   permits popular lossless compression algorithms (like the LZW used
+   in GIF) to compress the image substantially.
+
+Another popular option was to use palettes in the same way, but index
+them with something other than the escape time.  For example, if you
+use the argument of the bailout-exceeding value to index into the
+palette, each region that would have been a solid color with the
+escape-time algorithm instead becomes a cyclic progression through the
+colors — a gradient, perhaps — typically repeating N times.
+
+Generalizing palettes
+---------------------
+
+This suggests a useful generalization of the palette concept to me.
+The initial fractal rendering process computes for each pixel a vector
+of result values: the number of iterations, the complex value of the
+escaping value, and so on.  Different rendering processes might
+produce different sets of values; presumably John Milnor’s
+distance-estimation algorithm, for example, won’t produce those, but
+it might produce a different vector.  Then the “palette” function maps
+each such vector to a color.  One special case is to use just the
+number of iterations modulo the length of a given list of colors, but
+many others are possible.  Other special cases include Fractint’s
+“outside=real” and “outside=imag” options, which add the real or
+imaginary parts of the escaping point to the number of iterations
+before indexing the palette, as well as an option “outside=tdis” to
+use the total distance traveled by the orbit of the escaping point,
+again cyclically indexing the palette with the result.  Fractint also
+has a “biomorph” option, which is Clifford Pickover’s invention of
+overriding the color that would otherwise be used (based on the
+iteration count or whatever) with an image-wide constant if either the
+real or the imaginary component of the escaping point is less than the
+bailout.  And a “decomp” option, which overrides the outside color in
+another similar way, which I think should be the same as
+“outside=atan” but which doesn’t seem to be.  And so on.
+
+But what if your “palette” were a two-dimensional color gradient,
+indexed in one dimension by number of iterations and in another by the
+angle of the escaping point?  What if the “palette” includes a truly
+continuous gradient, rather than a 256-color approximation to one?
+What if the “palette” varies with time, as in color cycling, but in a
+more general fashion?

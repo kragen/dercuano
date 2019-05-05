@@ -1,0 +1,131 @@
+A group of students at EPFL have started a company called Rayform to
+make objects with customized caustics (both reflection and
+refraction), using materials such as PMMA, aluminum, and glass to form
+their “caustic generators”.  This prompted a couple of thoughts from
+me tonight.  First, what about sunlight automicroscopy?  Second, how
+about cheaper fabrication technology?
+
+See also files `gauzy-shit` and `caustic-simulation`.
+
+Sunlight automicroscopy
+-----------------------
+
+Sunlight reflecting off a convex surface projects a magnified image of
+whatever colors or patterns are on the surface; this is easily seen
+with, for example, a Red Bull can.  Sunlight is about 100 kilolux,
+while sunlight shadows can vary but are typically around 3–10 kilolux.
+So even if the reflected light is spread over a 20× larger surface
+than the reflective convex object, it still has brightness comparable
+to the ambient light.  And the projected image is substantially larger
+than the patch on the surface that it is projected from — in the
+aluminum-can case, all the spread is in a single dimension, so it can
+be on the order of 20× larger, while the correspondingly bright
+reflection from a sphere would have a linear magnification factor of
+only 4–5 before becoming undesirably dim.
+
+However, the caustic-shaping technique can potentially rescue the
+method — in the geometrical-optics approximation with point-source
+illumination, it can focus the light from an arbitrary area onto a
+point or line of zero area, thus achieving infinitely bright
+illumination.  Rayform’s demo videos seem to show focusing of more
+than one order of magnitude.
+
+Point-source light reflecting from a surface whose normal varies over
+some angle θ will in turn vary over the angle 2θ.  The sun subtends
+about half a degree, so the reflection from a curved surface patch
+will subtend about half a degree more than the curved surface, which
+blurs the projected image somewhat.  However, this is a limit on the
+angular resolution of the microscopy method, not its spatial
+resolution.  And narrowing the sunbeam by passing it through a pinhole
+that subtends less than half a degree from the point of view of the
+generator.
+
+The nonzero angular size of the sun also provides the limit on the
+brightness increase available by focusing: the projected focus spot
+will have, at minimum, the same angular size as the sun, as viewed
+from the point on the generator that is generating it.
+
+Another limit on this technique is the diffraction limit: as the
+concave facet producing the focused spot becomes smaller, the produced
+beam has a larger divergence.  I think that roughly to achieve half a
+degree divergence — the best you can do with a half-degree-wide sun
+light source —  you need a facet of diameter roughly λ/(½sin(½°)).
+This works out to about 126 μm for 550-nm light.  This *is* a spatial
+resolution limit.
+
+The facet can be a concave paraboloid section, in which case it
+produces a point caustic, but if it is less concave in one direction,
+it will spread out its light to produce a line caustic subtending some
+arbitrary angle at some arbitrary rotation.
+
+Setting the spatial and angular resolution limits equal, maybe we
+would like 126 μm to subtend about ¼° of the curve of the convex
+surface, which gives us a radius of about 29 mm.  Spheres or cylinders
+with a diameter smaller than 58 mm will have an unnecessarily coarse
+angular automicroscopy resolution limit, larger than ¼°, imposed by
+diffraction of light from their facets; those with a larger diameter
+will have an unnecessarily coarse spatial automicroscopy resolution
+limit, larger than 126 μm, imposed by the apparent size of the sun.
+
+If we want these 126 μm facets to project pixels at about
+72dpi — 350 μm, a lower limit for comfortably readable text, although
+older computer terminals and printers used a slightly coarser 8
+vertical pixels per 6lpi line, giving 530 μm — then we want 350 μm to
+subtend ½° as seen from the surface of the mirror.  This gives a
+projection distance of 40 mm, which seems rather small to me, so maybe
+100 mm would be better, which gives blurry 870-μm projections.  Since
+each facet can project an arbitrarily oriented line, rather than just
+a point, you only need about, say, 5 of them per letter.  This means
+our 29-mm-radius shiny sphere with its 10500-mm² surface area, holding
+about 850 000 facets of 0.0124 mm² each, can project about 170 000
+letters, about 40 or 50 pages’ worth of text.
+
+This may not be reasonable — the pixels may be too crowded together.
+Consider that if the facets are all just directly pointed away from
+the center, the spots they project will be ½° apart as seen from the
+surface — which is to say, they will all kind of blur together, unless
+you stack some of them on top of each other, which is of course what
+Rayform does.
+
+How bright are they by default?  Consider a mm² in the center of the
+sunbeam, which is reflecting its light onto a screen in shadow
+positioned a negligible angle to the side of it.  This mm² subtends 34
+milliradians (1.98°) and so its projection will subtend 78 mrad
+(4.0°), which means that at 100 mm it covers an area 6.9 mm × 6.9 mm,
+which is 48 mm².  So it will be 48× dimmer than the direct sunlight:
+2100 lux, visible on a 10 kilolux shadow background but far from
+overwhelming.  But areas illuminated by several times this
+126-micron-wide minimum will be considerably brighter than the shadow.
+
+How much spatial precision do we need to make the surface reflect like
+this?  Suppose we’re willing to tolerate ¼λ deviations.  Well, at
+555 nm, that works out to 139 nm (≈ 5.5 micro-inches).  This is a
+relative radius error of 4.8 parts per million.  Regular ABMA bearing
+balls of grade 100 have a surface finish smoothness of
+5.0 micro-inches (127 nm), but to get roundness of 5 micro-inches, you
+have to go down to grade 5.  That isn’t even the lowest grade, but
+grade-5 bearing balls don’t come as large as 58 mm; they only go up to
+2 inches, which is 50.8 mm.
+
+Turning a spherical surface with a radius of 29 mm into a
+127-micron-wide paraboloidal facet with its focus at 100 mm requires
+changing the curvature radius from +29 mm to -200 mm.  At +29 mm, the
+middle of the facet would be 69 nanometers proud of planar; at
+-200 mm, it would be 10 nm below.  This seems like I must have some
+kind of calculation error, since it seems inconceivable for such a
+small difference to produce a precise focus.
+
+Cheaper fabrication technology
+------------------------------
+
+First off, what about using sugar glass instead of PMMA or soda-lime
+glass for the refractive pieces?  Instead of polishing it with rouge,
+you could polish it with water.
+
+Second, how about using electropolishing to remove tiny, precisely
+controlled amounts of metal, leaving a smoothly varying surface, while
+leaving a mirror finish?  Electroplating at around 1000 A/m² deposits
+chromium at something like 100 nm/minute, so it seems like thickness
+control down to the level of less than a monolayer should be feasible.
+This is also potentially useful for making large mirrors out of invar
+or similar, then aluminizing or silvering them.

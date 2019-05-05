@@ -1,0 +1,209 @@
+I want to do some median-filtering image processing.  First I want to
+do it in a janky way that will work for 2×2, 3×3, 4×4, and 5×5 square
+filter kernels, to see if the results I get are reasonable.  Then I
+want to see if there’s a better way to do it.
+
+Median filtering by brute-force sorting
+---------------------------------------
+
+The janky way is to copy the pixels in the window into a buffer, sort
+the buffer, and then take the middle pixel, or like an average of the
+two middle pixels.  These buffers are small enough that insertion sort
+is probably the way to go.  Insertion-sorting a 5×5 square requires
+300 comparisons, though, which is enough to make it slow.
+
+> A weighted-median filter could be an interesting way to cut down on
+> resonance artifacts: count the pixels toward the center as having
+> more weight than they really do.  One way to do this is, after
+> sorting, you calculate the CDF of the weights in the sorted order,
+> then take the pixel with the CDF in the center of the range.
+
+Median filtering by quickselect
+-------------------------------
+
+Quickselect should be about 6× as fast, but it will still do 50
+comparisons, I think.
+
+Subjectively, quickselect on my laptop becomes unbearably slow once
+the window is bigger than about 12×12, at which point it’s doing 548
+comparisons per window; I think that with the usual partition
+algorithm it would be doing 288, but I’m using Lomuto’s algorithm
+because it’s simpler.
+
+Incremental median filtering
+----------------------------
+
+Can you reuse some of the work from one window position to the next
+window position?  For example, if you’re shifting a 5×5 square (or
+whatever 5-pixel-tall window) to the right by one, can you replace the
+original 5 pixels with the new 5 pixels and then move them to the
+right place?  On average they’ll move 12 positions, so this involves
+about 60 comparisons — probably still slower than quickselect.
+
+### Incremental quickselect ###
+
+How about incrementalizing quickselect itself?  Once you’ve found the
+median, the buffer is partitioned between less-than-median and
+more-than-median items.  If you replace 5 of them, they may need to
+move to the other side of the buffer, pushing the median over a
+bit — but you don’t a priori know which element from that expanded
+side is the new median.  You have to run quickselect on it again,
+which is only a speedup of 2, giving you about 50 comparisons.
+
+### Median of medians ###
+
+What if you calculate the median of each pixel column and then take
+the median of their medians?  This turns out to also save you only
+about two thirds of the work, down to half in larger cases.  Here are
+how the partitioned items relate to the median of medians, having
+sorted the columns by their medians
+
+    ? ? + + +
+    ? ? + + +
+    - - = + +
+    - - - ? ?
+    - - - ? ?
+
+That is, one of them is the MOM itself, two medians to the left are
+known to be less, and the two to the right are known to be greater.
+Transitively, the elements earlier in the left two columns are also
+known to be less than the MOM, because they’re less than their own
+column median, which is less than the MOM.  Analogous remarks apply to
+the right.  But we don’t know anything about the other 8 elements; any
+of them could be the overall median.
+
+I’m not sure how to get from this to the actual median in an efficient
+way, although this might be a good approximation to the actual median.
+
+### Merging for incremental sorting ###
+
+What if we sort the new column and then merge it into the sorted order
+of the non-deleted pixels in a single pass, 1950s business DP style?
+This seems like it is going to be a win; sorting the new column with
+insertion sort takes 10 comparisons, and then merging it into the
+sorted order takes I think 25, for a total of 35 or so.
+
+### Heaps for incremental quantiles ###
+
+What if we maintain a max-heap of the elements in the window that are
+less than the median and a min-heap of those that are greater?  We can
+replace the old pixels with new pixels and then sift them up or down
+as appropriate, possibly shifting elements through the median to keep
+the heaps the same size.  Consider the 5×5 case; with 12 elements in
+each heap, we will typically sift about 2 steps, for about 10 steps
+per window shift.
+
+In the 12×12 case, quickselect needs about 548 comparisons in my
+current implementation.  The heap approach would have 72-element
+heaps, which would be mostly 6 levels deep, so we would typically sift
+each element by about 3 steps, for 36 comparisons.
+
+### Incremental overhead ###
+
+The data structure for such an incremental approach probably needs to
+be a little more complicated than a simple array of pixel values,
+because we need to be able to efficiently find the 5 samples to
+replace when we shift.  We need one map from (x, y) pairs to buffer
+positions so that we can find the buffer positions to replace and a
+second map from buffer positions to (x, y) pairs so that we can access
+the actual pixel value or swap the positions of two pixels.  When you
+swap two positions, you have to update both arrays.  I don’t know if
+there’s a simpler way than this.  This will probably impose enough
+update overhead that the crossover from non-incremental quickselect
+will come at a larger size than 5×5, since non-incremental quickselect
+can work on mere pixel values.
+
+### Histograms ###
+
+Suppose you have only, say, 256 different possible color values in the
+image.  Then you could represent the distribution of those values in a
+window with a histogram, an array of 256 numbers counting the number
+of pixels that has each value.  The prefix sum of the histogram, the
+empirical CDF, would cross half the size of the window precisely at
+the median.
+
+A desirable property of the histogram is that it can be updated
+incrementally quite efficiently: to shift a pixel out of the window,
+decrement its value in the histogram, and to shift one in, you
+increment its value in the histogram.
+
+Instead of maintaining all 256 values, you could maintain a reduced
+histogram with, say, 16 buckets; and instead of maintaining just a
+count in each bucket, you could maintain an array of the colors that
+fell into that bucket.  The bucket at which the empirical CDF crossed
+the median would tell you approximately the median, but to find it
+precisely, you would need to compute some arbitrary order statistic
+over the pixels in the bucket, which could be done with quickselect.
+Removing a pixel from the bucket now requires a linear search through
+the bucket for its value, but the number of pixels in each bucket is
+small.
+
+Perhaps, in the form described above, the ideal number of buckets is
+roughly the square root of the window size; for example, for a 12×12
+window, perhaps 8 to 16 buckets would be best.  This is because for
+each new output pixel we must recalculate the empirical CDF, which
+takes time linear in the number of buckets, and then we must calculate
+an order statistic inside some bucket, which (under dubious but
+probably approximately correct assumptions) takes time inversely
+proportional to the number of buckets.
+
+An incremental prefix sum data structure would change the cost
+function to favor a larger number of buckets, and the recursive
+binary-tree form in particular can update the prefix sum in
+logarithmic time; in its sparse form, it reduces to a binary trie over
+pixel values in which each trie node knows the total number of
+descendants it represents.
+
+(As an alternative to going all the way to the trie structure, you
+could use some structure other than a linear list inside each bucket.
+But nothing occurs to me that would be a real speedup.)
+
+The bucketing and trie techniques allow the histogram approach to
+scale to large color spaces, such as 12-bit grayscale or 24-bit color.
+
+The complexity cost of this technique is nontrivial.  My quickselect
+implementation is 18 lines of C and worked the first time; my
+prototype trie implementation, which crashes, is 157 lines, although
+to be fair it was probably a premature optimization to use node pools
+before I had it working at all.
+
+Rank order filters
+------------------
+
+An interesting thing to note about median filtering is that it can be
+generalized to a family of quantile filters; you could use any
+arbitrary percentile rather than just the 50th percentile.  The result
+is a filter that tends to suppress local noise and leaves
+uniform-color areas of the image unchanged, but tends to contract or
+expand brighter areas according to whether the percentile is less or
+greater than 50.  In the extreme cases of 0 and 100, where we take the
+minimum or maximum of the neighborhood, the filters are the familiar
+erosion and dilation operations from mathematical morphology; the
+other percentiles provide a more or less smooth variation between
+erosion and dilation, which are the maximally contractive and
+expansive filters of the family, respectively, and the most sensitive
+to noise, while the median filter itself is neutral between
+contraction and expansion and the least sensitive to noise.  With a
+25-element kernel with equal weighting, there are 25 quantile filters
+in the family, three of which are erosion, median, and dilation.
+
+These are commonly known as “rank order filters” or sometimes
+“order-statistic filters”.
+
+The data structures discussed above for median filtering are all
+applicable to these more general filters, but their efficiency
+properties vary.  The median-of-medians mentioned above provides a
+better estimate in any case other than the median case, for example:
+
+    ? + + + +
+    ? + + + +
+    ? + + + +
+    - = + + +
+    - - ? ? ?
+
+And in the extreme cases of erosion and dilation, it has no unknown
+pixels, amounting to the standard decomposition of a rectangular
+erosion or dilation kernel into horizontal and vertical kernels.
+
+The trie algorithm, in particular, can effortlessly handle arbitrary
+rank-order filters.

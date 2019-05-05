@@ -1,0 +1,125 @@
+Improving Lua #L with incremental prefix sum in the ∧ monoid
+============================================================
+
+Lua’s #L operator, to find the length of a list, is implemented by a
+binary search through indices to find an index j such that L[j+1] is
+nil but L[j] is not.  This is not constant-time and produces erratic
+results, but it allows the indexed assignment operation L[j] = nil to
+be, I think, amortized constant time.
+
+The solution
+------------
+
+A more predictable approach (or less euphemistically, an approach that
+always gives the right answer) would add a binary tree onto the side
+of tables and make L[j] = nil logarithmic-time like #L.  The idea is
+simply that you maintain a set of user-invisible keys full(n, m) such
+that
+
+    L[full(n, m)] == true  ⇔  ∃i ∈ ℤ : i > 0 ∧ bⁱ = m ∧ m | n ∧ ∀j ∈ [n, n+m): L[j] != nil.
+
+(We ignore the abomination of L[0] here.)
+
+The base or branching factor b is a tradeoff between storage cost and
+efficiency; 2, 3, 4, 8, or 16 might be reasonable choices.  The node
+size m is a power bⁱ of b, and its start index n is a multiple of m.
+
+Algorithms in more detail, with asymptotic costs
+------------------------------------------------
+
+When you set an index L[j] to nil, you need to look for
+full(⌊j/bⁱ⌋, bⁱ) nodes that contained that index, deleting them and
+increasing i until you don’t find one; at worst this takes
+⌈log(|L|)/log(b)⌉ iterations, where |L| is the number of items stored
+(at integer indices) in L; so, for example, deleting an item from a
+list of up to 16 777 215 items and b = 4 might require up to 6
+iterations.
+
+Conversely, when you set an index L[j] that was previously nil to a
+non-nil value, you may need to create up to a logarithmic number of
+full(⌊j/bⁱ⌋, bⁱ) nodes; each node that is created requires verifying
+the existence of b-1 existing child nodes that are siblings of the
+node just created, treating indices L[k] as if they were full(k, 0)
+nodes.  In our example, this potentially involves creating or
+examining 4 nodes at each of 6 levels, a total of 24 iterations.
+
+These are worst-case numbers; in most cases, deleting a numeric-index
+table entry would not require the deletion of any full(n, m) nodes,
+and adding one would not require the creation of any full(n, m) nodes,
+and for typical usage patterns they would be amortized constant time,
+just like the current implementation.  But it would be easy for a
+program to provoke the worst-case logarithmic slowdown: create a large
+list and repeatedly delete and recreate its first element.
+
+Computing #L would follow a logarithmic-time process similar to the
+present process, first walking up through the full(0, bⁱ) items until
+it found the largest one, then walking back down looking for successor
+nodes to last children.  In the worst case, this requires examining b
+full(n, m) nodes at each of ⌈log(|L|)/log(b)⌉ levels; our example list
+of 16 777 215 items would require examining 24 full(n, m) nodes, just
+like insertion.  The difference from the current implementation is
+that the answer it gives is precisely the index of the first non-nil
+item whose successor is nil.
+
+The storage overhead is up to |L|/(b-1) invisible table items that do
+not exist in the current implementation.
+
+This is precisely the parallel prefix-sum algorithm used for
+incremental rather than parallel computation in the ∧ monoid.  Using
+the ∨ monoid gives an alternative definition which could be computed
+in a similarly efficient way, also complies with the current
+definition, and is more similar to the definitions in sister languages
+like JS and Perl, would return the index of the *last* non-nil item
+(whose successor is therefore nil).  I think this is wrong for Lua,
+because it’s unnecessarily incompatible with the behavior of `ipairs`.
+
+Improving constant factors
+--------------------------
+
+As a locality and space optimization, it might be desirable to store
+the full(n, m) items in a way that somehow tacks them on to L[n+m-1]
+rather than as separate table items, sort of like a skip list.  For
+example, you could store them in a bitmask indexed by log(m)/log(b).
+(This allows the initial examination of the full(0, bⁱ) items in #L to
+be done with a single instruction on some CPUs.)  Alternatively, you
+could store them separately as ⌈log(|L|)/log(b)⌉ bitvectors of
+logarithmically decreasing numbers of bits, but that seems like it
+could be complicated if you start storing things at high indices.
+
+As a complicated optimization, you could lump these bits into lumps
+big enough to amortize storage overhead; taking again b = 4, in a
+128-bit lump of level j, you could have 64 nodes of full(n, b⁵ʲ⁺¹),
+16 nodes of full(n, b⁵ʲ⁺²), 8 nodes of full(n, b⁵ʲ⁺³), 4 nodes of
+full(n, b⁵ʲ⁺⁴), and 1 node of full(n, b⁵ʲ⁺⁵), using 93 of the 128
+bits.  You need one such level-0 lump for each run of 1024 list items,
+a level-1 lump for each run of 1 048 576, a level-2 lump for each run
+of 1 073 741 824, and so on; and you need zero such lumps until you
+have a run of 4 items that’s properly aligned to generate a lump.
+This limits the worst-case space overhead to 25%, if the lumps are the
+same size as normal table entries.
+
+In the case of b > 2, this storage optimization would also allow the
+use of simple bit masking operations to simultaneously test for the
+existence of all children.  But, for insertion and deletion, this
+mostly helps with the worst case, because in the average case, you’re
+overwhelmingly testing membership in the table itself.
+
+The b tradeoff
+--------------
+
+Choosing b to be larger makes assertion of new values and computation
+of length almost proportionally slower (O(N/log(N))), but also reduces
+storage overhead by b-1 and makes deletion logarithmically faster
+(O(1/log(N))).
+
+Since deletion is much less common than insertion, it would be nice if
+there was a way to shift that factor of N over to the deletion
+algorithm.  I haven’t found one.  You might try the simple approach of
+making nodes at a given level conditional on the existence of not just
+all of their children but all of their previous siblings.  Thus
+insertion creating a new node at a given level need only check for the
+existence of its previous sibling to decide whether to create its
+“parent”, but deletion potentially needs to delete all of its
+following siblings.  But insertion at the beginning retains the same
+worst case, and the usual case is amortized constant time, just as
+before.  So I think this doesn’t really help.

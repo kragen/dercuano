@@ -1,0 +1,190 @@
+I was reading Raph Levien’s notes on “rope science” in his “xi”
+editor.  He’s talking a lot about monoid cached trees for applications
+like maximum line width computation, height computation, parenthesis
+matching, detection, and word wrapping; the objectives are to enable
+these computations to be done in parallel (across multiple cores),
+incrementally, and lazily.
+
+It occurs to me that most of these are kind of special cases of a
+generalized DFA monoid, and using the standard parallel prefix-sum
+algorithm on the DFA monoid might provide a more convenient way to
+express these computations.
+
+Consider this simple example of a comment-tagging NFA, in Perl regexp
+syntax extended with `@x` to tag the just-matched character with `x`,
+using `N` for non-comment and `C` for comment:
+
+    ([^#]@N|#@C([^\n]@C)*(\Z|\n@N))*
+
+This works out to a fully deterministic regexp, in the sense that you
+never have more than one state live after a given character.  If we
+unpack it from the regexp syntax into traditional programming outline
+syntax, it looks like this:
+
+    repeat:                     # 1
+        either:
+            match [^#]
+            tag N
+        or:
+            match "#"
+            tag C
+            repeat:             # 2
+                match [^\n]
+                tag C
+            either:
+                match EOF
+            or:
+                match "\n"
+                tag N
+
+Despite being 15 lines of code, and not counting the final state, this
+FSM only has two states, marked above with the comments “# 1” and
+“# 2”. The state diagram looks like this (pipe to `dot -Tx11` from the
+graphviz package to see):
+
+    digraph nc {
+        rankdir=LR;
+        LR_1 [ shape=circle, label="1" ]; LR_2 [ shape=circle, label="2" ];
+        EOF [ shape=doublecircle, label="" ];
+
+        LR_1 -> LR_1 [ label="[^#]\nN" ];   LR_1 -> LR_2 [ label="#\nC" ];
+        LR_2 -> LR_2 [ label="[^\\n]\nC" ]; LR_2 -> LR_1 [ label="\\n\nN" ];
+        { LR_1 LR_2 } -> EOF [ label="EOF" ];
+    }
+
+XXX why is state 2’s EOF transition sort of explicit while state 1’s
+isn’t?
+
+Now, obviously, you can run this on a text sequentially, starting from
+a known initial state, tagging each of the characters with either N or
+C as you go.  At any given point in the text, your state is either 1
+or 2.
+
+However, you can *also* run it from an *unknown* initial state.  In
+this case, your state at any given point in the text is a *function*
+from the initial state to the current state.  Initially this function
+is { 1: 1, 2: 2 }.  And as you go, you tag each character, not with N
+or C, but with a *function* from the initial state to the tag.  For
+example, if the first character is “q”, then you tag it with { 1: “N”,
+2: “C” }, and your state doesn’t change.  But if then you match a “#”,
+your state function changes to { 1: 2, 2: 2 }, which is to say, always
+2, and you tag it with { 1: “C”, 2: “C” }, which is to say, always
+“C”.
+
+If you run this algorithm over a block of data taken from the middle
+of a long file, you will end up with some final state function at the
+end of the block of data.  For this DFA, it will be either
+{ 1: 1, 2: 2 }, { 1: 2, 2: 2 }, or { 1: 1, 2: 1 }.
+
+(If you do this with an NFA instead of a DFA, your result will be a
+binary relation rather than a function.)
+
+If you break the file up into many blocks and run it in parallel over
+each block, you will compute such a function for each block.  By
+composing these functions, you can compute such a function for longer
+runs of the file.  For example, if block 39 comes out to { 1: 1, 2: 2 }
+and block 40 comes out to { 1: 2, 2: 2 }, then the concatenation of
+blocks 39 and 40 comes out to { 1: 1, 2: 2 }.
+
+If you compose these blocks into a balanced binary tree, you can then
+compute the function for the whole file by propagating these functions
+up the tree; functions are, of course, a monoid under composition.
+Also, though, this allows you to take a known initial state and then
+efficiently propagate it back *down* the tree, left to right, to every
+character in the file.
+
+This is the standard parallel prefix sum algorithm, applied to DFA
+execution.
+
+If you were doing a similar kind of tagging in an NFA, you would
+probably want to only apply the tags that didn’t belong to branches of
+the possibility tree that were ultimately discarded.  This involves
+propagating information *backwards* as well in the down-the-tree
+stage.  I think this simply involves rolling back the things that led
+to intermediate states that ultimately mapped to a null set of states.
+
+You could think of this transformation of the DFA from a computation
+on states into a computation on functions from states to states as a
+kind of abstract interpretation with non-standard semantics of the
+DFA.  You can do the same kind of abstract-interpretation trick with
+computational models more powerful than a DFA, although you lose the
+bounded-space guarantee the DFA gives you.  For example, consider this
+parenthesis-counting automaton:
+
+    repeat:
+        either:
+            match "("
+            n++
+        or:
+            match ")"
+            n--
+            either:
+                n >= 0
+            or:
+                n < 0
+                tag X
+        or:
+            match [^()]
+
+It tags “X” whenever there’s an unmatched “)”.  You can run it in the
+standard way with an initial concrete value of `n` such as 0, and it
+will tell you if there are mismatched parentheses in your text, its
+state at any given position being some concrete value of `n` such as
+3.  Or you can run it with an initial abstract value such as `n₀`, and
+its values at different positions will be further abstract values such
+as `n₀` + 3 — or, you could say, λn₀.n₀ + 3.
+
+    digraph pp {
+        LR_1 [ shape=circle, label="" ];  EOF [ shape=doublecircle, label="" ];
+
+        LR_1 -> LR_1 [ label="(\nn++" ];
+        LR_1 -> LR_1 [ label=")\nn--\nn>=0" ];
+        LR_1 -> LR_1 [ label=")\nn--\nn<0\nX" ];
+        LR_1 -> LR_1 [ label="[^()]" ];
+        LR_1 -> EOF [ label="EOF" ];
+    }
+
+XXX graphviz is sucking at laying out those edges and labels
+
+Although this automaton has an infinite set of possible states, as
+well as possible mappings from state at the beginning of a block and
+state at the end of a block, and representing one of them could in
+principle consume an arbitrarily large amount of space, you can apply
+exactly the same approach to composing those functions into a monoid
+tree.  And, as it happens, these particular mappings have a relatively
+compact representation, all fitting the schema λn₀.n₀ + k.
+
+It seems to me that to make the abstract interpretation tractable, you
+need some kind of limitation on the power of the language — you don’t
+want to have to solve the Halting Problem for one of the blocks.  I
+suspect that it’s probably sufficient to forbid loops that don’t
+advance through any input, but I’m not sure.
+
+The objective here is to have a scripting language in which you can
+conveniently express any of the monoid computations Raph talked about
+in “rope science”, including word-wrap and the like, and that also
+provides some kind of evaluation efficiency guarantee.  You’d like to
+be able to compute, for example, that if at character 512 the carriage
+position was between 110 and 170 pixels, then the word breaks
+thereafter will be at characters 547, 610, 665, ..., and that at
+character 1024 the carriage position will be 212; while if it was
+between 170 and 220, they will be at 542, 604, 665, ... and the
+carriage position at character 1024 will still be 212.  And you’d like
+to be able to compute that automatically from a word-wrapping script
+written in a backtracking language with numerical variables.
+
+Parenthesis matching, however, is harder — the case where you want to
+not just count parentheses, but also blink the matching parenthesis.
+You need a stack, and the effect of running a paren-matching script
+over a section of the file will be to pop some set of parens from the
+stack (possibly requiring them to be of the right type) and push some
+others.  Such functions can still be composed into a monoid tree, of
+course.  (If you want the parenthesis locations to be integer offsets
+from the beginning of the file, maybe one state variable should be the
+current offset.)
+
+Bjoern Hoehrmann has been working on an algorithm called “parselov”
+which compiles a context-free grammar to a finite-state automaton that
+approximates the CFG using a limited-depth parse stack (one stack
+item, I think).
+

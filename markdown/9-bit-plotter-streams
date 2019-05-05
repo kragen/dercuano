@@ -1,0 +1,163 @@
+Suppose we’re in an alternate history where Japan won WWII due to some
+grievous miscalculations by the US.  Computer technology developed
+anyway, somewhat later, on 18-bit machines like the PDP-4, PDP-7, and
+PDP-9, with 9-bit bytes, accommodating potentially a 512-bit character
+set — not enough for single-character kanji, but plenty for hiragana,
+katakana, and some common kanji.  The electromechanical output device
+of choice in 1970 is not a teletype, but a kind of pen plotter
+optimized for curve plotting, with a scotophor CRT memory tube (like a
+Skiatron) as a higher-speed and less material-consuming alternative.
+
+Instead of having two motors driving a teletype carriage across the
+paper, a third motor to select a letter from a typewheel, and a
+solenoid to fire a type hammer, the plotter has a pen-down solenoid
+and X and Y motors (counting from the upper right corner of the page)
+servoed from, nominally, analog voltage signals with a SNR of some
+26dB, providing an effective resolution on the paper of some
+2000×2000.  These position signals are controlled in two ways: by
+setting them directly from a 12-bit DAC and by being changed over time
+by a velocity signal, which is also nominally an analog voltage signal
+with a 26dB SNR; it, too, can be set directly from a 12-bit DAC, but
+is changed over time by a (26 dB SNR) acceleration signal, which is an
+analog voltage signal that can only be set directly or zeroed by a
+reset command.  This allows the plotter to plot perfectly smooth
+curves by setting only the acceleration signal periodically as the
+motors move under servo control.
+
+There is additionally a “form feed” command, which initiates a change
+of page, either through manual operator intervention or through an
+automatic motor mechanism.  The scotophor tube implements this by
+erasing the image.
+
+This gives us 10 basic commands: x←, y←, x'←, y'←, x"←, y"←, reset,
+form feed, pen up, and pen down.  Additionally, there’s an 11th
+command, which idles the command stream for the given amount of time
+to allow the pen to catch up.  The basic plotter command word, then,
+is an 18-bit word consisting of a 4-bit order code field, a 12-bit
+operand field, and two extra bits.
+
+The “reset” command sets the velocity and acceleration to 0, but
+doesn’t change the position.
+
+In our timeline, the 1981 CGA had 128 kilobits of framebuffer; the
+US$1200 1976 ADM-3A had 16 kilobits of ASCII screen contents buffer
+(not even inverse video!).  We’re supposing that this plotter thing
+became standardized in 1965 at a budget of about US$50000, in a
+timeline where Moore’s Law’s 18-month capacity doubling was about five
+years behind our own.  In our timeline, the appropriate amount of
+memory for computer terminal equipment was about one bit per 7.5¢
+(total cost of the equipment, not the cost of the memory) in 1976,
+which would be 1981 in the Japan plotter timeline.  So 1965 would be
+16 years back from that, roughly 10 capacity doublings back: US$75.00
+per bit.  So the plotter has a digital memory budget of about 32 of
+these 18-bit words, or 64 9-bit bytes.
+
+A terrible problem for terminal equipment at the time was that speeds
+of 10 characters per second were demanded (this was the major upgrade
+in the Teletype Model 28, introduced in our timeline in 1953, and a
+widely used computer console until about 1970 in our timeline; the
+Friden Flexowriter used as the console for the LGP-30 was also 10
+6-bit characters per second) but it was challenging to transmit data
+over long distances at more than 300 bits per second.  Much of Unix’s
+user interface design (for example, the absence of success messages,
+the two-letter command names, and the "?" error message from ed, The
+Standard Editor) derives from this.  We can suppose that the Japanese
+would be satisfied with 5 characters per second, but instructing the
+plotter to draw a single character like “ア”, “ラ”, “マ”, or “ハ”
+involves about four or five vertices per character, and each vertex
+requires typically a new x/y position, perhaps a new x'/y' velocity,
+and often pen up or down.  This means we need three or four commands
+for each vertex, and maybe 16 such commands per character, totaling
+288 bits — almost an entire second to transmit in full!
+
+There are about two strokes and two non-plotting movements per
+character, so the plotter pen also needs to be able to move the
+distance of a typical character stroke 20 times per second, or 50
+milliseconds.  If the character box is 5 mm square, and the typical
+stroke length is about half of that or 3 mm, we need a 60 mm/s pen
+movement speed, which seems rather slow; we can probably specify
+240 mm/s, giving us the physical ability to plot some 20 katakana
+characters per second, rather than only 5, for which we would also
+need to be able to execute 320 commands per second.  If we presume
+that our paper is shiroku-ban size 4, 264 mm × 379 mm (implying ≈200μm
+servo resolution), it will take us an entire second to move from one
+side of the paper to the other, and the paper can hold 52 columns of
+75 characters, which will take some 195 seconds to finish plotting,
+which is an entirely reasonable kind of interval for a human operator
+to be asked to manually change the paper.  (If we analyze a
+hypothetical analog electronic PID control system for controlling the
+pen position with a mechanical system whose acceleration is low-pass
+filtered by its mechanics, we can derive the kinds of glitchy
+distortions likely to result in the characters.)
+
+If we figure that a typical stroke length is 3 mm at 240 mm/s, the pen
+needs 12.5 milliseconds to execute it, so millisecond resolution is
+likely adequate for the “delay” command; to be safe, let’s say we
+count cycles of a 8kHz clock, so the maximum delay with a 12-bit
+operand is about half a second.  Of course, later plotters that manage
+higher speeds, and the CRT version, will virtualize these
+“milliseconds”.
+
+(What should the scale for the v and a components be?  Like, how many
+virtual milliseconds should x'=1 take to increment x by 1?)
+
+We have a relatively large discrepancy here between the hypothetical
+mechanical device’s physical capabilities to execute 320 commands per
+second and the hypothetical serial link’s physical capability of 300
+*bits* per second.  In the other direction, in our timeline, the
+(18-bit!)  1959 PDP-1 could execute about 93,000 instructions per
+second, and presumably a similar stack-based machine could execute
+about 200,000 instructions per second, or maybe 20,000 if it were much
+smaller and therefore less powerful than the PDP-1’s 2700 transistors,
+3000 diodes, and 4096 18-bit words of core.
+
+Could we advantageously use this powerful memory of 64 9-bit bytes or
+32 18-bit words, or maybe a few times that, and the potential of
+executing tens or hundreds of thousands of instructions per second, to
+bridge the gap between the 300-bit-per-second serial link and the 320
+drawing operations per second.  Maybe you could even take full
+advantage of the curve-drawing abilities of the hardware with a font
+ROM made with PCB inductance, like the HP 9100A’s microcode PCB (512
+64-bit words totaling 32 kibibits, 1968 in our timeline, US$5000, 23
+registers of core RAM; projecting forwards to 1973, backwards 8 years
+to 1965 to get a factor of 6 Moore’s Law reduction, and up by a factor
+of 10 to account for the larger budget, we get 53 kibibits), or core
+ropes, like the Apollo AGC (1966 in our timeline, astronomical
+budget).
+
+The GreenArrays C18 core has (not counting its stacks) 128 18-bit
+cells in its memory address space, of which 64 18-bit cells are RAM
+and 64 18-bit cells are ROM; disregarding literal cells, each one
+normally has four five-bit instructions packed into it, with the
+fourth instruction having two implicit zero bits.  This is only a
+factor of two greater than the RAM budget of 32 18-bit cells I
+suggested above, and although it is somewhat limited in what you can
+achieve on a single core, I think a smaller C18-like processor would
+work fine as a controller for this hypothetical plotter.  Normally it
+would execute 18-bit instruction words received over its serial port,
+which could read and write its 64 cells of RAM, and also make calls to
+routines loaded into its RAM and routines already present in its ROM;
+if it can execute 20 000 instructions per second, then it has time to
+execute some 63 processor instructions per necessary plotter
+instruction or 1000 processor instructions per plotter stroke, and if
+our serial connection gives us a start bit, 9 data bits, and a stop
+bit per 9-bit byte, at 300bps we can receive 27 bytes per second and
+execute 733 processor instructions per serial byte.  Two such bytes
+should be adequate to invoke a subroutine to draw a character.
+
+This architecture would actually allow font ROMs with a significant
+number of kanji, since you could define and invoke subroutines for
+radicals with bounding-box parameters.
+
+Of course, this approach also allows you to write characters at
+arbitrary non-character-cell positions, to draw arbitrary line
+graphics, and probably to draw stipple patterns.
+
+(If the pen is replaced by a brush, it might make sense to use a
+proportional actuator like a servomotor or voice coil to control trace
+intensity, which of course is easy on a scotophor.)
+
+The physical system described here visits new points at about 20 Hz,
+which means it probably needs to have its first vibrational eigenmode
+well above 200 Hz to avoid unacceptable ringing (with a simple PID
+control system, anyway.)

@@ -1,0 +1,35 @@
+I’d like to do simulation and optimization of optical caustics.  The
+basic phenomenon is that caustics can have a very high dynamic range
+and project a reasonable distance, and in particular can produce
+divergence-limited-brightness lines in the projected image.
+
+Fundamentally the simplest idea is that if you take a single pencil of
+a collimated beam impinging on a nearly-flat mirrorlike reflector
+surface and look at the pattern it makes on a target — whether an
+interface between optical media or a metallic surface — the point
+where the pencil lands on the target is a continuous function of its
+position on the reflector, and can be computed using Heron’s law of
+reflection.  However, the pencil may be deformed to be convergent,
+divergent, or both, by the curvature of the reflector at that point.
+If it is converged to a point or a line, then there is a singularity
+of infinite brightness in the caustic.
+
+The derivative of the point to which the pencil is directed with
+respect to the point where it’s reflected may go through zero at these
+points, in X, Y, or both.  The product of the two derivatives gives,
+in some sense, the size of the spot.
+
+Probably the most sensible thing to do is actually to compute a bunch
+of reflected rays from different points, then calculate some kind of
+spline joining them.  The area of each square of the spline grid
+provides a local brightness, but the grid may fold back on itself
+through the aforementioned lines of singularity.  This is close to
+[the approach taken by Evan Wallace][0] in WebGL-Water.
+
+[0]: https://medium.com/@evanwallace/rendering-realtime-caustics-in-webgl-2a99a29a0b2c
+
+(Of course the bright lines are limited in brightness both by the
+divergence of the incident light and diffraction over the focusing
+zone.)
+
+See also file `gauzy-shit`.

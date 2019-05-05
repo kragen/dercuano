@@ -1,0 +1,163 @@
+Color computer displays in the 1980s and 1990s used a “palette” of
+colors to save memory, so that they could use only a single byte per
+pixel instead of the 2–4 bytes needed by the “TrueColor” displays we
+use nowadays, which did exist at the time but were specialty high-end
+hardware, used only for things like making movies.  The “palette” was
+a finite array of colors that the pixels in the framebuffer indexed
+into.
+
+But what if we’d used a different approach, one more driven by the
+capacities of the human visual system and of electronics?  I think we
+could have done about an order of magnitude better for photos and
+video.
+
+Before palettes
+---------------
+
+Prior to paletted framebuffers, computer displays commonly used
+character generators.  A color 80×25 terminal with 8×16 characters has
+256 000 pixels, but might have only 4000 bytes of RAM (one byte of
+character data and one byte of colors for each of the 2000 screen
+cells), and video cards for personal computers followed a similar
+approach.  As the electron beam scanned across the screen, the
+hardware would read out the appropriate line of pixels from the
+appropriate glyph in the font — at first in ROM, later RAM, allowing
+runtime-changeable fonts, at the cost of another 4096 bytes of RAM.
+Systems like the Nintendo used a similar tile system, adding features
+for “sprite” overlays, which many home computers also had.
+
+Typically, this approach required fixed-width fonts, although that
+wasn’t really a necessary restriction.  Later character-generator-
+driven systems like the DEC VT220 (and maybe the VT100?) often
+supported double-width and double-height characters, providing a
+little bit of typographical variety.
+
+Game computers of the time had different specialized hardware with
+sprites and some compositing built in;
+<https://prog21.dadgum.com/181.html> talks a bit about how the Atari
+2600 in 1977 managed to do NTSC-resolution video games with 128 bytes
+of RAM, and <https://prog21.dadgum.com/173.html> talks about the
+slightly later Atari 800.
+
+By contrast, the original Macintosh shipped with 128 kibibytes of RAM
+(because 512 kibibytes was thought to be too expensive) and had a
+512×342 one-bit framebuffer, which requires 22 kilobytes of RAM, five
+times as much as the fixed-font character generator and three times as
+much as the variable-font character generator, and it couldn’t fit as
+much readable text on the screen and couldn’t do color.
+
+The advent of the palette
+-------------------------
+
+The IBM EGA (in 1984), the Apple IIGS VGC (in 1986), the IBM VGA (in
+1987), and a large variety of other systems in the late 1980s and
+early 1990s instead adopted a “paletted” approach, in which a small
+number of bits per pixel in the framebuffer indexed into a palette.
+The EGA had 4 bits per pixel and 6 bits per palette entry, the VGC had
+4 bits per pixel and 12 bits per palette entry, and the VGA had 8 bits
+per pixel and 18 bits per palette entry.
+
+Let’s consider a 1024×768 Super VGA, common around 1990, with its
+traditional 256-color palette (with 6 bits per color channel).  At the
+standard 72 dpi, that’s 361×271 mm, a “17.8 inch” monitor, while on a
+more affordable 12.8-inch monitor it would hit 100 dpi.  And it could
+display pretty decent photos, although a lot of software fuckery went
+into palette handling and dithering, especially once you got into
+windowed displays and animation; the grainy look of GIF video nowadays
+comes from the 256-color-palette limitation that it inherited from the
+video hardware of that period.
+
+These displays could also do pretty decent text: in a readable but
+jaggy 5×8 font, you would get 96 lines of 204 columns on the screen,
+but a more easily readable 8×12 pixel font would give you 64 lines of
+128 columns.  That’s a bit more than a printed A4-size page of text.
+
+> Antialiased text rendering was not common because doing it on a
+> paletted display would use up a lot of colors in the palette and
+> essentially rule out using varying background colors, although
+> varying background colors itself was unusual.  Subpixel antialiasing
+> was not possible because the different colors of a pixel were fuzzy
+> blobs in the same place on the screen, not separately addressable
+> spatially distinct pieces, even though the differently-colored
+> phosphors on the monitor were in fact in different places.
+
+The palette meant that such SVGA cards could ship with only 768
+kilobytes of DRAM.  DRAM cost US$40 per megabyte from about 1992 to
+about 1996, due to a price-fixing cartel which eventually collapsed,
+and so this was US$30 worth of RAM — even more in 1990 or 1988.  A
+16-bit TrueColor display in the now-popular 5-6-5 RGB format would
+have cost US$30 more to make and had one bit less color precision in
+red and blue; a display at this resolution like the Targa, with the
+24-bit TrueColor that is now universal except on low-end cellphones,
+would cost US$60 more to make.
+
+Alternate history: gradient tiles or gradient pixels
+----------------------------------------------------
+
+But let’s consider different tradeoffs you could have made.  Suppose
+that, instead of 1024×768 pixels, the screen were divided into 192×144
+tiles, each 1.88 mm square on a 17.8" monitor, and each tile could
+display two arbitrary linear gradients, separated by a diagonal line
+at an arbitrary angle and position.  Suppose the start color and ∇
+(dr/dx, dr/dy, dg/dx, dg/dy, db/dx, db/dy) for each gradient are
+specified to 8 bits per channel, and 4 bits each specify the angle and
+the position of the dividing line, so the angle is specified with a
+resolution of 11°15', and the position is specified with a precision
+of, say, 118 μm if the line is vertical or 166 μm if the line is
+diagonal.
+
+This gives us about 3× the linear spatial resolution of the 1024×768
+display and 4× its color resolution on each channel (assuming the
+analog parts of the system are adequate), but subject to some
+significant lossy compression.  In particular, text is going to have
+to be pretty large.
+
+Let’s add up the memory per tile here:
+
+    |                        | bytes/tile |
+    | gradient 1 start color |          3 |
+    | gradient 1 ∇           |          6 |
+    | gradient 2 start color |          3 |
+    | gradient 2 ∇           |          6 |
+    | dividing line          |          1 |
+    | total                  |         19 |
+
+So that gives us 525 kilobytes or 513 kibibytes of VRAM, instead of
+the 768 KiB of VRAM we need for the SVGA.
+
+You could do the whole decoding process from the gradient tiles to
+voltages entirely digitally, feeding digital counts to a DAC according
+to a dot clock, just like a normal video card.  But you could actually
+get smoother gradients with much slower hardware if you generate the
+gradients with *analog* circuitry, consisting of a capacitor C1
+connected through a buffer to each output channel, connected to a
+transmission gate and a voltage-controlled current source controlled
+by another capacitor C2, which is itself connected to another
+transmission gate.  Each time you cross a tile boundary or a diagonal
+line, you short both C1 and C2 to voltages at the outputs of a couple
+of buffers driven by capacitors C3 and C4, which are
+sampling-and-holding outputs from a previous conversion result from a
+DAC.  The diagonal-line trigger is driven from a timer which is also
+set by a DAC at tile-boundary-crossing time.
+
+Supposing we have 768 visible scan lines and thus about 850 total scan
+lines in an 85-Hz frame, our horizontal scan frequency is about
+72 kHz; if we have 210 “gradient tile times” per scan line (including
+10% HBI) then our “gradient tile clock” is only 15.2 MHz.  Under the
+same assumptions, the 1024×768 traditional display needs an 82 MHz dot
+clock.  However, the jitter constraint on the gradient tile display is
+actually substantially tighter if we are to achieve the promised 3×
+spatial resolution improvement, and of course each color channel needs
+four DAC conversions per tile clock (initial value, initial partial
+derivative in X, and both of these after crossing the edge), so the
+DAC actually must run at almost the same speed.
+
+This isn’t quite as terrible as it might seem for text if the gradient
+saturates when it reaches a max or min value, as it would in the
+suggested analog embodiment; with a background that’s either black or
+white, that allows us to get a vertical line at the left edge of each
+tile and a diagonal line at the edge, simply by setting the gradient
+value large enough to rapidly saturate to the background color after
+the crossing.  I estimate that you could get readable (fixed-width)
+text with 2×2 gradient tiles per character cell, which would give us
+72 lines of 96 columns, in the same ballpark as the SVGA card.

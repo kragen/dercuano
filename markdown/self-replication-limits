@@ -1,0 +1,128 @@
+Since self-replicating automata entered the fictional literature in
+Samuel Butler’s Erehwon, humans have been concerned that their
+uncontrolled replication could be dangerous; notable examples include
+Karel Čapek’s “R. U. R.”, Lem’s “Invincible”, Dick’s “Second Variety”,
+Drexler’s “gray goo”, Star Control 2’s “Slylandro Probe”, and, in a
+way, Goethe’s sorcerer’s apprentice’s broom.  And, of course, our
+experience with biological self-replicating systems includes numerous
+troublesome examples of exponential self-replication, including locust
+plagues, cancer, all kinds of infectious diseases, toxic algal blooms,
+mold infestations, ant and other insect infestations, rats in cities,
+and cane toads in Australia.  In computers, self-replicating code and
+related phenomena have caused many problems, from the TFTP “Sorcerer’s
+Apprentice Syndrome” and the accidental fork bomb to the helminthiasis
+of the internet (the “Morris worm”); nowadays, self-replicating code
+is a mainstay both of computer security attacks (where it is often
+called a worm) and defense (where it is often called a security patch
+or security update).
+
+Our experience with biological systems, however, is misleading when it
+comes to mechanical systems.  If you want to design a self-replicating
+mechanical system to have a high degree of assurance that it won’t
+continue running on its own, consuming more resources than anyone
+wanted to produce more replicas of the system than anyone wanted,
+there are a variety of strategies you can employ without unduly
+limiting the system's intentional uses.
+
+1. Large size.
+
+    One reason that cancer is such a problem in animals is that we are
+    made from trillions of essentially autonomous units, each capable of
+    self-replication, most of which (except for red blood cells) do in
+    fact self-replicate in the regular course of events.  This provides
+    hundreds of trillions of opportunities for exponential
+    self-replication to arise during the lifetime of a single organism.
+
+    By contrast, we can design the self-replication process of a robot to
+    use convergent assembly, in which the minimal self-replicating unit is
+    very large — rather than the tens of microns of a typical eukaryotic
+    cell, it could be hundreds of millimeters, or even more than a meter,
+    in diameter.  This lowers whatever risk of exponential replication may
+    exist by a factor of about a quadrillion.
+
+    By using convergent assembly, in which the robot contains many small
+    manipulators producing parts to be assembled by asmaller number of
+    larger manipulators, it is possible to obtain this desirable large
+    size without paying an excessive cost in replication time, though this
+    is not intuitive from examining biological models such as elephants,
+    humans, or whales, with their perilously low fertility rates.
+
+2. Broadcast architecture.
+
+    Rather than keeping a copy of the full program to build a new robot
+    inside of each robot, as cells do, it has been suggested (originally
+    by Laing, I think, as a way to reduce the size of the robot) to store
+    the program in a centralized transmitter, broadcasting the subprogram
+    for each stage in the process to all of the robots at once.  In this
+    way, no robot ever contains the full construction program at once; if
+    the central transmitter ceases to transmit, perhaps because a human
+    has hit the red EMERGENCY STOP button, the entire replication process
+    will cease.
+
+    Concern about the space used for the program might seem quaint today
+    when the system-on-a-chip the Raspberry Pi is built around has a
+    gigabyte of RAM.  However, this may be purely an artifact of our
+    primitive macroscopic fabrication technology — semiconductor fabs are
+    optimized for efficiently producing consumer products, so the
+    wire-sawing process used to dice wafers has unacceptable waste below a
+    scale of a millimeter or so.  With self-replication, we may be able to
+    usefully reduce robot size below the level where each autonomous unit
+    contains space for hundreds of thousands of memory bits.
+
+    From a certain point of view, a convergent-assembly desktop factory is
+    a broadcast-architecture machine — after all, what distinguishes the
+    smallest manipulators from autonomous replicators is precisely that
+    they are fixed in place in a larger assembly governed by a larger
+    program they do not have access to.
+
+3. Manual process steps.
+
+    If the replication process turns a bucket of dirt and rocks into a
+    bunch of robots, a simple way to prevent the process from running amok
+    is to only fill the bucket through human intervention.  For example,
+    if the bucket is mounted on top of the replicator, a person could
+    shovel dirt and rocks into it with a shovel.  At a larger scale, the
+    person could use a backhoe or a manually operated hydraulic excavator
+    or power shovel capable of depositing hundreds of tons of material in
+    a single operation.
+
+    The manual process step need not be the initial raw-material handling
+    step; having a person manually pick up a bucket of finished parts from
+    an autonomous digging part-fabricating robot and dump them into the
+    parts hopper of an assembly robot would work too.  If the human
+    stopped carrying parts buckets, no further replicas would be produced.
+    At the extreme, you could require a single human-executed final
+    assembly step, such as installing a fuse or a magic word behind the
+    robot's teeth, in order to bring the fully-assembled robot to life.
+
+    However, the raw-material extraction step of the process is the step
+    most likely to cause damage to nearby objects such as buildings, other
+    machinery, or humans, so it is the step most desirable to automate.
+
+4. Alternation of generations.
+
+    If robot type A is well-suited to producing robot type B, and vice
+    versa, but neither is well-suited to produce others of its own type,
+    then it is possible to employ either type of robots to produce an
+    arbitrary quantity of the other type of robot, or other articles,
+    without ever enabling exponential growth.  Exponential growth is only
+    possible if replication of both robots is possible at once — both
+    construction programs and all the necessary raw materials must be
+    present.
+
+    Alternation of generations may be desirable for material-processing
+    reasons as well.  RepRaps and similar FDM machines cannot replicate
+    themselves from raw materials because, among other things, they cannot
+    manufacture their hotends (extrusion nozzles), because the hotends
+    necessarily remain solid at temperatures that melt the thermoplastic
+    extruded through them.
+
+    Moses, Yamaguchi, and Chirikjian refer to this kind of alternation of
+    generations as a “cyclic fabrication system”, saying, “It is cyclic in
+    the way the game ‘rock-paper-scissors’ is cyclic: tools, materials,
+    and fabrication processes are chosen such that one process creates
+    tools used in the next process…” They suggest prototyping using a hard
+    two-part polyurethane resin which can be cast in wax molds, which in
+    turn can easily be machined by fully-hardened polyurethane; or using a
+    low-melting metal alloy to make mandrels on which to electrodeposit
+    softer but higher-melting metals such as copper and nickel.

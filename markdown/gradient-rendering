@@ -1,0 +1,191 @@
+From <https://news.ycombinator.com/item?id=12223616>
+
+Raph wrote:
+
+> Another serious potential win in SVG is that you might be able to
+> interleave the area integration with alpha compositing /
+> masking. Could end up pretty darned fast.
+
+I responded:
+
+> I was thinking about using your prefix-sum approach for exactly that
+> almost all of last night. I don’t have an attack on the problem that
+> I’m satisfied with yet:
+> 
+> 1. Render each path to a fresh pixel buffer, alpha-compositing it
+>    down onto the final canvas. Advantage: straightforward, works for
+>    sure. Disadvantage: you need a lot of multiplies per pixel.
+> 
+> 2. Partition paths into “layers” of nonoverlapping paths, render
+>    each layer as a unit, and composite each new layer down onto the
+>    final canvas. Overlapping opaque paths can be incorporated into
+>    the same layer as whatever is below them by cutting an
+>    overlap-shaped hole in what’s below before adding in the new
+>    path; although that involves some intersection tests to know
+>    where to stop, my intuition is that it will be a big
+>    win. Advantages: straightforward, probably faster than the
+>    previous one. Disadvantages: the partitioning is a potentially
+>    costly extra step (one of those things that makes me wonder if
+>    it’s NP-complete to do it optimally), and there are still
+>    potentially many multiplies per pixel.
+> 
+> 3. Separately accumulate a numerator (total premultiplied color) and
+>    denominator (total alpha) for each pixel, then divide in the
+>    end. Advantages: You avoid doing lots of work per
+>    pixel. Disadvantages: This is a weighted sum, not alpha
+>    blending. Alpha blending is a different thing. So the result is
+>    wrong. Also, an honest division per pixel is more expensive than
+>    quite a number of multiplications, although maybe you could cheat
+>    on the final division with a table of approximate multiplicative
+>    inverses or something. So this would probably be super slow.
+> 
+> 4. Find a different group other than ℤ/256ℤ in which to do
+>    prefix-sum that somehow gives you the right results. Then you can
+>    just render all the edges into the same buffer and do a single
+>    vectorizable prefix-sum operation over it.
+> 
+>     Advantages: This sounds super fast.
+> 
+>     Disadvantages: It seems clear that this group is going to have
+>     to be able to represent the entire Z-ordered stack of colors at
+>     every pixel, because if I’m looking at some translucent green on
+>     top of translucent red on top of opaque black on top of pale
+>     blue, and I reach the right (negative) edge of the opaque black
+>     path, somehow I have to have remembered the blue thing
+>     underneath in order for it to peek through, which suggests to me
+>     that I need an unbounded number of bits per pixel to implement
+>     this scheme, which probably is not going to admit an actually
+>     fast implementation. In effect it has to reduce to the second
+>     approach, except that the software has to deal with the stack of
+>     layers once for every pixel. Or is there some magical way around
+>     this, at least for a fast-path case?
+> 
+> This part is probably obvious to you, Raph, but you can do SVG
+> linear gradients with two prefix-sum passes instead of one, where
+> the first pass just runs over signed gradient stops and gradient
+> clipping boundaries, and then you draw the signed path boundaries
+> into the buffer before the second prefix-sum pass. (Is that clear? I
+> suspect it may be too abbreviated.)
+> 
+> I suspect that with three prefix-sum passes you could do a decent
+> quadratic-spline† approximation of arbitrary gradients, including
+> the weird skew cone gradients SVG calls “radial gradients”. But I
+> haven’t worked out the details.
+> 
+> I know you don’t have a lot of time to hack on this stuff right now,
+> but would you have time to provide feedback if I were to hack on it
+> a bit? I imagine that I’d run into any number of places where
+> talking to you about it for half an hour could save me days of
+> wasted effort.
+> 
+> † here I’m talking about what Carl de Boor calls “splines”, which I
+> know disagrees with your usage of “splines”. I think you called them
+> “B-splines” in your dissertation.
+
+Then I wrote this:
+
+> You might have seen Raph's recent article on [font-rs], where he
+> observes that the color of a pixel in an antialiased painted polygon is
+> the prefix sum of the signed edge coverages, and prefix sum is a thing
+> you can do super fast with SSE.
+> 
+[font-rs]: https://medium.com/@raphlinus/inside-the-fastest-font-renderer-in-the-world-75ae5270c445
+> 
+> Dan Amelang's work with Gezira and Nile is pretty inspiring to me, and
+> the idea that you could get enough performance out of modern hardware to
+> not have to worry about precaching font glyphs or really anything else
+> is pretty neat.  And hey, AAA games rerender each frame more or less
+> from scratch, right?  And in 3D at that.
+> 
+> I've had pretty good experiences hacking together stuff in SVG,
+> especially with the little bit of data binding provided by D3 — you end
+> up with a buttload of code, but you have a lot of control over how
+> things look, and you seem to have pretty good composability, even if
+> there's a large constant factor.  It's just kind of like writing stuff
+> in assembly, but less error-prone.  (So maybe the verbosity problem of
+> D3 is a shallow problem that could be solved with a better surface
+> notation, like BLISS or Thompson's B instead of assembly?)
+> 
+> Amelang's Gezira, as I understand it, uses a single graphical primitive:
+> a path made of quadratic Bézier curves, filled with a single solid
+> alpha-blended color.  SVG primitively supports filling with multi-stop
+> linear RGBA gradients as well as solid RGBA colors, and if you were
+> going to pick a single kind of fill, gradients include solid colors as a
+> special case.  And linear gradients are powerful enough that you can
+> Gouraud-shade projected triangles with them, although I never took
+> advantage of that when I did that long-ago 3-D torus.
+> 
+> It may have occurred to you by now that linear gradients can also be
+> rendered by the prefix-sum method; it just requires two passes instead
+> of one.  First you fill the polygon with the ∂color/∂x of the fill
+> (which is constant for a linear gradient, regardless of its orientation,
+> until you hit a stop) using a first pass of the prefix sum; then, to
+> that, you add the signed edge coverages at the borders of the polygon
+> before doing a second pass of prefix sum.
+> 
+> I haven't yet figured out how to [do overlapping] alpha-blended filled
+> paths with this method.  Nonoverlapping paths can be done simply by
+> rendering all their signed edges into a single buffer before the
+> prefix-sum step or steps, and overlapping opaque paths can be done by
+> cutting holes in the paths on the bottom, removing the hidden parts of
+> their original edges (which nearly requires the property Levien calls
+> _extensionality_ in his dissertation) and adding extra edges to route
+> them around the intruding space.  But overlapping alpha-blended paths
+> seem like they could be arbitrarily expensive.
+> 
+[do overlapping]: https://news.ycombinator.com/item?id=12223616
+> 
+> So, I was thinking that it might be reasonable to make a UI out of
+> nothing but a collection of closed Bézier polylines filled with linear
+> RGBA gradients.  Maybe?  Texture maps would be hard to fit into that
+> model, and textures are pretty important, I don't know.
+
+Dave Long pointed out that two overlapped alpha-blended linear
+gradient regions still add up to a linear gradient:
+
+> Is that really true?  After reading, I'd guess you'd calculate stops  
+> at every path vertex *and* path intersection[0].  At each stop, the  
+> color layers are known and because gradients are linear, the  
+> combination of gradients from all layers ought to also be linear.   
+> 
+> [0] these could be expensive, up to n**2
+
+More recently, it occurs to me that there is a potential problem with
+precision here, but it can be overcome.  If we want to be able to make
+a linear gradient from any given 24-bit color to any other given
+24-bit color across some horizontal distance, then we need to support
+a change of a single count across that distance. If our intermediate
+results are only 48 bits (16 bits per color plane), then the furthest
+we can reach without missing is 256 pixels horizontally.  (In a sense,
+the other 8 bits per pixel hold a fractional color or error
+accumulator.)
+
+This suggests that the optimal way to do this thing is to render
+things in 256×1 chunks, with the buffer occupying 1536 bytes.
+Alternatively, you could do it a scan line at a time with 32-bit ints,
+which would work properly as long as the scan lines were shorter than
+2²⁴ pixels, but this requires more buffer space and also runs half as
+fast with optimal SIMD instructions.  For example, a 2048-pixel scan
+line would require 12288 bytes of buffer space, big enough to put
+serious pressure on the L1D cache.  (I’m writing this on an Atom with
+a 24 KB 6-way set associative write-back L1D cache, for example.)
+
+It might turn out to be work more effectively with current SIMD
+instruction sets to render a band of several scan lines at a time,
+because the vertical SIMD instructions have better coverage of the
+available space.  For example, using AVX-512 instructions, you could
+maybe handle 32 scan lines in each instruction, or maybe one color
+plane for each of 10 scan lines, thus rendering a 256×10 or 256×32
+band.  I think that with AVX-512 and four-way loop unrolling, the
+inner loop of the critical prefix sum there will take probably 320
+cycles; if it’s 256×10, that would be 8 pixels per cycle, or 4 pixels
+per cycle if you do it twice.  Repainting a 2048×1536 screen that way
+will take about 786432 cycles, plus whatever overhead is needed to set
+up the gradient stops and copy the finished pixels into the
+framebuffer and whatnot.
+
+(AVX2 and AVX-512 support gather load with the VGATHERDPS, VGATHERDPD,
+etc., instructions, as well as permuting stuff within a register with
+VPERMPS, VPERMD, PSHUFB, etc., so copying the finished pixels into the
+framebuffer might not be the horrible performance nightmare you might
+expect.  AVX-512F also has scatter store.)

@@ -1,0 +1,155 @@
+Could you replace a laser cutter with a focused-sunlight cutter?
+
+I mean obviously you can burn through things with focused
+sunlight — I’ve been doing it since I was a kid — but I’m asking if
+you can match the performance of off-the-shelf low-power laser
+cutters.
+
+The laser cutter I’ve been using to cut MDF cuts a 100-μm kerf
+positioned with 60-μm precision using a 60W laser through 3-mm MDF at
+24 mm/sec, although it can handle up to I think 12 mm at lower speeds.
+If we figure that the divergence of the beam can’t be more than about
+50 μm over those 3 mm, that’s about a sixtieth of a radian, 16.7 mrad,
+almost twice the visible width of the sun, which is about 9.3 mrad.
+
+Optics won’t work
+-----------------
+
+So there are two problems here: one is to focus, say, 100 W of
+sunlight in an area that’s less than 100 μm across, and the other is
+to keep the divergence of that focused beam down below, say, 10 mrad.
+
+The very direct approach is to use a single movable parabolic
+reflector at a sufficiently large distance.  But this will not work
+very well.  100 W is about 0.1 m² of sunlight at the surface, a mirror
+of 357 mm diameter; this is 10 mrad at a distance of 35.7 m.  A
+geometrically-perfect image of the sun at that distance would be 9.3
+mrad, which would make a 332-mm-wide image of the sun, which is
+substantially larger than the 0.1 mm we are shooting for.
+
+This amounts to a spot that is 3½ orders of magnitude too wide and is
+7 orders of magnitude too dim.
+
+Getting a smaller and thus brighter image from an imaging-optics
+system involves shortening the focal length, as all photographers
+know.  The desired power density here is 10 GW/m², which is (not
+totally coincidentally) 7 orders of magnitude brighter than sunlight.
+
+This is somewhat problematic because the illuminance limit imposed by
+thermodynamic reversibility is for the focal spot to be entirely
+surrounded by (reflected or refracted) sun surface, that is, 4π
+steradians of sun.  A 9.3 milliradian cone has a solid angle of about
+0.27 millisteradians (2π(1 - cos(9.3 mrad))), and so the theoretical
+maximum is only about 46000 suns, with 23000 suns being the limit for
+a point on a flat surface only being illuminated from outside the
+surface.  This is still three orders of magnitude dimmer than the
+laser — and without even being pulsed!
+
+Therefore even non-imaging optics can’t help us here.  We need
+stronger stuff than mere optics.
+
+One possibility is to concentrate the light optically as far as
+possible, then use some other approach to deliver the power to a small
+area.  We don’t actually have to violate any laws of thermodynamics to
+do this; the MDF doesn’t have to get hotter than the surface of the
+sun (5500°), and we don’t have to deliver all of the energy to it, but
+can waste some in pumping heat around.  One obviously feasible
+approach is to use photovoltaic panels to power the existing electric
+CO₂ laser, but are there more direct routes, maybe more efficient
+ones?
+
+Hot fluid flow
+--------------
+
+One obvious (to me) example is to use the sunlight to heat a fluid to
+a sufficiently high temperature and then cause the fluid to flow
+through the MDF.  Air is one possibility, although it might tend to
+catch the MDF on fire even more than the laser does.  Lead, which
+doesn’t dissolve much iron and doesn’t boil until 1749°, is another
+possibility; at higher temperatures, copper, which doesn’t melt until
+1084° but doesn’t boil until 2562°, or silver, which melts at 962° and
+boils at 2162°, might resist oxidation better.  (Molten silver,
+however, has a tendency to attack steel.)
+
+### Air is probably going to be too difficult ###
+
+How fast could air deliver power?  Suppose the hot air stream is
+limited to 1600° in order to be able to use ordinary ceramics to
+control it; air’s specific heat is 29.2 J/K/mol, and it weighs about
+30 g/mol.  Let’s suppose that the MDF cools the hot air down to about
+500°, so we have 1100 K to play with.  Delivering 60 W then requires a
+flow of about 1.9 millimoles per second, which works out to about
+56 mg/s, which would be 56 mℓ/s at normal temperatures — but at 1600°
+it’s more like 360 mℓ/s.  Dividing that by the area of a 50-μm-radius
+circle, we get the utterly implausible air speed of 46 km/s, roughly
+Mach 138.
+
+(I would have liked to use metals, but even superalloys are limited to
+about 1000°.)
+
+If we relax the requirements considerably, we can get into a feasible
+range; suppose that we make our air nozzle out of white-hot quicklime
+instead of regular ceramics, so that we can use air at 2600° (reducing
+the flow rate to 290 mℓ/s), and make the air stream 1 mm in diameter
+instead of 100 μm.  Then we can get the air speed down to 370 m/s,
+Mach 1.1, which is probably feasible.  (Turbulence in the nozzle just
+transforms into more heat in the air!)  A slightly wider nozzle of
+1.35 mm diameter can get your gas stream speeds down to 200 m/s, which
+is quite clearly feasible.  But if you’re blowing white-hot air on it,
+it’s going to be really difficult to keep the MDF from catching on
+fire; you probably need an inert-gas atmosphere, nitrogen at least,
+which probably means you need to filter and recirculate it.
+
+### Lead is more feasible ###
+
+Molten metal is probably a much more feasible approach; even at room
+temperature, it’s about ten thousand times as dense as air, and that
+advantage increases with temperature rather than decreasing.
+
+Lead’s vapor pressure is a still-relatively-safe 10 Pa at 814° (an
+atmosphere is 101 kPa).  Tin is a more expensive but nontoxic
+alternative with an even lower melting point (232°), an even higher
+boiling point (2602°), and an even lower vapor pressure; I think it is
+more vulnerable than lead to oxidation in air.  The eutectic 63%-tin
+mixture of the two melts even lower.
+
+If we figure that we can work from 900° down to lead’s freezing point
+of 327°, then take advantage of its 4.8 kJ/mol heat of fusion, how
+much lead flow do we need?  Its molar mass is 207.2 g/mol, so that’s
+23 kJ/kg of latent heat of fusion.  [Engineering Toolbox says][0]
+molten lead’s heat capacity is 140 J/kg/K, and we have 573 K here, so
+that’s 80 kJ/kg of sensible heat.  Together, they’re 103 kJ/kg, so our
+flow rate is only 580 mg/s; with molten lead’s density of about
+10.7 g/cc, that’s only 58 microliters per second of lead.
+
+Through a 100-micron-diameter circle, that’s still 7.4 meters per
+second, which is some pretty healthy metal pumping action; I don’t
+know what molten lead’s viscosity is, but that won’t be easy.  But
+it’s surely feasible.
+
+Hmm, [this IAEA document on nuclear reactor design][1] says lead’s
+dynamic viscosity is about 1 mPa·s in the temperature range
+considered.  A Poise is 100 mPa·s.  [Water’s viscosity at 20° is 1.002
+mPa·s][2], so we can treat lead as especially dense water in this
+temperature range.  This document also describes in some detail the
+physical properties of the lead-bismuth eutectic coolant used in many
+Soviet reactors.  [Some random engineering calculator site][3] claims
+that 1 mm of 0.1 mm-diameter pipe at 58 μℓ/s should result in about
+13 MPa of head loss; this is a straightforward pressure to achieve,
+and it amounts to a force of about 0.1 N across the area of the
+nozzle, and a hydraulic power of 750 milliwatts.
+
+[0]: http://www.engineeringtoolbox.com/liquid-metal-boiling-points-specific-heat-d_1893.html
+[1]: https://www.iaea.org/inis/collection/NCLCollectionStore/_Public/43/095/43095088.pdf?r=1
+[2]: https://en.wikipedia.org/wiki/Viscosity#Dynamic_viscosity_.CE.BC
+[3]: http://www.engineeringtoolbox.com/hazen-williams-water-d_797.html
+
+These numbers are all easily feasible.
+
+Solar-pumped lasers
+-------------------
+
+Another possibility is to use the sunlight directly to pump a lasing
+medium, such as a doped fiber; this is called a “solar-pumped laser”,
+and there are apparently a number of them around, mostly Nd:YAG,
+including a megawatt one in Uzbekistan (!).

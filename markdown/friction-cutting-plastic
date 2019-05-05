@@ -1,0 +1,124 @@
+I just tried friction-cutting some PVC pipe with cotton string.  A
+thicker braided string worked very reliably, but required a lot of
+work to melt the large amount of plastic, also leaving a rougher cut
+with bigger burrs.  A thin twisted cotton string worked with a lot
+less effort, leaving a cleaner cut, but also broke several times.
+
+I was thinking that you could probably do a kind of low-energy
+friction bandsaw/jigsaw for thermoplastics, as a kind of low-budget
+substitute for laser cutting and waterjet cutting, at least those that
+soften enough at a low enough temperature; cellulose string works up
+to about 200°, while steel wire should work well at higher
+temperatures.  Nylon reputedly also works for PVC, since its softening
+temperature is so much higher than PVC’s; [cellulose reportedly works
+for nylon itself][3], while [other sources claim cotton won’t cut
+PVC][5].  I think UHMWPE cord will not work at all, though I haven’t
+tried it.
+
+Ideally you’d have much, much less mass attached to the string than my
+hands and arms, so that when it encounters extra resistance it just
+stops instead of breaking the string, and then maybe backs off a bit
+to extricate the string from the melt before trying again.
+
+In theory the energy for making such a cut is strictly proportional to
+the volume of the cut, so as the cut becomes thinner, the energy to
+make it decreases proportional to the width.  However, the force
+available decreases proportional to the cross-sectional area of the
+cord, which (if it stays round rather than becoming a strip like an
+actual bandsaw or even jigsaw) is proportional to the *square* of the
+width; so applying the same amount of power per unit material requires
+increasing the speed in inverse proportion to the thread thickness.
+
+I was thinking that for straight cuts, slots, and non-through cuts,
+you might be able to use a paper or card disc in a sort of
+angle-grinder configuration — clamped somewhat close to the edge
+between two thicker discs to provide it with a sufficiently stiff
+forward force, to keep the paper from buckling too much.  In this
+case, at a high enough speed (for a small enough disc) the centrifugal
+force of the paper itself would provide most of the pressure against
+the material.
+
+[Plumbers say PVC is rated for up to 154° F][1] continuous service,
+which works out to be almost 68° in modern units and softens at 250° F
+(121°), but doesn’t melt until 360° F (182°); [Wikipedia claims the Tg
+is 82° and the melting point can be as high as 260°][2].  Probably
+somewhere in the middle is when it gets soft enough to be easily moved
+by the string.
+
+The variability in PVC’s heat-stability is partly because it needs
+heat stabilizers to work at all; otherwise it starts to release HCl at
+only 70°, according to Wikipedia.
+
+According to the plumbers’ discussion thread, its specific heat is
+0.25 “Cal/°C/gm”, which I think means a quarter of that of water,
+working out to 1.05 J/K/g in SI units, pretty close to the 0.9 kJ/kg/K
+in Wikipedia.  I think we’re talking about a ΔT of around 150 K, so
+around 150 J/g; due to PVC’s density of about 1.4 g/cc, this is
+roughly 210 J/mℓ.  The cotton string I was using might have been 0.8
+mm wide, the pipe was about 1.5 mm thick and about 20 mm across, and
+it took me less than a minute to cut through it at about 1 m/s of
+string motion at close to its breaking tension, which is about
+30 N — about 30 W and about 30 seconds, so about 900 J.  The annulus
+of π((10 mm)² - (8.5 mm)²) ≈ 90 mm² had a volume of about 70 mm³ and
+thus weighed about 70 mg or 0.07 g.  So the heat needed to soften it
+adequately should be about 15 J, about 60× smaller than what was being
+applied.  ([More experienced people report shorter times][5] to cut
+even thicker pipe.)
+
+Presumably the extra heat was lost to inconsistent pressure,
+conduction into the plastic with its ≈0.2 W/m/K conductivity (in part
+because the contact area was large — cutting worked much faster once I
+had gotten through the first wall), heating of the air, and heating of
+the string.  So probably using much higher power would have been more
+efficient; perhaps instead of 1.7% efficient we could reach 5% or 10%.
+
+To be concrete, maybe 10 m/s would have been a better speed for the
+800-μm string, cutting through the pipe in more like 3 seconds, or
+maybe 1 second if the hoped-for efficiency advantages materialize; if
+we were using an 80-μm cellulose string, we might prefer to run it at
+100 m/s and only about 2–3 N; this would theoretically melt the same
+amount of material per second, but in an 80-μm-wide path, so it would
+use 0.3 seconds or 0.1 seconds to cut through the same pipe.  This
+works out to about “500–1500 inches per minute” in archaic units,
+which is a quite fast cutting speed for panel-cutting machines like
+laser cutters, CNC plasma torches, CNC oxy-acetylene torches, and
+waterjet cutters.
+
+How much efficiency improvement could we expect from cutting faster?
+A W is a J/s, so we have 0.2 J/s/m/K of conductivity.  Presumably if
+we put the heat in in one-tenth as many seconds, we’ll have the heat
+spread out into the same set of nested cylinders it would have had if
+we had been cutting at the same speed in a material with one-tenth the
+thermal conductivity, 0.02 W/m/K.  I don't know how to estimate how
+much this improves your efficiency.
+
+Is it plausible to run an 80-μm cellulose thread at 100 m/s (220 mph
+in archaic units) and 2–3 N (7–11 ounces)?  You could maybe use a
+10-meter long loop of it at 10 Hz; it would be 50 mm³ and thus about
+50 mg.  3 N could accelerate or decelerate it at 60000 m/s/s, so it
+could start or stop in 1.7 milliseconds at the edge of breaking.  That
+sounds fast, but it’s 85 mm of travel at that speed, which is how much
+stretch would need to happen.
+
+So that might be too much, but a slightly less ambitious goal is
+probably feasible, though.
+
+Doing this in Styrofoam or other foams might be even more interesting,
+since there’s so much less mass, its thermal conductivity is so much
+lower, and the quality of a melted cut through Styrofoam is so much
+better than that of a cold cut, due to sealing off the cells.
+
+You might think polyethylene would be much easier to cut this way,
+given its lower melting point, but in practice it’s more difficult; I
+think this is [because it’s softer and has a higher specific heat][4]
+(2.3 J/g/K, 2.5 times higher) and higher thermal conductivity
+(0.3–0.5 W/m/K rather than 0.2), but also because it lubricates much
+better, so much higher normal forces are needed to get the same
+frictional force.  Presumably stepping up the power as outlined above
+would be sufficient to solve the problem.
+
+[1]: https://forums.jlconline.com/forums/forum/jlc-online-expert-forums/building-science/21439-melting-temperature-of-pvc
+[2]: https://en.wikipedia.org/wiki/Polyvinyl_chloride
+[3]: https://lifehacker.com/easily-saw-through-pvc-pipe-abs-pipe-and-nylon-rope-w-1792239198
+[4]: https://www.m-ep.co.jp/en/pdf/product/iupi_nova/physicality_04.pdf
+[5]: https://www.instructables.com/id/Cutting-PVC-In-A-Tight-Spot/

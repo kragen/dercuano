@@ -1,0 +1,144 @@
+So I was thinking that an AVR-driven lab power supply from trash
+(except for the microcontroller) would be a good idea.  You need a lab
+power supply for a lot of electronics tinkering.
+
+Lots of discarded electronics have power supplies in them.  They
+usually have a few problems we would need to fix for them to be decent
+lab power supplies:
+
+1. They’re noisy switching power supplies, not quiet linear ones.
+2. Their output voltage is fixed, not adjustable.
+3. They don’t have output current limiting, so it’s easy to blow them
+   up by shorting them out.
+4. They have no readout to tell you what the actual current (and
+   voltage) is.
+5. A lot of them are only 5 volts.
+
+Problem #1 is really tough to solve, so I think I’ll ignore it.  I
+think I can solve the others pretty reasonably, though, with a generic
+microcontroller and a relatively simple circuit plugged into the
+output of some generic salvaged power supply, like an ATX power
+supply, say.
+
+The basic idea is that you drive a buck-boost converter (a diode, an
+inductor, a capacitor, and a MOSFET) using a microcontroller’s digital
+output.  To its output you hook, in series, an inductor, a sense
+resistor, and the load, with a capacitor and megohm resistor across
+the load; then you add some diode protection.  You hook each end of
+the sense resistor to a separate high-impedance voltage divider to
+scale down the voltage to a range adequate to the microcontroller’s
+analog inputs.  Calibration trimpots form part of these voltage
+dividers.
+
+Two additional potentiometers are attached to other analog inputs of
+the microcontroller for use as user input, and an old Nokia serial LCD
+is attached to five digital I/O pins of the microcontroller.
+
+Actually, I think maybe the inductor and capacitor on the load end
+aren’t necessary.  The AVR can respond to changes in load in about
+50 μs.  I was thinking that the inductor would keep the short-circuit
+current from rising too quickly for the Arduino to respond, but in
+fact the buck-boost converter can’t respond instantly either — if its
+output impedance suddenly approaches zero, it won’t dump an unlimited
+amount of energy into it because it doesn’t contain an unlimited
+amount of energy in the first place!  It isn’t until the next cycle
+that it has the opportunity to charge up, but of course the
+microcontroller then has the opportunity to *not* charge it up.
+
+ATX power supplies have ±12V lines, but they are very limited in
+power.  The 5V lines are where the real power is at, typically
+hundreds of watts of it.  A pretty minimal bench power supply should
+be able to produce up to 30 volts and at least an amp or so, say
+1.5 amps, which works out to 45 watts.  (You can run four to eight of
+these off a single ATX power supply.)
+
+Consider first the simple inverting topology, even though that isn’t
+the right thing for a bench power supply.
+
+If we’re running the buck-boost converter at 31.25 kHz (the highest
+frequency an Arduino running an AVR at 16MHz supports with its native
+PWM with full 8-bit resolution) then each cycle is 32 microseconds and
+involves converting up to 1.44 millijoules from the input voltage of 5
+V up to the output voltage of 30 V.
+
+At this case, the duty cycle is 17%: the inductor (on the 5V side of
+the freewheel diode) is getting its current ramped up with 5V for 83%
+of the time, then getting its current ramped down with 30V for the
+other 17% of the time when the transistor is turned off.  During that
+time it dumps 83% of its 1.44 millijoules into the capacitor and 17%
+of it into the load, I guess, which means that the capacitor actually
+needs to be able to hold several times those 1.44 millijoules in order
+to keep ripple reasonable.
+
+In particular, say our output ripple is 3%, one volt.  That means that
+the difference between the capacitor energy at, say, 29V, and 30V, is
+that 1.44 millijoules.  C(30²-29²)V²/2 = 1.44mJ, so C =
+2·1440μF/(30²-29²) = 49 μF.  This means that the total energy in the
+capacitor is CE²/2 = 22 mJ.  If you were to short it out with a ¼Ω
+short circuit (about the internal resistance of a D cell), you would
+briefly get 120 A and 3.6 kW — but with a time constant of 12
+microseconds.
+
+Suppose we use a 10Ω sense resistor to measure the current, though.
+Now at 1.5 A, we drop 15 V across the resistor, and at 30 V, it’s
+impossible to draw more than 3 A, no matter how we short the output.
+This, however, requires that the capacitor charge up to 45 V, in order
+to get 30 V to such a hefty load.  So we could draw as much as 4.5 A
+actually, and a rather alarming 45 W on the sense resistor very
+briefly, coming down to 15 W after the control circuit kicks in.
+Gonna need a hefty heatsink on that sucker.
+
+So now the duty cycle is 11%: 5 V to spin up the inductor for 89% of
+the time, then 45 V as it charges up the capacitor the other 11% of
+the time.  And instead of 1.44 millijoules, because of the extra power
+in the sense resistor pushing us up to 60 W, it’s 1.92 millijoules, so
+our capacitor goes up to 65 μF, and the total stored energy is 29 mJ.
+And if you short out the output, the time constant is 290
+milliseconds.
+
+This is sort of alarming because it means you can’t get a reasonable
+slew rate on the output voltage, whether in response to changing load
+or in response to user input.  I think the solution is a combination
+of a higher switching rate and a somewhat smaller sense resistor,
+basically in order to keep the energy stored in the capacitor down.
+
+(No, wait, all of the above is wrong.  The time constant was 650
+microseconds.)
+
+It’s useful to have some kind of scale for how much energy we're
+talking about here.  2.3 kJ is enough to boil a gram of water, a cubic
+centimeter.  2.3 J is enough to boil a milligram of water, a cubic
+millimeter.  2.3 mJ is eough to boil a microgram of water, a cube 100
+microns in diameter.  This would still be enough to vaporize the bond
+wire of a chip if it could somehow be released there, but the bond
+wire will never be more than 0.1Ω, so even with a sense resistor of 1Ω
+we can ensure that the majority of the short-circuit energy is
+dissipated in the sense resistor and not the bond wire.  So tens of
+millijoules should be fine, but not more.
+
+Let’s suppose we can manage a higher PWM frequency — say, 125 kHz,
+maybe by using 6-bit resolution, since we’re only shooting for 3%
+ripple anyway.  And a 4.7Ω sense resistor, so at 1.5 amps we only
+dissipate 10.6 watts in its 7 V, for a total of 55.5 W, which means
+0.4 millijoules per cycle, and 15 microfarads is enough to keep the
+ripple acceptable, and our time constant when shorted is 70 μs.  Our
+duty cycle then is 5V/37V = 13.5%.
+
+You might also want some kind of minimum load there, in parallel with
+the real load, to keep the time constant reasonable when you're trying
+to adjust the voltage under open-circuit conditions.  50 ohms or
+something.
+
+Okay, enough about the capacitor and sense resistor.  What about the
+inductor?  It needs to spin up to some current Imax at 5 volts in 6.9
+microseconds, then spin back down at 37 volts in 1.1 microseconds,
+delivering 0.4 millijoules.  0.4 millijoules in 1.1 microseconds at 37
+volts is an average of 9.8 amps, so the max should be 19.6 amps.
+Let’s say 20 amps.  That means the inductor needs to be 1.7
+microhenries.
+
+Such inductors exist; Digi-Key lists a 12.8 × 12.8 × 7 mm item that
+costs US$1.20.
+
+What happens if the inductor is some other size?  Like, will it work
+better if the inductance is bigger or if it’s smaller?

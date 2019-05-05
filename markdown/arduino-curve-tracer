@@ -1,0 +1,145 @@
+I was thinking about diode logic (see file `diode-logic`) and I
+realized that I really need a curve tracer in order to theorize sanely
+about diodes and whatnot.  But an off-the-shelf curve tracer is
+pricey.
+
+You could generate carefully controlled ramps using PWM and filtering,
+but you don’t need to; if you’re willing to take the voltages that
+show up, you can just measure voltages at different points in a test
+circuit and see what happens.  A simple test circuit would have a
+capacitor, an inductor, a resistor, and the device under test, in that
+order, and you’d apply voltages (5V or 0V) at the ends of the circuit
+and measure the voltages at the two ends of the resistor.
+
+The idea is that the capacitor and inductor and so on turn your
+step-function voltage changes into a smoothly changing voltage, so you
+can see what the DUT does at a bunch of different voltages.  The
+inductor also serves to limit current, as well as permitting variation
+of dV/dt at a given voltage, and the capacitor serves to limit the
+total charge you can put through the device, thus the energy
+dissipated, thus the damage done.  The resistor also limits the
+current and additionally provides a way to measure currents.
+
+An Arduino’s built-in ADC can sample at 200 ksps, and you probably
+only really need 1000 samples to draw an adequate curve, which ends up
+being about 10ms if you’re sampling two separate points.  If you’d
+like this to be a single ramp, you probably want the resonant
+frequency 1/(2π√(LC)) to have less than a single cycle in 10ms,
+i.e. to be less than 250Hz, but it’s probably okay for it to be three
+or four or even ten cycles.  And the resistor will probably slow it
+down further.
+
+The ADC is most accurate when measuring against the 1.1 V bandgap
+reference, but of course we will potentially have voltages to the 5V
+rail and beyond — if the DUT is a piece of wire, then the voltage at
+that end of the resistor will be 5V all the time.  So we should
+probably use the 5V reference and merely calibrate it against the
+bandgap reference periodically.
+
+If we figure on currents up to about 2 mA, then a 2.2 kΩ resistor
+would scale those currents to be within the same 0–5V range.  If we
+use a much smaller resistor, we start losing precision on the current
+measurements.  Then if we want our RC time constant to be around, say,
+2ms, then we need something like a 1 μF capacitor.  Then, if we want
+2π√(LC) to be something like 1ms, we need a honking 22 millihenry
+inductor.  Maybe a better balance is to use a 1 kΩ resistor, a 3.3 μF
+capacitor, and a 4.7 mH inductor.
+
+ω₀ = 8000 radians/sec, Q = ω₀L/R ≈ 0.04.  This suggests that with such
+low inductance this is going to behave basically like an RC circuit.
+You don’t even get ringing until Q = 0.5, I think.  So to get the
+potential benefits of inductance here, you really would need a bigger
+inductor, which is surprising to me, since I think of millihenries as
+largish.
+
+The maximum energy stored in the capacitor at 5 V is 41 μJ, which
+seems comfortingly small.  The 100-pF 1.5 kΩ Human Body Model reaches
+that energy level at only 900 volts, so hopefully any device that is
+ESD-rated should be able to handle this without breaking down.  Maybe
+even back-biased tantalum capacitors.  This should be gentler than the
+HBM, because its initial current spike into a 1.5 kΩ load is 300 mA
+and 135 watts, while this circuit should be closer to 5 mA and 25 mW,
+or maybe twice that.
+
+I wish I could use a smaller resistor, too, because I’d like to trace
+curves well beyond 5 mA.
+
+So, next iteration of design: 220 Ω resistor, 1 μF capacitor, 47 mH
+inductor, resonant frequency 734 Hz, ω₀ = 4600 radians/sec, Q = 1.0,
+maximum current should be in the ballpark of 20 mA (the maximum on the
+datasheet for an AVR pin), 12 μJ in the capacitor when charged to 5 V,
+but we should be able to get a bit of overshoot from Q = 1.0; RC =
+220 μs, which is about 44 samples from the ADC, so we probably have to
+do a few cycles to get good coverage of the curve.
+
+If we were naughty we could perhaps get rather higher voltages out of
+the inductor by switching the pin on the other end of the DUT from its
+low-impedance “output” state to a high-impedance “input, no pullup”
+state.
+
+With a low-impedance DUT, when voltage is initially applied, all of it
+will be across the inductor.  This will result in a dI/dt of 5 V /
+47 mH = 106 A/s or 106 μA/μs.  Every 10 microseconds we will take a
+sample of voltage and a sample of current, with the current ramping up
+about 1.06 mA per sample at first, which works out to 230 mV across
+the resistor (about 48 counts out of 1024).  This seems like it will
+give poor coverage of the originally planned 0–2 mA range, but we
+could use a short pulse to start a current through the inductor, then
+turn the output back off to allow the inductor current to decay under
+the influence of the DUT, the resistor, and the capacitor.  If the
+current is at 5 mA, the capacitor is empty, and the DUT is low
+impedance, then the sense resistor will oppose with 1.1 V, which will
+cause the inductor current to decay more slowly at 23 A/s (23 μA/μs,
+0.23 mA per sampling interval).
+
+Also, though, for many kinds of DUTs, we should have plenty of time at
+low currents when the capacitor is almost charged.
+
+I hacked together a shitty simulation (using difference equations to
+approximate the differential equations, with a timestep of 200 ns) and
+observe the following:
+
+- The capacitor voltage overshoots the 5V rail by almost exactly a
+  diode drop, 5.79 volts.  In a sense that’s about the best we can
+  hope for — it’ll start to hit the AVR’s input-clamping action there.
+- The simulation sees the current continuing to ring down for 9 full
+  oscillations before it dies from roundoff error, but only the first
+  two full oscillations are above 5 mV, which is one count on the
+  AVR’s ADC when it’s using 5V as the reference.  Also they are
+  negative half the time, although they never reach a full diode drop
+  below ground.
+- Those 9 full oscillations reach about 15 ms, which would be about
+  600 Hz, suggesting that either my simulation is crappy or my
+  calculation of the resonant frequency is not a good way to calculate
+  the intervals between zero-crossings during ringdown.  Lowering the
+  resistance to 47 Ω shortens that to about 12 ms, which would be
+  about 820 Hz, which seems right.
+- The peak current is a bit over 12 mA, which is better than 5 mA, but
+  still leaves out a lot of interesting territory for many devices.
+
+Slow devices — over a millisecond or two — may be hard to test in this
+circuit.
+
+(Discarded idea: how about if we use 220 Ω, 47 mH, but 4.7 μF?  This
+eliminates the overshoot entirely (and thus presumably the possibility
+of doing much interesting with the inductor) but does give us slower
+ramps — we have like 6 ms of V_R being over 5 mV.  I didn’t expect
+that adding more capacitance would make it stop ringing entirely, but
+I guess it lowers the resonant frequency, and consequently Q if you
+don’t change R and L.)
+
+I tried driving this (simulated) circuit with a squarewave chirp and
+got peaks of current up to 15 mA where the period was about 3.6 ms.
+However, this also resulted in inductor voltages down to -6 volts.
+Better make sure that inductor-capacitor point isn’t connected to an
+AVR pin!  Worse, though, even the resistor voltage got down to about
+-3 volts, and that point *does* have to be connected to a pin.  We can
+perhaps raise the whole RLC circuit bodily to Vcc by raising the pins
+at each end to 5V, thus allowing us to measure these reverse currents
+and avoiding clamping.
+
+(You do want to make sure you have pins connected separately on both
+sides of the DUT and both sides of the capacitor, which amounts to
+three of the four pins you need to make this work at all.  Otherwise
+you have no way to discharge the capacitor in a reasonable amount of
+time if the DUT is diodish.)

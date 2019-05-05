@@ -1,0 +1,71 @@
+Trying to calculate caustics (see files `caustics` and
+`caustic-simulation`) and “Windy” Oona Raisanen’s oscilloscope traces
+and whatnot, it occurred to me that there’s a very simple solution.
+
+Let’s think about caustics first.  You have some uniform light density
+ρ on some original surface, you know, a caustic generator, and that
+density gets splayed across some other surface in some nonuniform but
+computable and continuous way.  If you want to find the density at a
+pixel of the caustic, the simple solution is to take the *inverse* of
+that computable, continuous mapping, and map the pixel center point
+through it; it will give you zero or more points on the generator,
+since the inverse is not, in general, a function.  You need to sum the
+density from those zero or more points.
+
+The density from each point, however, depends on the “focusing” from
+that point on the generator (which may be infinite).  Consider a small
+parcel of area ε around the point on the generator.  This parcel, with
+total brightness ρε, gets spread over some area on the caustic, which
+is some function of the partial derivative matrix of location on the
+caustic according to location on the generator.  I think maybe it’s
+the determinant.  Anyway, then you take the reciprocal of that, and
+you get the brightness contribution at that point.  (You may want to
+add some small value to the absolute value of the reciprocal to
+prevent singularities, analogous to how the finite spatial coherency
+of light in space prevents singularities in the electromagnetic
+field.)
+
+I think that you can do this more efficiently in the usual cases by
+computing not just this brightness but also its gradient in the
+neighborhood of the sample pixel.  Then you can do the full
+calculation of the inverse and its gradient at some subset of points,
+like 1/16 or 1/64 or something, and just interpolate at other points.
+
+If your sample points are evenly spaced, this is a lot like the
+algorithm for computing Perlin noise, except that not just the
+gradient but also the base brightness value is nonzero at the sampled
+point.  And of course it’s not random.
+
+However, I think you can do better than this with an approach similar
+to raymarching with signed distance functions.  You don’t need very
+many samples in areas with very uniform gradients, and in areas where
+the gradients are changing rapidly, you need a lot of samples.  You
+can try to approximate this by sampling the derivative matrix of the
+gradient (is that the Jacobian?) or you can compute the gradient over
+an area using interval arithmetic, rather than at a point using
+ordinary arithmetic.
+
+(Yes, that’s the Jacobian, and the Jacobian determinant gives you the
+brightness, or the reciprocal brightness, depending on which Jacobian
+you’re considering.)
+
+In the case of Raisanen’s oscilloscope traces, we have to solve the
+same problem once for each column of oscilloscope pixels.  Within that
+time interval, our brightness is spread out uniformly over a single
+dimension of time, but there may be very many points in time that map
+to the same vertical pixel.  We can sum the reciprocals of the
+(absolute plus epsilon) derivative of the waveform at these points to
+get the total brightness deposited at the pixel.  And, as before, if
+the second derivative is very small, we don’t need to sample very
+densely.
+
+In both cases, of course, we could avoid the inverse problem and just
+iterate over parcels of the generator.  But I think that’s almost
+certain to lead to sampling some areas far too densely while sampling
+other areas far too sparsely.
+
+Or will it?  Approximating the inverse function, in the general case,
+seems like it’ll mostly depend on that same kind of sampling, so it
+may not actually gain us anything to start from the pixels on the
+caustic rather than the generator.
+

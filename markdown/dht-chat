@@ -1,0 +1,133 @@
+DHT bulletin board
+==================
+
+I think you can build a DHT bulletin board system duplicating the
+functionality of Usenet fairly simply.
+
+Usenet
+------
+
+Usenet, a peer-to-peer communications system started in 1980, provides
+a bulletin-board or threaded-discussion system. It consists or
+consisted of a bunch of “articles”, each of which was identified by a
+“message-ID”, categorized in one or more “newsgroups”, and
+“referenced” zero or more articles that it was a “follow-up” to,
+typically the transitive closure of the “references” relation on the
+article it was replying to, with the ID of the message being replied
+to last.  Typically, a Usenet news server would provide access to
+articles recently posted to some finite set of newsgroups, replicated
+to other news servers using gossip.
+
+Typically, Usenet newsreaders would display a tree of the followup
+relation while displaying the body of a single article, which would
+often include pieces of other articles it was commenting on.  JWZ
+devised the [standard algorithm][3] for deriving the tree from the
+“references” headers.  Experimental visualizations such as Yee’s
+[threadmap][0] ([paper][1]) have been tried, echoing the
+two-dimensional hypertext layout used in the [Talmud][2] for
+millennia.
+
+[0]: http://zesty.ca/threadmap/
+[1]: http://zesty.ca/pubs/yee-threadmap-chi2005-workshop.pdf
+[2]: http://www.mesacc.edu/~thoqh49081/handouts/talmudpage.html
+[3]: http://www.jwz.org/doc/threading.html
+
+I’m speaking in the past tense here because Usenet has largely
+succumbed to spam; the gossip protocol’s lack of scalability and the
+needs of spam filtering resulted in a progressive centralization of
+Usenet servers; and web-based systems have largely supplanted it for
+day-to-day discussion.
+
+Making message-IDs unique was always a bit of a challenge, in
+particular since the gossip protocol in NNTP used message-IDs to
+determine whether it already had an article, so you could halt the
+spread of an undesirable message by posting a competing article with
+the same message-ID, if you got wind of it soon enough.  Modern
+peer-to-peer systems like BitTorrent, Git, Bitcoin, and Tahoe-LAFS
+usually use self-certifying names (such as secure hashes of documents
+or of public keys) in order to avoid such collisions.
+
+System design
+-------------
+
+The system consists of a DHT storage system for immutable data and
+feeds for mutable data.
+
+### The DHT, storage, messages, and newsgroups ###
+
+The system’s immutable data is stored, potentially permanently, in a
+DHT on the internet; the DHT’s basic interface consists of `key =
+PUT(data)` and `data = GET(key)`.  The `key` is a 192-bit unique ID,
+which is 24 bytes in binary or 32 bytes in base64, such as
+“oruMktRkd127bWh6av4tXhJXiEscirL/” or
+“SUrY99PC96aUjJttKFjmvWTFFqkNXmt1”; it consists of a randomly
+generated 96-bit symmetric encryption key to use to decrypt the
+article with an authenticated mode such as GCM, and a 96-bit secure
+hash of the encrypted data chunk (for example, the first 96 bits of
+SHA-256).  Only the secure hash is sent over the network to the DHT
+storage nodes in the GET operation.
+
+The DHT is only able to store fairly small chunks of data, up to 16
+kibibytes or so, so a single article may be split across many DHT
+chunks.  One of these chunks is the “root chunk” of the article, whose
+key is the message-ID, containing the following data, together with
+its typical sizes:
+
+- an “in-reply-to” field, with the message-IDs of zero or more
+  articles to which it is a followup (24 bytes);
+- optionally, a “supersedes” field, with the message-ID of a article
+  that this one is intended to replace, which must be signed by one of
+  the same authors (24 bytes);
+- zero or more signatures identifying the authors of the article (64
+  bytes), who may be bitcoins;
+- other human-useful metadata such as the subject/title, timestamp,
+  byte count, and tags (128 bytes);
+- the key to the root block of a Merkle hash tree containing the
+  article contents, including possibly other metadata (24 bytes).
+  Typically this tree will contain a single node, which is the body
+  itself.
+
+This is a total of about 264 bytes, and it’s roughly what a Usenet
+“overviews” entry would contain for the article.
+
+The Merkle hash tree in this case is made out of 192-bit keys, so it
+can support about 682-way branching; a single level of branching gets
+you to message bodies of 11 megabytes, two levels of branching get you
+to message bodies of 7.6 gigabytes, and three levels get you to 12.7
+terabytes.
+
+There are two kinds of “newsgroups” in this system: an “unmoderated
+newsgroup” consisting of a tag query over whatever articles you happen
+to know about, and a “moderated newsgroup” which is a special message
+content-type containing the concatenation of many message-IDs, each
+with the “root chunk” of the message appended to it in encrypted form,
+just as the DHT node would send it to you, so that you don’t have to
+query the DHT to get each message’s overview.
+
+With this structure, a moderated newsgroup with a history of 100 000
+messages would be a message of about 26 megabytes.  New versions of
+the newsgroup, as long as the moderator doesn’t reorder the overviews
+of the existing messages, will generally only alter the last chunk in
+the Merkle tree — so you can update your view of the moderated
+newsgroup by downloading only the root chunk, two levels of branching
+chunks, and the newly-updated chunk.  (At the cost of revealing,
+perhaps, how much of the newsgroup you had before.)
+
+#### Purging/expiry ####
+
+DHT nodes need to adopt some policy for purging data that nobody will
+ever query once their storage media begin to get full; otherwise, it
+will become impossible to post new articles, and this could even be
+carried out as a denial-of-service attack by a .  Inevitably, the system as
+a whole will expire data as old DHT nodes go offline forever and new
+ones replace them.  (Unless the system is, at the time, dying, like
+Usenet.)  So all of the data that ought to be preserved, in anybody’s
+opinion, has to get “refreshed” by being stored again in the DHT, at
+intervals.
+
+
+
+### Feeds ###
+
+None of the above allows you to go from old data to new data, because
+old data can only contain the keys of older data.  uery

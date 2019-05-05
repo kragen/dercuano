@@ -1,0 +1,148 @@
+Alphanumerenglish
+=================
+
+Arabic has some phonemes that don’t have a reasonable corresponding
+phoneme in Latin languages.  A common approach when writing Arabic
+with Latin letters is to use European digits for the missing phonemes,
+as in “3arabawy”.  This has the great advantage over X-SAMPA that it
+doesn’t deprive you of the uppercase/lowercase distinction
+entirely — although the digits themselves, in ASCII, don’t show the
+distinction visibly, you can still distinguish between “3arabawy” and
+“3ARABAWY”, or between “a7a”, “A7a”, and “A7A”.  The European digits
+are assigned to sounds represented by Arabic letters that physically
+resemble them.
+
+This seems like a great idea for English, too!  English has a few more
+phonemes than the Latin alphabet, and consequently has to force some
+letters to represent multiple different phonemes, but its traditional
+orthography worsens the problem by wasting some of the Latin letters
+(c, q, and x) on redundant assignments.  A rough phonological
+inventory of English follows, with a corresponding set of alphanumeric
+codes.
+
+    | Latin | IPA           | Alphanumerenglish |
+    | a     | æ a ɑ eɪ ə    | 4 a 2 8 e         |
+    | b     | b             | b                 |
+    | c     | k ʃ tʃ        | k c tc            |
+    | d     | d ɾ           | d d               |
+    | e     | ɛ i           | 3 i               |
+    | f     | f             | f                 |
+    | g     | g dʒ ʒ        | g dj j            |
+    | h     | h             | h                 |
+    | i     | aɪ ɪ i        | ai 1 i            |
+    | j     | dʒ ʒ          | dj j              |
+    | k     | k             | k                 |
+    | l     | l             | l                 |
+    | m     | m             | m                 |
+    | n     | n ŋ           | n 6               |
+    | o     | u ʊ ɑ ɔ oʊ æʊ | u 5 2 0 o au      |
+    | p     | p f           | p f               |
+    | q     | k             | k                 |
+    | r     | ɹ ɚ           | r er              |
+    | s     | s ʃ z         | s c z             |
+    | t     | t θ ð d ɾ     | t x q d d         |
+    | u     | u ʌ ju        | u 7 yu            |
+    | v     | v             | v                 |
+    | w     | w hw          | w hw              |
+    | x     | ks            | ks                |
+    | y     | j i ɪ aɪ      | y i 1 ai          |
+    | z     | z ʒ           | z j               |
+
+In a few cases, I’ve taken the liberty of giving a diphthong a
+spelling that isn’t quite what you’d deduce logically, in the interest
+of making it easier to write: /oʊ/ is “o” rather than “o5” or “ou”,
+because I think /o/ doesn’t occur in outside of that diphthong in
+English, and likewise /eɪ/ is assigned a single digit “8”; /æʊ/ is
+“au” rather than “4u” or “45”, because although [au] is not the
+central instance of the /æʊ/ class, it’s certainly a valid
+pronunciation of it; and /aɪ/ is “ai” rather than “a1” for the same
+reason.
+
+The mnemonics for the digits and other nonstandard pronunciations are
+as follows:
+
+    | 0 | ɔ  | looks like an O                             |
+    | 1 | ɪ  | looks like an I                             |
+    | 2 | ɑ  | no clue, sorry                              |
+    | 3 | ɛ  | looks like an ɛ, backwards                  |
+    | 4 | æ  | looks like an A                             |
+    | 5 | ʊ  | no clue, sorry                              |
+    | 6 | ŋ  | looks like the G in NG                      |
+    | 7 | ʌ  | looks like ʌ tilted a bit                   |
+    | 8 | eɪ | 8 is pronounced /eɪt/ in English            |
+    | c | tʃ | “c” is pronounced like standard “ch”        |
+    | e | ə  | looks like ə; also, the most common vowel   |
+    | q | ð  | no clue, and this one is super weird, sorry |
+    | x | θ  | no fucking clue, sorry                      |
+
+In the interest of ease of typing and reading, I’ve tried to assign
+the less common sounds to digits, and especially digits that don’t
+look like anything.  You might be able to get some benefit from
+swizzling around the assignment of 2 and 5, and maybe x and q too.
+
+You might also get a readability improvement out of reassigning /ə/ to
+"a" rather than “e”, which would leave “e” free for /ɛ/, but would
+require reassigning /a/ to something else, such as “9” or “3”.  /a/
+alone is relatively rare in English, but “ai” and “au” are relatively
+common.
+
+I’ve written a short Python hack to use eSpeak to convert traditional
+English orthography to Alphanumerenglish, not perfectly but with a
+tolerably low error rate.  It turns out Alphanumerenglish is about 10%
+shorter.
+
+Q7s wi ken rait i6gl1c perfektli fen3t1keli 1n 4lfenum3r1k w1q4ut
+nidi6 qe c1ft ki or qe los ev k8s d1sti6kcenz, werd sp8si6, 0r
+p76kcu8cen.  1t’s almost ridebel w164ut sp3cel tr8ni6, despait qe
+n3ses3ri k2mpremaizez 1n qi esainment ev gr4fimz te fonimz.
+
+> ’Tw7z br1l1g, end qe slaiqi tovz  
+> D1d gair end g1mbel 1n qe w8b.  
+> Al m1mzi wer qe b0r0govz,  
+> End qe mom r4xs autgr8b.
+>
+> Biw3r qe dj4berw0k, mai s7n!  
+> Qe dj0z qet bait, qe kl0z qet k0tc!  
+> Biw3r qe dj7bdj7b berd, end c7n  
+> Qe frumies b4ndersn4tc!
+>
+> Hi t5k h1z v0rpel s0rd 1n h4nd.  
+> L06 taim qe m86ksom fo hi s0t.  
+> 6en r3sted hi bai qe t7mt7m tri  
+> End st5d e hwail 1n x0t.
+>
+> End 4z 1n 7f1c x0t hi st5d  
+> Qe dj4berw0k, w1x aiz ev fl8m  
+> K8m hw1fli6 xru qe teldji w5d  
+> End berbeld 4z 1t k8m!
+> 
+> W7n, tu!  W7n, tu!  End xru end xru  
+> Qe v0rpel bl8d w3nt sn1ker-sn4k.  
+> Hi l3ft 1t d3d, end w1x 1ts h3d  
+> Hi w3nt gel7mfi6 b4k.
+>
+> “End h4st qau slein qe dj4berw0k?  
+> K7m tu mai armz, mai bim1c boi!  
+> O fr4bdjes dei!  Kelu, kel8!”  
+> Hi tc0rdeld 1n h1z djoi.
+> 
+> ’Tw7z br1l1g, end qe slaiqi tovz  
+> D1d gair end g1mbel 1n qe w8b.  
+> Al m1mzi wer qe b0r0govz,  
+> End qe mom r4xs autgr8b.
+
+Kemp3r q1s te qi X-SAMPA verjen:
+
+> twVz brIlIg, @nd D@ slAIDI toUvz  
+> dId gAIr @nd gImb@l In q@ weIb.  
+> al mImzi w@` D@ bOrOgovz,  
+> @nd D@ moUm r4Ts aUtgreIb.
+
+Te mai ai, et list, qi eks-s4mpe verjen 1z box l06ger end l3s ridebel
+ez n0rmel i6gl1c, ez w3l ez luzi6 qe degriz ev fridem ev k4p1telez8cen
+end sem p7nkcu8cen tu.  Ev k0rs, X-SAMPA also h4z qi eb1ledi te
+r3prez3nt l86guedjez 7qer qen i6gl1c, almost ez izeli, hw1tc
+4lfenum3ri6gl1c s4kr1faisez.
+
+1ded bi jusfel te rait e w3b skr1pt te kenvert st4nderd i6gl1c te
+4lfenum3ri6gl1c, m8bi jusi6 `espeak -qx`.

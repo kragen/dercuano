@@ -1,0 +1,196 @@
+We can manipulate arrays of (equal-sized) objects in constant time
+without the possibility of failure and without creating garbage.  It
+would be desirable to also manipulate flexible, irregular data
+structures in constant time without the possibility of failure and
+without creating garbage.  These three desiderata are nearly in
+increasing order or specificity — allocation implies the possibility
+of allocation failure, and if you are occasionally creating garbage,
+then eventually you will run out of memory if you don’t allocate any
+more; and allocation almost always implies non-constant-time behavior,
+except in extreme cases such as stack allocation and allocation from a
+fixed pool.
+
+The Lisp memory model and failure
+---------------------------------
+
+The Lisp memory model, an arbitrary directed object graph with garbage
+collection, is very flexible; it lets us treat arbitrarily large and
+irregular objects as if they were register values, just by using their
+memory addresses to name them, as long as we don’t mutate them.
+That’s why most modern programming languages have adopted it: Python,
+Java, Lua, JS, and many others.  (Others, like C++ and Golang, use a
+hybrid scheme in which some objects are embedded in other objects.)
+
+The fundamental object graph construction operation is to create a new
+object from a tuple of (references to) existing objects; its simplest
+form is Lisp’s `cons`.  As long as you stick to this operation,
+reference counting is adequate, though slow, to manage memory;
+generational garbage collection without a write or read barrier is
+also adequate, and fast.  However, note that this operation can fail.
+The price of using this memory model is that memory allocation is
+ubiquitous, so nearly any computation can fail or take an arbitrarily
+long time, so it is best used for programs where failure is an option.
+
+Rather than constructing new objects, we could mutate existing
+objects.  In this case, the fundamental operation is to overwrite a
+field with a reference to some existing object.  Since this permits
+creating references from older objects to newer ones, generational GC
+becomes more complicated, and cyclic references make refcounting
+dangerous.  The operation cannot fail, and it’s constant time if
+you’re not using refcounting, but it can create garbage, and you
+cannot tell whether it has created garbage or not without a global
+reference graph computation.
+
+The Z-machine
+-------------
+
+The Zork Z-machine memory model was designed for flexibly simulating
+virtual worlds on tiny microcomputers where memory exhaustion was a
+constant danger, and one which really harshes the buzz of dungeon
+exploration if it comes to pass.  It runs in constant space and
+constant time and does not create garbage, and although it is not as
+flexible as the Lisp memory model, it is more flexible than most of
+the alternatives.
+
+All objects in the Z-machine are arranged into a single hierarchy by
+way of three pointers per object: parent, first child, and next
+sibling.  The fundamental hierarchy mutation operation is to change
+the parent of an object, which cannot fail.  In Zork and similar
+games, this was used to express physical containment.
+
+(I lied somewhat here when I said that it runs in constant time and
+does not create garbage; if you allow an object to become a descendant
+of itself, it can create garbage, because then it becoes disconnected
+from the rest of the hierarchy; and if you check to see if you are
+doing this, that check will not run in constant time, and it may
+fail.)
+
+Sketchpad’s ring structure
+--------------------------
+
+In Ivan Sutherland’s Sketchpad, each type of object participated in
+one or more “rings”, which were intrusive circular doubly-linked lists
+in memory.  XXX add more info
+
+Zzstructure
+-----------
+
+Ted Nelson’s “ZigZag” program relates objects along an arbitrary
+number of “axes”, which can be traversed in either direction;
+hierarchies are expressed with two axes, a “first-child” axis and a
+“next-sibling” axis, which traversed in reverse are
+“is-the-first-child-of” and “previous-sibling”.  To preserve his
+“ZigZag” trademark, Nelson recommends calling this kind of structure
+“Zzstructure”.  A straightforward implementation of it in memory just
+uses doubly-linked lists, like Sketchpad but without the circularity,
+or like the Z-machine generalized to many hierarchies, but without the
+constant-time traversal to the parent.
+
+The fundamental operation of zzstructure is, as I understand it, to
+change the next or previous object of an object along an axis.  If
+previously next-sibling(A) was B, then also previous-sibling(B) was A;
+if we set next-sibling(A) ← C, then next-sibling(A) will be C, and
+previous-sibling(C) will be A.  What happens to previous-sibling(B)?
+I assume it must become nil, and similarly with next-sibling(D) where
+D was the former value of previous-sibling(C), if any.
+
+So this operation need not allocate, and it cannot fail, but it can
+create garbage, because B and previous-sibling(C) may have become
+unreachable.
+
+Pipeline and magtape processing
+-------------------------------
+
+A popular alternative in some environments is to use “streams” or lazy
+lists rather than reifying the entire list in memory.  So, for
+example, in Python you can compute a maximal nondecreasing subsequence
+of a sequence in “constant space” as follows:
+
+    def mnds(xs):
+        xs = iter(xs)
+        last = xs.next()
+        yield last
+
+        for x in xs:
+            if x >= last:
+                last = x
+                yield last
+
+One or another kind of iterator pattern like this is common to many
+languages — CLU had a special-purpose iterator construct, Smalltalk
+uses a general-purpose closure mechanism to implement it as a pattern,
+and Ruby bears the traces of having switched from the CLU approach to
+the Smalltalk approach, plus a little syntactic sugar.  The C++ STL is
+famously based entirely on “iterators”, but they use a totally
+different design which is not as amenable to streams.  Python’s
+approach is somewhat derived from Icon’s, whch is derived from
+SNOBOL’s, which is derived from backtracking for string processing.
+Prolog implementations can also generate a sequence of possibilities
+in constant space by backtracking.
+
+This approach goes back to the earliest days of computing; not only
+did business data processing in COBOL typically work by reading one or
+a few records into the very limited memory of the time, but some early
+machines like Turing’s Pilot ACE exposed the sequential nature of
+their delay-line memories.  And in some sense, this is what’s
+happening at the lowest levels of a CPU: the CPU registers are
+constant space, and they are used to lazily materialize sequences of
+values laboriously retrieved from main memory.
+
+Constant-space lists
+--------------------
+
+This may just be Sutherland’s idea from Sketchpad, but what if our
+fundamental memory mutation operation is to move an object from one
+list to another?
+
+Let’s say a given type of object participates in a given set of
+intrusive lists, which we can treat as fields of the object.  These
+lists are doubly-linked, so removing a linked object from one such
+list is easy, as is inserting an unlinked object before or after a
+linked object.  Combining these two operations gives us an atomic
+move-between-lists operation.
+
+This move-between-lists operation is constant-time and cannot fail.
+Can it create garbage?  Yes, because the object you are moving may
+have been the only surviving external reference to the list you are
+removing it from.
+
+(Heterogeneous lists presumably need some kind of run-time type
+identification information to get from the list header to the entire
+object, since different types of objects might have their list links
+at different field offsets.)
+
+I give up on the microscopic view
+---------------------------------
+
+I was hoping to find a set of one or more operations that would give
+me what I wanted: a way to manipulate flexible, irregular data
+structures in constant time without the possibility of failure and
+without creating garbage.  Clearly you can write a program that does
+some kind of computation on flexible, irregular data structures in
+constant time without the possibility of failure and without creating
+garbage, and you can even prove these properties, but you I don’t know
+how to do it by pushing those requirements down to the atomic level of
+the program.
+
+However, although you need some kind of less-local proof to establish
+the safety of any of these approaches, the different sets of
+primitives have different sets of proof obligations.  The Z-machine
+approach, for example, only requires that you prove that you aren’t
+reparenting a node to be its own descendant; in many cases this is
+easy, like when the node is a leaf node, or a node of a type that is
+statically known not to occur in the ancestors of the destination, or
+when the destination is closer to the root than the node being
+reparented.  Similarly, the constant-space lists approach just
+requires you to prove that there’s a reference somewhere else to the
+list you’re removing the node from, or alternatively that it was the
+only node in the list.
+
+By contrast, the immutable Lisp approach requires you to prove that
+there’s enough space for the node you’re allocating, perhaps because
+you preallocated it — also simple, but very different.  It’s very
+similar, though, to the kind of proof you need to do for constant-time
+code, where instead of proving an upper bound on the amount of
+allocation done by a function call, you prove an upper bound on the
+amount of time it can use.

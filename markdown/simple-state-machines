@@ -1,0 +1,175 @@
+I was thinking about laser-cut mechanical computation systems.  What
+are the simplest finite-state machines I could usefully implement?
+
+Bit transformation pipelines
+----------------------------
+
+The simplest finite-state machines have two states and two inputs.
+There are 16 possible such machines, corresponding to the 16
+fundamental logic gates.  Calling the state Q and the input I, we can
+display all 16 state transition tables as one:
+
+    Q I   new state; each column defines a machine
+    0 0   0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1
+    0 1   0 0 0 0 1 1 1 1 0 0 0 0 1 1 1 1
+    1 0   0 0 1 1 0 0 1 1 0 0 1 1 0 0 1 1
+    1 1   0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1
+
+Many of these machines are not very interesting; you kind of need
+transitions in both directions between the states to be interesting.
+That reduces the table to the following:
+
+    Q I   new state; each column defines a machine
+    0 0   0 0 0 1 1 1 1 1 1
+    0 1   1 1 1 0 0 0 1 1 1
+    1 0   0 0 1 0 0 1 0 0 1
+    1 1   0 1 0 0 1 0 0 1 0
+
+You also probably want to eliminate the state machines where the two
+possible inputs are equivalent.  If the two states are equivalent,
+that might still be okay, because the state itself might be the
+machine’s output.  This eliminates one more machine, which alternated
+between states incessantly regardless of the input, reducing the table
+to the following:
+
+    Q I   new state; each column defines a machine
+    0 0   0 0 0 1 1 1 1 1
+    0 1   1 1 1 0 0 0 1 1
+    1 0   0 0 1 0 0 1 0 1
+    1 1   0 1 0 0 1 0 1 0
+
+We can characterize these eight machines as follows:
+
+- 0100: stable in state 0 when the input is 0, but when triggered by a
+  1 input, transitions to state 1 for one cycle.  Alternatively you
+  could call it a controllable oscillator: the input turns it on, and
+  when the input is off, it stays in state 0.
+
+- 0101: its state is the input from the previous cycle.  This is
+  basically a D flip-flop.
+
+- 0110: stable in either state when the input is 0, but oscillates
+  when the input is 1.  This is basically a T flip-flop.
+
+- 1000: the same as 0100 with the sense of the input inverted.
+
+- 1001: the same as 0110 with the sense of the input inverted.
+
+- 1010: its state is the inverted input from the previous cycle, like
+  a D flip-flop's Q̅ inverted output.
+
+- 1101: stable in state 1 when the input is 1, but when triggered by a
+  0 input, transitions to state 0 for one cycle.  This is the same as
+  0100 but with the input and the state both inverted.
+
+- 1110: same as 1101, but with the input inverted.
+
+We can classify these “interesting” machines into three categories of
+behavior.  Oscillators (0100, 1000, 1101, 1110) produce a
+Nyquist-frequency square wave when the input is in one state, or a
+constant history-independent output when it is in a different state.
+Delays (0101, 1010) delay the input by a clock cycle (and 1010 inverts
+it too).  Bistable machines (0110, 1001) can stably remember a bit of
+information over time, but there is a given input that will cause them
+to switch (1 for 0110, 0 for 1001).
+
+In a sense these machines all have “fan-in”: even though they only
+have a single one-bit input, their output is a function of their
+previous input history (and initial state) as well their current
+input.  But because they can only take a single input, the only
+topology in which you can hook them together is as a fanning-out tree,
+in which any given bit of output is produced from a linear pipeline of
+state machines from the input bitstream.  (Alternatively, you could
+hook them up into a loop, taking no input from outside.)
+
+This may be adequate to do things like produce a binary count of the
+number of 1 bits in a bitstream, although I’m not even sure of that.
+An interesting question is whether such a pipeline can in some sense
+emulate any arbitrary finite state machine (that doesn’t get stuck),
+or what its expressive limits are, and how many of the above machines
+are needed to provide that expressiveness — presumably you need at
+least a bistable machine.
+
+The lack of signal fan-in keeps the delay machines from being
+especially useful in this context, so we can consider just the
+bistable and oscillator machines.
+
+If you feed a Nyquist-frequency square wave into a bistable machine,
+you get a half-Nyquist-frequency square wave.  If you feed that into
+the appropriate kind of oscillator, it will reduce the duty cycle of
+the square wave; feeding that into another bistable machine gives you
+a quarter-Nyquist-frequency square wave.  Feeding that into another
+bistable machine gives you the repeating sequence 10100000 or its
+complement.  If you feed that into a bistable 0110 that's initially in
+the 0 state, it becomes 01000000, which when fed to another one
+becomes an eighth-Nyquist-frequency square wave.
+
+This brings up the interesting fact that the initial states of the
+state machines can matter a lot.  You could imagine a loop of such
+machines whose “input” is provided entirely by its initial state.
+
+Time-delayed logic gates
+------------------------
+
+If we consider state machines with two states and two binary inputs,
+one of them is a time-delayed NAND gate:
+
+    Q I J   new state
+    0 0 0   1
+    0 0 1   1
+    0 1 0   1
+    0 1 1   0
+    1 0 0   1
+    1 0 1   1
+    1 1 0   1
+    1 1 1   0
+
+This is clearly sufficient for universal computation on its own,
+without any other kinds of machines.
+
+Is there some kind of finite state machine that is in some sense
+simpler than this, but that still allows us to build universal
+computers by connecting networks of them together?  I don’t think
+there is.
+
+J-K flip-flops
+--------------
+
+Above I mentioned that D and T flip-flops were two of the three kinds
+of interesting bit-transformation machines.  J-K flip-flops are more
+widely used as a discrete component; their state transition table,
+assuming active-high inputs, looks like this:
+
+    Q J K  new state
+    0 0 0  0
+    0 0 1  0
+    0 1 0  1
+    0 1 1  1
+    1 0 0  1
+    1 0 1  0
+    1 1 0  1
+    1 1 1  0
+
+This seems to me like it is certainly a universal gate in the same
+sense as the delayed NAND above, which is in some sense of equivalent
+complexity.  You have inputs that will set the stored bit or clear it
+when they are high, and you can connect them to separate places.
+Additionally you have the magic power of making the output oscillate
+by putting them both high.
+
+This extra magic power is pretty clearly not needed; you could use it
+as just an S-R flip-flop.  But if you try to use this to simplify the
+machine, you are kind of forced to lump J and K together into one
+input:
+
+    Q I  new state
+    0 0  0
+    0 J  1
+    0 K  0
+    1 0  1
+    1 J  1
+    1 K  0
+
+The problem with this is that you have lost not just fan-in but also
+compositionality; this machine’s state can no longer be the input of
+another identical machine.

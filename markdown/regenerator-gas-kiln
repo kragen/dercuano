@@ -1,0 +1,157 @@
+I want to start firing ceramics at home, but the mini-kilns I’m
+finding on MercadoLibre suck shit.  They’re electric and top out at
+low temperatures like a bit over 1200°.  (Maybe this is a consequence
+of their heating elements?)  Although earthenware can fire at as low
+as 1000°, temperatures in the 1350° range are needed for many other
+ceramics.
+
+For example, in July,
+<http://articulo.mercadolibre.com.ar/MLA-618696798-horno-para-vidrio-ceramica-gres-box-1-_JM>
+was a 1200-watt kiln with a 160 mm × 160 mm × 115 mm inside space
+(2.8 ℓ) that cost US$500.  And it only reached 1200°, but weighed
+6 kg.
+
+I was thinking that maybe a gas-fired kiln would work better, maybe
+fueled by a portable LP gas cylinder and with regenerators to keep
+noxious exhaust to a minimum.
+
+I want to beat that shitty electric kiln handily on all axes except
+weight: energy usage, volume, temperature, and cost.  I’m okay if it
+weighs a lot more, though.  Let’s shoot for a 320 mm cube inside
+capacity, 1400° max, cost under US$200, weight under 100 kg, and use
+under 600 W.
+
+(See files `millikiln` and `electric-micro-kiln` for versions of this
+with further reduced scope.)
+
+Energy and power usage and efficiency
+-------------------------------------
+
+The gas heater we use to heat the living room is 8000 BTU/hour, which
+is 2300 watts.  The little electric space heater I’m using to heat my
+office is 2000 watts.  Suppose 2000 watts is a reasonable power
+envelope and we need to be able to heat at 300° per hour (0.083 K /
+second) once the ceramic is dry.  Then the maximum thermal mass in the
+kiln is 24 kJ/K.  The specific heat of water is 4.2 kJ/K per kilogram,
+so this is about 6 kilograms of water; other substances like quartz
+have lower specific heats like 0.83 kJ/K/kg, so it’s in the
+neighborhood of 30 kg.  This is pretty close to the amount of stuff
+you’d like to have on the inside of a kiln’s insulation.
+
+[(Engineeringtoolbox lists specific heats of .70, .73, and .83 kJ/K/kg
+for different forms of quartz][0].)
+
+[0]: http://www.engineeringtoolbox.com/specific-heat-capacity-d_391.html
+
+This implies that you need pretty high efficiency; we can’t afford to
+just spew out the vast majority of your heat in an exhaust and expect
+to get the kind of temperatures we need.
+
+How much energy do you need at a minimum?  The minimum would be when
+you heat your kiln up inadvisably fast.  At 300° per hour (83 mK/s)
+you can reach 1200° in four hours, which would be 2000 W · 4 hours =
+29 MJ.  LP gas is 46.4 MJ/kg or 26 MJ/ℓ, so this is 630 g of gas,
+occupying 1.12 ℓ.  A regular 10 kg gas cylinder would power 15 such
+firings before refilling, a cost of about US$6 per firing.
+
+This doesn’t take into account the heat lost while the kiln is hot,
+which depends on insulation and regenerator losses, or the energy lost
+in boiling off the water, which is about 2.3 kJ/kg and thus relatively
+small in this context.
+
+Using regenerators in this context involves feeding the flame with air
+preheated from the regenerators.  LP gas burns at 1970° in cool air,
+which is hot enough, and presumably this temperature increases as the
+inlet temperature increases.  This means, though, that the chamber
+where the flame is happening will need to be able to withstand such
+temperatures.  Some amount of exhaust gas recirculation may reduce the
+load on the regenerators and lower the flame temperature.
+
+You probably don’t need to run the flame the whole time; the
+autoignition temperature of LP gas is around 400° or 500°, so you
+should be able to turn the gas back on and ignite it just from the
+walls of the burner chamber.
+
+You need two regenerators because you need to pull the intake air
+through one while running the exhaust air through the other,
+periodically alternating direction.  The use of a recuperator instead
+of regenerators would avoid this necessity, conventional (non-fractal)
+recuperator designs need to be fabricated from high-thermal-
+conductivity materials such as copper or aluminum, which can’t
+withstand such high temperatures.  (Copper melts at 1085°.)
+
+What regenerator material can withstand 1350°, though?  Lots.  Alumina
+melts at 2072° and even quartz doesn’t melt until 1670°, even though
+quartz-based felsic lavas and well-fluxed quartz-based glasses melt at
+much lower temperatures.  Regular fireclay is good to 1515°.  So a
+pebble bed of ordinary fireclay should work fine.  Limestone would
+calcine to quicklime, which would also work, and would be a useful
+product in its own right, though it might be an unnecessary hazard.
+Quicklime could also perhaps eliminate some acid contaminants from the
+exhaust gases, such as HCl from salt firing.
+
+Olivines are not suitable for the regenerator itself; although you
+might expect them to be much more refractory due to their role in
+raising the melting temperatures of mafic rocks,
+not to mention their foundry use as refractory sands,
+not only do some of them
+melt as low as 1200° (fayalites, though forsterites melt at
+higher temperatures up to 1900°), but they oxidize exothermically to
+quartz and magnesite when exposed to hot CO₂.  This might be useful to
+get a zero-carbon-emission gas-fired kiln if the reaction is fast
+enough; the exhaust air could contain less CO₂ than the input air.
+
+If the alternation time on the regenerators is 1 minute and the
+advection reaches 2000 watts (that must be retained), each regenerator
+must hold 120 kJ.  If the temperature swing in the regenerator
+averages 600° (more for the innermost chunks, less for the outermost),
+then it would be sufficient to have 250 g of quartz per regenerator at
+0.83 kJ/K/kg.  This is very promising!
+
+Let’s suppose that we want the kiln to stay at 1350° for 12 hours
+without losing more than, say, 10% of the heat energy through its
+insulation, so that we run the burner at about 10% power to keep it
+warm.  Earlier I said the inside should be a 320-mm cube, which gives
+it 0.61 m² surface area.  R-values are m²·K/W, and in this case we
+want to lose under 200 W through 0.61 m² and a 1330-K difference,
+which means our R-value needs to be at least 4.1.  Fiberglass is about
+22 m·K/W, so that’s about 190 mm of fiberglass.  Loose-fill perlite is
+about 19 m·K/W, loose-fill vermiculite can be as low as 15 m·K/W, so
+you might need as much as 275 mm of vermiculite.  This is eminently
+feasible, although it doesn’t leave a lot of extra room.
+
+NIST’s data
+<http://ws680.nist.gov/bees/ProductListFiles/Generic%20Fiberglass.pdf>
+says R-13 fiberglass batts (i.e. 13 m²·K/W, which is 3.2 times what we
+need) are 89 mm thick and weigh 12.1 kg/m³ (i.e. 12.1 g/ℓ).  This
+works out to be 146 m·K/W, which is 6.6× as high as the value I
+calculated above and twice as high as the values I find online for
+silica aerogel, so it cannot possibly be correct.
+
+Ah, this random CertainTeed™ brochure
+<http://www.certainteed.com/resources/IGProductKnowledge200608.pdf>
+explains that “R-13” is actually 2.3 m²·K/W, giving a thermal
+resistivity for fiberglass of 25.8 m·K/W, which is correct.  So we can
+probably take the density as correct.
+
+Using such batts (minus their facing layer, I suppose) to achieve the
+insulation level needed would require two layers of them, providing
+4.6 m²·K/W of insulation and increasing the dimensions of the kiln by
+178 mm on each side, for a total of (178+320+178) mm = 676 mm.  The
+total mass of the fiberglass then would be 3.3 kg, entirely
+reasonable.
+
+But you can’t actually use just those batts, because the innermost
+layers of insulation need to withstand 1400°, and glass won’t.  Glass
+will only handle up to 500° or so, so only the outer reaches can be
+made of glass.  You need inner layers of kiln bricks or vermiculite or
+something, and that’s going to drive up the weight considerably.
+(Or you could use ceramic fiber batts, which look like glass fiber
+batts but are made of alumina to withstand high temperatures.)
+
+To observe the inside of the kiln without losing a ridiculous amount
+of heat, although peepholes are the traditional solution, you might
+want some kind of optics.  I have no idea how this could work;
+wouldn’t a mica window melt?  Even if it doesn’t melt, could you see
+through it while it’s glowing?
+

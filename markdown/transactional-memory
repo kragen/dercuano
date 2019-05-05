@@ -1,0 +1,151 @@
+Transactional memory, immediate-mode structured graphics, serialization, backtracking, and parsing
+==================================================================================================
+
+(Originally posted at <https://write.as/s7f1ywj0jh735.md>)
+
+The standard API designs for graphics APIs are “immediate mode” and
+“retained mode”. In immediate mode, you emit a series of drawing
+operations, which typically change pixels, and that’s how you make
+your graphic. This means you can emit more drawing operations than
+there are pixels in the canvas, and in some cases you can do
+animations by sending a series of operations. Memory usage and
+performance are predictable, but not necessarily very good. `<canvas>`,
+PostScript, GDI, and Xlib are immediate-mode APIs.
+
+Retained-mode APIs, by contrast, maintain a set of graphical objects
+in memory, and the API lets you create and modify those objects. Often
+they’re arranged into a tree structure by containment. Typically they
+are a lot more of a pain to use and use a lot more memory. The SVG DOM
+is a retained-mode API.
+
+Immediate-mode APIs, although they’re often easier to use, have a few
+drawbacks:
+
+1. It’s a little bit tricky to make antialiasing work.
+
+2. You can’t zoom. Or, rather, zooming involves redrawing. And that’s
+   slow.
+
+3. The drawn objects can’t be clickable because they don’t have
+   persistent identities.
+
+This bit about redrawing, though, that’s interesting. Presumably the
+entire structure of your immediate-mode graphic somehow inheres in
+your code combined with the memory state it is interpreting. As long
+as you can re-execute the code deterministically, you can redraw or
+inspect whatever other behavior of the code you would like to inspect.
+
+Memory transactions and caching
+-------------------------------
+
+Optimistically-synchronized transactional-memory systems also rely on
+the ability of bits of code to re-execute deterministically, as does
+Umut Acar’s Self-Adjusting Computation. Optimistic TMs will roll back
+a transaction when another transaction has written to a shared
+variable that it has read, retrying it from the beginning with the new
+value, potentially as late as when it attempts to commit. (Some TMs
+also allow writes to leak out during transaction execution; in these
+cases, if another transaction reads those writes, it must be rolled
+back and retried if the writes are rolled back. This can lead to
+livelock.)
+
+The basic idea is that, if you can track all the bits of memory that
+the code reads from outside of its ephemeral internal state, you can
+be sure that the code would produce the same results if it were
+executed again; and if you control its outputs, you can undo those
+results if necessary. This allows you to confidently cache the results
+of running it, among other things.
+
+What if we did this with immediate-mode drawing? If we divide our
+drawing into a series of possibly nested transactions, the transaction
+system can provide the advantages of a retained-mode API potentially
+without all the expense —– the transaction system can intelligently
+trade off memory space against the possible inefficiency of having to
+re-execute. It can, for example, compute a bounding box for each
+transaction, and then, when zooming, only re-execute transactions that
+impinge on the visible screen area. (You could also offer an a-priori
+bounding-box function which tells you whether any of a given bounding
+box is visible, so as to avoid executing things inside of it, but this
+conflicts with the transaction system’s necessity for the viewport not
+to affect the drawing; a reasonable compromise is to offer a “clip”
+function which limits the visibility of further drawing to a given
+bounding box.)
+
+Also, of course, being able to confidently re-execute an
+immediate-mode drawing enables us to detect clicks, if that’s a thing
+we want to do.
+
+Data serialization
+------------------
+
+We can apply an analogous approach to serializing and deserializing
+data structures, with the highly desirable benefits of being able to
+orthogonally cache serializations and writing the serialization and
+deserialization code as one routine. An IMGUI library like Dear ImGui
+might establish a mapping between a character buffer and a widget on
+every drawn frame:
+
+    ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
+
+We might analogously establish a mapping between a character buffer
+and a chunk of the input/output stream:
+
+    int len = strlen(buf);
+    little_endian_32(&len);
+    bytes(buf, len);
+
+When serializing, `little_endian_32` will serialize `len` to the
+stream (as a little-endian 32-bit binary number, I suppose); when
+deserializing, it will overwrite its current value with the value
+deserialized from the stream. Then `bytes` correspondingly reads or
+writes the given number of bytes.
+
+We could imagine running the above in a transactional context that
+tracks its reads and the output bytes and is thus able to cache the
+output bytes and not re-execute the code when the inputs haven’t
+changed.
+
+Backtracking
+------------
+
+A transaction system is perfectly entitled to checkpoint
+partially-executed transactions so that it can restart them from a
+checkpoint, rather than from the beginning, if it needs to retry
+them. This may be more expensive (it needs to save the entire
+ephemeral state of the transaction, not just the program counter and
+inputs) but at some point it may be less expensive. This corresponds
+to chronological backtracking in AI search — if you checkpoint the
+transaction before returning the results of each nondeterministic
+choice, perhaps implemented as a read of a transactional variable, you
+can run a chronological-backtracking search over its execution space,
+searching for a set of nondeterministic choices that yields a
+successful execution.
+
+We can do better, though; with nested transactions, we can do
+non-chronological backtracking as well. Normally the failure of a
+nested transaction will result in the failure of the outer transaction
+as well, but the nested transaction may depend on far less input data
+than the outer transaction. The inputs to the nested transaction (its
+arguments and the set of nondeterministic choices made within it)
+comprise, for the purposes of backtracking, a nogood set. This should
+allow some degree of non-chronological backtracking, although it
+doesn’t allow the transaction system to direct the search procedure to
+nondeterministic choices with fewer remaining alternatives.
+
+In the context of serialization and deserialization, chronological
+backtracking amounts to recursive-descent parsing, and the transaction
+system is capable of the kind of memoization that allows Packrat
+parsers to guarantee linear-time parsing. I’m not sure if it’s
+possible to derive Earley parsing from recursive-descent parsing in
+this way.
+
+Reducing working sets
+---------------------
+
+Although all of the above is written from a big-computer perspective,
+the thing that originally attracted me to immediate-mode GUIs was
+Arduino menu systems. I hacked together an Arduino menu system that
+uses only a few bytes of RAM by using ImGui principles — from one call
+to the next, it only tracked the user’s position in the menu tree, but
+the menu tree itself was generated on demand by callback code, which
+of course was not stored in RAM.

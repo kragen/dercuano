@@ -1,0 +1,147 @@
+Some plastics, such as 6/6 nylon, are so resistant to abrasion that it
+is very difficult to machine them, but have very low viscosity once
+melted.  You can cut nylon with an abrasive wheel, for example, but it
+destroys the wheel.  Acetal (that is, polyoxymethylene or POM, aka
+Delrin) is popular not primarily because of its material
+properties — although they are quite good — but because it can be cut
+much more easily than most other thermoplastics.
+
+Plastic foams such as Styrofoam can be cut using a hot wire, typically
+stainless steel, but this approach doesn’t work for solid plastics;
+the molten plastic closes up the kerf behind the wire.  Hot-wire
+cutting also typically suffers from poor temperature control,
+vaporizing and burning some of the plastic, which increases the risk
+of hazardous fumes.
+
+Suppose that instead you had a narrow steel or aluminum pipe, for
+example 8 mm diameter with 0.5-mm-thick walls, heated to a precisely
+controlled temperature by pumping heated oil through it.  The oil
+could, for example, be heated to 290° and pumped around a closed loop
+past an electrically heated aluminum heatsink, with the heat applied
+to the heatsink controlled by a thermostat measuring the temperature
+of the output oil.  With this approach, most of the molten nylon can
+be made to run out of the kerf as the pipe advances through it,
+particularly if the nylon material is in a sheet of only a few
+millimeters thickness.
+
+If we take 45–45 cal/g (188 kJ/kg) to be the heat of fusion — a bit
+less than that of paraffin — 271° to be the final melting point, and
+1.21 g/cc to be the density of 6/6 nylon, from [Starkweather, Noller,
+and Jones 1984][0] then melting a 9 mm kerf through a 20 mm thickness
+of nylon would require 41 J/mm to do just the melting.  If we believe
+[Engineering Toolbox’s specific heat table][1], the heat capacity is
+1.7 kJ/kg/K, so heating by 250 K is another 425 kJ/kg, for a total of
+613 kJ/kg.  This means that same 9 mm kerf at 20 mm thickness requires
+135 J/mm.  So cutting at a reasonable speed of 10 mm/s, neglecting
+conduction, requires 1300 W.  Cutting at higher powers is more
+efficient, because you'll get a smaller error from neglecting
+conduction.
+
+[0]: http://onlinelibrary.wiley.com/doi/10.1002/pol.1984.180220905/abstract
+[1]: http://www.engineeringtoolbox.com/specific-heat-capacity-d_391.html
+
+Polyvinyl chloride is another example of a plastic that can be easily
+cut with a hot object, but is hazardous with poor temperature control.
+If we believe [the Polymer Science Learning Center’s decomposition
+temperature table][3], PVC decomposes in the 200°–300° range but
+doesn’t melt until 265°, and nylon 6,6 decomposes in the 310°–380°
+range, while PET melts at 268° and decomposes in the 283°–306° range.
+
+[3]: http://pslc.ws/fire/howwhy/thermalp.htm
+
+Transferring 1500 W to oil through a heatsink probably requires a
+heatsink of some 100 mℓ capacity, so the total amount of oil needed
+for this tool is probably around 150 mℓ.
+
+Avocado oil has a smoke point of 270°, which is probably high enough
+to melt nylon, but more normal cooking oils like soybean oil smoke at
+much lower temperatures like 238°.  This suggests that if a nontoxic
+oil is to be used in this tool, it has to be medical-grade paraffin or
+polydimethylsiloxane rather than any actually edible oil.  I’m not
+certain that either of these, but especially medical-grade paraffin,
+will withstand such high temperatures; [Engineering Toolbox
+suggests][5] a limit of 149° for mineral oil and 260° for PDMS or
+other silicones, but I suspect that may just be the point where the
+oil ceases to lubricate.  Some companies do sell [high-temperature
+lubricants][7] capable of lubricant use up to 270° and more; the
+fluorinated [Krytox XHT][8] supposedly doesn’t degrade until 350° and
+doesn't corrode metals until 288°.
+
+[5]: http://www.engineeringtoolbox.com/oil-temperature-limits-lubrication-d_1492.html
+[7]: http://www.moresco.co.jp/en/products/high-temperature-grease#sub-01
+[8]: https://www.chemours.com/Lubricants/en_US/applications/Extreme_Temperatures.html
+
+If the oil is heated to 290° and must not cool below 271°, we only
+have 19 K of sensible heat in which to store all the heat to be
+delivered to the nylon.  If the oil has a heat capacity of
+1.67 kJ/kg/K (according to [Engineering Toolbox's table][2]), that's
+only 32 kJ/kg, so we need 47 g/s of flow.  At 0.8 g/cc, that’s
+59 mℓ/s.  If a single-acting piston pump driven at 1500 rpm is driving
+this, the pump’s displacement needs to be 2.35 cc.
+
+In a 7-mm-diameter pipe, that’s a rather shocking 1.5 m/s average
+linear speed.  The Reynolds number is almost 11000.  But according to
+an [anonymous online calculator][4], the pressure drop from 200 mm of
+such a flow with .01 mm pipe roughness, if the fluid were water, would
+be only 11 mbar (1.1 kPa).  This implies that only 65 mW of pumping
+power is needed, which seems surprisingly small to me, suggesting that
+maybe my pipe resistance calculation is wrong.  [Another random online
+calculator][6] suggests that the head loss will be 294 mm, which would
+be 2.9 kPa, which is a little higher but still in the ballpark.
+
+[2]: http://www.engineeringtoolbox.com/specific-heat-fluids-d_151.html
+[4]: http://www.pressure-drop.com/Online-Calculator/
+[6]: http://www.calculatoredge.com/mech/pipe%20friction.htm
+
+These high powers suggest that it might be desirable to power the tool
+directly with fire rather than electrically.
+
+Alternative heat transfer fluids might include perfluorocarbons (like
+the Krytox XHT mentioned earlier), molten salts, and molten metals.
+
+In particular, ordinary tin-lead 63/37 solder melts at 183°, doesn’t
+boil until 1500°, and doesn’t suffer chemical breakdown.
+
+It does tend to dissolve metals — tin quite rapidly, of course, but
+also gold, silver, and copper at significant speeds, and even nickel
+some 25 times slower than copper.  In the case of copper, the
+dissolution diminishes rapidly once the solder is saturated with
+dissolved copper (at a fairly low level), as is done in SAVBIT solder.
+Presumably this also applies to other metals it can dissolve, too.
+People add nickel to solder to keep it from dissolving iron.
+Phosphorus counteracts this effect and increases stainless steel
+erosion — in lead-free tin-copper solder.
+
+There’s debate about whether tin-lead solder is capable of even
+*joining* steel, which I thought might imply that it has a very hard
+time *dissolving* steel as well.  Other alloys (lead-silver, cadmium-
+silver, tin-silver, and maybe tin-bismuth) supposedly work well for
+joining steel.  But apparently tin-lead solder does work with steel if
+you use acid flux.
+
+Molten solder in wave-soldering equipment is normally contained in
+stainless-steel equipment, which suffers erosion over a period of
+months, but this is at lower temperatures than what I'm discussing
+here.  One study I found, though, found about 0.25 mm erosion depth on
+stainless steel 304 (and a bit less on 316) after 384 hours in a 350°
+lead-free solder, which seems slow enough that the tool could still be
+useful.
+
+Type metal is a variant that has the desirable property that it
+doesn’t have a sudden change in volume when it melts.  It's a tin-lead
+solder that also includes antimony; the traditional composition is 18%
+tin, 28% antimony, 54% lead, while the eutectic is 4% tin, 12%
+antimony, 84% lead, which melts at 240°.  (Elemental antimony is
+fairly nontoxic, although its compounds are deadly, and its fumes are
+bad for you too.)  Legend has it that type metal is very poor at
+dissolving iron.
+
+Scrap type metal from Linotypes and the like is available on
+MercadoLibre at AR$55/kg (US$3.60/kg).
+
+If using a coolant that melts above room temperature, then to keep the
+machine from freezing solid permanently the first time you turn it
+off, you could thread a resistance heating element all the way through
+the pipe, probably with insulation around it.  That way, when you turn
+the element on, it will melt a path around it through the tube,
+allowing the coolant to begin to flow.

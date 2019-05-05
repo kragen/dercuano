@@ -1,0 +1,149 @@
+How do I dynamically generate bytecode?
+---------------------------------------
+
+Aside from understanding the JVM bytecode (for which `javap -c` and
+[chapter 6][] of the JVM spec are helpful), there’s the question of
+how to get from a plan for code to generate to actually being able to
+run the code on the JVM, as described in [chapter 5][] of the JVM
+spec.
+
+[chapter 6]: http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
+[chapter 5]: http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-5.html
+
+At the most basic level, you write a [custom ClassLoader][], which is
+five or six lines of code, and invoke `.loadClass(name)` on it.  But
+then you still have to generate the bytecode that will define your
+class.
+
+[custom ClassLoader]: http://stackoverflow.com/a/3174496
+
+(There’s an existing [overview][] of bytecode-generation and
+-manipulation libraries for Java at java-source.net.)
+
+[overview]: http://java-source.net/open-source/bytecode-libraries
+
+That’s what [ObjectWeb ASM][] does; it’s a library for JVM assembly
+programming, and it comes with a disassembler, which produces Java
+source code that invokes the ObjectWeb ASM APIs.  It’s used by CGLib,
+Hibernate, Clojure, Jython, JRuby, and so on.  It may be actively
+maintained (it supports Java 8) but change is mostly limited to
+bugfixes at this point.  It has a reputation for being simpler to use
+than BCEL, because it’s more narrowly focused on generating,
+transforming, and analyzing byte arrays representing JVM-bytecode
+classes.  Generating a [hello-world class][] with it is 14 lines of
+code in the documentation, and [generating a simple method][] as a
+sequence of bytecode ops is another six.
+
+[ObjectWeb ASM]: http://asm.ow2.org/doc/faq.html
+[hello-world class]: http://download.forge.objectweb.org/asm/asm4-guide.pdf#page=22&zoom=160,-184,610
+[generating a simple method]: http://download.forge.objectweb.org/asm/asm4-guide.pdf#page=51&zoom=160,-184,496
+
+[Javassist][] is an actively maintained 16-year-old free-software
+library for Java bytecode manipulation, with what seems to be a
+better-thought-out and more convenient interface, although it’s hard
+to find reasonable documentation (Javadoc doesn’t count!).  It’s
+integrated with its own Java compiler, so you can even specify
+bytecode to insert in the form of Java source code!  (However, its
+Java compiler supports a subset of the full language.)  It’s part of
+the JBoss project now, and apparently [uses ObjectWeb ASM][].
+
+[Javassist]: http://www.csg.ci.i.u-tokyo.ac.jp/~chiba/javassist/
+[uses ObjectWeb ASM]: http://blog.newrelic.com/2014/09/29/diving-bytecode-manipulation-creating-audit-log-asm-javassist/
+
+[Soot][] is an actively maintained framework for analyzing and
+optimizing Java bytecode, supporting different intermediate
+representations (each of which has a textual syntax).  It also
+supports Android bytecode (which I assume means Dalvik), which makes
+it unique among the libraries I’ve looked at.  It’s mostly oriented
+toward program analysis (e.g. interprocedural dataflow analysis)
+rather than dynamic code generation, but you can also use it for
+dynamic code generation; the [hello-world Soot dynamic class][]
+requires 28 lines of code to generate. Despite being actively
+maintained, it doesn’t yet support Java 8.
+
+[Soot]: https://sable.github.io/soot/
+[hello-world Soot dynamic class]: https://github.com/Sable/soot/wiki/Creating-a-class-from-scratch
+
+[BCEL][], previously known as JavaClass, is a library for generating
+and transforming JVM bytecode,.  It comes with, among other things, a
+Java disassembler to Jasmin syntax.  It’s at a very similar level to
+ObjectWeb ASM, but it looks somewhat more cumbersome to use, although there
+are some very cool facilities in it; its most [basic example][],
+called HelloWorldBuilder, is over 100 lines, although that includes
+things like try-catch blocks.  BCEL seems to have been abandoned in
+2006.
+
+[BCEL]: https://commons.apache.org/proper/commons-bcel/manual.html
+[basic example]: https://commons.apache.org/proper/commons-bcel/manual.html#A_Appendix
+
+[SERP][] is another actively maintained library for, mostly, bytecode
+modification, apparently with a stateful DOM-like API.  It’s almost
+completely undocumented.
+
+[SERP]: http://serp.sourceforge.net/
+
+How do I profile?
+-----------------
+
+The crudest tool is a thread stack dump, which you can get by typing
+control-backslash or by using `jstack` (included with the JVM) with
+the appropriate PID.  This will show you the stack of each thread in
+your JVM process, from which you can see what it’s currently taking
+too long to do.
+
+There’s also a profiler that comes with the JVM called [HPROF][];
+you invoke it for CPU-sampling
+profiling with `java -agentlib:hprof=cpu=samples YourProgram`
+or with
+entry-and-exit instrumentation, 
+which slows the program down by an order of magnitude
+but gets accurate call counts,
+with `-agentlib:hprof=cpu=times`.
+
+[HPROF]: http://docs.oracle.com/javase/8/docs/technotes/samples/hprof.html
+
+[Profiler4j][], open-source, abandoned in 2006, “in beta stage”, based
+on bytecode instrumentation.
+
+[Profiler4j]: http://profiler4j.sourceforge.net/
+
+Some old profilers use the JVMPI interface, which has been [phased out
+to be replaced with JVMTI][JVMTI] in current Java.
+
+[JVMTI]: http://www.oracle.com/technetwork/articles/java/jvmpitransition-138768.html
+
+The Netbeans folks wrote a profiler which is now this separate thing
+called VisualVM, which has now expanded far beyond just profiling.
+VisualVM is free software but apparently [hasn’t been ported along
+with OpenJDK][VisualVM], although there seems to be no licensing
+reason not to; maybe you can [compile it from source][], and it
+[supports OpenJDK][].
+
+[VisualVM]: https://stackoverflow.com/questions/10769043/visualvm-not-part-of-openjdk7
+[compile it from source]: http://icedtea.classpath.org/wiki/VisualVM
+[supports OpenJDK]: https://blogs.oracle.com/nbprofiler/entry/five_visualvm_myths_demystified
+
+[JIP][] is a profiler that hooks the classloader and uses ObjectWeb ASM to
+instrument bytecode as it’s loaded.  It’s supposedly much lower
+overhead than hprof.  But it’s been abandoned since like 2008.
+
+[JIP]: http://jiprof.sf.net/
+
+[TPTP][] was a profiler integrated into Eclipse, built on JVMTI.  It
+was [abandoned in 2011][].
+
+[TPTP]: http://www.eclipse.org/articles/Article-TPTP-Profiling-Tool/tptpProfilingArticle.html
+[abandoned in 2011]: http://www.eclipse.org/tptp/home/project_info/devplans/EclipseTPTPProjectPlan2010.htm
+
+[Jvmtop][] monitors all the JVMs on a machine, like top, and includes
+a high-overhead sampling-based CPU console profiler.  Jvmtop as a
+whole was abandoned in 2013.
+
+[Jvmtop]: https://code.google.com/p/jvmtop/
+
+[GCViewer][] is a currently maintained viewer of GC statistics, using
+the GC profiling functionality built into the JVM, to help you
+understand GC behavior with pretty graphs and extensive statistics.
+Jörg Wüthrich took over maintenance from tagtraum industries in 2008.
+
+[GCViewer]: https://github.com/chewiebug/GCViewer

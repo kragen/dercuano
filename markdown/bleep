@@ -1,0 +1,136 @@
+Suppose you want to transmit data a short distance between cellphones
+and Cortex-M0 devices like the STM32F0 family over ultrasound.  What’s
+the simplest thing that could possibly work?
+
+You can probably generate and even analyze audio on the cellphone in a
+webpage, using the Web Audio API.  This suggests that maybe you want
+to see if you can press biquad filters into service.
+
+Probably FSK for the encoding, and probably the sweet spot for
+audibility by humans but not cellphones is around 18kHz.  And the
+further apart you have your frequencies, the faster your
+tone-detection filters can work.  If they’re at 17.5kHz and 18.5kHz,
+for example, your Q could be only about 18 and still separate them by
+3dB.  A 17.5kHz square wave will be just a sine wave after it gets
+through a standard audio speaker — its second harmonic is amplitude 0,
+and its third harmonic is 52.5kHz, which is not going to get
+reproduced by the speaker.
+
+A Q of 18 means you get about 1kbps, which is adequate for some
+applications. (?! where does this number come from)
+
+You probably want some kind of hefty error-detection code so that you
+don’t turn random noise into garbage data.
+
+I was thinking that the Goertzel algorithm is the standard algorithm
+for tone detection, but if your microphone isn’t picking up
+substantial harmonics, it’s probably fairly harmless to just chop the
+signal with a square wave or modified square wave, and chopping with
+two square waves in quadrature should give you I and Q signals.
+However, 17.5kHz and 18.5kHz are 2.52 and 2.38 samples per cycle,
+respectively, at 44.1ksps, so quadrature chopping would be somewhat
+tricky!  You’d have to resample to a higher sample rate first.  You
+can definitely use Goertzel though.
+
+You probably want to window the signals both on output and on input,
+both to avoid spectral leakage down to the audible spectrum and to
+improve discrimination between them.  Empirically, a first-order
+moving average is not good enough here, unless it’s sized specifically
+for the beat frequency.
+
+I think a negative-weight feedforward comb filter on input, plus a bit more
+frequency margin, might help with frequency discrimination.  Setting
+the 1/0 threshold requires some amount of adaptation, empirically,
+which suggests that a constant-weight code would be helpful;
+Manchester encoding is the simplest, though it discards half the
+bandwidth.
+
+I’m thinking maybe 17500 Hz and 18970 Hz, which differ by 1470 Hz,
+which is a period of 30 samples.  Halfway through that period, they’re
+½τ out of phase, and ¼ or ¾ of the way through (7.5 and 22.5 samples),
+they’re 90° out of phase, so when one is at its maximum, the other is
+at its zero.  So, for example, if y(n) = x(n-7) - x(n), the 17500Hz
+signal is attenuated by a factor of 0.985 (-0.13 dB, hardly at all),
+while the 18970Hz signal is attenuated by -0.070 (-23 dB).  Perhaps
+better, if y(n) = x(n) - x(n-5), the 17500Hz signal is attenuated by
+-0.100 (-20dB) and the 18970Hz signal is attenuated by 0.812 (-1.8dB).
+Similarly, if y(n) = x(n-34) - x(n), the 17500Hz signal is attenuated
+by -0.050 (-26dB) and the 18970Hz signal is attenuated by 0.709
+(-3dB).
+
+So we could maybe filter each signal with a four-stage cascade.  For
+17500Hz:
+
+    y(n) = x(n-7) - x(n)
+    a(n) = y(n) * cis(17500 τ n/fs)
+    b(n) = a(n) + b(n-1)
+    c(n) = b(n) - b(n-30)
+
+For 18970Hz:
+
+    y(n) = x(n-5) - x(n)
+    a(n) = y(n) * cis(18970 τ n/fs)
+    b(n) = a(n) + b(n-1)
+    c(n) = b(n) - b(n-30)
+
+And in practice a(n) and b(n) could be combined into a single Goertzel
+stage, and the final c(n) stage can be decimated.
+
+The initial comb-filtering stage, in addition to attenuating the
+opposing signal relatively by 23dB, also works as a single-pole
+high-pass filter.  The 7-sample window has its lowest resonance at
+3150 Hz and other resonance peaks at 9450 Hz, 15750 Hz (the one whose
+sidelobe we’re using (?)), and 22050 Hz.
+
+XXX Oh wait this is totally wrong.  I was calculating those
+attenuations based on the value of |sin(ωt)| at those points, but
+actually the attenuation we want is |cos(ωt) - cos(0)|.
+
+Thinking about how to *emit* the levels inexpensively, it occurred
+that Don Lancaster’s Magic Sinewave approach might work well if the
+baud time is a common multiple of the carrier periods (i.e. a multiple
+of 30 samples at 44100 Hz), which is to say that the baud rate should
+be a factor of 1470 Hz.  490 baud and 735 baud (90 and 60 cycles
+respectively at 44100 Hz) suggest themselves.  The idea is sort of
+like wavetable diphone synthesis: you divide time into 30-sample
+grains (≈0.68 ms) and during each grain time you play an appropriate
+precomputed grain according to the current bit, the following bit, and
+your position within the bit.  So in the 735-baud case, for example,
+you have two frame positions and four situations (00, 01, 10, 11), so
+8 precomputed grains.  For machines with an audio DAC, in 16 bits at
+44100 Hz, each of these are 30 samples and 60 bytes, so the total
+wavetable is 480 bytes.  The 490-baud case would need 12 precomputed
+grains.
+
+(This is assuming that we’re using a window with support of less than
+two transition intervals.)
+
+Machines without an audio DAC probably need to compensate by using a
+higher sample rate; this will be limited by their CPU load, CPU speed,
+and memory.  Supposing they can afford 4 KiB of program memory to
+store the wavetables, that’s 16384 samples, or 2048 samples per grain,
+which works out to 3.01 megahertz, which is a low enough speed that
+you don’t need fancy signal integrity stuff, and maybe it’s within
+reach of even things like AVRs (which would probably need an external
+ADC to receive signals, anyway).  This gives you about 68 bits per
+44100sps sample; √68 ≈ 8, so I think you’ll have a signal-to-
+quantization-noise amplitude of about 8, or 18.3 dB.  That’s not a
+wonderful noise budget but it’s probably adequate.  Possibly we can
+dither that noise up to very high frequencies where it won’t even get
+digitized on the receiving end.
+
+You might be able to win a bit more by just repeating the same grain
+during the transition for the 00 and 11 cases, taking advantage of the
+fact that those grains themselves are time-reversal invariant, and
+time-reversing the 10 and 01 cases.
+
+XXX wait, 17500 isn't divisible by 1470.
+
+I did try the comb filter thing.  I’d forgotten that feedforward combs
+have sharp nulls and very broad peaks.  It helps a lot.
+
+Thanks to Nick Johnson, Ezequiel Alfie, Alastair Porter, Florian
+Pignol, Arthur Sittler, Kia, Colby Kraybill, Eugene Jercinovic, Andrea
+Shepard, John Bognar, and Rick Bartells for all the things I’ve
+learned from them that enabled me to get this to work.  I haven’t even
+mentioned it to most of them, so don’t blame them if it’s bogus.

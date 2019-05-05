@@ -1,0 +1,233 @@
+So I was thinking about the sparse difference-array representation
+METAFONT uses for rows of pixels: +1 at the left edge of an ink area,
+-1 at the right edge.  Once all the ink is thus applied, potentially
+including overlapping strokes, the prefix sum is calculated, thus
+spreading the ink, and the pixels with positive, or nonzero, amounts
+of ink are then colored.  If you instead color pixels with odd amounts
+of ink, you get even-odd filling rather than nonzero filling.
+
+In METAFONT, IIRC, the difference array is sparse: it contains
+(X-coordinate, increment) pairs, which could be specialized to (X, ±1)
+if we allow duplicate Xes.  This allows an arbitrarily high
+X-resolution, for a fixed number of edges anyway, at only logarithmic
+cost.  For a number of edges E much larger than the number of pixel
+positions N, a dense array is more efficient, since it can coalesce
+multiple edges that happen to cross the scan line within the same
+pixel; it need only contain N items instead of the larger number E.
+
+Dense arrays also have the advantage of permitting more regular
+processing which fits better into CPUs.  In what follows, I’m only
+considering dense arrays.
+
+Gray code on bit-packed scanlines
+---------------------------------
+
+It occurred to me that, in the even-odd case, you could use single
+bits for the pixels, and the prefix-sum operation and its inverse are
+simply the operations of converting between binary and
+reflected-binary Gray code.  Converting from binary to RBGC, the
+backward difference operation, is simple and efficient (`x ^ x >> 1`),
+but the inverse operation (RBGC to binary, prefix-sum of XOR) is
+somewhat less efficient on a normal CPU.  Chapter 13 of _Hacker’s
+Delight_ is about Gray code, and it gives this algorithm for 32 bits:
+
+    B = G ^ G >> 1;
+    B ^= B >> 2;
+    B ^= B >> 4;
+    B ^= B >> 8;
+    B ^= B >> 16;
+
+An additional shifted-XOR is needed for 64 bits.  GCC for amd64
+renders this as follows, requiring three instructions per line, 18
+instructions in all, plus in this case a `retq` of overhead:
+
+      400620:	48 89 f8             	mov    %rdi,%rax
+      400623:	48 d1 f8             	sar    %rax
+      400626:	48 31 f8             	xor    %rdi,%rax
+      400629:	48 89 c2             	mov    %rax,%rdx
+      40062c:	48 c1 fa 02          	sar    $0x2,%rdx
+      400630:	48 31 d0             	xor    %rdx,%rax
+      400633:	48 89 c2             	mov    %rax,%rdx
+      400636:	48 c1 fa 04          	sar    $0x4,%rdx
+      40063a:	48 31 d0             	xor    %rdx,%rax
+      40063d:	48 89 c2             	mov    %rax,%rdx
+      400640:	48 c1 fa 08          	sar    $0x8,%rdx
+      400644:	48 31 d0             	xor    %rdx,%rax
+      400647:	48 89 c2             	mov    %rax,%rdx
+      40064a:	48 c1 fa 10          	sar    $0x10,%rdx
+      40064e:	48 31 d0             	xor    %rdx,%rax
+      400651:	48 89 c2             	mov    %rax,%rdx
+      400654:	48 c1 fa 20          	sar    $0x20,%rdx
+      400658:	48 31 d0             	xor    %rdx,%rax
+      40065b:	c3                   	retq   
+
+This works out to 0.28 instructions per pixel, which is still less
+than 1, and furthermore a third of those are `mov`s that might
+disappear in the micro-op representation inside the CPU, but it’s not
+the order-of-magnitude kind of speedup we might hope for.
+
+(On ARM Thumb-2 (not shown) it’s 28 instructions.)
+
+If you’re running this operation on an entire scanline to compute its
+XOR prefix sum, you need to bring in the output parity bit from the
+previous word as well.
+
+Bitsliced scanlines
+-------------------
+
+Another approach to this problem is to bitslice it.  Suppose that we
+have an array of 1024 32-bit words W, each word W[i] of which has bit
+N set (i.e. `0 != (W[i] & (1 << N))`) iff there is a left-right
+boundary at (i, N).  Then we can calculate the XOR prefix sum,
+i.e. convert each row of pixels from RBGC to binary, simply and
+efficiently in parallel across the scan lines:
+
+    for (int i = 1; i < 1024; i++) W[i] ^= W[i-1];
+
+This gets compiled to the following for amd64:
+
+       0:	48 8d 47 04          	lea    0x4(%rdi),%rax
+       4:	48 8d 8f 00 10 00 00 	lea    0x1000(%rdi),%rcx
+       b:	8b 50 fc             	mov    -0x4(%rax),%edx
+       e:	31 10                	xor    %edx,(%rax)
+      10:	48 83 c0 04          	add    $0x4,%rax
+      14:	48 39 c8             	cmp    %rcx,%rax
+      17:	75 f2                	jne    b <xor_prefix_sum_bitslice+0xb>
+      19:	f3 c3                	repz retq 
+
+This inner loop is 5 instructions (two of which contain memory
+references) processing 32 pixels.  It takes about 2.2 μs on my 1.6 GHz
+Pentium N3700, or 67 ps per pixel, 9.3 pixels per clock cycle.  But
+you can unroll it, say by a factor of 4:
+
+      W[1] ^= W[0];
+      W[2] ^= W[1];
+      W[3] ^= W[2];
+      for (int i = 4; i < 1024; i += 4) {
+        W[i] ^= W[i-1];
+        W[i+1] ^= W[i];
+        W[i+2] ^= W[i+1];
+        W[i+3] ^= W[i+2];
+      }
+
+      1b:	8b 47 04             	mov    0x4(%rdi),%eax
+      1e:	33 07                	xor    (%rdi),%eax
+      20:	89 47 04             	mov    %eax,0x4(%rdi)
+      23:	33 47 08             	xor    0x8(%rdi),%eax
+      26:	89 47 08             	mov    %eax,0x8(%rdi)
+      29:	31 47 0c             	xor    %eax,0xc(%rdi)
+      2c:	48 8d 47 10          	lea    0x10(%rdi),%rax
+      30:	48 8d 8f 00 10 00 00 	lea    0x1000(%rdi),%rcx
+      37:	8b 10                	mov    (%rax),%edx          ; loop starts here
+      39:	33 50 fc             	xor    -0x4(%rax),%edx
+      3c:	89 10                	mov    %edx,(%rax)
+      3e:	33 50 04             	xor    0x4(%rax),%edx
+      41:	89 50 04             	mov    %edx,0x4(%rax)
+      44:	33 50 08             	xor    0x8(%rax),%edx
+      47:	89 50 08             	mov    %edx,0x8(%rax)
+      4a:	31 50 0c             	xor    %edx,0xc(%rax)
+      4d:	48 83 c0 10          	add    $0x10,%rax
+      51:	48 39 c8             	cmp    %rcx,%rax
+      54:	75 e1                	jne    37 <xor_prefix_sum_bitslice_unrolled+0x1c>
+      56:	f3 c3                	repz retq 
+
+This processes 128 pixels in 11 instructions, although 8 of those
+instructions contain memory references, so it’s really more like 19
+instructions.  (Or more, if you count the indexing operation
+separately.)  It takes about 1.0 μs on my 1.6 GHz Pentium N3700, or
+31 ps per pixel, 20 pixels per clock cycle.  Filling a megapixel thus
+would require 31 μs, assuming you don’t incur cache misses.
+
+These numbers give us respectively 0.156 (5/32), 0.086 (11/128), and
+0.148 (19/128) instructions per pixel.  That’s more like it!
+
+(That also suggests that the N3700 is managing about 1.7 instructions
+per clock cycle.)
+
+You might hope that other architectures would be more efficient, but
+they seem to be about the same; here’s an ARM Thumb-2 compilation of
+the same unrolled loop, which is one byte shorter and has 16
+instructions instead of 11 in the inner loop; it avoids the redundant
+memory loads of the amd64 version, but has to use explicit loads and
+stores.
+
+      1c:	6842      	ldr	r2, [r0, #4]
+      1e:	6803      	ldr	r3, [r0, #0]
+      20:	405a      	eors	r2, r3
+      22:	6042      	str	r2, [r0, #4]
+      24:	6883      	ldr	r3, [r0, #8]
+      26:	4053      	eors	r3, r2
+      28:	6083      	str	r3, [r0, #8]
+      2a:	68c2      	ldr	r2, [r0, #12]
+      2c:	4053      	eors	r3, r2
+      2e:	60c3      	str	r3, [r0, #12]
+      30:	4603      	mov	r3, r0
+      32:	f500 607f 	add.w	r0, r0, #4080	; 0xff0
+      36:	691a      	ldr	r2, [r3, #16]   ; loop starts here
+      38:	68d9      	ldr	r1, [r3, #12]
+      3a:	4051      	eors	r1, r2
+      3c:	6119      	str	r1, [r3, #16]
+      3e:	695a      	ldr	r2, [r3, #20]
+      40:	4051      	eors	r1, r2
+      42:	6159      	str	r1, [r3, #20]
+      44:	699a      	ldr	r2, [r3, #24]
+      46:	404a      	eors	r2, r1
+      48:	619a      	str	r2, [r3, #24]
+      4a:	69d9      	ldr	r1, [r3, #28]
+      4c:	404a      	eors	r2, r1
+      4e:	61da      	str	r2, [r3, #28]
+      50:	3310      	adds	r3, #16
+      52:	4283      	cmp	r3, r0
+      54:	d1ef      	bne.n	36 <xor_prefix_sum_bitslice_unrolled+0x1a>
+      56:	4770      	bx	lr
+
+On a 64-bit machine, we could halve all these numbers, at the expense
+of doubling the working set (to 8 KiB) and the data traffic to the
+cache, by using 64-bit words.
+
+Unfortunately, then we need to transpose the bit matrix to get the
+pixels in the usual scanline order.
+
+Oversampling
+------------
+
+These approaches might be sufficiently efficient to permit you to do
+antialiasing by the brute-force approach of oversampling.  For
+example, if you do brute-force oversampling in both X and Y, you have
+four subpixels per screen pixel, and thus five gray levels for each
+screen pixel (0, 1, 2, 3, 4).
+
+Even-odd-filled polylines
+-------------------------
+
+If you have a closed polygon or polyline, in theory you can just draw
+the edges into your scanline buffer with XOR (`W[x] ^= 1 << y` or
+`W[y*w + x/N] ^= 1 << (x%N)` or whatever) and get it filled this way.
+But you have to be careful about vertices: in the scanline where a
+vertex falls, you must be careful to XOR it into that scanline only
+once, not once for the line that starts there and again for the line
+that ends there.  That bug leads to an inverse-video bleed-across on
+that line.
+
+Similarly, you need to be careful with local minima and maxima of the
+Y-coordinate along the border, particularly if there’s a vertex
+present.
+
+Gradient and texture fills
+--------------------------
+
+The above algorithms handle solid-color fills pretty well, but solid
+colors nearly don’t exist in nature.  Even objects whose color is
+perfectly homogeneous are usually lit by inhomogeneous lighting,
+either because they are curved, because of fuzzy shadows, or because
+of varying distances to nearby light sources, including indirect light
+diffused from other objects.  So non-computer-screen objects almost
+always have gradients.
+
+Also, non-computer-screen objects usually have texture.  Wood has
+grain, cement or dirt has white-noise texture, hair has striation,
+cloth has weave, and so on.  At large grain, we can handle this by
+drawing thousands of objects, but the grains of a brick or the hair of
+a crowd of people, for example, is impractical to handle this way.
+
+Further thoughts on this in file `cheap-textures`.

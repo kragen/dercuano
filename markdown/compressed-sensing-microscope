@@ -1,0 +1,106 @@
+By using a fairly rigid aperture grille with sparse randomly placed
+holes of different sizes, including a large number that are very
+small, it should be possible to do very high resolution microscopy,
+including subwavelength near-field light microscopy of flat objects,
+using only low-resolution, low-quality lenses or mirrors to focus
+light.
+
+You put the grille on top of the sample, in contact with it, and shine
+light through the sample and the grille, taking a picture of the
+starfield pattern that comes through.  Where a hole is over a clear
+spot in the sample, a white point of light will show; where it’s over
+a transparent red spot, a red point of light will show; where it’s
+over an opaque part, no light will show.  The holes are much smaller
+than the camera pixels, but they are sparse enough that typically only
+one hole or less makes a significant contribution to each camera
+pixel.  The consequence is that moving the grille by a hole diameter
+or so scans many such high-resolution pixels over the sample, and by
+taking many such frames, eventually the whole sample can be covered
+redundantly by many holes.
+
+It’s necessary to estimate the relative positions of the holes to deep
+subpixel resolution, and it may be necessary to do this simultaneously
+with estimating the image of the surface, a problem similar to the
+simultaneous localization and mapping (SLAM) problem in robotics.
+Alternatively, if the grille is rigid enough, it may be possible to
+estimate the hole positions ahead of time, using, for example, a known
+microscopic image or many high-resolution photographs of the grille.
+
+Using a variety of different sizes of holes in such a grille is a way
+to reduce the difficulty of this estimation problem.  The larger holes
+provide a blurrier image, but their positions are much easier to
+estimate to the desired precision, and the blurry image helps in
+estimating the position of the smaller holes.
+
+A very practical way to produce such a grille is by perforating a thin
+metal surface, such as gold leaf; aluminum foil peeled from a gum
+wrapper; the aluminum coating on metallized Mylar/boPET or polyimide,
+such as a discarded potato chip bag; or the silvering of a
+first-surface mirror.  A very practical way to perforate such a metal
+sheet is with a short-lived arc, triggered by bringing an electrode
+close to the surface; the hole diameter, if not its position, can be
+controlled fairly precisely by controlling the energy released in the
+arc, which can be measured fairly precisely by measuring the charge
+and voltage loaded onto a capacitor before the discharge.
+
+Gold leaf is typically 0.2 microns thick; Mylar is commonly 10 microns
+thick, but only about 0.5 microns of that is the metallized film,
+sometimes as little as 0.1 microns.  Regular kitchen aluminum foil is
+on the order of 20 microns thick.  Vaporizing a 1-micron-diameter hole
+in an 0.5-micron-thick metal film requires vaporizing about 0.4 (μm)³
+of metal, which at 2.7 g/cc for aluminum works out to about a
+picogram.  Solid aluminum's specific heat is 24.20 J/mol/K, its heat
+of fusion is 10.71 kJ/mol, its heat of vaporization is 284 kJ/mol, and
+it boils at 2470°, so we're looking at (2470 - 20) K 24.20 J/mol/K +
+10.71 kJ/mol + 284 kJ/mol = 354 kJ/mol, and its atomic weight is about
+27.0 g/mol, so that’s 14 kJ/g = 14 nJ/pg = 14 nJ per hole.  That’s the
+energy of a 280 pF capacitor at 10 V.
+
+If the capacitor’s capacitance were to increase or decrease by 1% (for
+example due to temperature, ferroelectric, or soak effects), which is
+a typical precision for low-capacitance capacitors like this, that
+would increase or decrease the diameter of the hole by about ½%.  It
+should be straightforward to measure the charge deposited on the
+capacitor during the charging process to within about 0.1%.
+
+I say it’s probably not practical to control the location of the hole
+precisely because you need to bring the electrode close enough to the
+foil to provoke a dielectric breakdown of the air; for 10 V to be
+adequate, for example, the distance needs to be about 3 microns.  But
+if the tip has a spherical radius of 3 microns, then a corona
+discharge will be occurring around the tip at the same time.  This
+seems undesirable to me for a variety of reasons (uncontrolled loss of
+energy, ionic erosion) so it would be better to make the tip diameter
+much larger than this.  But this means that the position of the arc
+will be uncertain to within several microns, controlled by small
+asperities on the tip or on the foil or by stray ions that wander by.
+You’re depending on the positive feedback of the arc itself to channel
+all the energy into a small area, but that same positive feedback
+creates unpredictability.
+
+Using lower voltages would help if it were possible, but it probably
+is not practical; Paschen’s law has its minimum for nitrogen at about
+one torr cm and about 300 V.  An atmosphere is 760 torr, so we reach
+one torr cm at about 13 microns.  Using higher voltages makes the
+lateral uncertainty larger.
+
+XXX now that I know about Paschen’s law I need to rethink the above
+for a higher voltage.
+
+Coloring the grille black, for example with a layer of carbon black
+deposited by smoke, should reduce stray light contamination which will
+damage SNR and require algorithmic rejection after the fact.  This
+should be especially helpful for imaging using reflected light rather
+than transmitted light.
+
+This approach doesn’t seem like it would offer any advantages for
+electron microscopy, and without very exotic materials, it probably
+doesn’t extend very far into the ultraviolet.
+
+Doing telescopy rather than microscopy with this approach probably
+will not work very well, because diffracting light through small holes
+like that will lose a lot of information about which direction it came
+from.  But in telescopy, the whole point is to determine which
+direction it came from.  A more purely diffractive approach, where the
+incoming light diffracts through a random aperture grille and then
+falls on a focal plane with no intervening lens, might work better.

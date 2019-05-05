@@ -1,0 +1,275 @@
+Tagging parsers
+===============
+
+See also file `minimal-imperative-language`.
+
+I’ve written a [PEG parser generator][0] with inline semantic actions
+in itself; it was 66 lines of code, although it was fairly minimal.  A
+more complete implementation would be a bit longer.  An embedded DSL
+for Python that parses to syntax trees, called [Tack, was 27 lines of
+code][1], but eliminating the extra crap from the syntax tree took
+[another 13 lines][2] on top of the grammar itself.
+
+[0]: https://github.com/kragen/peg-bootstrap
+[1]: http://canonical.org/~kragen/sw/dev3/tack.py
+[2]: http://canonical.org/~kragen/sw/dev3/tacktest.py
+
+Inline semantic actions have the difficulty that they are
+host-language-specific, so if you want to parse the same data format
+in different programming languages, you need to rewrite the grammar
+over and over again.  In today’s polyglot programming environment,
+this is a serious disadvantage for the development of grammar
+libraries over time, as each host language has its own private set of
+grammars.
+
+(And of course embedded DSLs have this problem to an even greater
+degree.)
+
+As an example grammar, consider this numerical expression grammar, in
+a very minimal PEG language:
+
+    sp <- ' ' / '\n' / '\t'.
+    _ <- sp _ / .
+    digit <- '0' / '1' / '2' / '3' / '4' / '5' / '6' / '7' / '8' / '9'.
+    digits <- digit digits / digit.
+    num <- (digits ('.' digits / '.' / ) / '.' digits) _.
+    i <- num / '(' _ a ')' _.
+    e <- i '**' _ i / i.
+    m <- e ('/' / '*') _ m / e.
+    a <- m ('+' / '-') _ a / m.
+
+If we have repetition `*` and nonempty repetition `+` in the language,
+we can simplify it a bit:
+
+    _ <- (' ' / '\n' / '\t')*.
+    digit <- '0' / '1' / '2' / '3' / '4' / '5' / '6' / '7' / '8' / '9'.
+    num <- (digit+ ('.' digit* / ) / '.' digit+) _.
+    i <- num / '(' _ a ')' _.
+    e <- i '**' _ i / i.
+    m <- e (('/' / '*') _ e)*.
+    a <- m (('+' / '-') _ m)*.
+
+This is more or less the example grammar I used for Tack, but the tree
+Tack builds for it includes all the whitespace and is tagged with all
+the nonterminals.  (Additionally, because Tack doesn’t support
+repetition, it associates the wrong way.)
+
+XML
+---
+
+A possible solution that occurred to me was to put XML-like tags into
+your grammar, instead of relying on the nonterminals.  Then the
+parser’s job is merely to associate these tags with points in the
+input text.  For example:
+
+    _: (' ' | '\n' | '\t')*.
+    digit: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'.
+    atom: <num> (digit+ ('.' digit* | ) | '.' digit+) </num> _ | '(' _ a ')' _.
+    e: <exp> <base>atom</base> '**' _ <pow>atom</pow> </exp> | atom.
+    m: <term> e (<op>('/' | '*' | '%')</op> _ e)+ </term> | e.
+    a: <sum> m (<op>('+' | '-')</op> _ m)+ </sum> | m.
+
+We can think of the parser as adding markup to the text.  In fact, we
+can actually implement it that way, if we like.  So, given the text
+`13 + 4 * 5 + 4 ** 3 * 1`, it will convert it to the following, with
+some liberty given to spacing:
+
+    <sum>
+      <num>13</num>
+      <op>+</op>
+      <term><num>4</num> <op>*</op> <num>5</num></term>
+      <op>+</op>
+      <term>
+        <exp><base><num>4</num></base> ** <pow><num>3</num></pow></exp>
+        <op>*</op>
+        <num>1</num>
+      </term>
+    </sum>
+
+This may not be the easiest way to read it, but it makes it super easy
+to apply stylesheets to it, and each span of text is tagged for the
+necessary processing.
+
+If we weren’t trying to look like XML, a terser and perhaps clearer
+syntax would be the following:
+
+    _: (' ' | '\n' | '\t')*.
+    digit: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'.
+    atom: <num digit+ ('.' digit* | ) | '.' digit+> _ | '(' _ a ')' _.
+    e: <exp <base atom> '**' _ <pow atom>> | atom.
+    m: <term e (<op '/' | '*' | '%'> _ e)+> | e.
+    a: <sum m (<op '+' | '-'> _ m)+> | m.
+
+Or maybe with more C-like syntax:
+
+    _: (' ' | '\n' | '\t')*;
+    digit: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+    atom: num { digit+ ('.' digit* | ) | '.' digit+ } _ | '(' _ a ')' _;
+    e: exp { base { atom } '**' _ pow { atom } } | atom;
+    m: term { e (op { '/' | '*' | '%' } _ e)+ } | e;
+    a: sum { m (op { '+' | '-' } _ m)+ } | m;
+
+Or syntax chosen to be less noisy and more compact, using `;` for
+alternation, `{}` for grouping, `foo()` for tagging, and `.` for
+termination:
+
+    _: {' '; '\n'; '\t'}*.
+    digit: '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9'.
+    atom: num(digit+ {'.' digit*; }; '.' digit+) _; '(' _ a ')' _.
+    e: exp(base(atom) '**' _ pow(atom)); atom.
+    m: term(e { op('/'; '*'; '%') _ e }+); e.
+    a: sum(m { op('+'; '-') _ m }+); m.
+
+APIs
+----
+
+At the API level, aside from just generating some kind of
+S-expressions or XML, you could imagine either DOM-style or SAX-style
+interfaces.  SAX-style interfaces offer the possibility of rejecting a
+candidate parse from the host language; for example, when parsing C,
+you need to distinguish between type identifiers and other
+identifiers, which is beyond the powers of PEGs, but straightforward
+if the parser can call out to a host-language symbol table.  But this
+is somewhat more complicated than in real SAX, since it means we need
+to invoke host-language actions for tentative parses that may fail.
+
+JSON
+----
+
+Nowadays, of course, JSON — arbitrarily nested dicts and lists, in
+Python parlance — is a much more popular data model than XML.  What
+would this expression grammar look like if it were to produce a JSON
+structure instead?  Maybe like this:
+
+    _ = (' ' | '\n' | '\t')*.
+    digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'.
+    atom = #(digit+ ('.' digit* | ) | '.' digit+) _ | '(' _ a ')' _.
+    e = { type: `exp` base: atom '**' _ exp: atom } | atom.
+    m = { type: `term` head: e factors: {rator: ('/' | '*' | '%') _ rand: e}+ } | e.
+    a = { type: `sum` head: m terms: {rator: ('+' | '-') _ rand: m}+ } | m.
+
+Here `{}` constructs a finite map (an “object”), `+` or `*` makes a
+list of each of the things it matched if they yielded some value
+(rather than just matching text), `#` converts the matched text into a
+number (perhaps overly specific to this purpose), `` `backquotes` ``
+enclose a literal string to be inserted into the JSON (rather than
+matched against the input), and `foo: bar` assigns the value produced
+by `bar` to the key `foo` in the object at hand.  Every element of the
+grammar parses to some value (usually a string) but in the absence of
+some capturing key, the value is discarded.  So the example `13 + 4 *
+5 + 4 ** 3 * 1` from before becomes the following:
+
+    { "type": "sum"
+    , "head": 13
+    , "terms": [ { "rator": "+"
+                 , "rand": { "type": "term"
+                           , "head": 4
+                           , "factors": [{"rator": "*", "rand": 5}]
+                           }
+                 }
+               , { "rator": "+"
+                 , "rand": { "type": "term"
+                           , "head": {"type": "exp" , "base": 4 , "exp": 3}
+                           , "factors": [{"rator": "*", "rand": 1}]
+                           }
+                 }
+               ]
+    }
+
+OMeta
+-----
+
+[OMeta][3] has the following syntax:
+
+    meta E {
+      dig ::= '0' | ... | '9';
+      num ::= <dig>+;
+      fac ::= <fac> '*' <num>
+            | <fac> '/' <num>
+            | <num>;
+      exp ::= <exp> '+' <fac>
+            | <exp> '-' <fac>
+            | <fac>;
+    }
+
+It also supports ~negation and `kleene*` closure.  Note that it’s
+using left-recursion, which is generally fatal to PEGs, but they found
+a hack to Packrat parsing that allows it to work in cases like this
+one (though they never characterized cleanly which cases it worked
+for).  This allows them to easily get the right associativity in this
+case.
+
+They used inline semantic actions like peg-bootstrap, with
+postposition identifiers:
+
+    exp ::= <exp>:x '+' <fac>:y => `(+ ,x ,y)
+          | <exp>:x '-' <fac>:y => `(- ,x ,y)
+          | <fac>;
+
+They also had inline semantic predicates:
+
+    largeNumber ::= <number>:n ?(> n 100) => n;
+
+And they took advantage of the angle brackets to provide parameters to
+parameterized productions:
+
+    cRange x y ::= <char>:c ?(>= c x) ?(<= c y) => c;
+    ... <cRange 'a' 'z'> ...
+
+and they take advantage of this to hack a tokenizer into some of their
+grammars.
+
+[3]: http://www.vpri.org/pdf/tr2007003_ometa.pdf
+
+Perl6 regexes
+-------------
+
+[Perl 6 regexes][4] permit things like this:
+
+    my regex header { \s* '[' (\w+) ']' \h* \n+ }
+    my regex identifier  { \w+ }
+    my regex kvpair { \s* <key=identifier> '=' <value=identifier> \n+ }
+    my regex section {
+        <header>
+        <kvpair>*
+    }
+
+Here `<header>` is invoking the regex named `header`, and
+`<key=identifier>` invokes the regex named `identifier` and binds its
+results to the variable `key`, which would default to `identifier` if
+it weren't specified (so `<header>` saves the result under the name
+`header`.)
+
+[4]: https://docs.perl6.org/language/regexes
+
+Inside-out quotes and inline definition (nested rather than flat)
+-----------------------------------------------------------------
+
+The above suffers a bit from excessive quoting, especially in lines
+like this:
+
+    digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'.
+
+Wouldn’t it be nicer to be able to write `0|1|2|3|4|5|6|7|8|9` as we
+can in regular expressions?  (In this case, of course, `[0-9]` or `\d`
+might be nicer still.)
+
+We could use a Perl-regexp-like notation in which alphanumeric text
+matches itself by default, without needing quotes, and uses
+non-alphanumeric characters to escape to metacharacter land.
+Furthermore we can embed our nonterminals within an expression.
+(Perhaps this is similar to Perl 6 patterns?)  This requires two
+different ways of tagging segments of the pattern; for example, we
+could use `<>` and `[]`.
+
+    [e <exp <base atom> '**' _ <pow atom>>; atom]
+
+Or we could use capital and small letters.
+
+AST rewriting
+-------------
+
+In addition to the DSL for defining PEGs, it might be useful to have a
+DSL for describing structural rewritings of ASTs in terms of
+pattern-replacement pairs.  It could use a pure tree-rewriting
+paradigm, but still support iterative computation.

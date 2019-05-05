@@ -1,0 +1,147 @@
+There were common non-inverting logic families in the past, an idea
+that always appealed to me in my childhood, since burning power in
+every logic gate seemed wasteful.  (I didn’t understand how much it
+simplified the process of digital design.)  Diode logic and threshold
+logic (McCulloch-Pitts neurons without inhibitory inputs) are two
+rough families, although they are at different levels of abstraction.
+
+Circuits whose combinational logic is non-inverting
+---------------------------------------------------
+
+A typical way to manage this, e.g. in Stan Frankel’s 1956 LGP-30, was
+to do the combinational logic with diode logic, then the registers
+with flip-flops which generated two-rail outputs, i.e. both Q and Q̄.
+A flip-flop at the time was a pair of cross-coupled vacuum tubes and a
+pair of resistors, as I understand it.  (The apparent design rationale
+for the 1958 Сетунь, wanting to use a smaller number of
+flip-flop-flaps rather than a larger number of flip-flops, makes me
+think this kind of thing was universal at the time.)
+
+The LGP-30-style design combines the functions of amplification,
+signal level restoration, inversion, glitch elimination, and memory in
+a single device, the flip-flop.
+
+In case it’s not clear how this works: absent restrictions on fan-outs
+and fan-ins, you can always reduce the combinational logic to this
+form as follows.  Register all the inputs through flip-flops; convert
+the desired logical formula into sum-of-products form (disjunctive
+normal form), i.e. ∨ᵢ∧ⱼXᵢⱼ where each Xᵢⱼ is either 1, an input
+variable Qₖ, or a negated input variable Q̄ₖ; run all the flip-flop
+outputs, both negated and non-negated, down the columns of your
+schematic; convert each ∧ⱼXᵢⱼ into a row that is a many-input AND gate
+taking its inputs from those columns; and finally combine all the rows
+with a many-input OR gate.  You can think of this as a kind of binary
+matrix-multiplication operation, where the bits of the resulting
+vector are the inputs of the final OR gate, which computes the Boolean
+norm† of that vector.
+
+Note that both AND and OR gates are non-inverting, and here you only
+need two levels of them, so this is a feasible design to realize in
+unamplified diode logic.  It may be possible to do better, since in
+many cases the inflation factor of reducing a formula to a sum of
+products is large, but it guarantees that it is always possible.
+
+This kind of thing seems appealing to me somehow even in the world of
+MOSFETs: an N-channel enhancement-mode‡ MOSFET with a weak pulldown
+resistor can be thought of as an AND gate where a low-impedance
+connection to Vdd counts as “1”, no such low-impedance connection
+counts as “0”, and no low-impedance paths to Vss exist.  With these
+conventions, an OR is just a wired connection, and the circuit depth
+problems imposed by diode voltage drops go away.  Presumably people
+have thought of this, but this approach isn’t widely used, maybe
+because the pulldowns are slow to discharge the gates unless they’re
+burning a lot of power normally.  (I thought this might be what is
+called “pass transistor logic”, but that turns out to be a different
+but related approach.)
+
+Circuits whose combinational and also sequential logic is non-inverting
+-----------------------------------------------------------------------
+
+It wasn’t until I was rereading Merkle’s 1990 buckling-spring paper
+“Two types of mechanical reversible logic” today that I understood
+that the sum-of-products thing generalizes to cases where your memory
+elements don’t do inversion.  He makes a casual aside about how
+Landauer in previous work had assumed dual-rail logic, where each
+value computed is accompanied by its complement, so negation is
+obtained simply by switching the two.
+
+The Landauer reference is found in his “Dissipation and noise immunity
+in computation and communication”, on p.781 of Nature, Vol. 335:
+
+> In these schemes we use majority logic to do computation.  There is
+> an odd number of inputs (typically three) to a given [potential
+> energy] well.  The well under consideration then gets set according
+> to the majority vote of the stages exerting an influence on it.  If,
+> for example, we have one input set at zero, with the other two
+> inputs being variable, we get a ‘1’ output [iff] both of the
+> variable inputs are ‘1’.  In this scheme we cannot perform a
+> negation directly.  Therefore, we need dual rail logic, in which we
+> carry along a variable and its complement, and perform negation by
+> interchanging the two.
+
+This is a brilliant revelation to me: it means that you don’t need
+negation *inside* the system *at all*, even in memory; you only need
+to generate the complements of signals *on input* to the system.  That
+is, the feature of flip-flops that they automatically generate
+complements on every registered bit is completely dispensable, at the
+cost of twice as much logic, more or less.
+
+This is achieved through simple De Morgan conversion: to compute
+~(XY), you compute ~X | ~Y, and to compute ~(X | Y), you merely
+compute ~X & ~Y, where the operators are as in C.
+
+Consider a basic inverting function which is necessary for binary
+addition, XOR: X⊕Y ≡ XȲ + X̄Y.  In this dual-rail scheme, you can
+compute it in just that way, and then, if necessary, its complement,
+XNOR, as (X̄ + Y)(X + Ȳ).  This requires six AND and OR gates, but
+calculating it with NAND requires four gates, and calculating the
+complement requires five (with, e.g., ((B|B)|(A|A))|(B|A), where `|`
+is now the Sheffer stroke denoting NAND rather than the C bitwise OR.)
+
+In a dual-rail system with absolutely no inversion inside the
+system — only inversion at inputs — you may need more register bits
+than you would need in a system in which only the combinational logic
+is noninverting, since you (often) have to register both a bit and its
+complement, while a conventional flip-flop will generate one from the
+other.
+
+Further extensions
+------------------
+
+The dual-rail system can be thought of as a one-hot encoding with two
+possible values.  It is straightforward to mix dual-rail signals with
+one-hot signals of other multiplicities, including the Сетунь’s three
+but also four and even five and higher, as in the biquinary encoding
+used in the IBM 650 Knuth learned to program on; this may afford
+economies of logic under many circumstances, as the aforementioned
+Boolean matrix becomes much sparser.
+
+For e
+
+Note that Landauer’s suggested family of approaches performs level
+restoration at every gate, rather than leaving that up to the
+flip-flops, and thus doesn’t suffer the severe limitations on
+combinational circuit depth that diode logic did.  Circuit depth is
+still a crucial factor for clock speeds, though.  (And the escape from
+this, asynchronous logic, coincidentally also typically depends on
+dual-rail logic...)
+
+* * *
+
+† I say “the Boolean norm of that vector” because I think that N-way
+bitwise OR is the only non-constant function that satisfies the
+definition of a norm ((g ≠ 0 ⇒ ν(g) > 0) ∧ ν(g + h) ≤ ν(g) + ν(h) ∧ (g
+∈ ℤ ⇒ ν(mg) = |m|ν(g))) , under the usual interpretations: AND for
+multiplication, OR for addition, 0 for false, 1 for true, and 0 < 1.
+
+‡ You could use a P-channel enhancement-mode MOSFET as an AND-NOT
+(abjunction or negated implication) gate, which provides a limited
+form of negation: it will only let through a low-impedance connection
+to the positive power rail if the gate is pulled low, meaning that the
+gate has no such connection.  Abjunction is as universal as NAND if
+you have access to a constant 1, but it’s falsehood-preserving: any
+circuit made of abjunction gates will have output 0 if all its inputs
+are 0.  Worse (for use as a NAND-like universal gate, anyway, though
+not in this context) is the fact that you can’t build an OR gate out
+of abjunctions without access to that constant 1, even though the OR
+gate is also falsehood-preserving.

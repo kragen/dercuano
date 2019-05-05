@@ -1,0 +1,143 @@
+These were some notes on a numerical method that at first I was
+excited about, but which didn’t pan out; it was a way to compute
+trajectories of systems of ordinary differential equations with high
+accuracy, but it turns out not to apply to any interesting systems (at
+least, none that I can find so far).  It can’t possibly work for
+anything that isn’t linear and time-invariant (when augmented with
+some set of auxiliary state variables), which I think means it is
+limited to systems whose solutions are sums of complex exponentials.
+
+Basics
+------
+
+The Euler method for approximating solutions of differential equations
+is just a matter of
+
+    x[0] = a
+    for i in range(1, n):
+        dxdt = f(x[i-1], t)        # calculate derivative at previous point
+        x[i] = x[i-1] + h * dxdt   # extrapolate according to derivative
+        t += h
+
+which of course has some error if the derivative isn’t constant, an
+error proportional to h² and d²x/dt² — according to the professor
+lecturing yesterday, precisely ½h²d²x/dt² at some point within the
+(open) extrapolated-over interval, although this obviously depends on
+at least the second derivative in question being continuous.
+
+The second-order Taylor method attempts to correct for this by adding
+in ½h²d²x/dt² computed at the beginning of the interval, on the theory
+that the second derivative changes slowly enough through the interval
+that calculating it at the beginning is probably good enough.  And of
+course you can use third-order or higher-order Taylor methods,
+although you start to risk oscillations.
+
+The Euler method, which is the first-order Taylor method, has an error
+proportional to the interval size h²; the nth-order Taylor method has
+error proportional to hⁿ⁺¹.  Since this error accumulates over many
+intervals, at a given distance from the initial conditions (as opposed
+to a given number of timesteps) it’s actually proportional to hⁿ, at
+least.  This still means that if you want to simulate accurately, you
+need some absurdly tiny interval size.
+
+A variant of Euler’s method that I had some success with for the
+special case of computing sin and cos was to represent the transition
+function for a timestep as a matrix.  It happens that d/dt[sin t] =
+cos t and d/dt[cos t] = -sin t, so that if we have a vector-valued x⃗
+containing a purported (cos, sin) pair, Euler’s method would amount to
+multiplying it by a matrix M(h):
+
+    ⎡ 1  -h ⎤
+    ⎣ h   1 ⎦
+
+A problem is already evident in that this matrix’s determinant is
+1+h², but if h is smallish, that can be a very small error.  But if h
+is smallish, you have to do the multiplication a largish number of
+times.
+
+However, since it’s a matrix, you can compute a power of it
+efficiently.  For example, by squaring it 16 times, you can compute
+M(h)⁶⁵⁵³⁶, or by squaring it 32 times, you can compute M(h)⁴²⁹⁴⁹⁶⁷²⁹⁶.
+This approach allows you to start with an exponentially small
+incremental angle and thus compute with an exponentially small error
+proportional to that angle.  This is sort of similar to using an
+order-4294967296 Taylor method, but I’m not sure if it’s actually
+equivalent.
+
+It occurred to me that you could take this approach with the Euler
+method in general: augment your system’s state vectors with extra
+state variables that are the Nth derivatives of the original state
+variables (with respect to time), and then use the Euler method in
+this matrix form in order to get absurdly tiny timesteps.
+
+In some cases, you’ll run out of (nonzero) derivatives pretty quickly,
+or you’ll be able to write the new derivatives in terms of the known
+ones, and you’ll get the same exponential-order characteristic as with
+sin and cos.  In other cases, you’ll need to stop taking derivatives
+at some point in order for the transition matrix you’re exponentiating
+to fit into your L1D cache.  (Or, since the transition matrix is O(N²)
+in the number of elements and will be dense after a few iterations,
+you might run into a problem of diminishing returns.)
+
+It also isn’t going to be efficient for systems that intrinsically
+have a lot of degrees of freedom, even if their derivatives are
+simple.  For example, if you have a 100×100 grid of values, your state
+vector has 10,000 variables in it before you start augmenting it with
+derivatives, which means that your transition matrix is 10,000×10,000,
+containing 100 million elements; though maybe its initial state is
+pretty sparse, it gets dense pretty quickly.
+
+In some cases, you’ll have derivatives that are polynomials made of
+multiple terms.  It may be advantageous to add each term, without its
+coefficient, as a separate variable, as an auxiliary variable, rather
+than adding the derivative as a whole.  For example, if y'(t) = 2y(t)
+- 5 sin(t), then rather than adding a 2y(t) - 5 sin(t) row (and
+column) to the matrix, you can just add a sin(t) row, sticking +2 and
+-5 in the appropriate matrix cells.  (Then you'll need to add a cos(t)
+row in the next step, and then you’re done, because cos(t)’s
+derivative is -sin(t).)  For this purpose you might want to multiply
+out more complicated derivatives into polynomials or ratios of terms.
+
+In the sin/cos case and in the 2y(t) - 5 sin(t) example, the
+transition matrix was constant, so neither it nor its exponent needed
+to be recomputed.  For more general systems, that may not be the case.
+
+Somewhat annoying example: y' = cos t²
+--------------------------------------
+
+Suppose dy(t)/dt = cos(t²), i.e., y = ∫ cos(t²) dt.  After five more
+differentiation operations, we have seven functions from which we can
+construct one another’s derivatives, and this allows us to construct a
+7×7 matrix for taking an arbitrarily small step of Euler’s method:
+
+    y'    = cos t²
+    y''   = 2t cos t²
+    y'''  = 2 cos t² - 4t² sin t²
+    f     = t² sin t²
+    f'    = 2t sin t² + WTF
+
+Further investigation shows that my 7×7 matrix was bogus and this
+method does not actually work for the cases I was interested in.  It
+does work for some cases that already have closed-form solutions.
+
+Substantially more annoying example: y' = cos y²
+------------------------------------------------
+
+Very annoying example: y' = cos (1/y²)
+--------------------------------------
+
+Relation to other methods of numerical integration of ODEs
+----------------------------------------------------------
+
+I think this is not the same as the extension of the Euler method to
+higher-order differential equations, although it has in common with it
+the idea of augmenting the original variables with some derivatives;
+it is not the same as Taylor methods (though it shares with them the
+idea of correcting the first derivative using higher derivatives) and
+it has nothing in common with the Runge-Kutta method.  It is not a
+multistep linear method; the transformation matrix (including any
+power of it) implements a transition from a *single* previous state to
+a *single* new state.
+
+This is very similar to exponential integrators, but I think it is not
+the same thing.

@@ -1,0 +1,167 @@
+Microlens arrays for 4D lightfield displays are now being shown
+publicly — more or less, a brute-force realization of “holographic
+displays”.  Essentially, this is garden-variety lenticular 3D, but
+with a computer screen rather than a printed image behind the lenses.
+But this places new demands on the underlying screen resolution.  To
+reliably get human binocular vision at a distance of one meter, I
+think you need new images every 50 milliradians, half the distance
+between human eyes.  With two dimensions of parallax and a radian or
+so of viewing angle, this works out to a few hundred images, let’s say
+256.  For a 512×384 image, which I think is what the original
+Macintosh had, that means you need 50 megapixels.
+
+(As a point of comparison, Thomas Burnett’s FOVI3D display displays a
+180×180 image with 50×50 viewing angles across 90° (10π milliradians),
+for a total of 81 megapixels, using 20 4K OLEDs tiled without very
+good brightness correction; another model uses 108 megapixels.  He’s
+doping all the pixels to yellow-green to get spatial resolution and
+brightness at the expense of color.)
+
+It’s challenging to fabricate so many pixels.  One possible solution
+is to temporally multiplex a smaller number of pixels, scanning each
+pixel over a significant area with a vibrating or rotating mirror.
+DLP and inorganic LED pixels are capable of response times
+sufficiently fast to make this a viable option; LCD, CRT, and plasma
+pixels are not.  DLP pixels are too close together, though, which
+leaves inorganic LED pixels as the only option.  I’m going to consider
+only monochrome displays for now.
+
+Doing this kind of thing with a vibrating or rotating mirror requires
+some kind of scanning pattern that scans the (image of the) physical
+pixel over all the spatial locations it’s responsible for
+illuminating; the traditional approach from analog TV is a pair of
+sawtooth signals, a slow one (≈60Hz) for Y and a fast one (≈15kHz,
+with important harmonics up to, say, 105kHz) for X.  Other scan
+patterns, such as Lissajous, are possible but do not remove the
+necessity for a rather high scanning speed in one dimension.
+
+Vibrating or spinning a mirror at low speed is much easier than
+vibrating a mirror at high speed, especially if the mirror is large.
+Consider a small area of 393 216 spatial locations — this could be 512
+lines of 768 spatial locations, 768 lines of 512 spatial locations,
+128 lines of 3072 spatial locations, 48 lines of 8192 spatial
+locations, and so on.  In the last case, supposing the Y dimension is
+scanned at 60 Hz, the X dimension will need to be scanned at 2880 Hz,
+which is considerably less demanding than 15kHz.  At some cost in
+effective resolution and complexity of brightness control, you can use
+a sinusoidal scan for the X, avoiding the need for responsivity at
+higher harmonics such as 8640 Hz.  Alternatively, you could use a
+spinning mirror such as those used in supermarket scanners and laser
+printers; a hexagonal mirror would give you a 2880 Hz scan at 480Hz or
+28’800 rpm, which is challenging but feasible.
+
+That is for a single LED; you need to position it at least 48 LED
+heights above the next LED below.
+
+Ideally you’d like to be able to change all 50 megapixels for each
+frame, but even without that ability, you can make the display work
+for less-frequently-updated images.  For example, you could assign a
+microcontroller to each 8192×48 area (512×3 macropixels), which it
+would have to refresh at least 60 times a second: 23’592’960 pixel
+outputs per second.  This is within the capability of STM32F
+microcontrollers, which cost 59¢.  Moreover, they can control 16 lines
+at a time at this speed, so a single microcontroller (and perhaps
+three associated 40¢ ULN2003 seven-Darlington low-side switching
+chips) can control a 8192×768 area (512×48 macropixels).  Eight such
+microcontrollers would suffice for the whole 6144×8192 display
+(512×384 macropixels), with a total BOM cost of US$14.32 for the
+silicon, not counting the 128 tiny LEDs and 128 resistors, and
+actually wasting a bunch of the Darlingtons.
+
+However, an STM32F0 microcontroller typically only has 4K of RAM.
+Rather than economizing so much on microcontrollers, it might make
+more sense to economize on mirror X scanning.  For example, if we use
+64 microcontrollers instead of 8, with 16 LEDs per microcontroller, we
+can control 1024 LEDs via 147 ULN2003s, and each LED only needs to
+cover an 8192×6 area rather than 8192×48, so the X scan on the mirror
+can slow from 2880 Hz (28’800 rpm with a hexagonal mirror) to 360 Hz
+(3600 rpm), which is much easier to achieve.  Moreover, the signal to
+each LED need only change at 2’949’120 Hz rather than 24 MHz — this
+still poses signal integrity challenges but is dramatically simpler.
+You need 147 ULN2003s and 64 STMF0s, for a silicon BOM cost of $96.56.
+
+(I should check the ULN2003 datasheet to see if it can handle a 3MHz
+or 24MHz signal.)
+
+Note that this still only leaves you with 256K of RAM to hold the data
+to display on a 6144×8192 display, i.e. 192 pixels per byte.  I think
+there are some items in the STM32 line with more RAM, up to 2
+megabytes per chip.  DRAM would likely be fast enough.  Also, external
+RAM chips with their data lines connected to the driver inputs might
+work, as long as the drivers have a disable input.  But it might be
+adequate to generate a single 8-kilobit scan line (1 kilobyte) on each
+scan, starting with some kind of heightfield model or something that
+you could reasonably rasterize a line of in 48MHz/360Hz = 133’333
+32-bit CPU cycles.
+
+By using the double-parabolic mirror trick used for the famous
+floating coin illusion, you can cause the microlens-array-generated
+lightfield image to appear to float in midair instead.
+
+If we wanted to reduce this approach to an absolute minimum demoable
+product, maybe we could start with something the size of an 80×25
+terminal with a narrow viewing angle.  Let’s say 80×5 = 160
+macropixels horizontally and 25×8 = 200 macropixels vertically.  And
+let’s say we are willing to accept fewer viewing angles: 8
+horizontally and 4 vertically, for example.  And let’s lower the
+refresh rate to a cinema-flickery 24Hz.  And let’s use a mirror that
+only scans in one dimension, horizontally.  Now we need 800 fricking
+LEDs, but we can probably multiplex them a bit, because the whole
+matrix is only 1280×800, so we only need 61'440'000 pixels out per
+second, or 3'840'000 16-bit updates per second.  If you run 32 of the
+LEDs at any given time using 5 ULN2003s, you can use 25 high-side
+switches (what are these called?) in, say, 4 chips.  To get these 57
+GPIOs you might need, say, four microcontrollers, with very lax
+constraints on their output timing.  This works out to 13 chips that
+collectively cost US$6.  The 800 fricking LEDs may cost more than
+that, but probably not more than US$16.
+
+The optics may be somewhat more of a problem.  You only need 24Hz
+scanning (240 rpm) and possibly some kind of magnification in order to
+be able to use a manageably small scan mirror.
+
+You might really want RGB LEDs and multiple brightness levels, which,
+at these speeds, are probably best achieved by linearly controlling
+current sources rather than PWM.  These are probably achievable but
+may be difficult.
+
+To investigate
+--------------
+
+- ULN2003 speed: Is 3MHz OK?  24MHz?  The ULN2803A datasheet (the one
+  with 8 Darlingtons instead of 7) says 130 ns propagation delay low
+  to high, 20 ns high to low, which suggests it ought to be able to
+  make it up to about 6MHz, but the ULN2003A gives a max of 1 μs for
+  each of these, suggesting a limit of 500kHz, despite a typical
+  propagation delay of 250 ns (thus 2MHz).
+- Does the ULN2003 have chip enable?  No.
+- What’s the high-side equivalent of the ULN2003?  There used to be a
+  UDN2891 but it’s obsolete.  As a sort of replacement, TI has come
+  out with the US$1.81 TLC59123 and TLC59123A 8-input 500mA 13.2V
+  latching synchronous high-side drivers, which claims it can only be
+  clocked up to 1 MHz.  It doesn’t have a chip enable either.  It also
+  has 100–200 ns propagation delays, and requires clock pulses of at
+  least 100ns, so you would think it ought to be able to do several
+  MHz.  There are other alternatives, like the US$2.52 Allegro A2982
+  (8 parallel 50V 500mA high-side drivers, but up to 10μs turnoff
+  delay).
+- Is PSRAM fast enough for framebuffers?  The US$3.20 ISSI
+  IS55WV51216EBLL-55TLI 8-megabit 16-bit-parallel 44-pin TSSOP PSRAM
+  claims 55 nanoseconds, which is plenty fast enough, though the
+  datasheet only claims 60ns; the US$2.10 ISSI IS62C1024AL-35QLI-TR is
+  a 128K × 8 (1-megabit) real SRAM 32-SOP that claims 35ns.
+- original Macintosh screen size: 512×384?  No, 512×342.
+- How much do SMD LEDs cost?  How small do they come?  4.0¢ in metric
+  1608 packages (archaic 0603) in quantity 1000.  These are the Rohm
+  SML-D12x1 series, which come in five colors: V and U reds (630 and
+  620 nm), D orange (605 nm), Y yellow (590 nm), and M yellowish green
+  (572 nm).  They can withstand 100mA peak current (at 10% duty cycle
+  1kHz), 20mA continuous current, and 54mW power dissipation, with
+  respectively 40, 63, 100, 100, and 30 millicandelas at 20mA.  They
+  drop 1.7–2.2 V.  The Lite-On LTST-C191KGKT, another archaic 0603,
+  costs 6.0¢; these can handle 30mA continuous, 80mA peak, and 75mW
+  dissipation, and claim a max of 71 mcd at 20 mA instead of 30.
+  These are binned by brightness and color.  (But the min is only 18.)
+  These LEDs (both types) turn off after dropping by about 200 mV;
+  neither specifies a junction capacitance or response time in its
+  datasheet.

@@ -1,0 +1,176 @@
+Suppose I want a cylinder with a given mass and aspect ratio made out
+of a material with a given density.  For example, an aspect ratio of
+10:1, made of quartz with a density of 2.65 g/cc, and weighing 1kg.
+
+It’s easy to write down and verify the equations that govern this
+system:
+
+    diameter = 2 · radius
+    area = π · radius²
+    volume = area · length
+    mass = volume · density
+    aspect_ratio = length / diameter
+
+    mass = 1 kg
+    aspect_ratio = 10/1
+    density = 2.65 g/cc
+
+And it’s not that hard to solve algebraically:
+
+    length / diameter = 10
+    length = 10 · diameter = 20 · radius
+    volume = π · radius² · 20 · radius = 20 · π · radius³
+    volume = mass / density = 1 kg / (2.65 g/cc) ≈ 377 cm³
+    377 cm³ ≈ 20 · π · radius³
+    6.00 cm³ ≈ radius³
+    1.82 cm ≈ radius [excluding the two complex solutions]
+    diameter ≈ 3.64 cm
+    area ≈ 10.4 cm²
+    length ≈ 36.4 cm
+
+Except I got it wrong the first time I did it, coming up with a mass
+of 552 grams instead of 1000, because I calculated π 1.82 cm² instead
+of π (1.82 cm)², spending about 10 minutes on the problem.  Then when
+I tried to apply it to some other cases in a spreadsheet, I
+accidentally used 20 instead of 2 · aspect_ratio, getting nonsensical
+answers.
+
+The standard approach to reducing the hassle of problems like this is
+to solve the equations algebraically to get a procedure to compute
+radius, diameter, cross-sectional area, and length given mass, aspect
+ratio, and density, or perhaps just volume and aspect ratio:
+
+    radius = ∛(volume / 2 π aspect_ratio)
+    diameter = 2 · radius
+    length = 20 · radius
+
+Then you can package this procedure up as a subroutine and use it many
+times, instead of doing the algebraic manipulation each time.
+
+But it would be nicer to be able to simply specify the relations — or
+even refer to them from somewhere — and have the computer find a
+solution.
+
+Spreadsheets offer a simple form of this as “Goal seek”.  In Gnumeric
+and other similar spreadsheets, you can enter the problem this way,
+for example:
+
+           A              B
+   1    Radius        5
+   2    Area          =pi()*B1^2
+   3    Diameter      =2*B1
+   4    Aspect ratio  10
+   5    Length        =B4*B3
+   6    Volume        =B5*B2
+   7    Density       2.65
+   8    Mass          =B7*B6
+
+And then you can tell “Goal seek” to set B8 to 1000 by changing B1.
+However, this isn’t composable (you can’t use a “goal seek” as a
+formula in a cell), must be manually recomputed (or recomputed by a
+macro) when the inputs change, and can’t be applied across a range
+(for example, if you have several different aspect ratios to solve
+for).  So it’s a step in the right direction, but it’s awkward to use.
+Mac Excel has a somewhat more powerful constrained minimization solver
+called “Solver”.
+
+“Goal seek” and “Solver” and similar metaheuristic solvers can often
+find solutions to problems that have no closed-form algebraic
+solution.
+
+There is a tradition of numerical constraint programming going back to
+the 1970s for creating graphics in systems like METAFONT, IDEAL, and
+Linogram, typically limited to cases that could be efficiently solved
+without recourse to possibly nonterminating algorithms.  For
+interactive use, though, such restrictions seem like overkill — and,
+in many cases, modern solvers can make short work of problems that
+have no closed-form solution.
+
+That is to say, maybe constraint logic programming over infinite
+domains would be a handy tool to have for calculations like this.
+
+You could also imagine composing my example model above from existing
+submodels.  For example:
+
+    circle:
+        diameter = 2 · radius
+        area = π · radius²
+
+    prism:
+        volume = area · length
+
+    oblong:
+        aspect_ratio = length / diameter
+
+    cylinder:
+        circle
+        prism
+        oblong
+
+    uniform_solid:
+        mass = volume · density
+
+    cylinder
+    uniform_solid
+    mass = 1 kg
+    aspect_ratio = 10/1
+    density = 2.65 g/cc
+
+In this case everything is just all glommed into a single namespace,
+like with inheritance, but you could imagine composing it slightly
+differently with some hierarchy.  For example, maybe this is a better
+model of a cylinder:
+
+    cylinder:
+        circle c
+        diameter = c.diameter
+        prism p
+        cross_sectional_area = p.area = c.area
+        length = p.length
+        oblong
+        
+Here we are namespacing the circle and prism attributes to
+subnamespaces, then explicitly exporting `p.length` and `c.diameter`
+to where `oblong` can find them implicitly.
+
+We could imagine a froodier set of models with further properties like
+this:
+
+    circle:
+        diameter = 2 · radius
+        area = π · radius²
+        perimeter = π · diameter
+
+    prism:
+        volume = end.area · length
+        surface_area = 2 · end.area + length · end.perimeter
+
+    cylinder:
+        circle c
+        prism p
+        p.end = c
+        oblong
+
+Here, `prism` takes an `end` argument, which has to be something with
+an `area` and a `perimeter`, such as `circle`.
+
+This shows how to include properties with values more complex than
+simply a number, thus enabling hierarchical decomposition of the
+problem (although, lacking conditional recursion, you can compile the
+hierarchical structure thus generated into a set of atomic variables
+with constraints between them).  You could imagine including
+properties whose values are displayed as, for example, images,
+sparklines, or 3-D meshes.
+
+I’ve written the above values with units, because that helps me a lot
+with interpreting things during debugging and in being assured that
+the result is in fact correct.
+
+In terms of type systems, as I said, you could say that `prism` needs
+an `end` argument with both `area` and `perimeter`; but actually if
+you were to give `prism` a `length` and an `end` argument with just
+`area`, it could still compute the `volume`.  And you could imagine
+that if you gave it a `surface_area`, `volume`, `length`, and
+`end.area`, it could compute `end.perimeter`.  I’m not sure exactly
+how to formalize this, but it seems like it could be useful to carry
+such deductions out as far as possible.

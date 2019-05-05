@@ -1,0 +1,191 @@
+The standard interval-arithmetic approximation is wonderful for
+ensuring correctness, but it doesn’t work very well in regions where
+the derivative is high.  Functions can be perfectly regular in the
+analytic sense and still have an arbitrarily large derivative.  As a
+result, if you are computing a function over an interval and you chop
+the interval in half repeatedly, you may end up merely chopping the
+function’s result in half repeatedly.  (Or not even that, if it has a
+singularity.)
+
+Can we do better?
+
+As an alternative,
+you might think
+we could conservatively approximate the function’s
+value over that interval x ∈ [a, b) with a triple (m, d, e) such that
+x ∈ [a, b) ⇒ f(x) ∈ [mx + d, mx + e).  Just as with simple intervals,
+there are many possible such triples that could be used; it may not be
+immediately clear which is the best choice, but I think it’s the one
+with the smallest e - d value.  (For a function given as an
+enumeration of points, there is a usually efficient algorithm
+beginning with its convex hull.)
+
+The identity function on any interval is represented by (1, 0, 0); the
+constant k, similarly, is (0, k, k).
+
+Addition and subtraction of such values is fairly easy and reminiscent
+of that with intervals.  Multiplication may or may not have a local
+maximum which must be taken into account; division, as with interval
+arithmetic, may or may not have a singularity, as well as perhaps
+local maxima.
+
+For a regular function, intuitively I expect that, when I divide a
+small enough interval in half, its derivative should vary by half as
+much over the interval, because on a small enough interval, its third
+and higher derivatives create too little change to matter, so it looks
+like a parabola.
+
+I intuitively guess that the best approximation of a parabolic segment
+(in the e - d sense) is tangent to the parabola at the midpoint of the
+interval.  Adding a linear function doesn’t affect the e - d error, so
+for analysis we can add a linear function that brings both endpoints
+of the interval to the X-axis, with the midpoint horizontal.  Now if
+we divide this into two sub-parabolas and do the same with them, their
+second derivative is the same as the original, but with only half as
+far to affect the parabola from the horizontal midpoint to the
+endpoint, it can reach only a fourth as high.
+
+Therefore, I intuitively expect this approach to quadruple its
+accuracy when you chop an interval in half, so it will need half as
+many evaluations to reach the same accuracy of some arbitrary regular
+function as the simple interval-arithmetic method.  As a bonus, it
+provides an approximation of the first derivative over that same
+interval, but it is not a conservative approximation.
+
+I intuitively expect this accuracy improvement to be crucially
+important for a composition of functions, since it means that the
+output of your approximation is in some sense more precise than its
+input — so you might not suffer progressive degradation as you get
+further from the input.
+
+If you extended this approach to use a higher-order approximation than
+linear, you could perhaps tighten the bounds further; but this isn’t
+necessary in order to get the precision-improvement property mentioned
+above.
+
+When extended to multiple independent variables, this linear
+approximation approach requires linear extra work per independent
+variable; instead of a single variable m, you have a vector of
+coefficients [m₀, m₁, ...mₙ], and the dot product of this vector with
+the vector of independent variables [x₀, x₁, ...xₙ] gives you the
+approximation correction.  Higher-order approximations would
+necessarily involve sets of coefficients at least quadratic in the
+number of independent variables.
+
+Bisection methods potentially take time exponential in n in an
+n-dimensional space.
+
+Arithmetic operations
+---------------------
+
+As I said before, the identity function i(x) = x is represented as
+I = (1, 0, 0), and the constant function kₙ(x) = n is represented as
+Kₙ = (0, n, n).  But where do we go from there?
+
+Given
+
+- x ∈ [a, b) ⇒ j(x) ∈ [mⱼx + dⱼ, mⱼx + eⱼ)  (J(a, b) = (mⱼ, dⱼ, eⱼ))
+- x ∈ [a, b) ⇒ k(x) ∈ [mₖx + dₖ, mₖx + eₖ)  (K(a, b) = (mₖ, dₖ, eₖ))
+
+Then what can we say about pointwise operations on these functions?
+
+Addition is fairly simple.  Clearly j(x) + k(x) ∈ [(mⱼ + mₖ)x + dⱼ +
+dₖ, (mⱼ + mₖ)x + eⱼ + eₖ), so (J + K)(a, b) = (mⱼ + mₖ, dⱼ + dₖ, eⱼ +
+eₖ).
+
+Subtraction is only slightly trickier; j(x) - k(x) ∈ [(mⱼ - mₖ)x +
+dⱼ - eₖ, (mⱼ - mₖ)x + eⱼ - dₖ), so (J - K)(a, b) = (mⱼ - mₖ, dⱼ - eₖ,
+eⱼ - dₖ).
+
+Multiplication starts to get hairy.
+
+The product j(x)k(x) is guaranteed to be in the interval
+
+    [min((mⱼx + dⱼ)(mₖx + dₖ),
+         (mⱼx + dⱼ)(mₖx + eₖ),
+         (mⱼx + eⱼ)(mₖx + dₖ),
+         (mⱼx + eⱼ)(mₖx + eₖ)), min((mⱼx + dⱼ)(mₖx + dₖ),
+                                    (mⱼx + dⱼ)(mₖx + eₖ),
+                                    (mⱼx + eⱼ)(mₖx + dₖ),
+                                    (mⱼx + eⱼ)(mₖx + eₖ)))
+
+However, which of the four alternatives is the minimum and which is
+the maximum might vary according to x.  The first one expands out to
+mⱼmₖx² + (mⱼdₖ + mₖdⱼ)x + dⱼdₖ, which can clearly change sign twice
+over some interval and possibly have a local maximum in the middle.
+
+The quadratic term is the same across all four alternatives, but the
+linear term varies, and the combination of those two means that the
+location of the parabola’s extremum can vary between the four; each of
+the four might be the minimum at some point in the interval!
+
+In most cases, both j(x) and k(x) will have known sign on the
+interval — they are known to be either positive everywhere in [a, b)
+or negative everywhere in [a, b).  If *either* of them meets this
+criterion, the solution is simple; if j(x) is known to be positive
+(i.e. mⱼa + eⱼ > 0 and mⱼa + dⱼ > 0), then XXX
+
+Hmm, the answer to this isn’t clear to me right now.
+
+****
+
+Coming back later to rethink this:
+
+So the idea is that you represent a value yᵢ computed for some
+interval {x₀ ∈ [p₀, q0), x₁ ∈ [p₁, q₁), ... xₙ ∈ [pₙ, qₙ)} as some
+function Σᵢxᵢmᵢ + [d, e) associated with that interval, where “[b, c)”
+means “some unknown number e such that b ≤ e < c”; the representation
+of that value then is
+
+    (d, e, [(m₀, p₀, q₀), (m₁, p₁, q₁), … (mₙ, pₙ, qₙ)])
+
+Then, when values are valid over the same interval, we can do
+relatively straightforward things for arithmetic operations, although
+I haven’t worked out the details in cases of indeterminate signs for
+multiplication and division.  When they are valid over different
+intervals, we can intersect their ranges and apply a subdivision
+operation.
+
+In effect here what we are computing with are piecewise-linear
+approximations of functions with error bounds per piece, rather than
+individual intervals.
+
+To take a concrete example, in raytracing, we have x₀ and x₁, the
+pixel coordinates, and we want to compute colors (r, g, and b) as
+functions of those two values.  An approximate solution here is
+perfectly fine as long as the approximation isn’t too wildly wrong.
+(And in fact common rendering algorithms are wildly wrong for some
+pixels, the ones that are close to object boundaries.)  So we can
+start with a conservative approximation for, for example,
+x₀ ∈ [0, 1024) ∧ x₁ ∈ [0, 768) — we can calculate the ray directions
+as intervals, calculate which objects could possibly be intersected by
+those rays, and calculate what range of colors and illumination those
+objects could potentially result in, eventually coming up with some
+kind of conservative approximation for the color gradient of the whole
+scene.
+
+Once we have this conservative approximation for the scene as a whole,
+we can compare its error bounds to the error bounds we want to accept
+for our colors.  If it’s too large, we break up the interval into
+subintervals and redo the computation for each subinterval.  In the
+past, doing things like this, I found that dividing into three
+subintervals was better than dividing into two.  Unfortunately the
+representation gives us no clue as to which dimension is most
+promising to subdivide.  In this case that is quadratically bad in
+some cases, but with many dimensions it is exponentially bad.
+
+While you’re doing the calculation, though, you have some idea how
+much of the error comes from each independent variable.  If you could
+somehow include that information, with something like forward-mode
+automatic differentiation, you would have a much better chance of
+choosing good subdivision dimensions to reduce the error.
+
+However, if you have both many independent variables and many
+dependent variables, this will be quadratically large.  One possible
+solution to this problem is to redefine the indices of the dependent
+variables as separate independent variables, as in the raytracing
+example in which ultimately there are only three dependent variables,
+r, g, and b.  This, I think, makes the *reverse-mode* automatic
+differentiation problem computationally tractable, which should help
+some with the problem of picking which dimension to subdivide.
+

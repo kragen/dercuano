@@ -1,0 +1,135 @@
+There are a couple of algorithms for computing a linear-time sliding
+RMQ (“range minimum query”): [the ascending minima algorithm][0] and
+the van Herk/Gil–Werman algorithm.  The ascending-minima algorithm is
+interesting in that all of its comparisons of data (as opposed to
+indices) are comparisons against the most recent datum: you run all
+your input data through a deque, which you maintain in ascending order
+by popping items off its back when they slide out of the window and
+off its front when they are higher than the new datum.
+
+[0]: http://richardhartersworld.com/cri/2001/slidingmin.html
+
+This occurs to me as an interesting way to compute a “top event of the
+month” kind of list: add new events as they come in, removing any
+older events that are less significant and any events that, though
+more significant, are older than a month.  At the end of the month,
+you simply write down the oldest event in the list, which is more
+significant than anything that came before it and at least as
+significant as anything that followed.  This could work for personal
+achievements as well as news events; it has the characteristic that
+one of the events you’re comparing is always the current event, which
+you presumably have uppermost in your consciousness.  Unfortunately,
+both news events and personal achievements share the characteristic
+that it’s often hard to determine their significance until after the
+fact.
+
+There are some interesting tweaks to be made on the ascending-minima
+algorithm.
+
+If you aren’t space-limited, you could put the items on a stack rather
+than a deque; rather than shifting items off the left end of a deque,
+you can just increment an “oldest” pointer up the stack.  The ultimate
+contents of the stack are the global minimum, the minimum of all the
+items that followed it, the minimum of all the items that followed
+*it*, and so on.  These are the range minima of all possible ranges
+that end at the end of the entire event sequence.
+
+Suppose we push in the normal way, but “pop” from the stack not by
+physically removing events but merely by updating a predecessor
+pointer on the newly added item.  The physical sequence of the stack,
+then, will be the entire event sequence, augmented with predecessor
+pointers that enable rapid traversal of all the possible ranges ending
+at the end of the entire event sequence.  These predecessor pointers
+convert the stack into a concise tree representation of the state of
+the stack at every point in time.  This enables us to answer any range
+minimum query in expected logarithmic time: we start with the event at
+the end of the desired range, then follow its predecessor pointers
+until they lead us outside the desired range.  The item whose
+predecessor pointer led us outside the desired range is, then, the
+range minimum.
+
+If we furthermore update each “popped” item with the time when it was
+popped, then we can find in constant time the largest interval it was
+the minimum of: it was the minimum from the moment following its
+predecessor until it was popped.
+
+To be concrete, to compute the predecessors array, we can do the
+following, in Python notation:
+
+    js = [None] * len(xs)
+
+    for i in range(1, len(xs)):
+        js[i] = i-1
+        while js[i] is not None and xs[js[i]] >= xs[i]:
+            js[i] = js[js[i]]
+
+And to use it to find the index k of the minimal element in some
+nonempty [i, j):
+
+    k = j-1
+    while js[k] is not None and js[k] >= i:
+        k = js[k]
+
+The van Herk/Gil–Werman algorithm computes the sliding RMQ (for a
+single window width) of the pixels in O(N) linear time, while this
+takes O(N log M) time, where M is the window size.  If you have a
+fixed number of window sizes before you start the algorithm, you could
+compute them in linear time (each) by walking their respective
+pointers up the stack as you pass over the input pixels, thus avoiding
+the logarithmic-time slowdown from computing them after the fact.
+
+I’m not sure how the performance of this approach compares to Urbach
+and Wilkinson’s 2008 chord-table algorithm (doi 10.1.1.442.4549,
+“Efficient 2-D Grayscale Morphological Transformations With Arbitrary
+Flat Structuring Elements”.)  Their objective is to compute sliding
+RMQ for a set of “chord lengths” or window sizes for each scan line;
+they do this by augmenting the set of chord lengths with enough powers
+of 2 to reach the longest chord length; they start with trivial case
+of window size 1, and then, to compute sliding RMQ for each larger
+window size R(i) as T[i, ...] from already-computed results for window
+size R(i-1) in T[i-1, ...] — R(i-1) is guaranteed to be at least half
+of R(i) due to the augmentation with the powers of 2 — they compute d
+= R(i) - R(i-1) and then compute each result pixel T[i, x] = T[i-1, x]
+∧ T[i-1, x+d], where ∧ is the pairwise-minimum operation.
+
+So, for example, the chord-table algorithm will compute a sliding RMQ
+result for the window starting at position 71 with a window size of 18
+(T[R⁻¹(18), 71]) from two previously computed results with a window
+size of 16, we can take T[R⁻¹(16), 71] and T[R⁻¹(16), 73].  These two
+16-pixel windows overlap by all but two pixels, which is harmless.  In
+many cases the chord-table algorithm will compute more window sizes
+than necessary, but the computation for each window size is very
+regular, while the computation of the predecessor array described
+above is very irregular, even if a known set of window sizes is being
+pursued.  In particular, it should be trivially possible to vectorize
+the chord-table algorithm, computing results for 16 or 32 scan lines
+in parallel.
+
+(Urbach and Williamson’s paper actually writes T_y(i, x, r), but the
+extra parameters r and y are, as far as I can tell, not actually
+useful; the chord table for each scan line is computed entirely
+independently.)
+
+Returning to the problem of computing a backward-looking greatest
+achievement of the month, we can of course compute the
+backward-looking greatest achievement of the past 1, 2, 4, 8, and 16
+days, each by comparing the greatest achievement from the smaller
+number of days to the achievement in the previous window — for
+instance, comparing the greatest achievement of the last 8 days with
+the previously-computed greatest achievement of the previous 8 days in
+order to compute the greatest achievement of the last 16 days.  Then
+for a given month we simply use two overlapping 16-day windows.  This
+is clearly more work than the ascending-minima algorithm, requiring as
+it does 5 comparisons per day rather than 2.  However, a
+sliding-window algorithm is unnecessary for this non-sliding-window
+application, and a simple binary-tree algorithm would require only 1
+comparison per day on average.
+
+Wikipedia has an RMQ solution using Cartesian trees achieving
+constant-time queries with linear space, which I think is a result due
+to Harel and Tarjan, which I don’t understand yet.  Cartesian trees
+are binary trees obeying the min-heap property whose inorder traversal
+returns the original sequence of elements.  Interestingly,
+constructing the Cartesian tree uses almost precisely the algorithm
+given above!  The stack is used to maintain the “rightmost spine” of
+the Cartesian tree under construction.

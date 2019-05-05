@@ -1,0 +1,189 @@
+Most of the time people use their multitouch Android phones with one
+or two thumbs, the better to type on the keyboard at the bottom of the
+screen.  But the direct-maniplation possibilities of this interaction
+paradigm are not very well explored, beyond tapping items to select
+them and scrolling vertically.
+
+One-finger scrolling is such a ubiquitous interaction that not
+supporting it — or turning it into something incompatible — is going
+to be painful.
+
+However, you could quite easily use one-thumb quasimode shifts to
+identify an action to be taken using objects selected using the other
+thumb.  It’s easy enough to support three or so separate buttons per
+thumb, and sliding after touch could select from a pie menu or adjust
+two parameters.  Ideally actions like “undo” should require a slide,
+so that you can touch the button to see what you can slide to without
+fear of invoking an action.  If you have three buttons per thumb and
+six slide directions, you have 36 actions or quasimodes available plus
+6 further quasimodes.
+
+Also, when you tap an object to select it, you can pop up another
+radial menu around the object, which can display detailed properties
+of the object; tapping on the menu items can pop up submenus
+accessible by dragging, invoke quasimodes, or permit a two-dimensional
+continuous adjustment of two parameters.  A common pattern might be to
+display the numerical value of an attribute, drag to adjust it
+continuously, or tap to enter a new value with the keyboard.  Under
+the same six-direction constraint, this allows another 42
+object-specific actions.
+
+Initially I thought that perhaps the object context menu should
+disappear as soon as your touch ends, so that the menu itself was a
+sort of quasimode; but that introduces three problems.  First, you
+can’t select from that menu by dragging, because that would interfere
+with one-finger scroll, so you have to use your other thumb — but half
+the time the menu item you want will be on the wrong side of the menu,
+so you have to cross your thumbs, or start over.  Second, part of the
+menu is hidden under your thumb, so you can’t see what the options
+are.  Third, you give up the possibility of quasimodal menu items on
+the object menu.
+
+Here are some example applications.
+
+Interactive geometry
+--------------------
+
+(See also file `interactive-geometry`.)
+
+This is a program like KSEG, with points, lines, line segments, rays,
+circles, labels, and measurements, computed in a DAG, each possessed
+of color and layer properties; layer visibility can be toggled.
+
+Panning, zooming, and rotation of the canvas are conducted using
+one-finger drags and two-finger pinches and rotations.  Tapping an
+object highlights it and brings up a context menu depending on the
+object type; additionally it may bring up other menu options
+elsewhere on the canvas.
+
+All operations that you might want to apply to a number of objects at
+once or in quick succession, or on no objects, are necessarily on
+global quasimode options rather than individual object context menus.
+
+The lower left corner has translucent quasimode buttons for “move”,
+“trash”, and “create point”.  Tapping in an empty space flashes the
+“create point” quasimode button, since maybe that’s what the user
+meant to do.  While that button is held, any taps on the canvas create
+points, which are initially selected and thus display their context
+menus.  While “trash” is held, skulls and crossbones hover over all
+the objects visible on the canvas; tapping them will delete them.
+“Move” causes chaos symbols to hover over all the objects visible on
+the canvas, and the objects can then be moved with another
+finger — indeed, you can move more than one object at a time this way.
+
+While you are holding down one of these buttons, the lower-right
+quasimode button cluster is replaced with a popup view of the radial
+menu of the button you’re currently on, with a shaded cone connecting
+it to that button to clarify that it’s a sort of magnified view.
+Dragging up and left on the “trash” button executes “undo”; dragging
+down and right executes “redo”.
+
+The lower right corner has a similar set of quasimode buttons.  One is
+the “layer” button, which displays the name of the current layer and
+whether it is visible.  Holding it invokes a quasimode that moves any
+object then tapped to that layer.  Dragging it down and left and up
+and right cycle among the layers, with the possibility of cycling
+through more than one layer if the motion is extended.  Other drag
+directions let you change the name of the layer, toggle its
+visibility, or add a new layer (initially labeled with the ten
+Heavenly Stems).  Another is the “style” button, which shows the
+current style applied to new objects on this layer (or objects moved
+to this layer), and which either primarily shows color, line style, or
+point style (selectable by dragging up and right or down and left),
+and invokes a quasimode to change its focused aspect of objects while
+held.  Other drag directions on “style” allow you to change attributes
+of the focused aspect of the style (for example, by invoking a modal
+popup color selector, or changing the thickness and dash pattern of
+lines) or to hide or show labels (itself a quasimode that causes all
+objects’ labels to appear in gray, allowing you to tap objects to hide
+or show their labels).  The submenus associated with these pop up in
+the lower left-hand corner, replacing the left-hand buttons.
+
+The “layer” button in particular allows you to easily create a new
+layer with one drag, hold it to point to the objects you want to move
+onto it (tapping them a second time to undo the action, perhaps), and
+then tap it again to hide them all.  Layers are automatically unhidden
+when switching to them.  This provides a conveniently reversible way
+to hide objects.
+
+Constructions with two objects as inputs are handled entirely through
+object context menus, because you can’t really tell where you’re going
+to start a drag — fine selection requires that you be able to correct
+your course by dragging after making initial contact.  So, for
+example, to create a triangle, you create three points with the point
+quasimode, then tap one of them to bring up its context menu.  Holding
+the “segment” option on the context menu to activate a segment
+quasimode, the other points light up (as would, for example, tangent
+points on a circle and perpendicular points on lines and segments) and
+you tap two of them, then release “segment”.  Then you tap one of
+them, hold its “segment” item, then tap the other and release.  While
+the quasimode is active, possible objects to construct appear dimly,
+lighting up when your finger is touching in the right place to
+construct them.
+
+Other context-menu two-input constructions include perpendicular
+through a point, parallel through a point, circle from center and
+radius, circle from center and point on circumference, perpendicular
+bisector, angle bisector, or line or ray through two points.  Also,
+you can constrain or unconstrain a point to lie on some other object,
+go to the object’s layer, make the object’s style the current style,
+or change the object’s style.
+
+So, for example, circle-from-center-and-radius is just a tap, a hold,
+and a tap, and creating two circles with the same radius and different
+centers just requires one additional tap, as long as you had the
+foresight to start the construction from the radius rather than the
+center.  In Geometer’s Sketchpad, each circle is two clicks to select
+the inputs and two clicks in a pull-down menu, so you pay eight clicks
+for two circles instead of three taps and a hold.
+
+However, intersection points, midpoints, and points constrained to an
+object are constructed using the point quasimode — you just drag your
+finger around until you get the option you want, displayed in a
+callout.
+
+Constructions of more than two inputs use a different interface.  The
+third lower-right button opens a cartoon of the construction on top of
+the canvas; you then specify correspondences between the
+formal-parameter objects in the cartoon and the corresponding actual
+parameters in your sketch by touching them at the same
+time — effectively the formal parameter objects are quasimodal.  Once
+only one formal parameter remains unspecified, you can see previews
+for possible formal-parameter values as you drag around the canvas.
+
+Dragging on that constructions button scrolls around a universe of
+possible constructions to try.
+
+A drawer that can be slid out from the right side with a tab contains
+a step-by-step textual description of the sketch, and objects can be
+selected in either the canvas or the text.
+
+Other miscellanea include creating text objects, creating formulas,
+creating loci, creating new constructions (including by refactoring),
+entropy-minimizing point coordinates via implicit slow snaps, and file
+management.
+
+Whenever an object is selected, its parents and children are also
+highlighted in different colors.
+
+### Prototype plan ###
+
+To see if that’s a good idea, I need to write a prototype, and DHTML
+is the easiest way to do that.  But right now I don’t have hardware
+that I can usefully get multitouch events from in DHTML: I can’t find
+my new iPhone, my modernish Android phone has a power fault, I don’t
+have a charger for my old iPhone (and I don’t know if it will charge),
+and although my ancient Android phone delivers touch events in its
+browser, it seems to unavoidably collapse into pinch-zoom mode as soon
+as there’s more than one touch on the display at once.
+
+So I’m going to start by prototyping on my laptop, using the keyboard
+for the quasimodes.
+
+The very most minimal functionality that can possibly be interesting
+to look at at all is:
+
+- Making points.
+- Making lines between those points.
+- Moving the points.
+

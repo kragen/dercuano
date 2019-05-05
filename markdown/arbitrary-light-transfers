@@ -1,0 +1,209 @@
+An optical system reversibly transforms a light input to a light
+output.  In the geometrical-optics approximation, the light input (or
+output) is a function from ℝ⁴ (four-tuples of real numbers) to
+spectra.  If we reduce the spectra down to RGB, which is reasonable
+for some purposes, this is a function ℝ⁴ → ℝ³; if we reduce it down to
+monochrome, which is reasonable for other purposes, it’s a function
+ℝ⁴ → ℝ.  We could think of this as a four-dimensional scalar field.
+One view of the four dimensions is that they are the X and Y
+coordinates where light enters (or exits) the system boundary and the
+θ and φ angles at which it enters.  That is, the system can do
+different things with light that enters at the same angle at different
+points, or with different angles at the same point.
+
+So, in monochrome, the overall system behavior is a function (ℝ⁴ → ℝ)
+→ (ℝ⁴ → ℝ).  But this is still an extremely loose description, because
+there are many such functions that we cannot realize as an optical
+system, and there are others that we can realize only with great
+difficulty.
+
+(In wave mechanics, the input and output are very much simpler; at a
+given wavelength, each point on the boundary of the system only has a
+single complex phase and amplitude.  This fact allows holographic
+optics to achieve astonishing performance for single-wavelength
+systems.  Unfortunately the situation with multiple wavelengths
+becomes complicated again, while geometric optics either depends not
+at all on wavelength or only depends on wavelength in a very simple
+way, with color filters and whatnot.  So here I will focus on
+geometric optics.)
+
+Conservation of energy
+----------------------
+
+For reasons of convenience, I’m going to focus on optical systems that
+don’t dissipate energy, so the amount of light coming out is the same
+as the amount of light going in.  This seems like kind of a stupid
+focus, since all actual systems do absorb some light, often most of
+it.  Then they convert that light into heat.  But it turns out that,
+if we treat this as a sort of aberration, we can derive some very
+interesting properties of optical systems that don’t have it, and then
+we can figure out how real systems behave by adding in light
+absorption as a sort of correction.
+
+Reversibility
+-------------
+
+Another limitation, given conservation of energy, is that optical
+systems must be *reversible*.  That is, if a certain beam of light
+going into the system produces a certain distribution of light coming
+back out of the system, if we send this second distribution of light
+back in, it will come out as the first beam of light, just going the
+other way.  This seems not to be true in our day-to-day experience,
+and this requires some examination.  For example, a laser pointer
+shining on white paint produces a spot that can be seen from any
+direction, so we know it’s throwing off light in every direction, in a
+way that’s called Lambertian reflection, and yet light going into the
+spot from every direction doesn’t go back into the laser pointer.  We
+explain this by saying that the paint is full of many different
+microscopic facets, each of which throws off light in a particular
+direction when the laser hits it, and there are so many of them even
+in that little spot that the light seems to go in every direction at
+once!  And if we could shoot a very, very thin beam of light at each
+facet, in just the reverse of the direction that the laser was making
+it shine before, all of those beams would be redirected perfectly back
+to where the laser pointer had been.
+
+Now, in reality, these facets are often so tiny that the geometrical
+optics approximation breaks down, and we have to use wave mechanics to
+see what will happen.  But it turns out that wave mechanics is
+reversible too; reversibility is not just a consequence of the
+geometrical-optics approximation, but a property of the
+wave-mechanical nature of light that survives in the
+geometrical-optics approximation.
+
+But if our system consists entirely of macroscopic
+features — mirror-smooth surfaces that are perhaps curved or have
+edges, everything either polished metallic mirror-bright or
+transparent — then, indeed, any transformation that the system
+produces can in fact be time-reversed in this way.  And you can do it
+in practice, not just in theory, because you don’t need
+microscopically tiny slivers of light the way you do for the white
+paint.
+
+This imposes some restrictions on the mathematical form of our system.
+It can’t, for example, transform two different distributions of
+incoming light into the same distribution of outgoing light, because
+then if you time-reversed the outgoing light, it wouldn’t know which
+of these two different distributions it should produce.  The function
+must be bijective, invertible.
+
+But is that the only restriction?  Can we realize any arbitrary
+invertible (ℝ⁴ → ℝ) → (ℝ⁴ → ℝ) function as an optical system?  No, not
+even close.
+
+One of the strongest restrictions is linearity.
+
+Linearity
+---------
+
+Most optical systems are linear, in the sense that different beams of
+light don’t interact with each other.  If you have some beam A and the
+system transforms it to f(A), and some other beam B and the system
+transforms it to f(B), then if you shoot both of those beams of light
+at the system at once, A + B, then the distribution of light that
+comes out will be exactly f(A) + f(B).  You can have a lens, for
+example, bend one light beam a bit to the left, and the other a bit to
+the right, but you can’t have it bend the first light beam to the
+right when the second one is present, or to the left otherwise.
+
+Now, this is just an approximation, but under most circumstances, it’s
+a very, very good approximation, and it takes very sensitive
+instruments to detect departures from linearity.  It’s actually a much
+better approximation than geometrical optics is, because you can see
+the diffraction phenomena produced by wave mechanics very easily in
+everyday life, if you know where to look; they’re quite strong
+whenever you have objects on the scale of a few microns involved, such
+as your eyelashes.  They’re rarely more than one or two orders of
+magnitude away from visibility.  Departures from linearity, by
+contrast, are usually six or more orders of magnitude away from
+visibility.  So nonlinear optical systems are substantially more
+difficult to build.
+
+There are a few that are common, though.  Fluorescence is usually
+pretty linear, but it often has a substantial time constant, which
+means that it departs from instantaneous linearity.  Optically-pumped
+lasers, however, are a sort of nonlinear fluorescence phenomenon: you
+don’t get a laser beam at all until the gain of the lasing medium
+rises past 1, as limited by the Q of your cavity.  And the most common
+kind of green laser isn’t a green laser at all; it’s an infrared laser
+with a frequency-doubling crystal on the front of it, and that’s a
+nonlinear phenomenon — it doesn’t start happening until the light
+intensity is above a certain level.
+
+Other nonlinear optical phenomena include phase-conjugating mirrors,
+Kerr cells, the self-focusing of intense laser beams, and soliton
+transmission, which is a sort of temporal analogue of spatial
+self-focusing.  Any dielectric inevitably behaves nonlinearly to light
+passing through it, since its overunity refractive index is due to its
+response to the electric field of light being different from the
+response of the vacuum, and that’s an effect that inevitably reaches a
+limit at some field strength.  Normally, though, light’s electric
+field is far too weak for us to notice this nonlinearity.
+
+But, in the geometrical optics approximation, we invariably ignore
+these nonlinearities, because they are tiny in everyday life.  So our
+transfer function is, in effect, transferring every separate light
+beam that could enter our apparatus into some distribution of light at
+the output.  So our transformation function can be computed from a
+sort of point spread function of the form ℝ⁴ → (ℝ⁴ → ℝ).
+
+However, the requirement that the function be *reversible* means that
+as the input light beam shrinks toward a perfectly collimated beam
+entering at a single point†, the output light beam must *also* shrink
+toward being such a thing, except perhaps at discontinuities.  So it’s
+actually even simpler, and this is a simple case of a more general
+principle called “conservation of étendue”.
+
+XXX is this really correct?
+
+† For wave-mechanical reasons you can’t actually make a perfectly
+collimated beam entering at a single point — there’s a diffraction
+limit on the divergence — but here we’re talking about properties of
+the geometric-optics approximation.
+
+Conservation of étendue
+-----------------------
+
+Étendue is a quantity that 
+
+Translation-invariance
+----------------------
+
+Electroforming and Electropolishing
+-----------------------------------
+
+Electric current passes through a battery electrolyte not as free
+electrons, as in a metal, but as positive metal ions, and this is true
+whether you’re charging or discharging the battery.  The positive ions
+are formed from the metal at the surface of the positive electrode,
+which has electrons running away from it down a wire, through a
+circuit, and back around to the negative electrode, where they travel
+to the surface of the metal and neutralize arriving positive ions,
+thus transmuting them back into insoluble metal.
+
+You can use this process to coat some random conductive thing with a
+layer of metal, which is called galvanizing or electroplating — or
+electroforming, if you do it long enough — or to remove a thin layer
+from the surface of a piece of metal, which is called
+electropolishing, or cathodic corrosion if you do it by accident, like
+on a metal ship hull.
+
+Because electric fields are strongest around edges and sharp points,
+electropolishing tends to remove those, leaving a mirror-like finish
+on initially rough metal.  Also, since it doesn't 
+
+At the currents typically used, this process typically deposits around
+a nanometer per second of metal on one electrode and removes around a
+nanometer per second from the other.  Much lower or higher currents
+don’t work as well.
+
+Fresnel electropolishing
+------------------------
+
+Holographic electropolishing
+----------------------------
+
+
+https://en.wikipedia.org/wiki/View_factor
+https://en.wikipedia.org/wiki/Lagrange_invariant
+https://en.wikipedia.org/wiki/Etendue

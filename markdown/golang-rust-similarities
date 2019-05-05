@@ -1,0 +1,117 @@
+Golang and Rust have a lot of similarities, some stemming from their
+birth around the same time in groups of programmers
+with similar backgrounds and overlapping goals, and others due to
+direct borrowing.
+
+Both use the C memory model of nested records and arrays with
+pointers, but add automatic memory management — a garbage collector in
+Golang’s case, an innovative affine typing system in Rust’s case
+(although Rust was born with a GC, it became garbage along the way and
+has been collected).  This is a huge and underappreciated difference
+from mainstream garbage-collected languages like JS, Java, and Python,
+in which memory is just an object graph.
+
+Both have interface inheritance but not implementation inheritance
+(and both use the keyword `struct` where C++ would use `class`).  In
+both, an existing type can be retroactively caused to implement a
+newly invented interface (called a “trait” in Rust), but only in Rust
+does this permit you to add new methods to an existing type.
+
+Both languages have untyped constants, where a number like `0` or
+`3.14` in the source code doesn’t have a fully determined type — the
+precision of its type is determined by its context of use.
+
+Both languages have limited type inference, eliminating nearly all
+type declarations for local variables but requiring nearly full type
+declarations for top-level module items.  In both cases, the designers
+made the misguided choice to cede the `=` operator to mutation, while
+using a somewhat more verbose locution for the more common operation
+of declaring and initializing a variable.  Rust’s type system supports
+full parametric polymorphism, while Golang’s type system, like C’s,
+has some parametrically polymorphic types, but no mechanism to define
+new ones.
+
+Both languages have very limited use of exceptions in the sense of
+nonlocal transfers of control (which both call “panics”), instead
+handling normal errors using return values somewhat richer than are
+practical in C and similar languages.  In both languages, unused-value
+messages from the compiler prevent you from accidentally suppressing
+an error signaled by this mechanism.  In both languages, the mechanism
+to explicitly ignore such an error is to assign it to a pseudovariable
+called `_`, a language feature I think both copied from ML.
+
+In both languages, there is a dichotomy between “arrays” and “slices”,
+which last are pointer-plus-length references to part of an array,
+while array sizes are statically known.  Array indexing is checked at
+runtime in both languages.
+
+Strings in both languages are sequences of implicitly UTF-8 bytes,
+rather than sequences of UTF-16 encoding units (as in Java and JS), of
+UCS-4 codepoints (as in Python), or bytes that each implicitly encode
+a character (as in C).
+
+Both languages propose nonmainstream concurrency mechanisms in order
+to escape the disadvantages of pure event-loop languages like ordinary
+JS and implicit-shared-everything languages like Java (and C or C++
+with pthreads or Win32).  Rust’s novel type system statically prevents
+data races between threads; Golang has lightweight threads
+(“goroutines”) and supports shared mutable state with the same
+concurrent-access bugs that Java does (and, at least originally,
+didn’t even try to prevent segfaults from concurrent access to the
+same map), but provides special syntax for interthread communication
+over type-safe channels to minimize the use of shared mutable state.
+
+Both languages add a simpler syntax for iterating over a range.  In
+both languages, the range representation is half-open, including its
+left bound and excluding its right bound.  Both of these are so
+universal nowadays that they hardly seem worth mentioning, but
+e.g. C, Java, and JS lack range syntax, and R, Matlab, and Fortran
+fail to use the half-open representation.
+
+Both languages have acclaimed library package management systems
+(Cargo and `go get`) with integrated network access.  Rust leans more
+heavily on its package manager in the sense that its standard library
+includes almost nothing — its `std::net` module, for example,
+implements no protocols higher-level than TCP, and it apparently
+offers no way to format a timestamp, parse a CSV file, or encrypt a
+string, although it does have things like binary heaps, hash tables,
+pathname handling, and some limited Unicode encoding.  By contrast,
+Golang’s standard library includes AES, ELF, DER, CRC, JPEG, suffix
+arrays, RFC-2822, SMTP, URLs, and JSON-RPC.  In Rust these are
+available as external crates, except apparently there’s no SMTP
+server; crates.io lists 7542 crates.
+
+Both languages have syntactic support for user-defined external
+iterators, which sounds like a minor detail but turned out to be
+absolutely transformative to Python when Ka-Ping Yee introduced it.
+
+The biggest difference seems to me that Rust focuses on static safety,
+even at the cost of programmer convenience, in a way that Golang does
+not.  So, while in Golang it’s common to define functions or data
+structures that pass around `interface{}` references — which can be
+converted to interfaces of the proper type with a run-time-checked
+type conversion — in Rust such practices are virtually nonexistent,
+instead using its parametric polymorphism facilities.  In Golang all
+references are implicitly initialized to `nil` (as in Java, but much
+less problematically due to the difference in memory models), while in
+Rust null references are statically impossible, being supplanted by
+the `Option` type and pattern matching, which doesn’t exist in Golang.
+
+I’m tempted to make the analogy to the Pascal/C dichotomy of the
+1970s: Rust, like Pascal, prioritizes static correctness and
+mathematical purity, while Golang, like C, prioritizes programmer
+convenience, practicality, and compatibility from one month to the
+next.
+
+I think things might turn out differently this time around, though.
+First, probably no programming language will ever again be as dominant
+as C was during the 1980s; neither Rust nor Golang is likely to die
+within the next century.  Second, static verification has become
+dramatically more effective over the last 40 years, which means that
+you can get a lot more safety with a lot less hassle.  Third, we can
+afford a lot more CPU cycles and RAM for running compilers nowadays,
+even if running the C++ preprocessor over hundreds of gigabytes of
+repetitively `#include`d header files is not a particularly productive
+use of those CPU cycles.  Fourth, cooperation with many other
+programmers is more important now than in the 1970s, and static safety
+helps a lot with that.

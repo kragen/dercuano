@@ -1,0 +1,163 @@
+Scanning an ultraviolet diode laser over a cheap phosphorescent screen
+should give you a very inexpensive, high-resolution,
+very-low-refresh-rate display screen.
+
+Projecting an image with a laser suffers from a few problems.  One is
+that, if the part of the laser beam that would fit through someone’s
+pupil is bright enough, it can be an eye safety hazard.  Another is
+that the beam must be scanned very rapidly over the screen in order to
+provide the illusion of a stable image, and equipment for scanning the
+beam very rapidly is energy-hungry and expensive.
+
+We can solve both of these problems with multiple ultraviolet lasers.
+
+Eye safety
+----------
+
+Ultraviolet light below about 400nm is blocked by the lens of the eye,
+so it will not be focused onto the retina and cause the instant
+retinal burns that are the principal danger of visible and especially
+infrared lasers.  However, it can cause lens damage if continued over
+a period of time, including cataracts.  Below 315nm, it cannot even
+penetrate the cornea, so it instead will cause only acute
+photokeratitis, which will heal unless it is very severe indeed.
+
+However, in discussing the *kinds* of damage that can be caused, we
+risk losing sight of the *quantitative* safety factor.  The IEC 60825
+maximum permissible exposure for a 355nm ultraviolet laser over the
+course of a millisecond is 100 watts/cm², falling to under 1 watt/cm²
+if the exposure extends to an entire second, and down to 1 mW/cm² if
+the exposure continues for a kilosecond.  By contrast, the MPE for a
+visible-light laser is 10 milliwatts if for a millisecond, or 3
+milliwatts if for an entire second, converging with the ultraviolet
+MPE levels at 1000 seconds.
+
+That means that the safe power levels for brief exposure to
+ultraviolet lasers are around 100 times higher than for visible-light
+lasers.  This means you can send a great deal more energy to your
+screen at a safe power level.  It might be a good idea to wear
+UV-blocking goggles and to couple your UV laser with a lower power,
+but painfully bright, but not dangerous, red laser, in order to
+trigger people’s blink reflex.  1mW should be plenty.
+
+An alternative way to provide eye safety under normal circumstances is
+to project the laser onto one side of a screen while you look at the
+other side, enclosing the laser, scanning apparatus, and back of the
+screen inside a sealed, opaque box.
+
+One unfortunate aspect of this approach, though, is that there aren’t
+any laser diodes of shorter wavelengths than 370nm commercially
+available yet.
+<https://www.thorlabs.com/NewGroupPage9.cfm?ObjectGroup_ID=5400>
+offers Thor Labs’s new 375nm 70mW ultraviolet laser diode L375P70MLD
+for US$4300.
+
+Refresh rate
+------------
+
+A phosphorescent screen will not only convert a certain fraction of
+the laser illumination into light, but also continue to glow over a
+long period of time, exponentially decaying.  This acts as a
+single-pole low-pass filter on the image signal, attenuating
+frequencies faster than the time constant of the phosphor by 3dB per
+octave.
+
+Zinc sulfide’s phosphorescence decay time constant is a few seconds to
+a few minutes.  (I found some paper claiming 9', but that seems
+implausibly long to me from experience with glow-in-the-dark toys).
+This means that once a glowing image has been drawn on the zinc
+sulfide with the laser beam, it will stay there, gradually fading, for
+a few minutes.
+
+This means that you can draw an image on the screen with a laser over
+a period of seconds or minutes, and it will continue to be visible.
+This means that you can draw a fairly complex image even with a fairly
+slow apparatus for scanning the laser beam across the screen.  It also
+means that you can’t erase anything: you have to wait for it to fade.
+
+It also means that it takes seconds to minutes for the image to reach
+full brightness, but because of the logarithmic brightness perception
+of human vision, this is not as much of a problem as you would expect.
+(I’m guessing this from my experience with analogue oscilloscopes with
+zinc sulfide screens.)
+
+Copper-doped zinc sulfide is by far the most common glow-in-the-dark
+material.
+
+It might be worthwhile using a secondary, say, red laser to draw a
+smaller amount of graphical information that can be instantly erased.
+This will work better if the screen is not sensitive to the wavelength
+of the secondary laser.
+
+Erasing
+-------
+
+<https://physics.stackexchange.com/questions/79860/why-is-a-laserpointer-able-to-erase-a-glow-in-the-dark-sticker>
+reports that a red laser pointer was able to *erase* the glow from a
+glow-in-the-dark sticker (presumably ZnS:Cu).  There is a video of
+this phenomenon at <https://www.youtube.com/watch?v=kUteUH7mz0A>, but
+the erasure seems temporary.
+
+Multiple lasers
+---------------
+
+Laser diodes themselves are relatively inexpensive; Digi-Key has 1.5mW
+infrared lasers at US$5.76 and red 5mW lasers at US$12.52.  But as the
+power goes up, cost increases sharply.  Their cheapest 20mW laser is
+US$46.07 (green), their cheapest laser over 40mW is a 120mW 405nm
+near-ultraviolet unit for US$78.44 (this is the wavelength used by
+Blu-Ray players), and the only more powerful laser diode for which
+they list a price is an 175mW near-ultraviolet unit for US$452.
+
+Given this price curve, you can probably get not only more visible
+light output but also more information on the screen by using several
+different laser diodes, each pulsed rather than CW, so that sequential
+points on the screen are often drawn by different lasers.  Using two
+to six separate lasers will increase the energy throughput of the
+laser bottleneck significantly, without affecting the rest of the
+system.
+
+Also, laser diodes can be controllably pulsed much more rapidly than
+mirrors can scan the beam — MHz in the common case or GHz in
+exceptional cases — and you can draw minimally readable letterforms by
+interrupting three or four vertical lines:
+
+     #  ##  # #  ##  ###  #  # #  #
+    # # # # ### #  # #  # #### ## #
+    ### ##  ### #### ###  #### # ##
+    # # # # # # #  # #  # #  # #  #
+    # # ##  # # #  # ###  #  # #  #
+
+Given three or four laser beams with a slight angle offset between
+them horizontally, you could sweep them vertically with a single
+movement of the mirror while pulsing different dash patterns on them
+to draw the letters.
+
+Resolution calculations
+-----------------------
+
+You should be able to do a few megapixels this way, but probably not
+much more.
+
+Suppose you’re using a 2m² screen, with the laser 1.5m away, and you
+have a 1mRad-divergence beam, which is a pretty normal divergence for
+a laser pointer.  Then your spot will be 1.5mm across, so your screen
+is only about 1300×1300 “pixels”, for a total of 1.8 megapixels.  If
+you can get a better-quality laser spot of 0.5mRad, you can get four
+times that, or 7 megapixels.
+
+(The diffraction-limited divergence angle is 2λ/(πw), where λ is the
+wavelength and w is the beam-waist radius.  So for a 650nm red laser
+to have 1mRad divergence, you need w > 2 · 650nm/(π · .001) ≈ 0.4 mm.
+Larger collimating optics can produce smaller divergence, but you
+aren’t going to get that beam waist below 0.4mm even if the beam waist
+is on the screen.)
+
+However, you may only be able to illuminate a small fraction of these
+pixels at a time; even expensive laser-show galvos are rated at under
+50kpps, and even in two minutes, 50kpps is only 6 million points.
+Simpler scanning apparatus, perhaps driven by scavenged hard disc
+voice coils or by paper cone speakers, might only hit 1kpps, and thus
+only 120k pixels illuminated per laser.  With multiple lasers and dash
+patterns, you could actually paint all of those pixels, a few thousand
+per second.

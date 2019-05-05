@@ -1,0 +1,151 @@
+HTTP has an “ETag” attribute, short for “entity tag”, to identify the
+current state of a resource, which can be usefully used in four ways:
+
+- In the response to a GET or HEAD request, to inform the client what
+  the current ETag of the resource is, making the other three uses
+  possible;
+- In the If-None-Match header of a GET request, to request that the
+  server not send (a representation of) the resource if it hasn’t
+  changed (validating the cache to ensure it hasn’t gotten too out of
+  date);
+- In the If-Match header of a PUT request, to execute a kind of atomic
+  compare-and-swap for safe lock-free concurrency, preventing the
+  request from executing if the resource has changed since it was last
+  fetched;
+- In the If-Match header of a byte-range GET request to ensure that
+  the underlying file hasn’t changed in a way that would make previous
+  byte-range requests invalid.
+
+These three kinds of concurrency control, however, are limited by the
+request-response nature of the REST architectural style, which can
+only propagate invalidation notifications by polling; thus, it faces
+an unavoidable painful tradeoff between expected notification latency
+and polling load, [as described in Khare’s dissertation][0].  Various
+approaches to this have been suggested, including Khare’s proposed
+WATCH method for HTTP and the [RFC 7641 Observe option for CoAP][1],
+which are very similar to one another, but in practice the most common
+solutions today are [HTTP long polling][2] and WebSockets, which are
+effectively ways to tunnel arbitrary application-layer protocols on
+top of HTTP.
+
+[0]: http://www.ics.uci.edu/~rohit/Khare-Thesis-Duplex.pdf
+[1]: https://tools.ietf.org/html/rfc7641
+[2]: https://tools.ietf.org/html/rfc6202 "Known Issues and Best Practices for the Use of Long Polling and Streaming in Bidirectional HTTP"
+
+There are a number of potential problems with the straightforward
+implementation of the Observer pattern in a distributed system,
+modified only by a timeout, as proposed by Khare’s dissertation and
+RFC 7641:
+
+1. There is no flow control to the stream of update messages.  If the
+   client has a 10kbps connection, while the server has a 100Mbps
+   connection, then under circumstances of constant updates, a
+   500-byte subscription can result in the client’s network connection
+   being overwhelmed by four orders of magnitude more traffic than it
+   can handle, until the subscription expires.
+
+2. One of the great benefits of REST is its stateless-server
+   constraint; by storing all session state on the client, it enables
+   easy horizontal scalability of servers (including by serving the
+   same resource from many physical servers), allows servers to
+   operate reliably and correctly even with extremely limited
+   resources, simplifies failure recovery, and permits extremely large
+   client-to-server ratios.  These event-notification proposals,
+   however, obligate servers to maintain unbounded amounts of session
+   state on behalf of clients.
+
+3. Thus, the subscription itself becomes a long-lived resource on the
+   server; to support subscription inspection and cancellation, we
+   begin to desire defined protocols and content-types to manage the
+   subscription, not to mention authentication and access control
+   lists.  This adds undesirable complexity not only to the server but
+   also to the protocol suite.
+
+4. A typical factor we examine for network deployments nowadays is
+   their DoS potential, as measured by their amplification factor — if
+   an attacker forges a request from a victim, how much traffic can
+   they direct to the victim?  These proposals have potentially very
+   large DoS potential.
+
+I would like to suggest a minimal extension to HTTP and similar
+protocols which covers most publish-subscribe use cases and largely
+solves the above problems.
+
+The solution
+------------
+
+The client includes a new ETag-Change-To header which includes a
+webhook URL.  The server is free to ignore this header or to add the
+webhook URL to a set of observers it maintains for the current ETag of
+the resource being requested.  When the resource’s state changes, it
+sends the URL of the resource in an HTTP request to each webhook in
+the observer set for the old ETag, then discards that observer set.
+This allows the client, if they are still interested, to immediately
+retrieve the new state of the resource (possibly resubscribing), while
+bounding the maximum possible traffic to one in-flight message at a
+time, and the maximum possible cost imposed on the server to sending a
+single such message.
+
+By atomically adding the webhook to the set associated with the ETag
+associated with the representation that was actually retrieved, we
+ensure that no updates happen after the retrieval but before the
+subscription.
+
+In contexts like CoAP, protocols other than HTTP might be more
+appropriate for delivering these cache invalidation notifications.
+For example, an additional CoAP Response message — as with the RFC
+7641 Observe option, but lacking the payload — may be a perfectly
+adequate solution, since CoAP imposes no constraints on how far in the
+future that message can be sent; or a CoAP Request message analogous
+to the HTTP request to a webhook may be more appropriate.
+
+This approach is not better under all possible circumstances.  At
+times, as mentioned in Khare’s dissertation, it’s desirable to have
+many update messages in flight at the same time; a stock-price logging
+application might prefer to see all the intermediate market prices of
+a stock, even when they are milliseconds apart and it is separated
+from the data source by hundreds of milliseconds of latency.  However,
+there is a very broad range of applications for which the drawbacks of
+such streaming data are greater than their advantages.
+
+Furthermore, in many cases, the appropriate response to such a cache
+invalidation message is not to update the cache, but rather merely to
+purge the cache, possibly generating further cache invalidation
+messages.
+
+Since the server is not required to store the ETag-Change-To webhook,
+the server may suffer a hardware failure, and in any case the
+invalidation message may be lost, the client must still poll the
+resource at intervals determined by its maximum tolerable staleness
+time.
+
+As an alternative that doesn’t depart from the strict request-reply
+discipline, we could instead use a GET request with a new
+When-None-Match header, which delays the response to the request until
+the resource’s ETag no longer matches the supplied ETag.  That is, if
+the ETag is different, the server will respond immediately, as if with
+If-None-Match; but if the ETag is the same, the server will simply
+acknowledge that the request has been received, and perhaps send a
+response at some later time.
+
+Derived resources
+-----------------
+
+[Mediators like Shodouka, Google Translate][3], [CritLink][4], and the
+[Jupyter Notebook Viewer][5] host virtual resources derived from other
+resources whose URLs are passed as query parameters.  These resources
+could, in principle, be cacheable — they only change when the
+underlying derivation code changes, or when the source resources do.
+(In practice, the Jupyter Notebook Viewer is rather annoyingly
+aggressively cached.)
+
+[3]: http://zesty.ca/mediator.html
+[4]: http://zesty.ca/crit/yee-crit-cscw2002-demo.pdf
+[5]: http://nbviewer.jupyter.org/url/norvig.com/ipython/Economics.ipynb
+
+If such resources wanted to participate in this kind of push cache
+invalidation, they would probably be best served by propagating cache
+invalidations downstream when they received them, rather than
+refetching upstream resources to repeat their mediating
+transformation, perhaps many times, in order to keep up-to-date a
+resource that will perhaps never again be used.

@@ -1,0 +1,141 @@
+In 2000 I wrote about “opacity holograms” — a way to encode a large
+number of two-dimensional input images into two images such that just
+by passing light through them both in different directions, you can
+reconstitute any of the original input images, using only geometrical
+optics (i.e. no wave mechanics.)  The naïve approach to this involves
+a reduction of N× in both resolution and brightness for N input
+images: e.g. for 100 input images you take a hit of 99% of the
+original input light intensity.  I think it’s possible to do better
+than that, maybe even as far as the √N that real interference
+holograms get, but I haven’t figured out how yet.
+
+The naïve approach is something like this: on one sheet of film, leave
+one transparent pixel in the center of each 10×10 pixel square; now
+lay this atop another sheet of film on a lightbox.  The upper “grille”
+will leave visible one out of every 100 pixels in the lower sheet, and
+by sliding it one pixel up, down, left, or right, you can select one
+of 100 different “pages” of information.  It’s probably more
+practical, as I wrote in 2000, to permanently mount the “grille” and
+the interleaved image on opposite sides of a sheet of glass.
+
+One possible use of this is for archival information storage.  One of
+the problems confronted by the design of artifacts like the Rosetta
+Project’s Rosetta Disk is how to make the archived information
+retrievable without advanced technology like a computer.  (Presumably
+if computers survive, then so will computerized archives of our
+current information.)  The unhappy compromise adopted by the Rosetta
+Project is to require the reader to have a 650× microscope.
+
+If your film is printed on a 1200dpi laser printer, then each of the
+100 interleaved pages of information has 120dpi available to it — more
+than enough for crisp, readable text.  In the roughly 3½×6 pixel font
+I designed for laser-printed microfilm and shown in
+<http://canonical.org/~kragen/bible-columns>, you’ll have 20 lines of
+text per vertical inch (rather than the usual 6: effectively, a
+3.6-point font), moderately readable to the naked eye; roughly ten
+thousand words on a page, a dozen times the usual areal density.  The
+100 pages together are roughly a million words, or a bit longer than
+the Bible — on a single page.  And since each page is potentially full
+color, you can do better still by encoding separate monochrome images
+in red, green, and blue color channels: 3600 pages of text, readable
+with the naked eye and a color filter, printable on a single pair of
+pages with a regular laser printer.  With a high-resolution printer,
+you might be able to get more.
+
+I suspect that you can do better than this naïve approach by jointly
+optimizing the two opacity images of the “grille” and “interleaved
+image”, but I don’t know how much better.
+
+How much separation can you get?  Ideally you’d like to spread out the
+100 pages (or however many you can get) over as much solid angle as
+you can, so that, for example, you don’t have to be a precise distance
+from the page to see a single image, you don't switch images when your
+eye saccades (moving your pupil a few millimeters), and you see the
+same image from both eyes.  Let's figure that the maximum angle you
+want to have to turn the page from looking at it straight on is 60°,
+because at that point you've visually squished it by a factor of 2,
+and more than that will impede readability.  So you have 120° of angle
+that you need to divide into 10 increments, thus 12° each.  So you
+want a single-pixel displacement between the two sheets (1/1200 inch,
+or 21 microns) to correspond to 12°, which means you want the distance
+between the sheets to be effectively about 1/sin⁻¹(12°) ≈ 5× that 21
+microns: 105 microns, about a tenth of a millimeter.  This is assuming
+no refraction; the refractive index reduces the necessary thickness,
+and also linearizes the displacement a bit, so that the nonlinearity
+of arcsin becomes less significant.
+
+You need to make sure your pixels are big enough that geometrical
+optics is a good approximation, which is to say that the pixels need
+to be a lot bigger than the wavelength of light.  21 microns is
+sufficiently bigger than 0.7-micron red light, and there's room for
+another factor of 2 or 4 in there, which would be a factor of 4 or 16
+in information density.  But 2400dpi printers are a specialty item,
+and 4800dpi printers are only used for transferring CGI imagery onto
+movie film, so they are much less accessible.
+
+Alternatively, you could accept lower resolution per encoded page (and
+lower light levels) in exchange for more encoded pages by making the
+grille holes sparser.  This won't increase the number of words
+encoded, because the font size has to be bigger, but it may make the
+text easier to read by making it larger.  Perhaps a factor of 2 is
+available here.
+
+Printing transparency film on both sides is the ticket
+------------------------------------------------------
+
+Amazon has [100 sheets of laser-printable transparency film at half an
+inch thick][0], or about 130 microns thick, which is in the right
+ballpark.  The extra thickness (and refractive index) reduces the
+viewing angle correspondingly, perhaps to 8° or so.  At a reading
+distance of half a meter, that’s about 7 cm; so your two eyes will see
+different pages, but each eye will comfortably see a single image
+regardless of where it saccades to.
+
+[0]: http://www.amazon.com/School-Smart-Transparency-without-Sensing/dp/B003U6KYO8/ref=sr_1_1?ie=UTF8&qid=1400705721&sr=8-1&keywords=transparency+film
+
+Amazon’s current price on this is US$19.32, or US$0.19 per
+roughly-A4-size sheet.  The material is probably cellulose acetate,
+which [is not archival-quality and will degrade within a century under
+most conditions,][1] through a process known as the “vinegar
+syndrome”, which [poses major problems for current archival
+collections][2].  It also has a refractive index of about 1.5.
+
+[1]: https://en.wikipedia.org/wiki/Cellulose_acetate_film
+[2]: http://anthropology.si.edu/conservation/lamination/lamination_guidelines.htm
+
+The archival-quality substitute seems to be the now-discontinued [Type
+D Mylar film][3] or [Melinex 516 or other equivalent PET film][7],
+which you can apparently [etch with carbon tetrachloride to get it to
+take inkjet ink][4].  Amazon has what appears to be [inkjet-printable
+Mylar][5] at 36" × 125' at 4 mil thick (216μm) for US$175, but I don’t
+know if it’s archival.  Archival (but possibly not easily printable)
+Melinex 516 is [available from Talas at US$290 for a 2-mil (51μm) 60"
+× 250' roll][6], which is 116m² or 1862 A4-page equivalents, or
+US$0.16 per A4 page — comparable to the acetate.  Mylar’s refractive
+index is about 1.65.
+
+[3]: http://cool.conservation-us.org/byorg/abbey/an/an13/an13-5/an13-507.html
+[4]: http://www.theswamp.org/index.php?topic=27878.0
+[5]: http://www.amazon.com/Inkjet-Erasable-Mylar-Film-carton/dp/B008YWKUX8/ref=sr_1_2?ie=UTF8&qid=1400708761&sr=8-2&keywords=inkjet+mylar
+[6]: http://apps.webcreate.com/ecom/catalog/product_specific.cfm?ClientID=15&ProductID=17967
+[7]: http://www.thegrumble.com/archive/index.php/t-23425.html
+
+What to store: Rosetta Project, OED, Wikipedia Vital Articles
+-------------------------------------------------------------
+
+The Rosetta Disk is currently slated to hold 13 000 pages of language
+documentation, according to the project's home page at the moment, out
+of the 100 000 they have gathered.  These 13 000 pages could be
+encoded on about two to six A4-sized transparency films.  On 2-mil
+film, this would occupy about 3–9 milliliters.
+
+The whole 100 000 page collection [is available for download from the
+Internet Archive][8].  This would be eight times as large: 25 to 75
+milliliters, 16 to 50 sheets.
+
+[8]: https://archive.org/details/rosettaproject
+
+The first edition of the Oxford English Dictionary is slightly larger;
+the English Wikipedia’s selection of 1000 “Vital Articles” is similar
+in size.
+

@@ -1,0 +1,210 @@
+I remember when I was a kid I used to love playing Joe Power’s
+“Wizard’s Castle” game, which is about 900 lines and, as I learned
+today, originally ran on the 16-kilobyte model of the Exidy Sorcerer
+home computer at the New Directions in Computing computer store, after
+which the Kingdom of N’Dic is named.
+
+When I was a kid I tried to understand the source code of the game,
+since after all it is only 900 lines, written in a programming
+language I was pretty familiar with, and performed a function I was
+pretty familiar with, having spent hundreds, if not thousands, of
+hours playing the game.  Unfortunately, I didn’t know what I was
+looking for.
+
+I just downloaded the IPCO version of the the game from
+myabandonware.com and find that it’s still somewhat hard to understand
+the source.  Unfortunately this version is broken, or rather
+cheated — the map is revealed starting from the beginning of the game.
+So I needed to fix the bug, which turned out to be that line 4150
+said:
+
+    4150 IF Q > 99 THEN Q=Q-100 ' LET Q=34 TO HIDE ROOMS
+
+when it should say:
+
+    4150 IF Q > 99 THEN Q=34 ' LET Q=34 TO HIDE ROOMS
+
+It also has a bug on line 3590, which says:
+
+    3590 PRINT CHR$(27);"E"
+
+This is the clear-screen sequence for the Heath H89 and H19, but this
+version of the program is for GW-BASIC or BASICA; this line should
+just say
+
+    3590 CLS
+
+Here is a sort of dictionary of the subroutines, goto targets, and
+variables in the program.
+
+A$: a temporary input variable.
+
+Q: a temporary variable used in many places for many things.
+
+R$: an array of the 4 player race names.
+RC: the index of the player’s race.
+
+SAMP$: a parameter indicating whether the program was invoked from
+IPCO's SAMPLES.BAS program; if "YES" (due to being invoked as CHAIN
+"WIZARD", 1010) then, upon exit, it reinvokes SAMPLES.BAS rather than
+exiting to the BASIC prompt.
+
+1000: program entry point
+
+RF: a boolean indicating whether you have the Runestaff
+OF: a boolean indicating whether you have the Orb of Zot
+
+L: an array of 512 ints, representing the castle contents.  For
+whatever reason (perhaps resulting from the conversion from the
+Sorceror version which stored this array in character RAM), this is a
+one-dimensional array with indices calculated by FND(Z) rather than a
+three-dimensional array.  L entries have 100 added to them to mark
+them as “unknown”.  Valid numbers range from 1–33 and 101–133, with 34
+as a sort of special case representation of the whole 101–133 range
+for the map.
+
+The valid values are:
+
+1. . AN EMPTY ROOM
+2. E THE ENTRANCE
+3. U STAIRS GOING UP
+4. D STAIRS GOING DOWN
+5. P A POOL
+6. C A CHEST
+7. G GOLD PIECES
+8. F FLARES
+9. W A WARP
+10. S A SINKHOLE
+11. O A CRYSTAL ORB
+12. B A BOOK
+13. M A KOBOLD
+14. M AN ORC
+15. M A WOLF
+16. M A GOBLIN
+17. M AN OGRE
+18. M A TROLL
+19. M A BEAR
+20. M A MINOTAUR
+21. M A GARGOYLE
+22. M A CHIMERA
+23. M A BALROG
+24. M A DRAGON
+25. V A VENDOR
+26. T THE RUBY RED
+27. T THE NORN STONE
+28. T THE PALE PEARL
+29. T THE OPAL EYE
+30. T THE GREEN GEM
+31. T THE BLUE FLAME
+32. T THE PALANTIR
+33. T THE SILMARIL
+
+These are used to index into C$() and I$() mentioned below.
+
+The two other special unique items (the Runestaff and the Orb of Zot)
+do not have their own codes; the Runestaff is in the possession of a
+monster (and is thus in the same room with it) while the Orb of Zot is
+“disguised as” a warp, and in fact behaves as one.
+
+C$(): an array of the 34 strings describing different room contents; the
+34th is the dummy entry "X".
+
+I$(): an array of the 34 characters to display different room contents
+on the map.
+
+9590–9620: a subroutine to pick a randomly chosen empty room and set
+its contents to Q, returning its results in X, Y, and Z.
+
+C: a 3×4 array of ints.  C(1,4), C(2,4), and C(3,4) are used to
+represent whether the player is afflicted with particular curses, I
+think — a leech that drains your gold, lethargy that makes you move
+more slowly, and forgetfulness, which slowly erases your map.  These
+curses are found in particular empty rooms.  This logic is in lines
+2940–3050.
+
+Lethargy apparently just makes you eat more often, but not eating
+doesn’t harm you.  This has the feeling of an unfinished feature.
+However, lethargy also gives monsters the initiative in combat.
+
+H: the last time you ate.
+T: The current time.
+
+W$(): an array of weapon and armor names; NO WEAPON is index 1,
+while NO ARMOR is index 5.
+
+E$(): an array of 8 dishes one can cook from monsters.
+
+WV: one less than the index of your current weapon in W$(), or 0 if
+you are empty-handed.
+
+AV: 5 less than the index of our current armor in W$(), or 0 if you
+are empty-handed.
+AH: your armor’s health or armor’s hit points; when this reaches 0,
+the armor is destroyed.
+
+LF: 1 if the player has a lamp, 0 otherwise.
+FL: the number of flares the player has.
+BL: 1 if the player is blind, 0 otherwise.
+BF: 1 if the player has a book stuck to their hands, 0 otherwise.
+
+T(): an array of 8 ints which are 1 if the player possesses the
+corresponding treasure or 0 otherwise.  These are in the same order as
+the numbers for the room contents; for valid indices, T(Q) represents
+the possession of C$(Q+25).
+
+O(): an array of 3 ints containing the coordinates of the Orb of Zot
+R(): an array of 3 ints containing the coordinates of the Runestaff
+
+O$: the returned user input from the subroutine at 9830 or other input
+subroutines
+
+FNA(Q): returns a random number in [1, Q]
+
+FNB(Q): returns Q wrapped to the range [1, 8] (i.e. (Q-1) % 8 + 1),
+which is what you want for wrapping coordinates to the 3×3×3
+hypertorus structure of Zot’s castle
+
+FNC(Q): returns Q if Q<19, otherwise 18; used for saturating
+arithmetic on character attribute values (strength ST, dexterity DX,
+intelligence IQ), which cannot increase past 18.
+
+FND(Z): returns the index into L at which to find the contents of
+castle room (X, Y, Z).
+
+FNE(Q): returns, roughly, Q % 100 — used to compute the true contents
+of a possibly unmapped room.
+
+X: an X-coordinate in the castle, normally that of the player (but
+also an implicit argument to FND); saved in A when a temporary value
+is needed
+
+Y: a Y-coordinate in the castle, normally that of the player (but also
+an implicit argument to FND); saved in B when a temporary value is
+needed
+
+Z: a Z-coordinate in the castle, normally that of the player; saved in
+C when a temporary value is needed
+
+A, B, C: used to save the player’s X, Y, and Z at times; also used in
+one place temporarily for the coordinates of the Orb of Zot.  Also,
+during combat, A is used to store the index of the monster type (12
+less than its index into C$().)
+
+VF: 1 if vendors are angry with you, 0 otherwise
+
+Y$: a prompt string
+
+NG: the number of games played so far, used to avoid reintroducing the
+game
+
+1–1200: initialization code for the whole program
+
+1240–1390: initialization code for a new game (“restocking the castle”)
+
+9770–9820: subroutine to print a line of asterisks
+
+9830–9870: subroutine to request a generic one-letter choice from the
+user in O$, with two entry points — the entry point at 9830 prints a
+blank line and a prompt, while the entry point at 9850 does not.
+
+2920–8410: the main game turn loop.

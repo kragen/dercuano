@@ -1,0 +1,177 @@
+(See also file `millikiln`.)
+
+There are lots of ways to heat things up to, for example, fire
+ceramics.  Setting things on fire is probably the most fun way, but
+it’s inefficient and hard to control.  You can also concentrate
+sunlight, absorb microwaves, or run electricity through refractory
+wires.
+
+Suppose we reduce the kiln problem to make it easier: we have no
+convection, and we just want to heat the kiln to 660°, the melting
+point of aluminum, using one of the three non-fire methods.  And let’s
+say we’re satisfied with a kiln about the size of a sake cup: 50mm
+across, 60mm tall, 118mℓ.  How much insulation do we need?
+
+(Note that in the sunlight case, you also need a sufficient solar
+concentration factor, which works out to be 42 suns, 4.2 million lux.)
+
+Well, of course, that depends on our power budget.  At 2500 watts the
+problem is easy; at 2 watts the problem is hard.  As a reasonable
+medium, let’s take 500 watts, which is 2 amps here in Argentina, less
+than a toaster, hair dryer, or microwave oven, and about half a square
+meter of sunlight.
+
+With such a small kiln, we aren’t going to get a very good
+approximation by pretending the thermal gradient is constant across
+our insulating wall, but let’s do it anyway.
+
+Our top and bottom walls are 2·π·(25mm)² ≈ 4000 mm²; our outer wall is
+2π·25mm·60mm ≈ 9400 mm²; total is 13400 mm².  Our total thermal flux
+is 500 W/(11400 mm²) ≈ 37 kW/m².  Over a difference of 640 kelvins,
+that’s about 58 W/m²/K.  Expressing this as an insulation value
+(R-value) instead, we have 0.017 m² K/W.  Loose-fill vermiculite is
+17 m·K/W (according to file `regenerator-gas-kiln`, though I don’t
+know where it got that figure) so this requires about 1.2mm of
+vermiculite.  Other insulators are in the ballpark.
+
+So actually the constant-thermal-gradient approximation is going to be
+pretty good.  I’d go with making it 10 mm or 20 mm of insulation
+anyway, just in case, and maybe doubling the linear size of the kiln.
+
+500 watts into 118 mℓ works out to a bit over 4 W/mℓ, which is
+adequate for a few kelvins per second of temperature rise, if somehow
+the whole microkiln is full of solid and yet thermally homogeneous.
+Since that would reach full firing temperature in a few minutes, it
+seems like a more than adequate specific power.
+
+In the sunlight case, say you go with a solar concentration factor of,
+say, 100, just to be safe, and you also go for a whole square meter,
+to get a kilowatt.  Now you are faced with the problem that to squeeze
+the whole square meter into the kiln aperture, which ideally faces
+directly downwards, you must exceed this solar concentration factor;
+the kiln aperture can’t be more than a 500th of a square meter at that
+kiln size.  This is another reason to want to increase the size of the
+kiln, and by more than a factor of 2.
+
+So, revised design parameters: internal volume is a cylinder 150 mm
+across and 100 mm tall.  Now we have 1.8 ℓ of volume, 0.018 m² of
+surface area on the bottom to cut a sun hole in, and 0.059 m² of total
+internal surface area to lose heat through by conduction.  We use 20mm
+of insulating refractory for the walls and floor, which is kind of
+crappy as insulators go, so maybe its insulation value is only
+8 m·K/W; this works out to 0.37 W/K, which means that at 640 K of
+inside-outside temperature difference we need 236 W of power input to
+maintain temperature.  But we actually have 400 W of power, a
+comfortable safety margin, which works out to 230 mW/mℓ, which would
+heat water by about four kelvins a minute if the thing were full of
+water, but in the more reasonable case where it contains like 200
+grams of stuff, we get 40 kelvins a minute, which gets us to full
+firing temperature (disregarding heat loss through the insulation!) in
+15 minutes.
+
+(Hmm, Henan Sinocean says [their high-alumina insulating firebrick][0]
+conducts 0.18 to 0.5 W/m/K, which I guess is insulating at 2 to 5.6
+m·K/W, at a density of 0.3 g/cc for the best insulation up to 1 g/cc
+for the worst.  These numbers are very high for insulating substances,
+barely better than ordinary bricks, but they are only a little worse
+than [the Sheffield Pottery insulating firebrick numbers in
+Wikipedia][1] and the [BNZ Materials insulating firebrick
+brochure][2], and I probably can’t do better, though I might do worse.
+So I might need 40mm of insulation instead of 20mm.)
+
+[0]: http://www.firebrick-refractory.com/Products/Pro_285.html
+[1]: https://en.wikipedia.org/wiki/List_of_thermal_conductivities
+[2]: http://www.bryantrefractory.com/uploads/products/20_9.pdf
+
+400 watts of sunlight is 0.4 m²; a solar concentration factor of 100
+(theoretically capable of reaching 900°) then requires a hole of
+0.004 m², which is nearly a quarter of the floor area, which is still
+probably okay.  A solar concentration factor of 100 could also be
+thought of, in imaging optics, as 10× magnification, or, in antenna
+design, as 20dBi.  Both of these are eminently achievable.  You could
+even reach that level with a trough reflector, though it wouldn’t be
+the easiest way.
+
+[Fusión Refractarios in Avellaneda offers imported 0.81 g/cc 0.3 W/m/K
+1427° firebricks for $87][3], which are 229×114×63mm; at
+$87/(2·229·114 mm²) at 31½mm thick, the cost is $1670 per square
+meter.  I could maybe get two or four of these firebricks and try to
+stick them together.
+
+[Ten meters of Kanthal costs AR$70][4], whether it’s 0.2 mm, 0.3, 0.4,
+or 0.5, and it’s good to 1250° — not ideal for a pottery kiln, but it
+would do.  It’s not clear which Kanthal this is; there are various
+grades of Kanthal; [one is Kanthal AF][5], which is good to 1300° and
+has a resistivity of 1.39 Ω mm²/m, but doesn’t come in such narrow
+gauges.
+
+[3]: http://articulo.mercadolibre.com.ar/MLA-614252011-ladrillos-aislantes-k26-t26-1427-c-livianos-importados-_JM
+[4]: http://articulo.mercadolibre.com.ar/MLA-622365277-kanthal-alambre-para-resistencias-020-030-040-050-_JM
+[5]: http://www.kanthal.com/en/products/material-datasheets/wire/resistance-heating-wire-and-resistance-wire/kanthal-af/
+
+How do I figure out how much wire I need?  In theory you can get an
+arbitrarily large amount of power out of a fixed voltage source by
+putting an arbitrarily small resistance across it, since P = E²/R.
+However, in this case the crucial fact is not really the resistivity
+of the wire — as I thought it was — but its surface area!  It needs
+enough surface area to emit the desired amount of power at its safe
+temperature — at these temperatures, almost entirely as radiant heat.
+
+That’s why the Kanthal data page gives its fully-oxidized emissivity:
+0.7.  So how much wire surface area do I need to emit 400 watts with
+emissivity 0.7 at, say, 1100°?  0.7 σ T⁴ = 141kW/m², so I need
+2800 mm² (0.0028 m²), about 5% of the total inner wall area of the
+microkiln.
+
+That’s somewhat alarming!  But, it turns out, not fatal.
+
+Ten meters of 0.5 mm diameter Kanthal has almost 7900 mm² of surface
+area, and so thus, emitting at 1100°, it emits 1108 watts; at 1200°,
+it emits 1470 W.  So really four meters of it (AR$28) should be
+adequate.  (I’m a little skeptical that the price is actually correct,
+since all the other prices seem to be much higher.)
+
+(Is it bad that I’m ignoring the radiant heat absorbed by the wire?  I
+think it’s okay, since it’s hypothetically so much hotter than
+everything else.)
+
+There *is* the engineering question of making the resistance low
+enough to get enough power out, without making it so low you draw too
+much power.  In this case we want about 2 amps at 220 volts, which
+requires 110Ω.  Four meters of 0.5 mm wire should be about
+10 · 1.39 Ω / (π (¼mm)²), which is close — it’s 28 ohms.  The easy
+thing to do is just go ahead and use a longer wire: at 7Ω/m, you need
+15.5 meters.  Or a narrower one: ten meters of the 0.4 mm wire should
+be just right, and has 12566 mm² of surface area.
+
+At 150 mm diameter, that’s about 20 turns of a spiral around, which
+puts the turns about 5 mm apart up the walls if I don’t coil them.  Or
+I could coil them and use, say, four turns.
+
+The volume of refractory is, say, the difference between a 230mm
+diameter, 180mm height cylinder, and the 150mm diameter, 100 mm
+cylinder space within: 7478 mℓ - 1767 mℓ = 5711 mℓ.  If we take a
+middle-of-the-road figure of 0.7 g/cc for the refractory, it’s 4 kg of
+clay.
+
+To control the temperature, we need a thermocouple, probably AR$200,
+probably type K.
+
+What would this microkiln design look like if I wanted to include
+safety margins to ensure that it would heat up and wouldn’t burn out?
+After all, many unexpected things will no doubt occur — perhaps the
+brick walls will leak, the Kanthal may be a counterfeit that burns out
+at 1100° or has the wrong resistivity, the bricks may conduct more
+than expected, and so forth.
+
+I’m not sure what I would do to give it a *temperature* safety margin
+so that it wouldn't burn up if it hit 1400°, which is a temperature
+I’m extremely interested in.  Except to make it purely solar, I guess,
+or arc-driven.
+The issue is the maximum service temperature of the wire.  Kanthal A-1
+is supposedly good to 1400°, and Kanthal APM is supposedly good to
+1425°.  [Kanthal A-1 is available on MercadoLibre, but at a 15× higher
+price][6].
+
+[6]: http://articulo.mercadolibre.com.ar/MLA-624923350-kanthal-a1-26-awg-importado-lo-mejor-setups-usa--_JM
+

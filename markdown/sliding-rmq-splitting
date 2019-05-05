@@ -1,0 +1,164 @@
+Robust hashsplitting with sliding Range Minimum Query
+=====================================================
+
+Hashsplitting is a process used by bup, `gzip --rsyncable`, and fuzzy
+hashing used for spam and malware detection.  Current hashsplitting
+systems are vulnerable to malicious input and are also needlessly
+inefficient.  By using the linear-time sliding range-minimum-query
+algorithm, we can improve its efficiency measurably and its robustness
+against malicious input dramatically.
+
+Background
+----------
+
+Bup and `gzip --rsyncable` and forensic “[fuzzy hashing][2]” all use a
+sliding-checksum algorithm to split their input data into chunks at
+irregular intervals, determined by the bytes in the neighborhood, in
+such a way that the chunk boundaries will move with insertions and
+deletions into the text.  Bup calls this process “hashsplitting.”
+This generates, effectively, a pseudorandom number at each byte offset
+depending on the previous bytes, and tests it against a customizable
+threshold, or even set of thresholds, in order to figure out where to
+divide into chunks.
+
+### Naïve hashsplit chunk size has a geometric distribution. ###
+
+Since chunk ending is a memoryless (Bernoulli) process, the
+distribution of chunk sizes (the “waiting times”) follows a geometric
+distribution, the discrete analogue of the exponential distribution.
+
+The geometric distribution has a very large standard deviation (in the
+limit, equal to its mean) because occasionally values much larger than
+the mean will result.  For example, here are some interval sizes from
+a Bernoulli process with parameter .001 [0]:
+
+    array([2216,  130,  138,  125,  659,  861, 1708,  421, 1794, 1416,  810,
+            982,  118,  237, 1755,  383,  841,  632,  200,   85, 1062, 1241,
+           1804,  591,  916,  600, 1167,  630,  480,    9,  713, 2656,    2,
+            883,  459,   71, 2753,  599,  389, 2187,  593,  442,  348,  764,
+           3094, 1371,  481, 2667,  194, 1093,  183,  671,  872,  874,  311,
+            345, 1958,  219,   81,  593,  365,  988,  349,  673,  909, 2013,
+            267,  387,  503,  146,  339, 4818,  200, 1393, 1556, 1640, 1257,
+            816, 1618, 1630, 4719,  699,  693, 2515,  161,  505,  782,  922,
+             23,  226,  489, 1757,  933, 1966,  698, 2500,  837,  352, 1508,
+            339])
+
+XXX can I maybe measure the chunk sizes from bup?
+
+The mean waiting time of this process is 1000 (and the mean of these
+variates is 964 and their standard deviation 898) but more than a
+third of them are less than half the mean, and one of them is almost
+three times that.  Two of them are more than four times the mean,
+which is slightly more than typical.
+
+### Geometric chunk size distribution is inefficient. ###
+
+As noted in the [design of bup][1], for many of the applications of
+hashsplitting, although some variability is demanded by the
+application, this large degree of variability is undesirable.
+
+For example, if the above numbers came from using a sliding-checksum
+algorithm to divide a slightly modified 96-kilobyte file into
+roughly-1000-byte chunks and calculate a hash of each, so that we
+could transmit or store only the newly changed chunks, the changes
+will be disproportionately concentrated in the larger chunks, which in
+turn are disproportionately expensive to transmit or store; the 9-byte
+chunk and the 2-byte chunk are very unlikely to have been the ones
+that changed!  So the cost of a chunk is proportional to the *square*
+of the chunk size, which, after all, is why we’re splitting the input
+into chunks in the first place.  In this case, the extra cost is some
+32%.
+
+### Current hashsplitting performance is vulnerable to malicious data. ###
+
+The situation gets worse if the data being handled is actively
+adversarial.  Sliding-checksum algorithms tend to be linear functions
+of the last N bytes, in order to make them efficient to compute.  This
+means that a data-generating adversary who knows the particular
+sliding checksum in use can generate data which will either never
+generate a cut, producing arbitrarily large blocks, or generate a cut
+very frequently — every four bytes for an Adler-32 (as used by `gzip
+--rsyncable`), CRC32, or simple 32-bit checksum, for example.  Under
+some circumstances, this “pathological” data could cause serious
+problems in a program attempting to apply them.  Even if the sliding
+checksum were impractical to calculate preimages for, an attacker
+could still repeat a "separator" sequence of the size of the checksum’s
+window (64 bytes in Bup) that induces a split.
+
+It would be useful to have a pseudorandom algorithm that still
+triggered at the same places after faraway insertions or deletions,
+but whose waiting times didn’t suffer from this large variability and
+vulnerability to adversarial input.
+
+Sliding range minimum query
+---------------------------
+
+Range minimum query, or RMQ, is a well-studied algorithmic problem:
+given some finite sequence H — say, a sequence of hash
+values — efficiently find the index of a minimum value `H[k]` in some
+range [i, j), that is, find a `k` such that
+
+    i <= k < j ∧ ∀n ∈ ℤ: i <= n < j → H[n] >= H[k]
+
+(Of course this works just as well for maxima.)
+
+There are a bunch of data structures for this.  You can precompute a
+table of the results in O(N²) space and time and answer arbitrary
+queries in constant time, or a "segment tree" of the results in O(N)
+space and time and answer arbitrary queries in O(log N) time, along
+with other possibilities.
+
+However, one particular special case is the *sliding* RMQ problem,
+where the window size `j - i` is a constant; this can be computed for
+all possible values, with [the following simple linear-time
+algorithm][3]:
+
+    size = j - i
+    d = make_deque(max_size = size)
+    k = 0
+    for item in H:
+        while d.nonempty() and H[d.rightmost()] > item:
+            d.remove_rightmost()
+
+        d.add_on_right(k)
+        if d.leftmost() <= k - size:
+            d.remove_leftmost()
+
+        yield d.leftmost()
+        k += 1
+        
+Hashsplitting with sliding range minimum query
+----------------------------------------------
+
+If you run the sliding RMQ algorithm over a sequence of hash values
+generated from the text, as long as the values are unique within the
+window, it is guaranteed to generate at least one split per window
+size.  OH FUCK IT CAN GENERATE ONE SPLIT EVERY BYTE.  Is that fixable?
+
+Probably the thing to do is to take, say, every 8KiB window starting
+from the start of the file, and split at the location of the minimal
+hash within that window.  But that requires no algorithmic cleverness
+whatsoever.
+
+[0] Python code for calculating waiting times of a Bernoulli process:
+
+    def bernoulli_process(p):
+        while True:
+            yield random.random() > p
+
+    def intervals(process):
+        i = 0
+           for item in process:
+               i += 1
+               if item:
+                   yield i
+                   i = 0
+
+    x = numpy.array(list(itertools.islice(intervals(bernoulli_process(.999)),
+        100)))
+
+[1]: https://github.com/bup/bup/blob/master/DESIGN "The Crazy Hacker's Crazy Guide to Bup Craziness, by Avery Pennarun"
+
+[2]: http://ssdeep.sourceforge.net/ "Fuzzy Hashing and ssdeep, a program for computing context triggered piecewise hashes (CTPH), by Jesse Kornblum"
+
+[3]: http://wcipeg.com/wiki/Sliding_range_minimum_query

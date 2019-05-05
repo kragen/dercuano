@@ -1,0 +1,222 @@
+I find myself somewhat unexpectedly desiring a new serialization
+format for Python data structures.  This is unexpected because
+Python’s standard library already includes several serialization
+formats: pickle, marshal, json, and xmlrpclib (not counting xdrlib,
+ConfigParser, and struct), and other formats such as bencode are also
+widely used in Python.
+
+(bencode might actually be the right solution, but I can’t look at the
+internet to see right now.)
+
+I’m defining a network protocol for a program I’m writing, and one of
+the things I want to do in this protocol is to pass Python data
+structures over the wire.  I’m not concerned with being able to
+serialize arbitrary class instances — I’d be satisfied with built-in
+data types — but I don’t want a lot of hassle.
+
+The serialization needs to be:
+
+- Secure — all of pickle, marshal, and xmlrpclib have warnings against
+  using them on data from potentially malicious sources, leaving only
+  json of the standard modules.
+- Self-describing — it must be possible to deserialize a serialized
+  value without referring to some external schema information.
+- Self-delimiting — it must be possible to deserialize a serialized
+  value from a byte stream and then continue using the byte stream,
+  for example to deserialize another value that follows it.  This rules
+  out json; I think it rules out bencode but I’m not sure.
+- Dependency-free — its implementation code must be self-contained.
+
+Ideally, the serialization would also be:
+
+- Simple to implement, improving its chances of being secure.
+- Fairly transparent, supporting the full range of commonly-used
+  built-in Python data types, preserving the tuple-list distinction,
+  the int-float distinction, the bytes-unicode distinction, non-string
+  dict keys, Booleans, None, and maybe even sets.
+- Hashable, in the sense that a given Python value is representable by
+  only a single possible byte stream.
+- Capable of serializing class instances, optionally, with an explicit
+  namespace of supported classes.
+- Devoid of arbitrary format limitations, such as limiting strings to
+  2³² bytes.
+- Pure ASCII except when it’s encoding strings that aren’t.
+- Reasonably efficient.
+- Supportable on other programming languages, including old versions
+  of Python.
+
+But it does not need to be:
+
+- Easy to type by hand.  (So length fields are okay.)
+- Super efficient.
+- Capable of serializing functions and/or closures and/or generators.
+- Capable of serializing exotic or very stateful Python types like
+  Ellipsis, xranges, code objects, type objects, memoryviews, file
+  objects, and complex numbers.
+- Capable of representing and restoring sharing or circular data
+  structures.
+- Super easy to read.
+
+Length-free design
+------------------
+
+    val ::= bytes | unicode | tuple | list | dict | boolean | none | int | float
+    bytes ::= '"' stringcontents
+    unicode ::= 'u"' stringcontents
+    stringcontents ::= '"' | stringbyte stringcontents
+    stringbyte ::= [^"\] | '\"' | '\\'
+    tuple ::= '(' tuplecontents
+    tuplecontents ::= ')' | val tuplecontents
+    list ::= '[' listcontents
+    listcontents ::= ']' | val listcontents
+    dict ::= "{" dictcontents
+    dictcontents ::= "}" | val val dictcontents
+    boolean ::= "T" | "F"
+    none ::= "N"
+    int ::= sign digits " "
+    digits ::= [0-9] | [0-9] digits
+    float ::= sign digits "e" sign digits " "
+    sign ::= "-" |
+
+The pairs of vals in a dict are key-value pairs.  Dict keys must
+appear in sorted order by the lexicographical ordering of their
+serializations.  Unicode strings are represented in UTF-8.  The only
+whitespace allowed is that within strings and that following numbers.
+The only case where the next byte is not sufficient to dispatch to the
+appropriate routine is the int/float dichotomy.  Yes, floats are
+expressed without decimal points, so "31416e-4 " is a reasonable
+representation for an approximation of π.
+
+In practice this should be slightly more compact than bencode except
+for large binary strings (which it inflates on average by almost 1%
+but by 100% in the worst case), and much more readable and writable,
+but considerably slower and more error-prone.
+
+As an example, `{"announce-list": [["foo"], ["bar"]], "info":
+{"files": [{"length": 4541, "path": "baz", "safe": False}], (): (1,
+1.0)}}` would be represented as
+`{"announce-list"[["foo"]["bar"]]"info"{"files"[{"length"4541
+"path""baz""safe"F}]()(1 1e0 )}}`.
+
+Length-prefixed design
+----------------------
+
+    val ::= bytelength body
+    bytelength ::= digits
+    digits ::= [0-9] | [0-9] digits
+    body ::= bytes | unicode | tuple | list | dict | boolean | none | int | float
+    bytes ::= 'H' data
+    unicode ::= 'u' data
+    data ::= "" | [\x00-\xff] data
+    tuple ::= '(' vals
+    vals ::= "" | val vals
+    list ::= '[' vals
+    dict ::= "{" pairs
+    pairs ::= "" | val val pairs
+    boolean ::= "T" | "F"
+    none ::= "N"
+    int ::= " " sign digits
+    float ::= "." sign digits "e" sign digits
+    sign ::= "-" |
+
+Here every `val` begins with a decimal representation of the number of
+bytes in the body of its serialization, not counting the initial type
+byte.
+
+As an example, `{"announce-list": [["foo"], ["bar"]], "info":
+{"files": [{"length": 4541, "path": "baz", "safe": False}], (): (1,
+1.0)}}`, the same example value from before, would be represented as
+`100{13Hannounce-list14[6[3Hfoo6[3Hbar4Hinfo58{5Hfiles36[33{6Hlength4
+45414Hpath3Hbaz4Hsafe1F0(8(1 13.1e0`.  This is about 10% bigger than
+the length-free design, and a hell of a lot harder to type or read,
+especially the parts that seem to say “45414H” and “13.1e0”, but can
+be navigated efficiently and can support large chunks of binary data.
+
+Stack-based design
+------------------
+
+Pickle deserializes by interpreting stack-based bytecode similar to
+Python bytecode (which leads one to wonder why they didn’t just use
+Python bytecode).  The pickle-version-0 encoding of the sample datum
+`{"announce-list": [["foo"], ["bar"]], "info": {"files": [{"length":
+4541, "path": "baz", "safe": False}], (): (1, 1.0)}}` is the following
+188 bytes:
+
+    (dp0
+    S'info'
+    p1
+    (dp2
+    S'files'
+    p3
+    (lp4
+    (dp5
+    S'path'
+    p6
+    S'baz'
+    p7
+    sS'length'
+    p8
+    I4541
+    sS'safe'
+    p9
+    I00
+    sas(t(I1
+    F1.0
+    tp10
+    ssS'announce-list'
+    p11
+    (lp12
+    (lp13
+    S'foo'
+    p14
+    aa(lp15
+    S'bar'
+    p16
+    aas.
+
+Here:
+
+* `a` appends an item to a list,
+* `s` appends a name-value pair to a dict,
+* `(` pushes a PostScript-style mark,
+* `t` forms a tuple from the items down to the PostScript-style mark,
+* `l` forms a list (down to the mark),
+* `d` forms a dict,
+* `S`, `I`, and `F` encode strings, ints, and floats (up to the end of
+  the line),
+* `p` names the item on top of the stack so it can be referred to later
+  if there are more references to it, and
+* `.` ends the pickle.
+
+Now, I have no idea why pickle incrementally appends stuff to lists
+and dicts as it builds them.
+`pickle.loads("(S'foo'\nS'bar'\nS'baz'\nI37\nd.")` does return
+`{'foo': 'bar', 'baz': 37}` as you would expect, and changing the `d`
+to an `l` generates the corresponding list.  So I don’t know why `a`
+and `s` exist.
+
+If you wanted to take this approach to make your serialization and
+deserialization as little code as possible, you could use this
+approach:
+
+    op ::= digits intop | '(' | '}' | ']' | ')' | 'T' | 'F' | 'N' | LF
+    intop ::= ' ' | '-' | 'H' data | 'u' data | 'F' data
+    digits ::= [0-9] | [0-9] digits
+    data ::= "" | [\x00-\xff] data
+
+Here the '}', ']', and ')' ops play the role of 'd', 'l', and 't' in
+pickle; LF plays the role of '.'; ' ' specifies that the preceding
+digits just represent an integer (and '-' is the same, but negates
+it); 'H' and 'u' specify that the preceding digits are a count of
+following bytes for a byte string or UTF-8-encoded Unicode string; and
+'F' represents a floating-point number in some way that I’m not
+specifying right now.
+
+As an example, `{"announce-list": [["foo"], ["bar"]], "info":
+{"files": [{"length": 4541, "path": "baz", "safe": False}], (): (1,
+1.0)}}` would be represented as
+`(13Hannounce-list((3Hfoo](3Hbar]]4Hinfo[5Hfiles((6Hlength4541
+4Hpath3Hbaz4HsafeF}]()(1 1F1)}}\n`, which is one byte longer than the
+length-free design, but retains most of the efficiency advantage of
+the length-prefixed design.  I'm not sure there’s a meaningful
+difference, really...

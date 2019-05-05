@@ -1,0 +1,151 @@
+What’s the smallest we can make an imperative programming language to,
+for example, plot points in a framebuffer?
+
+Well, BF is one answer to that question; StoneKnifeForth is another.
+But what about a language that supports subroutines (recursive, with
+arguments, but without closures), conditionals, loops, arrays, and
+arithmetic with infix syntax?  Because I guess I’m not willing to go
+*that* minimal.
+
+A thing you have to think about is whether arrays are valid as
+arguments or not.  That makes a big difference in the flavor of the
+language.
+
+You need some way to declare arrays, but that could be static, like
+subroutines are in C.
+
+Your syntax might look like this:
+
+    program: _ (name '['_ int ']'_ | name '('_ (name, ','_)? ')'_ ':'_ exp)*
+    exp: stmt, ';'_ | '{'_ (exp '->'_)? exp? '}'_ | stmt
+    stmt: name ('=' | '<-' | [-+*/%^&|] '=' | '&^=')_ stmt | cond
+    cond: cmp '?'_ cond ':'_ cond | (cmp, '&&'_), '||'_
+    cmp: val ('==' | '<=' | '>=' | '<' | '>' | '!=')_ val | val
+    val: ((((chain, [*/%]_), [-+]_), ('<<' | '>>')_), ('&' | '&^')_), [|^]_
+    chain: ([-+~]_ chain | atom) ('('_ (expr, ','_)? ')'_ | '['_ exp ']'_)*
+    atom: '('_ exp ')'_ | name | int
+    _: [ \n\t]*
+    int: [0-9]+
+    name: [A-Za-z_] [A-Za-z0-9_]*
+
+In this grammar, the syntax `a, b` means `a (b a)*`; `,` binds more
+tightly than `|`, so `a | b, c` means `a | (b, c)`, and `a, b | c`
+means `(a, b) | c`.  This enables this grammar to get by without
+defining associativity much, though it does define precedence.  It
+also is free of left recursion, enabling a straightforward PEG
+implementation.
+
+Most of this is the same as C or Golang, but the `{ foo -> bar }`
+construct is intended to mean `while (foo) { bar }`, and the
+distinction between `=` and `<-` is that `=` declares and initializes
+a new variable, while `<-` mutates an existing variable.
+(Inconsistently, `+=` and the like are not written `+<-`.)  The
+intended semantics are that everything has a value, including `stmt`,
+but loops return just the zero value of their conditional upon exit,
+rather than anything useful like their last body expression or a list
+of their last body expressions (since we don’t have lists).  Sequences
+`a; b` likewise return the value of the last item in the sequence.
+
+There’s a bit of parsing confusion where a stray `:` after a function
+call could give you a potentially misleading error message.
+
+So here’s a program:
+
+    f[100]
+    fib(): f[0] <- f[1] <- 1; i = 2; {i < 100 -> f[i] <- f[i-1] + f[i-2]; i += 1}
+
+The really lame nature of not being able to initialize data structures
+shows up strongly in this program.
+
+Here’s another.
+
+    minskytron(x, p, n): y = 0; {n -= 1 -> x += y >> p; y -= x >> p; pset(x, y)}
+
+Here’s a toupper function operating on ASCII codes in s.
+
+    s[4096]
+    toupper(i, end):
+        {i < end ->
+            (s[i] >= 97 && s[i] < 97 + 26) ? s[i] -= 64 : 0;
+            i += 1}
+
+This language is somewhat similar in its capabilities to BASIC or bc,
+though it lacks strings.
+
+It is, however, considerably bulkier in the description of its syntax
+than the λ-calculus, Abadí and Cardelli’s ς-calculus, or the ur-Lisp.
+On the other hand, an implementation of an interpreter for it might be
+simpler, since you don’t need any memory management or type testing.
+(You might need subscript error handling.)
+
+PEG syntax
+----------
+
+(See also file `tagging-parser`.)
+
+It’s perhaps worthwhile dwelling a bit on the syntax of the PEG above.
+It doesn’t use negation, but I’m including negation here, since it’s
+an important tool in PEGs in general.
+
+    grammar: (name ':'_ alts)*
+    alts: (seq | seq ','_ seq), '|'_
+    seq: ('!'* (name _ | str | class | '('_ alts ')'_) [?*+]*)*
+    str: "'" ('\\' char | [^\\'])* "'" _
+       | '"' ('\\' char |  [^\\"])* '"' _
+    class: ('[^]' | '[]' | '[^') [^]]* ']'_
+    _: [ \n\t]*
+    name: [A-Za-z_] [A-Za-z0-9_]*
+
+The definition of character classes omits the syntax of ranges, but
+that’s okay as long as we don’t care about the rightmost member of a
+range being `]`.
+
+A big problem with this syntax is that it doesn’t provide a way to tag
+parts of a production so they can be referred to elsewhere.  Following
+the proposal in file `tagging-parser`, let’s use the syntax `name {
+contents }` to tag the range of input matched by `contents` with tag
+`name`.  To achieve this, we could just change the definition of `seq`
+in the above as follows:
+
+    seq: ('!'* (name _ | str | class | '('_ alts ')'_ | name _ '{'_ alts '}'_) [?*+]*)*
+
+Now we can take advantage of this to build an AST, refactoring the
+grammar a bit in the process:
+
+    grammar: _ rule {name ':'_ choice}*
+    choice: choice {alt {term* | item {term*} ','_ sep {term*}}, '|'_}
+    term: '!' negated {term} | modded { atom mods { [?*+]+ } } | atom
+    atom: name _ | str | class | '('_ choice ')'_ | tagged
+    tagged: tagged {tag {name} _ '{' _ spans {choice} '}'} _
+    str: "'" str {('\\' char | [^\\'])*} "'" _
+       | '"' str {('\\' char | [^\\"])*} '"' _
+    class: '[' class {'^'? ']'? [^]]*} ']'_
+    _: [ \n\t]*
+    name: name {[A-Za-z_] [A-Za-z0-9_]*}
+
+Separating nonterminals from tags allows us to avoid constructing
+worthless intermediate nodes in some cases; the `term` rule can
+generate, for example, just a `str` node or just a `class` node,
+rather than a `term` containing an `atom` containing a `str`.  It also
+enables the resulting node to tag just the relevant text, omitting
+irrelevant delimiters.
+
+The idea is that each AST node has a start byte position, an end byte
+position, and a sequence of zero or more child nodes.  In token-like
+cases, the client program is probably more interested in the byte
+positions, while in other cases, it probably only cares about the
+child nodes.  So, for example, a `choice` node in the AST will have
+zero or more `alt` children, none of which children include the `|`
+separators between the alternatives.  The `alt` nodes may have a
+single `item` child and a single `sep` child, or they may have a
+sequence of the possibilities that come from `term`: `negated`,
+`modded`, `name`, `str`, `class`, `choice`, or `tagged`.
+
+The `modded` node structure is an unfortunate result of PEGs’ lack of
+left-recursion; ideally the AST for something like `x*+?` would be
+`optional { oneormore { zeroormore { name "x" } } }`, although of
+course that is a pretty stupid thing to write.  Nowever, once we’ve
+parsed the thing into a lopsided tree structure, it’s pretty easy to
+write imperative code in your language of choice to produce the
+desired structure.  See file `tagging-parser` for another solution to
+this problem.

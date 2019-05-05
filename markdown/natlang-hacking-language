@@ -1,0 +1,146 @@
+To come up with non-words beginning with "sex" consisting of an "s"
+followed by a real word, in bash:
+
+    < ~/devel/wordlist cat | while read freq word
+        do case "$word" in
+        ex*) echo "s$word";;
+        esac
+    done | grep -vf <(< ~/devel/wordlist head -15000
+                      | while read freq word
+                        do echo "^$word\$" done) | head -45 | sort
+
+This is probably the wrong way to do it.  I thought it might be easier
+in Python, but it isn't:
+
+    import itertools
+    words = [line.split()[1] for line in open('/home/user/devel/wordlist')]
+    common_words = set(words[:15000])
+    swords = ('s' + word for word in words if word.startswith('ex'))
+    sorted(itertools.islice((sword for sword in swords if sword not in common_words), 0, 45))
+
+Python’s set type, lazy generator expressions, and implicit file-line
+iteration are useful here, but this still ends up being kind of a lot
+of code, even more than the bash version, in part because genexes are
+pretty pointful, which is in part because Python’s methods are not
+very useful to pass to higher-order expressions like `map` and
+`filter`.
+
+Another thing to keep in mind here is that I invariably write this
+kind of thing incrementally, looking at the results computed by
+intermediate versions, in order to decide what to do next.  For
+example, I added the filter to eliminate existing common words when
+“sexist” showed up in the output, and increased the cutoff from 2000
+to 15000 when it continued to show up.  Traditional
+`function(arguments)` syntax kind of sucks for this, because usually
+you write the arguments left to right (not least because the cursor’s
+implicit motion is to the right as you type), and then you have to
+move back to the beginning to add the `function` bit.  This gets even
+worse when we’re wrapping something in a list comprehension or a
+generator expression.
+
+The ideal environment for writing stuff like this incrementally would
+not be implicitly imperative, so that it could safely evaluate
+intermediate expressions without fear of damage and evaluate lazily
+for responsiveness without fear of confusion; it would allow you to
+add functions on the right; it would use map and filter functions
+rather than list comprehensions or generator expressions; it would use
+CLOS-like generic functions, with ML-like implicit currying, instead
+of methods so that you could use them as map and filter arguments; and
+it would allow you to write the equivalent of `f(a, g(b, h(c, d)))`
+without matching parens.
+
+These requirements actually make it sound a lot like Forth!  But I
+don’t think we need to descend down the rabbit hole of typelessness
+and syntaxlessness to get these advantages.
+
+Here’s a hack at an alternative syntax that maximizes left-to-right
+typability with incremental feedback:
+
+    '/home/user/devel/wordlist' file, split each; 1 th each -> words
+    words, 'ex' startswith only;
+        ('s' ++) each;
+        , (words, :15000 th set) contains not each;
+        :45 th sorted
+
+I’m not sure that's right or even parseable, but here are the things I
+was trying:
+
+- `f(a, b, c)` is written as `a, b, c f`
+- `x = a` is written as `a -> x`.
+- `f(a, g(b, h(c, d)))` is written, with syntax somewhat borrowed from
+  Mark Lentczner’s [Glyphic Script][0], which in turn borrowed it with
+  a semantic change from Smalltalk, as `c, d h; b g; a f`.  I'm not
+  sure that I have the parsing rules down correctly, and it might be
+  better to use `c, d h | b g | a f`.  Also I think both of these do
+  the wrong thing as you type the `c, d h; b` part, because it tries
+  to apply `b` to the results of `h`, though `b` will become merely an
+  argument to `g`; this will result in misleading feedback in the
+  middle.  (The `;,` thing in the middle there makes me think that
+  this is really wrong and I need to rethink it.)
+- For cases where the `,,;,,;` nesting-free syntax is inadequate
+  (because you need nesting in some parameter that isn’t the first
+  one) 
+- `map` is called `each`.  Probably it would be better to default to
+  `flatMap`, but this code is written with the opposite assumption.
+- Sequence indexing `[]` is spelled `th` (as in `4 th`, `5 th`, etc.),
+  and sequences are lazy by default.  This may not be the best
+  spelling.
+- `:` is an infix operator with the same semantics as in Python
+  slicing, except for indexes from the end: it returns a slice object
+  that can be used with `th`.
+- Functions are implicitly curried, making it easy to write functions
+  like `1 th each`, which means λx.each(λy.th 1 y)x in the λ-calculus.
+- There are no functions as separate from methods.  If we need ad-hoc
+  polymorphism, as for `th` and sequence iteration, we use CLOS-style
+  generic functions.
+- `++` is the sequence concatenation function as an infix operator, in
+  order to avoid semantic confusion with the `+` operator for numeric
+  addition, which probably ought to be implicitly lifted to apply over
+  conformable functions and sequences.  I thought about using OCaml
+  `^`, SQL `||`, Perl/PHP `.`, or Lua `..`, but all of those already
+  carry far too much semantic baggage already.
+- `(x op)`, where `op` is an infix operator, is a Haskell-style
+  “section”, meaning λy.x op y.
+- `not` is implicitly lifted to operate over not just booleans but
+  boolean-returning functions.
+- `open` is called `file` and implicitly opens read-only, as in Python
+  2.  Probably opening a file for write should use some kind of IO
+  monad or whatever.
+- `in` is called `contains`, on the theory that `common_words
+  contains` is a sensible phrase with the right meaning.
+- `split` takes a string and optionally a separator.  I need to figure
+  out how to reconcile implicit currying with optional arguments, but
+  I suspect OCaml labeled arguments have my back, and I don’t even
+  have to use their shitty syntax because I’m not backwards-compatible
+  with ML.
+- `filter` is called `only`, so that `words, 'ex' startswith only`
+  returns the items from `words` that start with 'ex'.
+- `sorted` sorts the provided sequence, which is necessarily eager
+  (the last input item might be the first output) but because of lazy
+  evaluation, this only needs to loop until the first 45 items are
+  generated.
+
+[0]: http://www.ozonehouse.com/mark/codeworks.html
+
+The above suggests that it actually is necessary to have some kind of
+separator between a function and its arguments; in this line
+
+    '/home/user/devel/wordlist' file, split each; 1 th each
+
+it’s totally ridiculous that `each` is being applied not only to
+`split` but to the return of `file`.  We could use `.` to apply
+functions and call methods:
+
+    '/home/user/devel/wordlist'.file, split. each, 1.th. each -> words
+    words, ('ex'.startswith). only, ('s' ++). each,
+        (words, :15000.th. set. contains. not). each.
+        :45.th.sorted
+
+Or alternatively we could use `;`, but that’s kind of terrible,
+really, because the whole point of `;` is that its left and right
+precedence are very different:
+
+    '/home/user/devel/wordlist'; file, split; each, 1;th; each -> words
+    words, ('ex'; startswith); only, ('s' ++); each;
+        (words, :15000;th; set; contains; not); each;
+        :45;th;sorted

@@ -1,0 +1,173 @@
+There is a constant-time way to hash the value of a mutable set
+container, which converts some algorithms from O(N²) to O(N).
+
+A mutable set container of T is an abstract data type whose value is,
+at any given time, some set of values of type T; typically these
+support constant-time member addition, member removal, membership
+testing, and iteration over the items contained.
+
+Often these don’t guarantee a particular iteration order because they
+are implemented, for example, using hash tables, which may shrink with
+some hysteresis to preserve the performance guarantee for iteration.
+[The data structure Nayuki calls the Binary Array
+Set](https://www.nayuki.io/page/binary-array-set) is a non-hash-table
+mutable set container structure which can be iterated much more
+efficiently in some arbitrary order.
+
+I am trying to be careful in this essay to distinguish sets, which are
+immutable mathematical objects, from set containers, whose value at
+any given moment is a set, but which contain different sets at
+different times — the relationship is that a set is a possible state
+of a set container.
+
+Hashing sets: a more efficient approach
+---------------------------------------
+
+In Python, *immutable* sets are hashable (if their items are), which
+is a frequently useful feature, but often inefficient — making an
+immutable set from what Python calls a mutable set (what I’m calling a
+mutable set container) involves iterating over all the items.
+
+To make the values of a mutable set container efficiently hashable,
+XOR together the hash values of all of its items, then perform some
+one-to-one transformation that doesn’t commute with XOR, such as
+adding or multiplying some large constant, or computing its SHA-256 or
+Blake2.  This (except for the final transformation) can be done
+incrementally as items are added and removed, and it will always
+produce the same value for the same set of items, regardless of how
+the set was arrived at.
+
+The final transformation here is to ensure that related sets such as
+{1, {2, 3}}, {1, 2, {3}}, and {{{1, 2, 3}}} all have different hash
+values, a feature which seems likely to be desirable in practice.
+
+Doing it this way rather than the standard Python way will convert
+some O(N²) algorithms into O(N) algorithms.  If you add N items to a
+set container one at a time, each time testing a set of hashes to see
+if you may have seen the current state of the container before, this
+will take θ(N) time with this approach, but Θ(N²) time with the Python
+approach.
+
+16-bit example
+--------------
+
+As a 16-bit example, if your set is {4, 5, 8}, your hash function for
+integers is multiplying by 33947 mod 2¹⁶, and your final
+transformation is adding the random number 48709 mod 2¹⁶, then you
+compute ((4 · 33947) ⊕ (5 · 33947) ⊕ (8 · 33947)) + 48709 mod 2¹⁶, so
+the set’s hash value is 19970.  If you store the quantity ((4 · 33947)
+⊕ (5 · 33947) ⊕ (8 · 33947)) mod 2¹⁶ = 36797 in a variable in the
+mutable set container, and you add 10 to the set, you can
+incrementally update it by XORing in 10 · 33947 mod 2¹⁶ = 11790 into
+it, getting 36797 as the new untransformed hash value; upon request,
+you can return it with 48709 added, giving 19970.  If you then remove
+4 from the container, you can XOR 4 · 33947 % 2¹⁶ = 4716 into the
+variable, getting 40401, which you can verify is ((5 · 33947) ⊕ (8 ·
+33947) ⊕ (10 · 33947)) % 2¹⁶.
+
+(The ⊕ character is standard math notation for the XOR operation.)
+
+Minor variants
+--------------
+
+(Alternatively, you can sum the hash values of the items, then use a
+final transformation that doesn’t commute with addition, such as bit
+rotation or XOR with a constant.)
+
+If your item hash functions and final transformation are
+cryptographically secure hashes, then you would be justified in
+concluding that two states of the container are equal if their hashes
+are equal, without iterating over their items.
+
+Possible uses for incrementally hashing sets
+--------------------------------------------
+
+You might argue that it isn’t very helpful for you to keep around a
+hash value for a no-longer-current state of a mutable set
+container — certainly it isn’t useful as a way of finding the set
+container in a hash table, for example.  And in the common case where
+you don't use a cryptographically secure hash, there’s the chance of
+hash collisions.
+
+However, there are uses for this.
+
+One possible use for this technique is in incrementally optimizing NFA
+execution by partial compilation to DFAs (each DFA state corresponds
+to a set of NFA states), which can in the worst case produce a memory
+usage explosion — but if only state-sets that occur many times are
+compiled to DFA states, then the problem is much less severe.  If you
+snapshot states that appear in a list (or Bloom filter) of previously
+seen hashes, then you can recognize them if they come around again.
+
+Another possible use for this technique is in memoizing set
+arithmetic: if you have already computed the union, intersection, or
+set-subtraction of two sets, you may be able to avoid iterating over
+the set items to compute them again.
+
+A third use is in implementing operations on finite binary relations
+represented as sets of pairs — operations which, in addition to the
+set-arithmetic operations mentioned above, might include composition,
+converse, transitive closure, and various kinds of products.
+
+A fourth, very general, use is in combination with a transaction log.
+If you maintain a transaction log in a layer on top of a basic mutable
+set container that supports both insertion and deletion, listing the
+additions and deletions in the log, you can hash positions in the
+transaction log, and the state at each of these positions is
+retrievable in time bounded by the size of the transaction log.  This
+means you can add N items to a set container one at a time, making a
+hash table of the N successive sets that are the states of the
+container, in Θ(N) time, and then retrieve any state from the table in
+Θ(N) time.
+
+This kind of undo/redo journal approach is a very general and
+efficient approach for obtaining FP-persistent† semantics on top of
+ephemeral data structures.  If you bound the transaction log size, you
+can preserve constant-time guarantees for access, but then when the
+journal gets too large, you need to copy the whole data structure to a
+new one with a fresh journal.
+
+In the scenario given, if the transaction log size is k, you can
+retrieve any state in at most k steps, but you need to copy the hash
+table (in the limit, of average size N/2) ⌊N/k⌋ times, requiring N²/2k
+work inserting and deleting.  Depending on the relative frequency of
+probes and updates, and in particular the frequency of access to very
+old states, this approach can often save several orders of magnitude
+of performance — not an asymptotic improvement, to be sure, but good
+enough in many cases.
+
+Note that the Binary Array Set structure mentioned above can be viewed
+as a special case of this approach, where the update log is sorted
+into increasingly larger arrays.
+
+Other approaches to hashing states of mutable set containers efficiently
+------------------------------------------------------------------------
+
+A different approach is to store the sets in a trie, or in a binary
+search tree with a convergent tree balancing algorithm, like the
+jumprope data structure used for sets of large strings — convergent in
+the sense that a tree containing the same set of items will always be
+balanced in the same way.  This way, the hash can be computed on each
+treenode, which additionally enables hash-consing, especially useful
+for FP-persistent data structures.
+
+A third approach is to compute a bloom filter of some fixed parameters
+(or with some fixed sets of parameters) for the items in the set,
+rather than XORing their raw hash values together; then you can hash
+the Bloom filter by, for example, adding its words together at hash
+time.  The bloom filter may be only a few words long (say, 64 or 128
+bits) and yet effective under many circumstances, but there are
+difficult tradeoffs around expected set size.
+
+This approach has the additional benefit that you can directly compute
+bloom filters for unions and intersections, though not set
+subtractions, and the bloom filter may speed up membership tests.
+Bloom filters’ Achilles heel is their lack of support for deletion.
+
+-----
+
+† “Persistent” unfortunately has two conflicting meanings when it
+comes to data structures; functional programmers use it to mean that
+modifying the data structure does not make its previous states
+inaccessible.  By “FP-persistent” I mean this meaning, not the more
+common meaning of “retrievable after rebooting your computer”.
