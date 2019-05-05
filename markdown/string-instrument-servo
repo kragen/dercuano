@@ -1,0 +1,322 @@
+Measuring submicron displacements by pitch bending a slide guitar
+=================================================================
+
+We should be able to get astoundingly precise positional and force
+measurements using the principles by which musical instruments are
+tuned, especially string instruments.
+
+Genesis
+-------
+
+A friend invited me to a work of musical theater tonight; despite the
+astoundingly adept dances, I was captivated by the designs of the
+improvised musical instruments — one being a Blue-Man-Group style PVC
+flapped pipe organ, where the players activate particular pipes by
+whacking their upper ends with heavy rubber flaps, and others being a
+sort of dulcimer or harp with six to ten strings each, in which one
+end of the string was anchored to the center of the bottom of a
+topless tin can, which can was screwed down to a wooden table, and the
+other end of the string was anchored to a hard object fastened to the
+table some distance away (I’d call it a “barrel”, but in this context
+that word might be taken literally).
+
+The thing that most captivated me was the extreme pitch bend the
+player would sometimes extract from the string by squeezing the can a
+little bit.  Perhaps the rim of the can would lift by ten millimeters
+under this treatment, so the bottom where the string was anchored
+might be changing its natural position by two millimeters or so, but
+in all likelihood the can top was substantially more compliant than
+the string, so perhaps the string end was being displaced by half a
+millimeter or less out of the 500 millimeters or so of the string’s
+length: a variation in length on the order of one part in a thousand.
+Nevertheless, the pitch bend was quite audible and even extreme, maybe
+more than a semitone.
+
+Position sensing mechanisms
+---------------------------
+
+It occurred to me that this pitch-bending could be the foundation of
+very precise measurement techniques for measuring distance and thus
+size.
+
+### Audible pitch bending from string tension change ###
+
+Electric guitar players commonly do pitch bends by shoving their
+guitar strings a centimeter or so to the side along the fret, thus
+lengthening the string.  (Or they use the whammy bar, if they have
+one.)  If the string is one meter in length, this would lengthen it to
+√(1 m² + 1 cm²) = 1.00005 m, about 0.05 millimeters over a meter.
+Clearly the pitch bend is giving us a measurement of the string length
+that is sensitive to variations of some 50 parts per million, even
+better than I estimated in the paragraph above.  (But maybe the
+strings connected to the cans weren’t steel.)
+
+How sensitive should we expect pitch bending to be to the position on
+the end of the string?
+
+[The Wikipedia article on the musical cent
+says](https://en.wikipedia.org/wiki/Cent_(music)#Human_perception)
+that humans can directly hear pitch differences once they’re larger
+than 5–25 cents, depending on musical training, on how high the pitch
+is, and on the harmonic content of the sound.  A cent is a variation
+in frequency of about 578 parts per million, so the just-noticeable
+difference is on the order of 5000 to 20000 parts per million.  The
+[psychoacoustics article
+claims](https://en.wikipedia.org/wiki/Psychoacoustics) human frequency
+resolution is about 3.6 Hz in the 1–2 kHz octave, which is 1800 to
+3600 ppm.
+
+[The Wikipedia article on classical guitar strings
+says](https://en.wikipedia.org/wiki/Classical_guitar_strings) and [the
+Wikipedia vibrating-string article confirms and explains in more
+detail](https://en.wikipedia.org/wiki/Vibrating_string) that the
+velocity of waves in strings is √(T/μ), where μ is the linear mass
+density and T is the tension.  We can extrapolate that when the
+strings approach zero tension, the wave velocity (and thus the
+frequency) approaches zero, and when the tension varies by 1000 parts
+per million, the wave velocity varies by 500 parts per million.  The
+frequency should vary by less than 0.5%, since the length of the
+string and its mass density are also changing, but the difference in
+those is much smaller, because the tension varies proportional to the
+difference from the string’s natural length, while the length and mass
+density vary proportional to its difference from zero length, which is
+orders of magnitude larger.
+
+So we should expect an audible pitch bend when the string *tension*
+changes by something like 5000 to 10000 parts per million, 0.5% to 1%.
+At most, for a steel string, the tension elongates the string by about
+1% — after that, I think music wire will break, though most steels
+would deform plastically first — so you should always be able to hear
+an elongation of 2% of that, 0.02% of the total length, 200 parts per
+million.  This is pretty close to the electric guitar number above.
+
+But that’s the *worst* case!  We can do much better by putting the
+string under less tension.  In theory, this should give us arbitrarily
+precise measurement of the string length, though only over
+correspondingly arbitrarily short distances.  Indeed, I think this is
+one reason musical instruments are strung tightly, so that they won’t
+go out of tune easily, and so that the string frequency doesn’t rise
+for louder notes.  In practice, I’m confident you can get one order of
+magnitude improvement: a length resolution of 20 parts per million.
+
+### Inaudible pitch bending and frequency counters ###
+
+That, though, is assuming we’re trying to detect the length by ear
+alone.  Even a purely acoustic apparatus could improve on that: use
+two strings — a reference string of fixed length tuned to, say,
+3000 Hz, while the measurement string is tuned to 3010 Hz at its
+default position.  These will audibly beat at 10 Hz, more so if the
+second harmonic is attenuated (for example, by plucking or striking
+them in the center).  It should be easy to hear differences in the
+beat frequency of 2 Hz or less, allowing an experimenter to hear
+variations in pitch of some 700 ppm, and thus variations in tension of
+1400 ppm and in length of about 1.4 ppm.
+
+But if we’re thinking of an electronic measuring apparatus, rather
+than a purely acoustic one, we could straightforwardly just use a
+frequency counter to measure the frequency; these routinely have
+absolute accuracy of better than 1 ppm, and short-term precision even
+better than that.  I think that would allow you to measure variations
+in length of about 0.001 ppm, 1 ppb.
+
+At audio frequencies with guitar-sized 1-meter-long strings, 1 ppb is
+1 nm, about 10 carbon atoms.  If you use the same string under the
+same tension but only 100 mm of length, you get three octaves higher
+pitch (on the order of 10 kHz instead of 1 kHz) and resolution of
+0.1 nm, about one carbon atom.
+
+### Electric guitar pickups ###
+
+You can use an electric guitar pickup to detect very small movements
+of the string.  Linearity isn’t important, since the frequency is what
+we’re interested in.
+
+### The slide guitar mechanism ###
+
+The string-stretching mechanism described so far (call it the “whammy
+bar mechanism”) has one big drawback: the apparatus is very large
+compared to the displacements being measured.  So our hypothetical
+100-mm-long, 0.1-nm-resolution sensor described above is only capable
+of making any measurement at all over the range of about a millimeter
+before breaking the string, and only about 300 μm with precision in
+the 0.1-nm range.
+
+As an alternative, instead of altering the pitch of the string by
+stretching it, we could alter its pitch by sliding a “bottleneck”
+along it, as in slide-guitar playing.  Only the length of the string
+up to the bottleneck vibrates, so its frequency gives us a
+proportional measurement of the bottleneck’s position.  This way, a
+meter-long sensor, for example, could read out a location anywhere
+within a 500-mm length while staying within a single octave.
+
+The precision is correspondingly lower, but if you’re using a
+1-ppm-error frequency counter, you still get 1-micron resolution over
+a meter.
+
+### Trombone pipes ###
+
+As an alternative to strings, you could use a column of air as your
+resonant medium, sliding one pipe inside another to continuously vary
+its length.  The only advantage of this that occurs to me is that you
+can use any material at all.  The precision and range should be
+comparable to the slide-guitar mechanism.
+
+### Delay line noise correlation and matched impedances ###
+
+The above resonant mechanisms have certain problems with noise
+susceptibility and ringdown: it’s quite reasonable to imagine that
+there might be vibrations in the environment within the range used by
+the instrument, and it would pick them up and could give erroneous
+readings as a result.  Moreover, once they are resonating at some
+frequency, that vibration itself could bounce around inside solid
+bodies and be picked up even after the distance has changed — in
+effect, the instrument in the past produces its own interference in
+the future.
+
+Instead of measuring a resonant frequency, though, you could generate
+random noise, or better still LFSR noise, and feed it into the
+measurement medium at one point and then read it back out — either at
+the same point after it’s rebounded from the far end, or
+electronically at some other point, and measure the time lag with
+maximum correlation instead of a resonant frequency.  In this case,
+the resonance of the medium is actually undesirable, and you can use
+the same matched-impedance technique used in electronic signal
+transmission lines to prevent repeated reflection back and forth and
+the resulting resonance.  That way, the signal you detect is a clean
+copy of a single lagged version of your input signal, not a sum of
+many past segments of the signal at different lags, progressively more
+attenuated.
+
+A particularly interesting approach here is the slide-guitar approach,
+using non-contact sensing of vibrations in a wire as they travel past,
+for example using magnetic pickups, so that several sensors can share
+a single wire, which can end damped by a felt pad or something like
+that, beyond the sensors; or the trombone approach.
+
+### Free-air measurements ###
+
+Once resonance is no longer needed, you might be able to dispense with
+the string or pipe and just transmit the ultrasonic noise signal
+through free air, permitting distance measurements at many points in
+space and thus triangulation.  Stray reflections may give rise to
+multipath ghosting, but hopefully they can be kept manageable.
+
+Sources of error
+---------------
+
+There are a variety of reasons that the temporal measurement from any
+of the three mechanisms discussed above might vary for reasons other
+than the displacements that we want to measure.  We can try to
+eliminate these, or we can try to measure them and correct for them.
+For example, a free-air system should have at least one microphone a
+known, fixed distance away from the sound source, in order to correct
+for variations in the speed of sound in air.
+
+### Temperature ###
+
+The natural length of the string will vary as it expands and contracts
+under the influence of temperature, potentially altering its tension,
+but in itself this need not introduce a large error — if the frame
+it’s stretched on expands and contracts by the same proportion, its
+tension should remain constant.  This may be difficult, since making
+the frame from music wire is probably not practical, and even if it
+is, the properties of music wire should vary by diameter.
+
+The slide-guitar mechanism will, however, have a
+temperature-proportional error in position: if a movement causes the
+frequency to change by 0.1%, that represents a movement of 0.1% of its
+total length.  But if it has expanded from 1000 mm to 1000.5 mm due to
+temperature, that 0.1% is now 0.10005% of its original length.
+
+I think the whammy-bar mechanism will also have an analogous error:
+the Young’s modulus of the string material will not remain constant
+with temperature, and indeed I think should have roughly the same
+thermal coefficient as the material’s natural length.
+
+Steel’s coefficient of thermal expansion is about 10.8 ppm/° around
+room temperature, so we’re easily looking at a 100 ppm error here if
+temperature is not controlled.
+
+The trombone mechanism, however, suffers greatly from temperature
+drift, since the speed of sound in gases varies as the square root of
+the temperature.  A variation of 2% in the temperature (5.5°) thus
+changes the tuning or time lag of the tube by 1%.
+
+A potentially much bigger problem for the whammy-bar mechanism is
+that, when the surrounding temperature changes, the string will reach
+the new temperature much sooner than the frame will; and if a human
+handles the device, they will warm it up where they touch it.  If the
+string is steel 10° warmer than the steel frame, it will be ≈108 ppm
+longer, but if its strain was only 1000 ppm, that’s an error of 11%,
+110’000 ppm, in the strain.
+
+The use of Invar or some similar material might be worthwhile if the
+apparatus cannot be protected from such variations in temperature.
+
+### Humidity and pressure ###
+
+Solid materials should be pretty immune to pressure (at least until
+the mass of the air around the string becomes significant compared to
+that of the string — steel weighs about 8000 times as much as the same
+volume of air, and air’s density varies only proportional to pressure,
+so this should be a source of uncontrolled variation of frequency in
+the 1 ppm range).  Steel is pretty immune to humidity, too, but other
+possible string materials might be hygroscopic.
+
+The trombone mechanism, including the free-air version, suffers the
+most here: although to first order the speed of sound in air doesn’t
+vary with pressure, it does vary with humidity; since water replaces
+some air molecule with water molecules of roughly half the weight, it
+speeds up sound transmission by up to about half a percent,
+introducing a half-percent error (5000 ppm) in the distance
+measurement.
+
+### Creep ###
+
+Creep can reduce tension over time if a string is under constant
+tension.  Steel doesn’t creep much at room temperature, which is how
+pianos can stay in tune for months or years at a time, but other
+possible string materials (and, even more so, frame materials) might
+creep rather badly.  And it might be that these mechanisms are
+sensitive enough to detect creep phenomena in steel that usually go
+undetected.
+
+### Latency ###
+
+It’s desirable for position transducers to respond as rapidly as
+possible to help keep control loops stable.
+
+The resonant approaches suffer from the need for vibrations to build
+up over potentially several round trips; the noise-correlation
+approach avoids this, but still requires at least one round trip if
+the microphone is colocated with the speaker.  Sound in air travels at
+only 343 m/s, so measuring a distance of a meter is going to take
+about 3 ms.  Music wire can transmit vibrations faster but you’re
+still potentially looking at milliseconds of latency if you wait for
+the reflection.
+
+However, with the noise-correlation approach, if you locate the sensor
+at the place whose position you’re measuring, you don’t suffer this
+latency (except in the whammy-bar mechanism, which inherently averages
+the propagation time over the time the signal is traveling through the
+string).  You just need enough signal to correlate so that you don't
+get misled by noise.  So you could have a feedback latency measured in
+microseconds (assuming the vibration frequencies are sub-MHz) instead
+of milliseconds.
+
+Measuring force instead of displacement
+---------------------------------------
+
+The wire we’re talking about here is elastic, which is how sound waves
+can travel over it in the first place.  Up to now, the force needed to
+stretch it has been nothing more than a nuisance — hopefully we can
+use a thin enough wire that it doesn’t exert too much force and
+disturb the thing we’re trying to measure.  But what if we use that
+very elasticity?  Instead of stretching the string on a frame, hang an
+unknown mass from it and weigh it by way of measuring the sound
+propagation speed on the string.  It’s like the whammy-bar mechanism,
+but now our guitar has no neck.
+
+Again, we should expect to be able to measure the lag with an error of
+about 1 ppm, translating to 2 ppm error in the tension, with (I'm
+guessing) 11 ppm/° of thermal error.
