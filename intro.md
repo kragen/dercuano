@@ -49,10 +49,10 @@ Many of the dates are only approximate.
 
 ### Size and public-domain dedication ###
 
-On 2019-05-04 as I write this, the Dercuano tarball is 1.2 megobytes
-and contains almost 475,000 words in 185 notes,
-about 1600 paperback pages’
-worth of text.  This is about a quarter of the total amount
+On 2019-05-05 as I write this, the Dercuano tarball is 1.5 megabytes
+and contains some 570,000 words in 256 notes,
+about 2000 paperback pages’
+worth of text.  This is about a third of the total amount
 of text I have here and intend to include.  I’m still importing notes
 to add to it.
 
