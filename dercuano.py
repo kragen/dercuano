@@ -18,7 +18,7 @@ Next up:
   package is 33MB.
 
 """
-from __future__ import print_function
+from __future__ import print_function, division
 import cgi
 import errno
 import os
@@ -219,8 +219,13 @@ class Note:
 
     def extra_ley(self):
         date = self.date_string()
-        return [' ', date, ' ' if date else '',
-                '(', str(self.word_count()), ' words)']
+        return [' ', date, ' ' if date else '', self.minutes_string()]
+
+    def minutes_string(self):
+        # Wikipedia’s Reading article says "reading for comprehension"
+        # is 200–400 words per minute.
+        minutes = round(self.word_count() / 300)
+        return '(%d %s)' % (minutes, pluralize('minute', minutes))
 
     def word_count(self):
         if self._word_count is None:
@@ -266,6 +271,7 @@ class Note:
                          if categories else [])
 
         subtitle = ley(div(self.author(), ', ', self.date_string(),
+                           ' ', self.minutes_string(),
                            **{'class': "metadata"}))
         return html.replace('</h1>', '</h1>' + subtitle, 1)
 
@@ -304,6 +310,9 @@ class Note:
                 for word in re.findall(r'\w+', line):
                     yield word.lower()
 
+
+def pluralize(noun, number):
+    return noun if number == 1 else noun + 's'
 
 def markdown_replacing_links(bundle):
     def replace(s):
