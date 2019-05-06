@@ -1,5 +1,8 @@
 So I’ve been thinking about how to render low-computational-cost
-textures in 2D.  I have a few different objectives in mind:
+textures in 2D, for a few different reasons.
+
+Objectives
+----------
 
 - Ultra-low-power e-paper computing systems; the objective here is for
   the energy cost of generating the texture data to be comparable to
@@ -64,12 +67,13 @@ textures in 2D.  I have a few different objectives in mind:
 
 [0]: https://danluu.com/input-lag/
 
-So, all of these different ways that you can use low-computational-
-cost texture generation have different computational budgets (175
+So, all of these different ways that you can use low-computational-cost
+texture generation have different computational budgets (175
 instructions per pixel for e-paper, 16 for bitbanging NTSC, 80
 instructions and 400 multiply-accumulates for the laptop scenarios),
 but they’re all kind of in the same ballpark.  Moreover, they’re in a
-completely different world from the 6 MHz 1 Dhrystone MIPS 68000 and
+completely different world from the Macintosh with its
+6-MHz 1-Dhrystone-MIPS 68000 and
 its 9" 512×342 CRT, which I am assuming refreshed at around 60 Hz,
 giving it a dot clock a bit over 10 MHz — 10 pixels per instruction.
 They are, respectively, 1750 times faster, 160 times faster, and 800
@@ -110,33 +114,33 @@ Techniques
 To read
 -------
 
-<http://www.iquilezles.org/www/articles/simplewater/simplewater.htm>
-<http://demo-effects.sourceforge.net/>
-<https://github.com/ocornut/imgui>
-<http://www.lofibucket.com/articles/64k_intro.html>
-<http://www.iquilezles.org/www/articles/morenoise/morenoise.htm>
-<http://jcgt.org/published/0004/02/01/>
-<https://www.shadertoy.com/view/4ttSWf>
-<http://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm>
-<http://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf>
-<https://www.slideshare.net/DICEStudio/five-rendering-ideas-from-battlefield-3-need-for-speed-the-run>
-<http://web.archive.org/web/20180306233623/https://prideout.net/blog/?p=63>
-<http://www.microscopics.co.uk/blog/2010/paulstretch-an-interview-with-paul-nasca/>
-<https://web.archive.org/web/20160325174539/http://freespace.virgin.net/hugo.elias/graphics/x_water.htm>
-<https://github.com/intel/opencl-intercept-layer/blob/master/docs/kernel_isa.md>
-<https://nlguillemot.wordpress.com/2017/01/30/intel-gpu-assembly-with-pix-beta/>
-<https://www.x.org/docs/intel/CHV/intel-gfx-prm-osrc-chv-bsw-vol03-gpu-overview.pdf>
-<https://01.org/sites/default/files/documentation/intel-gfx-prm-osrc-hsw-3d-media-gpgpu-engine_0_1.pdf>
-<http://renderingpipeline.com/graphics-literature/low-level-gpu-documentation/>
-<https://doc.lagout.org/electronics/Intel-Graphics-Architecture-ISA-and-microarchitecture.pdf>
-<https://01.org/linuxgraphics/downloads/stack>
-<https://01.org/linuxgraphics/downloads/2018q1-intel-graphics-stack-recipe>
-<https://linuxhint.com/gpu-programming/>
-<https://software.intel.com/en-us/articles/introduction-to-gen-assembly>
-<https://en.wikipedia.org/wiki/Simplex_noise>
-<http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf>
-<flafla2.github.io/2014/08/09/perlinnoise.html>
-<https://mzucker.github.io/html/perlin-noise-math-faq.html>
-<https://en.wikipedia.org/wiki/Perlin_noise>
-<https://thebookofshaders.com/11/>
-<http://web.archive.org/web/20160304052449/http://www.noisemachine.com/talk1/>
+- <http://www.iquilezles.org/www/articles/simplewater/simplewater.htm>
+- <http://demo-effects.sourceforge.net/>
+- <https://github.com/ocornut/imgui>
+- <http://www.lofibucket.com/articles/64k_intro.html>
+- <http://www.iquilezles.org/www/articles/morenoise/morenoise.htm>
+- <http://jcgt.org/published/0004/02/01/>
+- <https://www.shadertoy.com/view/4ttSWf>
+- <http://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm>
+- <http://erleuchtet.org/~cupe/permanent/enhanced_sphere_tracing.pdf>
+- <https://www.slideshare.net/DICEStudio/five-rendering-ideas-from-battlefield-3-need-for-speed-the-run>
+- <http://web.archive.org/web/20180306233623/https://prideout.net/blog/?p=63>
+- <http://www.microscopics.co.uk/blog/2010/paulstretch-an-interview-with-paul-nasca/>
+- <https://web.archive.org/web/20160325174539/http://freespace.virgin.net/hugo.elias/graphics/x_water.htm>
+- <https://github.com/intel/opencl-intercept-layer/blob/master/docs/kernel_isa.md>
+- <https://nlguillemot.wordpress.com/2017/01/30/intel-gpu-assembly-with-pix-beta/>
+- <https://www.x.org/docs/intel/CHV/intel-gfx-prm-osrc-chv-bsw-vol03-gpu-overview.pdf>
+- <https://01.org/sites/default/files/documentation/intel-gfx-prm-osrc-hsw-3d-media-gpgpu-engine_0_1.pdf>
+- <http://renderingpipeline.com/graphics-literature/low-level-gpu-documentation/>
+- <https://doc.lagout.org/electronics/Intel-Graphics-Architecture-ISA-and-microarchitecture.pdf>
+- <https://01.org/linuxgraphics/downloads/stack>
+- <https://01.org/linuxgraphics/downloads/2018q1-intel-graphics-stack-recipe>
+- <https://linuxhint.com/gpu-programming/>
+- <https://software.intel.com/en-us/articles/introduction-to-gen-assembly>
+- <https://en.wikipedia.org/wiki/Simplex_noise>
+- <http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf>
+- <flafla2.github.io/2014/08/09/perlinnoise.html>
+- <https://mzucker.github.io/html/perlin-noise-math-faq.html>
+- <https://en.wikipedia.org/wiki/Perlin_noise>
+- <https://thebookofshaders.com/11/>
+- <http://web.archive.org/web/20160304052449/http://www.noisemachine.com/talk1/>

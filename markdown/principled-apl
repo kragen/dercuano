@@ -9,11 +9,15 @@ language that is more expressive (in the sense of more power in less
 tokens), more readable, and more efficient than traditional
 array-processing languages.
 
+Though I think the present note is self-contained, the initial
+development of the idea was in file `matrix-multiply` in probably 2007
+or 2008.
+
 The basic idea
 --------------
 
 A variable in a computer program has a value that varies.  Sometimes
-when a piece of code runs, it will have one value; other times, it
+when a piece of code runs, the variable will have one value; other times, it
 will have another value.  (In many languages it can change even during
 the same run, but that is not relevant to what I am considering here.)
 
@@ -41,7 +45,7 @@ languages like C or Java.
 Some examples from ray-tracing
 ------------------------------
 
-Consider this C code, from My Very First Raytracer:
+Consider this C code, from [My Very First Raytracer]:
 
     static color
     pixel_color(world here, int ww, int hh, int xx, int yy)
@@ -50,6 +54,8 @@ Consider this C code, from My Very First Raytracer:
       ray rr = { {0}, normalize(pv) };
       return trace(here, rr, 1.0);
     }
+
+[My Very First Raytracer]: http://canonical.org/~kragen/sw/aspmisc/my-very-first-raytracer
 
 This code is invoked a number of times with the same `world`, `ww`,
 and `hh` variables, but with varying values for `xx` and `yy`; but you
@@ -79,7 +85,7 @@ The C code enforces a particular order of evaluation: it is not
 capable of beginning to evaluate a second call to `trace()` until the
 first one is done, and no way to evaluate a second call to
 `pixel_color` until the first one is done.  But this may not be the
-most efficient way to do what we’re doing here.
+most efficient way to find out what color the pixels should be.
 
 The C code, you’ll notice, also has a fair bit of syntactic overhead
 associated with allowing these variables to vary; they have to be
@@ -99,8 +105,9 @@ temporary structs.)
 A language with an APL-like evaluation strategy could figure out that
 `xx` and `yy` vary independently, while `ww` and `hh` don’t vary at
 all, and so generate a ρ`xx`×ρ`yy` space of possibilities for the
-`vec`s that we’re normalizing.  (More detail on how to do this is in
-the next section.)
+`vec`s that we’re normalizing, where ρ is the APL operator that gives
+the shape of a matrix.  (More detail on how to do this is in the next
+section.)
 
 I think that’s the ultimate philosophical justification for APL’s
 conformability and broadcasting rules; if you’re ray-tracing 640

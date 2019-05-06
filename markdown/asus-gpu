@@ -1,0 +1,66 @@
+So the “i915” Intel graphics are actually part of the N3700 SoC
+<https://en.wikichip.org/wiki/intel/pentium_(2009)/n3700>, launched in
+2015, which is a 1.6GHz quad-core amd64 CPU with 16 Braswell “HD
+graphics” execution units, running at 400MHz.
+
+<https://ark.intel.com/products/87261/Intel-Pentium-Processor-N3700-2M-Cache-up-to-2-40-GHz->
+
+<https://en.wikipedia.org/wiki/List_of_Intel_graphics_processing_units#Eighth_generation>
+says this is of Intel’s “eighth generation”, and its core config is
+“128:16:2” with 25.6 GB/s memory bandwidth, which means 128 FP32 ALUs,
+16 EUs (“execution units”, each containing 2 SIMD-4 FPUs), and 2
+subslices, each containing 8 EUs and a 4 texels-per-clock sampler.  It
+also says that each EU is capable of 8 multiply-accumulates per clock
+cycle (one per ALU, I guess) in single-precision floating-point, but
+16-bit floating-point is capable of “2× floating-point performance”.
+Also they can do integer operations at the 32-bit floating-point
+speed, or 64-bit floating-point at ¼ the 32-bit speed.
+
+Doing the math, that suggests that it can do 400 * 128 million
+single-precision multiply-accumulates per second, or 51.2 billion.
+Intel likes to double-count these multiply-accumulates, as if the
+addition and the multiplication were two separate operations, which
+dishonestly inflates their published flops counts by a factor of 2.
+
+By contrast, <https://en.wikipedia.org/wiki/Nvidia_Tesla> says the
+NVIDIA Tesla V100 GPU Accelerator, released in 2017, reaches 14900
+single-precision Gflops, about 300 times faster.  And
+<https://en.wikichip.org/wiki/intel/hd_graphics_630> says the later
+Kaby Lake GPUs reach 134 single-precision GFlops with 24 EUs at 350
+GHz, so maybe it’s plausible.
+<https://news.ycombinator.com/item?id=18146625> says the V100 also
+costs US$10k, which is about 30× what my laptop costs, so the laptop
+has 10× worse price-performance.
+
+It supports OpenCL and GLSL.
+
+<https://github.com/Themaister/GLFFT> is an FFT implementation that
+has been tested on another GPU in the family.
+<https://software.intel.com/en-us/intel-opencl> is OpenCL which I
+think supports it.
+<https://en.wikichip.org/w/images/f/f4/Compute_Architecture_of_Intel_Processor_Graphics_Gen8.pdf>
+is a detailed description of the compute architecture.
+
+<https://01.org/linuxgraphics/downloads/2018q1-intel-graphics-stack-recipe>
+calls Gen8 “Coffee Lake”.
+
+<https://software.intel.com/en-us/articles/introduction-to-gen-assembly>
+is an introduction to its assembly language.
+
+So an interesting thing here is that the GPU can do 51.2 billion
+single-precision multiply-accumulates per second, or 51.2 billion
+32-bit integer ops.  But the CPU is 1.6 GHz with four cores, each of
+which supports the SSE4.2 instruction set extensions, which supports
+SIMD operations on 128-bit vectors of, among other things, four 32-bit
+floating-point or integer values.  Supposing that each core is capable
+of running one such instruction each cycle, that’s 1.6 · 4 · 4 = 25.6
+gigaflops of single-precision floating-point.  This is only half the
+power of the GPU, but still, I think, substantially more than the
+CPU’s non-SIMD capabilities.  There are even SIMD instructions that
+allow you to use these 128-bit registers as 8 16-bit integers or 16
+8-bit integers, though nothing for half-precision floats.
+
+The problem with the SIMD i386/amd64 instructions — other than being
+only having half the total computrons — is that there are a shitload
+of them, and the instruction set is quite irregular, in large part due
+to backward-combatibility concerns.

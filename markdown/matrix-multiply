@@ -1,6 +1,3 @@
-Summary
--------
-
 If you infer parametric types for variables used to index arrays (and
 then for functions that have them as arguments, and functions that
 call them, and so on), I think you can substantially simplify code
@@ -12,11 +9,14 @@ reflectively at run-time, you can get some additional power.
 Although the idea looks like it might be a bit clumsier than I was
 thinking at first, I still think it may have some merit.
 
+(Further development of the idea is in file `principled-apl`, from
+2015 to 2018.)
+
 Major Problems
 --------------
 
 I think this needs static domain (i.e. dependent type) inference to
-work at all (see in the "Efficiency" section) but maybe it's an
+work at all (see in the “Efficiency” section) but maybe it’s an
 interesting idea anyway.
 
 I sort of took for granted that you would want C-style curried arrays,
@@ -25,12 +25,13 @@ say a[i] and get an array b[j].  But this seems to have led to some
 extra complexity in the definition of asymmetric-union, in the kinds
 of domain inference that can plausibly be done in different
 situations, and even in the notation to define a two-dimensional
-matrix "narrowed" from some underlying function.
+matrix “narrowed” from some underlying function.
 
-Backus's Matrix Multiply Program
+Backus’s Matrix Multiply Program
 --------------------------------
 
-So I've been reading John Backus's 1977 Turing Award lecture paper.
+So I’ve been reading John Backus’s 1977 Turing Award lecture paper.
+(See file `backus-rebuttal` for more commentary.)
 In it, among other things, he gives this definition in his FP language
 for matrix multiplication:
 
@@ -55,9 +56,9 @@ where (less rigorously than in the paper)
     x is multiplication
     [fn1, fn2, ...fnx]:z = <fn1:z, fn2:z, ... fnx:z>
 
-    IP is his previously given program for the dot product of two
-    vectors (contained in a vector of two items), which reads as
-    follows:
+IP is his previously given program for the dot product of two
+vectors (contained in a vector of two items), which reads as
+follows:
 
     Def IP = (/+) o (alpha x) o trans
 where
@@ -71,9 +72,9 @@ If you put it all together and squeeze, you get
 A Simpler Matrix Multiply Program
 ---------------------------------
 
-So I couldn't help but think, leaving aside all Backus's points about
+So I couldn’t help but think, leaving aside all Backus’s points about
 algebraic manipulations of programs and how his unreadable point-free
-style is so cool --- let's go to the other extreme!  Wouldn't it be
+style is so cool — let’s go to the other extreme!  Wouldn’t it be
 easier if you could instead write this?
 
     MM[m][n][i][j] = sum(k) { m[k][j] * n[i][k] }
@@ -91,40 +92,40 @@ so that ((((MM m) n) i) j) is the same as (MM m n i j):
 Unifying Arrays With Functions
 ------------------------------
 
-I've thought for some time that it would be interesting to have a
+I’ve thought for some time that it would be interesting to have a
 programming language where arrays and dictionaries are treated as
-kinds of functions --- they have the distinction that their domains
+kinds of functions — they have the distinction that their domains
 are finite, but that is the case for many functions.
 
-"sum" in the program above is intended to range its dummy variable
+“sum” in the program above is intended to range its dummy variable
 across all possible valid indices.  Evaluating it for some particular
-i, j pair requires it to interrogate m for its domain --- and, more
+i, j pair requires it to interrogate m for its domain — and, more
 interestingly, (n i) for that i.  (What it should do in the case where
-the two domains are different, I'm not sure; probably it should signal
+the two domains are different, I’m not sure; probably it should signal
 an error by default.)
 
 Given that n has some associated thunk that yields its domain for such
-purposes, it's clear to see that the compiler could construct a
+purposes, it’s clear to see that the compiler could construct a
 similar domain thunk for the result of (MM m n), which would merely
-call n's domain thunk; and for, say, (MM m n 2), given that this
+call n’s domain thunk; and for, say, (MM m n 2), given that this
 reduces to (lambda (j) (sum k (* m k j) (n 2 k))), it can infer that j
-can range over the domain of (m k j) for some k.  (Again, it's not
+can range over the domain of (m k j) for some k.  (Again, it’s not
 clear what to do in the case that the domains are different for
 different values of k; if the domain of (MM m n 2) is never requested,
-the issue doesn't arise, but if it is, it might be a good idea to
+the issue doesn’t arise, but if it is, it might be a good idea to
 signal an error by default rather than taking their intersection.)
 
 Domain Inference as Type Inference
 ----------------------------------
 
-This "domain inference" is really just a kind of type inference, so it
+This “domain inference” is really just a kind of type inference, so it
 ought to be possible to do it at compile time.  Maybe we could
 statically infer that MM has a type something like
 
     ('a:'b -> 'c:'d -> 't) -> ('e:'f -> 'a:'b -> 't) 
         -> 'e:'f -> 'c:'d -> 't
 
-(I'm assuming here that multiplication has the type 't -> 't -> 't,
+(I’m assuming here that multiplication has the type ‘t -> ‘t -> ‘t,
 i.e. it can only multiply two things of the same type.  There are
 other alternatives, but I think that for static inference to work, the
 compiler at least has to know whether or not multiplication is going
@@ -147,7 +148,7 @@ flow through them as well:
 This is a function which, given a function such as a one-dimensional
 vector, and a zero value to extend it with, makes it into a
 one-dimensional vector with a domain of indices greater by 1 in each
-direction.  I'm using made-up functions "domainbegin" and "domainend"
+direction.  I’m using made-up functions “domainbegin” and “domainend”
 to return the minimum and maximum+1 values of the domain, which
 presumably therefore must consist of a single contiguous sequence of
 integers.  This is a useful abstraction to have when, say,
@@ -166,7 +167,7 @@ at which point you could deduce that the domain of i was the union of
 -1:0 (i.e. {-1}), 4:5 ({4}), and 0:4 (the domain of vec), which union
 comes out to -1:5.  Is there an easier way, say, one that could be
 done at compile time?  Even one that required restructuring
-"zeroextend"?  I don't think macros per se particularly help here.
+“zeroextend”?  I don’t think macros per se particularly help here.
 Maybe you could say:
 
     (define (zeroextend vec zero i)
@@ -179,9 +180,9 @@ Maybe you could say:
 Termination
 -----------
 
-I'm not claiming that you can infer which inputs will lead to an
-infinite loop.  That "Total Functional Programming" approach is not
-something I'm considering here, although it does kind of look
+I’m not claiming that you can infer which inputs will lead to an
+infinite loop.  That “Total Functional Programming” approach is not
+something I’m considering here, although it does kind of look
 interesting.
 
 Narrowing
@@ -214,7 +215,7 @@ desired range)
 Inference Rules for Primitives
 ------------------------------
 
-So if we want to infer the domain for some parameter, and it's being
+So if we want to infer the domain for some parameter, and it’s being
 used somewhere deep inside of a context that has some known domain, we
 can often solve it.  Here is a non-exhaustive list for cases of
 contiguous integer ranges; p is the parameter whose domain we want to
@@ -237,7 +238,7 @@ infer, and k is a constant.
     (max p k) as n:m => p as -inf:m if k >= n; complicated otherwise
     (abs p) as n:m => p as -m+1:m if n <= 0 and m > 0; complicated otherwise
 
-My hypothesis here is that these rules don't have to successfully
+My hypothesis here is that these rules don’t have to successfully
 analyze every possible program; it just has to be possible to write
 programs that they can analyze that do what you want, at least most of
 the time.
@@ -258,7 +259,7 @@ more restricted domains inferred for them; for example, the domain of
 (lambda (i) (m (+ i 1)) is the same size as the domain of m, but
 offset by 1; and (lambda (i) (m (/ i 2))) is twice the size of the
 domain of m.  (And depending on what kind of division that is and
-whether m's range consists only of integers, it might have twice as
+whether m’s range consists only of integers, it might have twice as
 many elements.)
 
 Parameters that are not used at all therefore could have any value,
@@ -267,35 +268,35 @@ require deciding what to do in the case of overlapping, but not equal,
 domains.  (Maybe there should be a default, and maybe the default
 should be to intersect the domains rather than to raise an error.)
 
-This is reminiscent of the restrictions placed by Girard's "linear
-logic" and Henry Baker's "Linear Lisp", in which each variable must be
+This is reminiscent of the restrictions placed by Girard’s “linear
+logic” and Henry Baker’s “Linear Lisp”, in which each variable must be
 used exactly once in a particular path of execution.  In this case,
 some paths of execution (those that depend on the value of the
-variable itself) may not count, but that's perhaps a detail.
+variable itself) may not count, but that’s perhaps a detail.
 
 Perhaps the solution, then, is to require or allow explicit
 duplication of parameters that are used for things with more than one
 domain, specifying how to resolve differences between the two.  For
-example, you could define a "deltas" function as follows:
+example, you could define a “deltas” function as follows:
 
     (define (deltas vec i)
       (- (vec (+ i 1)) (vec (intersecting i))))
 
-to specify that the domain inferred for the second "i" is to be
+to specify that the domain inferred for the second “i” is to be
 intersected with the other inferred domain, rather than raising an
-error.  (I'm not sure that this shouldn't be the default.)
+error.  (I’m not sure that this shouldn’t be the default.)
 
 Domain Inference In Conditionals
 --------------------------------
 
 So if we have (if cond result alt), what do we do?
 
-If the cond tests a parameter we're trying to infer information about,
+If the cond tests a parameter we’re trying to infer information about,
 we may be able to infer something about the values that parameter can
 take in the branch taken.  If we have (if (< i 2) (foo i) (bar i)),
-then we know that in the i<2 case, we're interested in foo's domain,
-and in the i>=2 case, we're interested in bar's domain.  So if foo's
-domain is 0:10 and bar's is -10:5, the correct domain to infer is 0:5:
+then we know that in the i<2 case, we’re interested in foo’s domain,
+and in the i>=2 case, we’re interested in bar’s domain.  So if foo’s
+domain is 0:10 and bar’s is -10:5, the correct domain to infer is 0:5:
 
 - first we construct -inf:2 and 2:inf domains;
 - we intersect -inf:2 with 0:10 and get 0:2;
@@ -304,7 +305,7 @@ domain is 0:10 and bar's is -10:5, the correct domain to infer is 0:5:
 
 (This gets tougher if we have ((if (< i 2) foo bar) i).)
 
-Suppose the conditional doesn't test the parameter of interest,
+Suppose the conditional doesn’t test the parameter of interest,
 though.  Now the domain is harder to figure out.  Should we intersect
 the domains computed for the two branches, as if they both got
 executed (a conservative approximation to the domain)?  Should we
@@ -329,7 +330,7 @@ I recently wrote this C function:
         }
 
 The table sqrtx256[ii] contains (int)(0.5 + 256 * 16 * sqrt(ii)) for
-values of ii up to max_sqrtx256; that's the rounded value of 
+values of ii up to max_sqrtx256; that’s the rounded value of 
 256 * sqrt(ii * 256), or sqrt(ii << 8) << 8.  For largish values of
 sqr, it linearly interpolates sqrt(sqr) between two adjacent values
 from that table, but I found that was too inaccurate for small values
@@ -354,27 +355,27 @@ sqrt:
 Now, if sqrtx256 has a known domain, it should be straightforward to
 infer the domains for approx1 and approx2, given appropriate rules for
 (>> x constant) and (+ x constant).  (In my case, it happened that
-approx1's domain was a subset of approx2's.)  So it would be nice to
+approx1’s domain was a subset of approx2’s.)  So it would be nice to
 construct a combined function that used approx1 for arguments within
-its range, and approx2 when they were outside of approx1's range but
-within approx2's --- a sort of asymmetric union ---
+its range, and approx2 when they were outside of approx1’s range but
+within approx2’s — a sort of asymmetric union — 
 
     (define interp_sqrt (asymmetric-union approx1 approx2 
                                           (lambda (x) (* (sqrt x) 256))))
 
 You can define asymmetric-union, for two functions and a single
 argument, as follows, in terms of the valid? predicate from the
-earlier "zeroextend" function:
+earlier “zeroextend” function:
 
     (define (asymmetric-union x y i) (if (valid? (x i)) (x i) (y i)))
 
-I'm not sure to what extent you can write an asymmetric-union that
+I’m not sure to what extent you can write an asymmetric-union that
 works for an arbitrary number of arguments.
 
 Space-Time Tradeoffs as Annotation
 ----------------------------------
 
-In general it's desirable when you can have the actual code to solve a
+In general it’s desirable when you can have the actual code to solve a
 problem in one place, while the optimizations that make it possible to
 execute the code with adequate speed are somewhere else.  SQL
 databases are probably the most-widely-known example of this; indices
@@ -394,19 +395,21 @@ difficult to determine whether the code is actually correct.
 
 Another common way to separate the optimizations from the semantics is
 to put the optimizations in the compiler, or even in the CPU.  While
-this is very economically efficient --- it allows all programs
-compiled by the compiler or run on the CPU to get the benefit --- it
+this is very economically efficient — it allows all programs
+compiled by the compiler or run on the CPU to get the benefit — it
 has a certain incentive problem, namely that the guy who thinks his
-code runs too slowly usually isn't in a position to modify the
+code runs too slowly usually isn’t in a position to modify the
 compiler or the CPU to speed it up.
 
 So recently I was computing, in Numerical Python, a bunch of animation
-frames of expanding haloes for a game-like program I was writing.  (I
-say "game-like" because it doesn't have a score or a goal; it's a
+frames of expanding haloes for [a game-like program I was writing][Pygmusic].  (I
+say “game-like” because it doesn’t have a score or a goal; it’s a
 simple sound sample sequencer.)  The NumPy code that renders a frame
-looks more or less like this, although I'm leaving out the stuff that
-computes the RGBA palette (indexed by 'take' in the last line),
+looks more or less like this, although I’m leaving out the stuff that
+computes the RGBA palette (indexed by ‘take’ in the last line),
 interacts with SDL, and handles varying object lifetimes.
+
+[Pygmusic]: http://canonical.org/~kragen/pygmusic
 
         # inputs are size, max_age, fuzz, age
         shape = (size*2, size*2)
@@ -435,7 +438,7 @@ this improved the situation to a slightly perceptible slowdown the
 first few times the larger halo was used (since only a few of the
 frames would be requested each time), but introduced a couple of
 visible levels of indirection into the code.  Now the NumericHaloMovie
-object has a __getitem__ that renders frames on KeyError, and there's
+object has a `__getitem__` that renders frames on KeyError, and there’s
 a get_halo_movie function that stores references to the existing
 NumericHaloMovies and creates new ones when needed.  This extra code
 complicates the task of someone who wants to see where the images are
@@ -445,7 +448,7 @@ In a system where the contents of arrays, the contents of
 dictionaries, and the return values of functions are defined the same
 way and accessed the same way, the decision about whether and how a
 particular function is memoized would not need to be part of that
-function's actual code.  You could simply say somewhere:
+function’s actual code.  You could simply say somewhere:
 
     (declare-concrete rsq density colors)
 
@@ -489,12 +492,12 @@ The Python code is clearer, I think.  Infix syntax helps for numerical
 things!  Also, the two-layer-deep narrow-to-int-range thing is a mess.
 
 However, this looks a lot like what I would write in C, and
-consequently isn't all that novel; none of the variables (other than
-discrete-colors) have what you'd think of as a matrix value.
+consequently isn’t all that novel; none of the variables (other than
+discrete-colors) have what you’d think of as a matrix value.
 
 I tried writing a version in which the variables x and y were passed
 explicitly to each thing that needed them, making it clear that, say,
-rsq and density varied by pixel, while max_level and palette didn't.
+rsq and density varied by pixel, while max_level and palette didn’t.
 So they were arrays, in a sense.  But it was far more wordy than this
 version.
 
@@ -511,9 +514,9 @@ sprites and shaped windows.
 Efficiency
 ----------
 
-Of course if you're checking (dynamically or statically) that the
-parameters you're passing to a function are inside a domain where that
-function won't violate any array bounds, you can leave off checking
+Of course if you’re checking (dynamically or statically) that the
+parameters you’re passing to a function are inside a domain where that
+function won’t violate any array bounds, you can leave off checking
 for that inside the function.  This subsumes a lot of the kind of type
 checking needed for safety and dynamic dispatch as well.
 
@@ -524,16 +527,17 @@ multiply program I had at the beginning:
 
 When you are evaluating, say, (MM m n 3 4), you check upon entry to MM
 that 3 is within the relevant domain, given m and n.  Then, in the
-inner loop, you don't need to do much bounds checking:
-- you know 3 is within the domain of m, because that's where the range
+inner loop, you don’t need to do much bounds checking:
+
+- you know 3 is within the domain of m, because that’s where the range
   of (MM m n) came from;
-- you know k is within the domains of (m 3) and n, because that's
+- you know k is within the domains of (m 3) and n, because that’s
   where its values came from.
 
 However, you still need to verify that (n k j) is valid, each time
-through the loop, because in the dynamic approach, you don't know if
+through the loop, because in the dynamic approach, you don’t know if
 each of the (n k) is a different length.  I think that this is a
-serious problem because it means you can't actually find out what the
+serious problem because it means you can’t actually find out what the
 domain of (MM m n 3) is at all.
 
 If you are calling MM from inside some larger loop, you may be able to
@@ -543,27 +547,26 @@ approach.  For example, if for some reason you were to write
     (sum i (sum j (MM m n i j)))
 
 then, each time through the inner loop, you would know that i and j
-were within the bounds of (MM m n) because that's where the sum
-operators are getting them, so you wouldn't need to do any
+were within the bounds of (MM m n) because that’s where the sum
+operators are getting them, so you wouldn’t need to do any
 bounds-checking inside at all.
 
 Other Related Stuff
 -------------------
 
-Neel Krishnaswami said, in a thread on Fortress, "Look at Hongwei Xi's
+Neel Krishnaswami said, in a thread on Fortress, “Look at Hongwei Xi’s
 work on Dependent ML <http://www.cs.bu.edu/~hwxi/DML/DML.html>.
 Checking matrix sizes was the first thing I thought of when I read his
-work."  So far, I haven't.
+work.”  So far, I haven’t.
 
-From http://www.haskell.org//pipermail/haskell/2004-August/014397.html
+From <http://www.haskell.org//pipermail/haskell/2004-August/014397.html>
 
-    Our example is `bsearch', taken from the famous paper "Eliminating
-    Array Bound Checking Through Dependent Types" by Hongwei Xi and Frank
-    Pfenning (PLDI'98).  Hongwei Xi's code was written in SML extended
-    with a restricted form of dependent types. Here is the original code
-    of the example (taken from Figure 3 of that paper, see also
-    http://www-2.cs.cmu.edu/~hwxi/DML/examples/)
-
+> Our example is `bsearch', taken from the famous paper "Eliminating
+> Array Bound Checking Through Dependent Types" by Hongwei Xi and Frank
+> Pfenning (PLDI'98).  Hongwei Xi's code was written in SML extended
+> with a restricted form of dependent types. Here is the original code
+> of the example (taken from Figure 3 of that paper, see also
+> <http://www-2.cs.cmu.edu/~hwxi/DML/examples/>)
 
     ] datatype 'a answer = NONE | SOME of int * 'a
     ]
@@ -593,6 +596,6 @@ From http://www.haskell.org//pipermail/haskell/2004-August/014397.html
     ] end
     ] where bsearch <| ('a * 'a -> order) -> 'a * 'a array(size) -> 'a answer
 
-    The text after `<|' are dependent type annotations. They _must_ be
-    specified by the programmer -- even for internal functions such as
-    `look'.
+> The text after \`<|' are dependent type annotations. They _must_ be
+> specified by the programmer -- even for internal functions such as
+> \`look'.
