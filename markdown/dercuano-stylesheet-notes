@@ -1,8 +1,8 @@
-I want to spiff up the Dercuano display a little so that it is
+I wanted to spiff up the Dercuano display a little so that it would be
 pleasant to read, but more with the objective of being like a book
-than being like an advertising brochure.  (When I started writing
+than being like an advertising brochure.  [When I started writing
 this, the only CSS thing I’d done was give it a max-width to keep the
-lines from being 2000 pixels long.)
+lines from being 2000 pixels long.]
 
 But what does a book look like?  What does a good web page look like?
 
@@ -63,6 +63,42 @@ megs.  So I pretty much have to rely on system fonts for Dercuano,
 since keeping the download bundle self-sufficient and small is pretty
 much the whole point.  (Also, I can’t find a Noto subset that includes
 the Latin letters this text is written in.)
+
+Later, though, on [Fernando Irarrázaval’s blog], I found the ET Book
+Bembo-like font family, which has been released under the MIT license
+by Edward Tufte and its authors, Dmitry Krasny and Bonnie Scranton.
+The four fonts I’m including, three of which I’m using, gzip to 180K,
+even though they cover all of Latin-1, plus a bit more!  And it’s
+beautiful, especially the italic, and it has old-style figures.  It
+even has ligature glyphs, although mysteriously the browser doesn’t
+use them, apparently because the font isn’t specifying the necessary
+context rules.
+
+So I’ve switched to ET Book.  But the 22px size I was using before
+(DejaVu Serif, the system default) is a lot bigger than the 22px size
+of ET Book.  The equivalent ET Book size is nearly 28px.  Now DejaVu
+Sans Mono looks dramatically oversized, its x-height being nearly as
+tall as the Antiqua capitals.  So I twiddled several things to
+compensate:
+
+- I used ET Book 26px as the default, reducing the line-height from
+  1.5 to 1.4 to compensate;
+- I reduced `<pre>` and also `<code>` to font-size: 80%;
+- I shortened max-width from 45em to 35em.
+
+These are somewhat suboptimal if ET Book doesn’t load for some reason
+(maybe your browser doesn’t support .ttf webfonts, although Firefox
+and Chromium do) but not catastrophic.  In particular the line length
+in ET Book is a little longer than I would like so that it's not
+uncomfortably short if ET Book fails to load.
+
+Characters not covered by ET Book are typically problematic, e.g., the
+lowercase Greek in the title of file `plato-inferior`, because they
+are larger, wider, bolder, and have less stress than ET Book, at least
+on my machine.  I’m not sure what to do about that; shipping Cardo is
+not an option, as it would add a megabyte or more to the package size.
+
+[Fernando Irarrázaval’s blog]: https://fernandoi.cl/blog/posts/altair/
 
 Books
 -----
@@ -961,8 +997,7 @@ surrounding text’s #fff — darker still for the headers (#eaecf0),
 which are bold and centered; they have substantial padding `(padding:
 0.2em 0.4em`) in the table cells.
 
-<a name="gwern">Gwern</a>
--------------------------
+<h2 id="gwern">Gwern</h2>
 
 Gwern’s website is set in a serif font (body text and headers too)
 with justified paragraphs, indented where they follow other paragraphs
@@ -971,7 +1006,8 @@ caps (in some cases, like
 [magnesium](https://www.gwern.net/nootropics/Magnesium), quite
 elaborate ones); no leading between paragraphs; and browser-provided
 hyphenation.  Some of the headings use small caps (with
-`font-feature-settings: 'smcp'`), though this varies by epoch; others
+`font-feature-settings: 'smcp'`
+rather than `font-variant: small-caps`), though this varies by epoch; others
 use caps.  He mostly uses old-style numerals (`font-variant-numeric:
 oldstyle-nums`).  These would be unremarkable choices for a book, but
 on a web page they seem radical.  There is more leading above headings
@@ -1058,6 +1094,27 @@ contents.
 
 Eccentrically, he adds a light gray background to `<q>`s.
 
+[Fernando Irarrázaval’s blog]
+-----------------------------
+
+Fernando Irarrázaval has a very pretty blog.  He’s using ET Book (it’s
+where I first saw it), falling back to Palatino for characters like
+_**∞**_, and he has a .newthought class to make the first word of a
+blog post small-caps and half a magstep larger (1.4 rem, while the
+body text is 1.2 rem).  He takes advantage of the ample margins on
+modern screens to replace “footnotes” with “sidenotes” in the margin,
+in smaller text (1 rem), with the numbers in red ink.  (The ample
+margins are due to the fact that they basically don’t support
+multi-column text.  I don’t know what his hand computer strategy is;
+hand computers barely have enough room for a single column.)  Source
+code blocks have a light grey background, and syntax highlighting done
+server-side with Pygments.  As you’d expect from a Tufte fan, tables
+have a single thin rule separating headers from body.  Figures are
+centered but sometimes are “captioned” in the margin to the right, as
+well as having source code above.  His `<ul>`s are without bullets,
+but with plenty of whitespace, to the point of having uncomfortably
+short line lengths.
+
 Firefox default styles
 ----------------------
 
@@ -1081,7 +1138,7 @@ everything has a 28.1px margin-bottom and a font-size of 42px.
 Typewriter type
 ---------------
 
-One complicating factor is that I use Markdown’s typewriter type
+One complicating factor is that I use Markdown’s typewriter type `<pre>`
 fairly often to “quote” things from character-cell terminals, which
 normally have at least 80 columns.  It would be nice for those quotes
 to fit into the column.  Here’s an 80-column box:
@@ -1105,6 +1162,12 @@ That worked nicely!  And 22 pixels (which Firefox is indeed
 interpreting as 22 of the literal screen pixels) is still only 10
 points on my screen, and I still get 25 or 30 lines in the browser
 window, so the larger size doesn’t compromise readability.
+
+Later I switched this to “80%” and applied it to `<code>` too, because
+once I switched to the old-style ET Book font with its small x-height,
+the much larger x-height of DejaVu Sans Mono made it jump out of lines
+unpleasantly.  80% works out to 18px rather than 19px at the default
+font size of 22px; at the new larger 26px size, it’s 21px.
 
 A possible tweak might be to add 10% (I don’t know, 0.03em or so) of
 letter-spacing to body text to reduce the number of words per line,

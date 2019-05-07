@@ -49,7 +49,7 @@ Many of the dates are only approximate.
 
 ### Size and public-domain dedication ###
 
-On 2019-05-05 as I write this, the Dercuano tarball is 1.5 megabytes
+On 2019-05-05 as I write this, the Dercuano tarball is 1.7 megabytes
 and contains some 570,000 words in 256 notes,
 about 2000 paperback pages’
 worth of text.  This is about a third of the total amount
@@ -61,3 +61,10 @@ whole or in part, modified or unmodified, with or without credit; I
 waive all rights associated with it to the maximum extent possible
 under applicable law.  Where applicable, I abandon its copyright to
 the public domain.  I wrote and published Dercuano in Argentina.
+
+The exception to the above public-domain dedication is the ET Book
+font family used, licensed under [the X11
+license](liabilities/LICENSE.ETBook).  This doesn’t impede you from
+redistributing or modifying Dercuano but does prohibit you from
+removing the font’s copyright notice and license (unless you also
+remove the font).
