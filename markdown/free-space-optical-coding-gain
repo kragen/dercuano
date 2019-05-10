@@ -1,0 +1,70 @@
+I was thinking about Wi-Fi and infrared remote controls for TVs and
+air conditioners today.  (Did you know there used to be infrared
+802.11 access points too?)  Remotes don’t work if you don’t point them
+at the air conditioner (or TV or whatever), although the infrared
+light they emit is pretty bright, as bright as a bright flashlight.
+But it’s modulated at a barely ultrasonic frequency; the first TV
+remote controls were in fact ultrasonic chimes pinged with a hammer,
+and bizarrely manufacturers have continued using the same frequencies
+despite using a completely different medium.
+
+A remote-control receiver receives about -54 dBm of signal
+----------------------------------------------------------
+
+I’m not totally sure, but I’m guessing that these remotes use infrared
+LEDs with a forward drop of about 1.5 volts, a current of about 40 mA,
+and an efficiency on the order of 4%.  (Typical LEDs have a luminous
+coefficient around 3%, although modern illumination white LEDs can
+reach 25%, but I’m assuming that these advances haven’t translated to
+the infrared LEDs used in remotes.)  That would work out to 2.4 mW of
+light energy, or +3.8 dBm, which is then emitted with an “antenna
+gain” of about 6 dBi (thus EIRP ≈ 6.2 dBm) spread over a sphere of
+perhaps two meters radius (50 m² of surface) and detected by a
+phototransistor of radius perhaps 8 mm (5e-5 m²), so the received
+signal should be about 60 dB below the EIRP, or about -54 dBm.
+
+But Wi-Fi works with orders of magnitude less than that
+-------------------------------------------------------
+
+Wi-Fi often achieves sustained, consistent data transmission despite
+signal levels below -70 dBm, sometimes below -100 dBm.  GPS receivers
+detect even weaker signals.
+
+What does the optical environment look like for that kind of thing?
+-------------------------------------------------------------------
+
+What if you used the spread-spectrum coding-gain approach used by GPS
+receivers and Wi-Fi receivers, but for local optical communication?
+You can easily modulate ordinary LEDs at over a megahertz, and now
+that CRT TVs are dying out, I think there aren’t many sources of
+megahertz-range optical noise in households.  Common illumination and
+taillight LEDs are typically pulsed, but only on the order of 100 Hz,
+in order to reduce switching losses; I think their 10,000th harmonic
+is going to be very weak, precisely because of those switching losses
+(aside from having a very low duty cycle even if the switching were
+perfect).
+
+There *is* still the problem that direct sunlight is 100 kilolux, and
+even indoor room lighting is 50–500 lux, while the light you’re able
+to transmit from an infrared LED is also only about 100 lux a few
+dozen millimeters in front of the LED, maybe 1 lux or less at the
+sensor.  Even if the infrared light coming in an open window is
+effectively constant over microsecond-scale time periods, it still
+gives rise to shot noise at your infrared sensor.  We usually think of
+shot noise as going away as signal levels rise, but actually it
+increases; it’s just that it increases proportional to only the square
+root of the signal, so the signal increases even more.  But in this
+case the sunlight “signal” carries no information, and an increase in
+shot noise proportional to its square root could eventually swamp the
+information-carrying signal.
+
+In the 1000-ms response time of a conventional remote control, you
+could transmit literally a million bits, giving you the possibility of
+up to 60 dB of coding gain.  (I think?  I’m kind of guessing about the
+limits of coding gain here.  I should go back and really understand
+information theory.)
+
+The key problem with light is that it is easily blocked, and even when
+multipath transmission can get it around obstacles, it’s heavily
+attenuated.  But, by the same token, there’s no need to share
+bandwidth or avoid interfering with reserved bandwidth.

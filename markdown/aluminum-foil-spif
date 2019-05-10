@@ -1,0 +1,109 @@
+I’m sitting in a café with a wall covered in embossed tiles, which I
+think are plastic painted to look like brass with a heavy patina.
+Some parts of the tiles have a sort of leather pattern, while other
+parts have raised floral designs and the like.
+
+Despite the enthusiasm for 3-D printing via FDM, most of the things
+people make with it have very limited mechanical properties; instead
+they primarily are of interest because of their appearance — the
+infill is commonly a honeycomb or cross pattern with 60% to 90% empty
+space inside the outer shell.  But appearance is mostly a function of
+the surface — entirely so, in the case of opaque objects.  So perhaps
+a process that shapes only a surface may be of interest.
+
+Single-point incremental forming, or “SPIF”, is an emerging industrial
+process for rapid prototyping, which is to say it barely works at all
+and it’s slow, but flexible.  The idea is that you clamp a metal sheet
+around the edges and poke it with a stick; in cross section in ASCII
+art:
+
+
+     |clamp|     | |            |clamp|
+     -------      U             -------
+     ----------------------------------
+     -------                    -------
+     |clamp|                    |clamp|
+
+Where you poke it, you make a divot by stretching (“forming”) the
+metal out the other side of the sheet, and if you drag the stick along
+the surface without letting up the pressure, you can make a groove.
+(Generally you use a rounded-end tool and you lubricate and/or rotate
+it to keep it from sticking.)  You can see the same process in action
+if you try to write on paper with a ballpoint pen with no ink.
+
+Where this gets interesting is that if you make the groove, say,
+circular, the metal inside the groove has nothing pulling it up, so it
+gets pulled down to the level of the bottom of the groove, making a
+flat circular depression.  Then you can do the process again inside
+there to make the depression deeper, and so on.  The same
+considerations of thinning, wrinkling, springback, and work-hardening
+that apply to deep drawing apply here, but since SPIF is mostly used
+for one-offs where you can’t afford the investment to make stamping
+dies (though sometimes people use it with dies too) you need to use
+FEM software to simulate them.
+
+(The low-tech approach to this whole thing is hammering sheet metal
+into shape over a form.)
+
+I was thinking that maybe you could do this with aluminum foil with
+really minimal force.  Aluminum foil also has the advantage that it’s
+thin enough that you can easily cut it with a spark; and, if you need
+to anneal it, you can be sure of a uniform temperature through the
+thickness of the material, and since [aluminum doesn’t need a soak
+time at high temperatures to anneal it][0], it can be done very
+quickly.  (This requires heating to close to the melting point; people
+sometimes use burnoff of carbon black on aluminum to indicate that
+it’s reached the right temperature.)
+
+[0]: https://www.tinmantech.com/education/articles/aluminum-alloys-annealing.php
+
+SPIF forming of a depression is normally done from the outside in,
+with an empty space under the workpiece, which is clamped only at the
+edges; this requires workpiece to transmit the load from the forming
+tool back all the way to the edges.  A possible improvement may be to
+do an initial forming step on a resilient backing, such as a sheet of
+rubber, or a disposable one, such as a sheet of cardboard, creating
+many parallel grooves with a bit of separation between them; this
+produces an accordion-fashion section which can then be unfolded with
+much less force once the backing is removd.
+
+Electrotyping may be a particularly appealing next process step to
+apply, allowing the soft, easily melted aluminum to give its
+precisely-dimensioned form to metals like copper, brass, bronze,
+nickel, chromium, gold, or silver; I’m not sure how well electrotyped
+coatings will adhere to the aluminum’s passivating oxide layer, and I
+don’t think it’s likely for cathodic reduction to eliminate aluminum
+oxide in water, but if it doesn’t adhere well, that merely facilitates
+the removal of the aluminum for disposal.
+
+Electrotyping is difficult to apply to alloys (whichever metal is
+easier to reduce tends to crowd out the other metals), although there
+are some processes that can electrodeposit some brasses and bronzes.
+But, by the same token, the electrodeposited metal may work well as a
+shell to fill with a harder alloy in the molten state.  The easiest
+combination is presumably a copper or nickel shell filled with
+type-metal, which (as discussed in file `glass-fluxing-3d-printing`
+and file `hot-oil-cutter`) melts at 241°, does not shrink upon
+solidifying, and does not dissolve iron or steel; I am guessing that
+it will not dissolve nickel either.  It probably dissolves copper
+pretty well, since lead–tin solder does, but probably not very deeply
+in the time before it cools at the surface of the mold.
+
+Copper doesn’t melt until 1084°, and nickel doesn’t melt until 1455°,
+meaning that in theory you could fill shells of them with materials of
+much higher melting points — including, in the case of nickel, cast
+iron (see file `glass-fluxing-3d-printing`), which will definitely
+dissolve it.  Dimensional precision may suffer from thermal
+contraction, although I seem to recall that cast iron in particular
+shares type-metal’s happy property of neither expanding nor
+contracting upon solidification.
+
+Various pot-metal alloys (Zamak, etc.) are also an option; in theory
+[Zamak] 2 melts at only 379–390° but has a yield strength of 361 MPa,
+better than ASTM A36 steel’s 290 MPa (according to file `heck-balls`)
+or 250 MPa (according to Wikipedia’s [A36 steel] article), though the
+steel beats it at ultimate tensile strength.  I think Zamak is more
+expensive than cast iron, though.
+
+[Zamak]: https://en.wikipedia.org/wiki/Zamak
+[A36 steel]: https://en.wikipedia.org/wiki/A36_steel

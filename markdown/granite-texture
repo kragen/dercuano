@@ -1,0 +1,89 @@
+(Probably far from an original idea.)
+
+I was thinking about texture generation today, and in particular what
+you can do in a fragment shader, where deciding which pixels to affect
+is not a thing you can do.  This seems like it could be a real
+problem, since many real-world textures are the result of a lot of
+different objects moving around; for example, the exposed stones in a
+sawn concrete surface are in some sense scattered randomly, as are the
+leaves on a forest floor.  But in a fragment shader you can’t just
+generate some random points and place leaves at them, at least not in
+a way that scales when you zoom out.
+
+Random points don’t look random
+-------------------------------
+
+I was reminded that when people look at independent identically
+distributed random points, they generally think they don’t look very
+random, because clusters of points randomly occur, and so the density
+of the points varies even at fairly large scales.  Many natural
+textures — the stones in the concrete I mentioned before, for example,
+but also hairs on the skin, cones on the retina, bubbles in a
+foam — break up such clusters by a sort of “relaxation” in which
+points move away from one another, evening out the medium-scale
+density variations, and eventually the large-scale ones too.
+
+Maybe random-looking points can be a perturbed periodic lattice
+---------------------------------------------------------------
+
+But maybe another approach would be to start with a very even dot
+distribution and perturb it enough that it looks random.  You could
+have some perfectly regular lattice of cells, with a dot at the center
+of each — a square or hexagonal lattice — and generate a
+two-dimensional value of Perlin noise by which to perturb the dot at
+that center.  As long as the dot doesn’t overlap the next cell, the
+algorithm to determine the color of a pixel is very simple; if z is
+the pixel coordinate:
+
+    c = round(z)
+    fragColor = hypot(c + r1 * noise2d(c) - z) > r2 ? bg : fg
+
+If we expand r2 or especially r1 to the point that the dots start to
+wander into adjacent cells, that simple seven-instruction algorithm
+starts to fail; if we run it for all the adjacent cells, though — 5,
+7, or 9 of them, depending on how many candidates there are — we can
+determine which of the neighboring cells’ dots are overlapping us, at
+the cost of a work multiplier of 5, 7, or 9.
+
+Maybe you can build a fake Voronoi diagram this way
+---------------------------------------------------
+
+In the same way, you can draw an almost-Voronoi diagram by having no
+dot-radius threshold, just coloring the pixel according to which dot’s
+center it’s closest to.  This will occasionally depart from the real
+Voronoi diagram because long, sharp projections will occasionally be
+truncated early by cell boundaries; perturbing the cell boundaries
+slightly with more noise may be a good way to keep that subtle.
+
+How to draw granite
+-------------------
+
+Well, what’s granite?  Granite consists of a lot of crystals of
+minerals of different colors which grew as the magma cooled, each one
+nucleating with some random position and orientation and growing
+around that center, faster along some planes of their crystal
+structure than along others.  At first only zircon and calcium-rich
+plagioclases can crystallize (or forsterite, but it doesn’t occur much
+in granite), but as the temperature drops, other minerals like
+pyroxenes, more sodic plagioclases, micas, and eventually even quartz
+can crystallize.  As the crystals grow, they deplete the local magma
+of their own mineral, which means that when the leftover magma
+eventually does crystallize, it will be of a different color.
+
+This is precisely the kind of prolonged multivariate field dynamical
+process that’s hard to simulate in a fragment shader†, but perhaps we
+can generate a similar-looking result by perturbing the Voronoi
+distances according to a random skew matrix.  That is, before
+computing the magnitude of the displacement from the pixel to a dot
+center, multiply that displacement vector through a skew matrix
+particular to that dot (generated from yet another call to noise).
+This should make the “crystal” tend to be longer in some
+apparently-random directions, and shorter in others.  If the skew
+matrix also has a random determinant, some “crystals” will be larger
+and others smaller.
+
+This is a terribly goofy way to generate this image, though, as you
+can solve precisely where the grain boundaries are going to be.  You
+don’t really need to do all this computering for every pixel.
+
+† Could be harder — at least crystallizing magma isn’t turbulent.
