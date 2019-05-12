@@ -191,6 +191,7 @@ class Note:
         self.source_file = source_file
         self.category_set = self._categories()
         self._word_count = None
+        self._date_string = None
 
     def __repr__(self):
         return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
@@ -199,6 +200,11 @@ class Note:
         return a(self.title(), href=("../" * level + self.localpart()))
 
     def date_string(self):
+        if self._date_string is None:
+            self._date_string = self.compute_date_string()
+        return self._date_string
+
+    def compute_date_string(self):
         written = updated = None
         for subj, verb, obj in self.bundle.triples():
             if subj != self.notename:

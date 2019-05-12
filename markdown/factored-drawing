@@ -1,0 +1,178 @@
+Designing a drawing editor for well-factored drawings
+=====================================================
+
+As described in file `dercuano-drawings`, I want to add illustrations
+to Dercuano.  These include things like sketches of screen layouts,
+box-and-arrow diagrams for things like data flows, cutaways of
+mechanical devices, pictures of three-dimensional solids to refer to
+in the text, plots of physical properties, decorative orders,
+timelines, diagrams of records in memory, and so on.  But I want the
+illustrations not to be extremely large files, so as to keep Dercuano
+easily downloadable.
+
+In file `fitts-law-musings`, I’ve talked a bit (perhaps to the point
+of beating a dead horse) about achieving this kind of efficiency at
+the primitive level: freehand drawings are going to involve a lot of
+coordinates of points, lines, and curves, placed individually with a
+stylus, mouse, or finger, and continuously displaced until they look
+right.  And it’s probably beneficial both to the quality of the
+drawing and to the download size to include intentional, considered
+placements and exclude random measurement noise.
+
+But the primitive level is just one aspect of a visual language,
+albeit the only one that is accessible to purely freehand drawings,
+which have much to recommend them.  And on top of this, we can layer
+things like blur and sharpen filters, or cutting and bending existing
+primitives, or using them as reference points for more primitives.
+However, it’s also often useful to make drawings by combining existing
+drawings, rather than starting entirely from scratch.  The simplest
+way of doing this is just putting one drawing next to another in a
+larger drawing, and a better way of doing merely this was sufficient
+for Gutenberg to revolutionize the world.  But several other means of
+combination are possible!
+
+In particular, let’s talk about curves (“polylines”) and how they can
+be combined.
+
+Curves have many attributes
+---------------------------
+
+A curve on the page has a shape, by which we mean that each point
+along the curve has a position, an orientation, and a curvature.  If
+we remember which direction the curve was drawn, it has a direction,
+which is the orientation plus one more bit of data.  If we remember
+the speed with which the curve was drawn, each point also has a time
+and a speed.  These are the intrinsic data of the curve; it also has a
+variety of presentation attributes or aesthetics, typically including
+fill color, stroke color, z-order, and stroke thickness, which we can
+change without changing (in the view we adopt here) the curve itself.
+
+Most of these aesthetics can also vary continuously along the length
+of the curve, just like its curvature and position.  Letterform curve
+thicknesses typically vary according to the local orientation of the
+stroke, and we could imagine applying such a relationship to a curve
+or many curves, perhaps interactively adjusting anchors on an
+auxiliary X–Y function curve like the luminance curves in the GIMP.
+Or we could adjust the curve thickness as a function of time, or of
+the distance from the start of the curve, or, if we make it a function
+of speed, orientation, and direction, we can perhaps achieve a
+quill-pen calligraphic effect.
+
+A curve can be approximated by a series of directed line segments,
+each of which is associated with a local frame of reference, one which
+distorts (perhaps via perspective) to follow the curve.  These
+distorted frames of reference, if used to transform the unit square,
+will produce a sequence of trapezoids that approximate the curve with
+unit thickness.  But the frames of reference can be orthogonalized,
+normalized, and even derotated, so that they become nothing more than
+a sequence of translations to the midpoints of line segments along the
+curve; or only some subset of these neutering operations can be
+applied.  The line segments themselves can be placed according to
+fixed length, fixed time, fixed maximum angle, fixed approximation
+error, or some other criterion.  By using fixed-length segments and
+using them to transform a tileable graphic segment, we can transform
+the curve into a rope, a braid, a dotted line, a (rather poor) dashed
+line, or a curly border.
+
+Given two curves, we can produce a variable number of additional
+curves interpolating between them (both in intrinsics and in
+aesthetics), or extrapolating beyond them.  Moreover, we can adjust
+the interpolation; the interpolated curves can be anchored along some
+other curve, at the midpoints of the approximating segments described
+earlier, and further auxiliary curves can adjust the nature of the
+interpolation.
+
+Interpolating an array of lines along a line gives you a fence, a
+brick wall, or half of a grille.  Interpolating an array of lines
+along a curve can give you a ribbon, a suspension bridge, or a
+sunburst.  Etc.
+
+From a curve with speed you can extract a “normalized” curve that has
+lost its speed information, making it equivalent to the distance along
+the curve.
+
+Any of these nonscalar attributes, intrinsic or aesthetic, can be
+pseudorandomized by adding deterministic noise, which can have varying
+frequencies and amplitudes.
+
+By making these attributes potentially time-dependent, we have
+animations.
+
+Stroking a curve produces another curve, one we typically fill with
+black; but we can use it to clip a texture in order to get many other
+kinds of curves.
+
+The ends of open curves are special; we can mark them with arrowheads.
+
+Reducing abstraction overhead
+-----------------------------
+
+A stencil that is merely copied wholesale into another drawing is
+already useful, and turning a drawing into such a stencil is
+conceptually trivial.  Nothing about the drawing need be explicitly
+abstracted, and it is then subject to whatever manipulations are
+available in its destination environment, which may include things
+like rotation, scaling, clipping, colorspace transformation,
+convolution, alpha-blending, skewing, and cutting into pieces.  (An
+image that has already been made so concrete that it consists only of
+pixels may not rotate as well, though, and one that has been merged
+with a transparent background may need some extra flying-matte work to
+re-abstract it to use in a new situation.)
+
+But often these leave something to be desired.  Scaling can change
+stroke widths, for example, and sometimes the original stroke width is
+desired; in other cases, bringing in stroke widths and colors from the
+new environment is necessary to get it to “look right”.  And you may
+want to change the text, adjust a rectangle to meet up with another
+graphic element, and so on.
+
+However, often the biggest issue is that it’s just very fiddly to
+convert a concrete graphical object into something that can be reused.
+The overhead of “abstraction”, even when no detail is actually being
+removed, eliminates the majority of opportunities in mainstream
+programs.
+
+Enabling individual drawn strokes in a drawing to be used as
+“stencils” in context, providing immediate feedback as they are
+edited, and making the combining facilities more flexible may help
+with this problem.
+
+Constraint drawing and optimization
+-----------------------------------
+
+Sutherland’s SKETCHPAD, SolidWorks, SolveSpace, and FreeCAD are four
+well-known constraint-drawing systems; their drawings contain graphic
+objects whose concrete parts are held in relation to one another by
+non-unidirectional constraints.  (See file `relational-modeling` for
+some more thoughts about this, generalized beyond purely graphical
+applications.)
+
+Constraint-based drawing has a potentially very flexible interface for
+combining drawings, even if only points can be constrained to be
+equal (this can enable one object to fit with another).
+
+SKETCHPAD solved its constraints iteratively by a sort of optimization
+approach.  It’s common for drawings to have some kind of desiderata
+they would like to optimize — it's best if arrows don't pass through
+boxes in box-and-arrow diagrams, for example, or kink too much or
+cross each other at shallow angles, but any of these can be
+acceptable.
+
+Particle systems
+----------------
+
+A seed leaps along a trajectory, curving under gravity, depositing
+branch segments behind it until it flames out; periodically a leaf
+sprouts.  Your mouse draws an arch, from which explode a thousand
+sparks, each of which seeks a consistent distance from its neighbors
+before sprouting a tapered, curved eyebrow hair.  Randomly sprayed
+points sprout into randomly rotated copies of a mother sand-grain
+polygon, each with its vertices perturbed slightly differently, and
+they repel until all their surfaces are a minimal distance apart.  One
+by one, slightly inconsistently sized bubbles appear at the nearest
+bubble boundary at a source, and bubbles shift and move until every
+bubble is in equilibrium.
+
+How can these systems, so seemingly simple to describe, be simple to
+create, debug, and tweak interactively?  Does the temporal description
+help or hinder?

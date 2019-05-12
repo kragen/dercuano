@@ -1,0 +1,246 @@
+I was thinking about soldering irons, temperature controlled high-end
+soldering irons and primitive ones consisting of a chunk of metal
+heated in a propane torch, and phase-change materials, and it occurred
+to me that with a phase-change material, you could get very tight
+temperature control of the primitive kind of soldering iron heated in
+a propane torch — perhaps very useful for `ghettobotics`.
+
+Soldering
+---------
+
+Electronics soldering requires heating the junction to the melting
+point of the solder — 183° for 63–37 tin–lead solder, according to
+file `filled-fdm` and Wikipedia’s [soldering article]. To achieve
+this, the soldering iron has to be hotter than 183°, because if the
+iron is at 183°, it would take infinite time for the joint to reach
+183°, even in a perfectly insulated vacuum; in a situation where
+you’re losing heat to radiation and air, it will never reach it.  So
+the iron needs to be hotter than the temperature needed at the junction.
+
+But the junction can’t get too far above the melting temperature, in
+order to reduce damage to the electronic components.  Traditional
+through-hole leaded packages were only connected to the solder joint
+with a thin copper wire, but surface-mount components are often
+entirely leadless, and so experience much faster heat flow from the
+joint.  So it’s important for the iron not to be *too* hot.
+
+Wikipedia’s [reflow soldering article] tells me that normal reflow
+temperatures are 20°–40° above the solder’s “liquidus” (the high end
+of the melting temperature range).
+
+Thermostat-controlled soldering irons are now becoming
+standard — because the necessary electronics are now much cheaper than
+the rest of the iron, because of the trickier nature of surface-mount
+soldering, and because the higher temperatures required for lead-free
+solder leave less room for error.  The other advantage they have,
+aside from not overheating, is that their tips don’t cool down when
+you touch them to a joint; the iron kicks up the current to compensate
+for the heat loss, which is an enormous help when you’re trying to
+desolder a power transistor from a big ground pour.
+
+Eutectic tin–silver–copper solder melts at 217° and thus requires
+higher soldering temperatures.  Other lead-free solders are in the
+211°–227° range, including tin–copper, tin–silver,
+tin–silver–copper–zinc, and tin–silver–copper–manganese.
+
+[reflow soldering article]: https://en.wikipedia.org/wiki/Reflow
+[soldering article]: https://en.wikipedia.org/wiki/Solder
+
+A can of phase-change alloy as a heat reservoir
+-----------------------------------------------
+
+Phase-change materials serve as reservoirs of heat over the relatively
+narrow temperature range of their phase change — in the case of
+melting, the range between the solidus and liquidus.
+
+For a eutectic, the liquidus and solidus are equal.  By adding more of
+one or the other metal to the eutectic, the liquidus is increased
+while the solidus remains unchanged; in between, the equilibrium state
+is a slush with crystals enriched in the excess ingredient mixed with
+a liquid eutectic.  So, for example, 70–30 tin–lead solder has the
+same 183° solidus as the eutectic, but its liquidus is 193°, and 40–60
+tin–lead solder (60% lead) has an even higher liquidus of 247°, which
+is actually higher than the liquidus of pure tin at 231.93°.
+
+Suppose you have 10 mℓ of 40–60 tin–lead sealed in a container, perhaps
+one made of 400-μm-thick copper flash-plated with nickel and then
+plated with, say, 10 μm of iron, the way soldering-iron tips are made.
+If you heat the container to 247°, the contents will be entirely
+liquid; if you allow it to cool uniformly to 183°, the contents will
+have entirely solidified.  For its density, let’s say 9 g/cc, since
+molten lead is 10.7 g/cc, room-temperature lead is 11.3 g/cc, and
+molten tin is 7.0 g/cc, so this is about 90 g of molten metal, which
+will yield up its heat of fusion as it solidifies; I don’t know what
+the eutectic’s is, but lead’s is 4.77 kJ/mol (= 23.0 J/g) and tin’s is
+7.03 kJ/mol (= 59.2 J/g), so let’s suppose the mix is somewhere around
+20 J/g; that gives us 1800 J of heat released through this transition.
+(Plus the small amount of sensible heat from the 60° temperature
+change, about 0.2 J/g/K (lead being 0.129 and tin being 0.227), adding
+another 18 J.)
+
+A typical non-temperature-controlled hand [soldering iron] is 15–30 W,
+although soldering guns are commonly 150 W.  1800 J at 150 W is 12
+seconds of soldering; at 30 W it’s 60 seconds of soldering.
+
+[soldering iron]: https://en.wikipedia.org/wiki/Soldering_iron
+
+So you could heat up such a reservoir (with fire or whatever) and then
+solder with it for a few seconds to minutes while it stays hot enough
+to melt tin–lead solder — up to a total mass of solder similar to the
+45 g it contains — or a shorter time while it remains hot enough to
+melt lead-free solder.
+
+Since solidified solder is a much poorer conductor of heat than
+[copper] (401 W/m/K for copper, vs. 35.3 W/m/K for [lead], 66.8 W/m/K
+for [tin], so solder is probably somewhere in that neighborhood), some
+copper bars inside the can might be useful in conducting heat from its
+interior to its surface.  In the other direction, some fiberglass or
+porous ceramic around the can might be useful in preventing heat loss
+through other than the tip.
+
+[Copper]: https://en.wikipedia.org/wiki/Copper
+[lead]: https://en.wikipedia.org/wiki/Lead
+[tin]: https://en.wikipedia.org/wiki/Tin
+
+How big a reservoir can you reasonably hold?
+--------------------------------------------
+
+I have one of those goofy multicolored ballpoint pens, with eight
+sliders near the back end to select the color.  It’s comfortable to
+use, but it’s toward the chunky end of what’s comfortable; it’s about
+17 mm in diameter and 130 mm long, and the tip curves down to a cone
+of about 60° included angle; so its total volume is about 30
+milliliters.
+
+Electric soldering irons are normally held much further from the tip,
+which I assume is because the old thermostat-less type only had its
+temperature limited by losing heat to the air; if they had only a
+little area exposed, then they could only use a very small amount of
+power, and consequently would heat up slowly and require very low duty
+cycles.  But this would seem to be unnecessary with any kind of
+thermal regulation.  Certainly it is possible to insulate the iron
+sufficiently that you can grasp it quite near the tip, and this would
+be advantageous.  So this pen is probably a reasonable way to estimate
+the comfortable volume that can be used for a phase-change soldering
+iron.
+
+However, if my estimate of solder’s density above is in the ballpark,
+a reservoir of 30 mℓ would weigh some 270 g — in folk units, nearly a
+pound.  Finely manipulating such a heavy reservoir would probably tire
+the hand before long (I did a brief test with a half-full 600mℓ
+plastic coke bottle, and found fatigue but no diminution of
+dexterity), so most likely the reservoir-based iron should be smaller
+than this.
+
+Phase-change alloy choice
+-------------------------
+
+If you only wanted to solder traditional tin–lead solder, maybe
+instead of a 40–60 tin–lead phase-change reservoir which needs to be
+heated up to 247° to be fully melted, you should use 70–30 tin–lead,
+which is fully melted at 193°.  This gives you a much more precise
+temperature, dramatically reducing the maximum temperature the
+delicate electronic components can reach — but the temperature is a
+bit low, meaning that heat flow will be slow, and this can actually
+increase the risk to the components by giving them too much time to
+heat up.
+
+Better choices for tin–lead soldering might include Sn 89%, Zn 8%, Bi
+3% (191°–198°), which has the advantage of being entirely
+non-precious-metal; Pb 60%, In 40% (195°–225°); the tin–zinc eutectic
+Sn 91%, Zn 9% (199°); and the near-eutectic ternary alloy Sn 86.9%, In
+10%, Ag 3.1% (204°–205°), which is 87% non-precious-metal.  (Indium
+and silver are about the same price.)  For lead-free soldering, pure
+tin (232°, as I said above) or the tin–silver eutectic (3.5% silver,
+221°) might be the best phase-change material.
+
+Hot-oil soldering for larger reservoirs and higher powers
+---------------------------------------------------------
+
+As described in file `hot-oil-cutter`, you can heat a thin pipe to a
+consistent high temperature by pumping hot oil through it; as
+described in file `coolants`, sunflower oil, glycerin, and mineral oil
+are all liquid and fairly stable at the temperatures under discussion
+as well as at room temperature.  So you could perhaps maintain a large
+“solder pot” partly molten, with a thick coolant pipe serpentining
+through it to carry off the heat of fusion, connected to a thinner
+coolant pipe to heat the iron tip.  However, this is probably more
+elaborate than a thermostatically-controlled electric tip would be, so
+probably isn’t justified.
+
+Thermal conductivity; a steel can is fine
+-----------------------------------------
+
+I suggested above using a thin can of copper to hold the phase-change
+alloy, but that’s probably unnecessary; a thick can of steel would
+surely work just as well, and would be cheaper, stronger, stiffer, and
+not at risk of dissolving in the phase-change medium.  As mentioned
+above, copper’s thermal conductivity is 401 W/m/K, so sending 150 W
+through a 400-μm wall with a 20° temperature difference would require
+a 3.8-millimeter-diameter circle of wall with an area of 7.5 mm²; this
+is about the diameter of a soldering tip, so you could reasonably just
+expose a conical tip of the can as the soldering tip.  That’s the only
+part of the can that would need to be copper, though.
+
+A more sensible approach, though, is to use a separate conical
+solid-copper tip to conduct the heat, which communicates with the can
+through a much larger contact area, at which point the can itself can
+be steel — despite its lower thermal conductivity (80.4 W/m/K for
+iron), the can is no longer contributing the majority of the thermal
+resistance.  This also makes it practical to use the plated copper-bar
+or plated copper-sheet conductors mentioned earlier to conduct heat
+out of the center of the can.
+
+[iron]: https://en.wikipedia.org/wiki/Iron
+
+Copper bars?  Nah, maybe heat pipes?
+------------------------------------
+
+Earlier I talked about using copper bars to conduct the heat from the
+midst of the solidifying reservoir to the tip where it is used,
+because of copper’s five-times-higher thermal conductivity.  Thinking
+about conducting heat lengthwise through a long cylinder, if the
+copper is to conduct more heat than the rest of the reservoir
+contents — much less *far* more heat — it needs to have at least a
+fifth of the cross-sectional area.  That suggests that, for example,
+if a cylindrical reservoir is to have a diameter of 15 mm, the copper
+bar must have a diameter of 6.7 mm.  That’s not enough to make the
+idea impractical, but it’s a fucking hell of a lot of copper.
+
+Consider, though, the total power we can get.  Suppose my reservoir is
+100 mm long and 17 mm in diameter, a bit smaller than the multicolored
+pen mentioned earlier.  If nearly all of it is filled with a massive
+copper bar, the most heat we can get from the middle of it to the end
+at a ΔT of 20 K is 401 (W/m/K) · 20 K · 2π(8½ mm)² / (50 mm) = 72 W.
+This is barely adequate, and becomes less so once more realistic
+amounts of copper are considered.
+
+Materials are known with higher heat conductivity than copper.  They
+are silver, diamond, carbon nanotubes, and graphene.  At present none
+of these is a practicable alternative.
+
+A possible alternative is the “heat pipe”, called by Wollaston, its
+inventor, the “cryophorus”.  This is an elongated, evacuated chamber,
+with a little liquid coolant in equilibrium with its vapor, in modern
+realizations with a wick to carry the liquid throughout the system.
+When one end of the chamber is cooler than the other, the vapor
+condenses at that end, lowering the pressure until the liquid
+vaporizes equally fast at the other; with the wick, this is an endless
+cycle.  Because the vapor carrying the enthalpy of vaporization from
+one end to the other moves bodily through space, it can travel
+considerably faster than heat diffusing through a body — the heat
+transfer power is almost independent of the distance the heat must be
+transferred.
+
+Most often, heat pipes are used near room temperature and employ water
+as the coolant; in theory, this works from water’s triple point at
+0.01° up to its critical point at about 374°, but as I understand it,
+water is normally only used up to about 200°, perhaps to avoid
+dangerously high pressures.
+
+Heat pipes don’t suffer from the drawbacks of the hot-oil approach
+mentioned earlier, in that they don’t need any pumping and don’t
+contain any moving parts.
+
+Alternatively, perhaps a much shorter, more bulbous heat reservoir
+could enable mere copper to deliver the heat adequately.

@@ -1,0 +1,391 @@
+Some musings on applying Fitts’s Law to user interface design and data compression
+==================================================================================
+
+Fitts’s Law says MT = a + b lg(1 + D/W): we divide the distance to the
+center of the target by its width along the line of motion, add 1,
+take the logarithm (in base 2, by convention), multiply by some
+parameter b, and add some other parameter a, to get the movement time.
+
+As described in file `dercuano-drawings`, I want to use Fitts’s Law to
+design a bandwidth-limited drawing system for Dercuano.  I can type
+about 72 bits per second if we count ASCII, or 24 bits per second if
+we use the gzipped weight of the text, or 45 bits per second if we
+consider the keyboard keys as being 5 bits each.  Since I often have
+to stop and think while I’m typing, probably the bit rate for drawing
+should be somewhere in the neighborhood — maybe 5 bits per second, or
+maybe 500, but probably not 1000 or 10000.  That is, some part of my
+mouse movements is basically random, and could be rounded off with no
+loss of intentional information.  Fitts’s Law can perhaps tell me what
+part.
+
+We know from Fitts’s Law that the imprecision of movement in a given
+time is proportionally greater when larger distances are being
+covered, although this flattens out for movements comparable to the
+target size.  Solving for D/W as a function of MT, a, and b:
+
+    (MT - a)/b = lg(1 + D/W)
+    2**((MT - a)/b) = 1 + D/W
+    2**((MT - a)/b) - 1 = D/W
+
+So, when MT = a, the start/stop time, D/W must be zero; when
+MT = a + b/2, you can reach targets about 0.414 of their width from
+your starting point (this is a bit silly, since you start inside of
+them!); when MT = a + b, you can reach targets 1W away (requiring you
+to move between 0.5 and 1.5 times their width in their direction);
+when MT = a + 2b, you can reach targets 3W away; when MT = a + 3b, you
+can reach targets 7W away; when MT = a + 4b, you can reach targets 15W
+away; and so on.
+
+What does Fitts’s Law suggest about the channel bit rate?
+---------------------------------------------------------
+
+Consider a pixel-resolution pointing device, and suppose your starting
+point is surrounded by approximate circles of circular target buttons,
+each of radius 15W, thus containing about 47 targets each.  If you
+move your mouse to the right, you cross the first of 8 circles of
+2-pixel targets after 30 pixels, and there are 8 such circles, the
+last ending before pixel 46.  Pixels 46 to 61 are divided into
+three-pixel-wide targets, pixels 61 to 77 into 4-pixel-wide targets,
+pixels 77 to 92 into 5-pixel-wide targets, and so on.  By the time we
+reach pixel 400 we have crossed 44 targets and entered a 45th; Fitts’s
+Law suggests that we should have been able to select any of these 44
+targets in time a + 4b.  Moreover, since each of the circles has 47
+targets arranged around it, we had a total of 2068 targets, all
+selectable in that same time: 11 bits of target.  If b ≫ a (let’s
+assume that for now), then that’s 2.8 bits per b.
+
+Now consider filling the same area with smaller targets, each of
+radius 31W, thus fitting 97 round targets around each concentric
+circle, and also about twice as many circles: 89 circles, say.  So we
+have 8633 possible targets, which makes 13 bits, selectable in time
+a + 5b, which is only 2.6 bits per b.
+
+This trend suggests that the highest possible bit rate would come from
+packing circles with the lowest possible D/W, which would be about 1.
+So your 2-pixel target is pixels 1 and 2, a 3-pixel target is pixels
+2:5, a 9-pixel target is pixels 5:14, a 28-pixel target is pixels
+14:42, an 84-pixel target is pixels 42:126, and a 252-pixel target is
+pixels 126:378, so in the same area as before, you have six “circles”,
+each of which can contain about six targets.  (You could probably do a
+bit better by staggering the circles to move the centers of targets
+further apart, but the improvement should be small.)  So you have
+about 36 targets, 5 bits, selectable in time a + b, which would be 5
+bits per b if a were small.  Our rationale for assuming a is small has
+gone away, since we’re no longer looking at the limit of large D/W,
+but it still seems likely that this is the best case.
+
+Still, that’s a much less variable bit rate than I was intuiting.  In
+this tautochronic arrangement, every doubling of D/W adds 2 bits to
+the information content of the selection and adds b to the time.  So
+if a = 1.5b (or perhaps a bit more, if the denser arrangements I
+mentioned pan out), the bit rate would stay fixed at 2 bits per b.
+
+Of course, if unboundedly far-off targets are allowed, there is no
+limit to the bit rate.  Instead of six “circles”, you could have
+12 “circles” of targets (the largest having targets 183708 pixels
+wide) or 24 (the largest having targets 97629963228 pixels
+wide — about 16000 km), and that would give you almost 7 bits per
+selection, which — according to Fitts’s Law — would still take the
+same amount of time, MT = a + b.  The number of bits per constant-time
+selection grows as log log D, though, and as you can see, that’s
+effectively constant.  Also I am going to go out on a limb here: I
+don’t think you can actually move your mouse cursor 16000 km in the
+same time you can move it 84 pixels, even if your screen *does* scroll
+and anywhere from 9200 km to 28000 km *would* be close enough.
+
+A different reductio ad absurdum of Fitts’s Law (in this basic form)
+is that it has no term for the width of the target in the
+circumferential direction of motion.  Above, I’ve considered the case
+where the width of the target is the same in all dimensions, but
+consider crossing-based user interfaces; in these, to activate a
+target, instead of moving the mouse to within a target and clicking on
+it, you just need to move the mouse across the border of the target,
+possibly without even stopping.  Effectively, the “target” has
+infinite width in the direction of motion, which means D/W = 0 and MT
+= a + lg (1 + 0) = a + lg 1 = a + 0 = a.  This would imply a constant
+time to select one of many targets that can be crossed in a straight
+line from where your mouse starts, regardless of how many such targets
+there are and thus how precise your angle has to be to hit the target
+you want, and also regardless of how far away the targets are from the
+mouse’s starting point.  (The same argument would suggest that the
+time to select a known item from a pie menu is independent of the
+number of items in the menu if its inner and outer radii remain
+unchanged.)
+
+Estimating the parameters from my handwriting
+---------------------------------------------
+
+My handwriting is about 13 words per minute, which is roughly one
+letter per second.  Each letter could be reasonably approximated by a
+couple of cubic Bézier curves, each of whose control points has an
+error in the neighborhood of, eyeballing, 10% of the distance from the
+previous control point, so perhaps D/W is about 7.  Given the guess of
+8 control points per letter and thus 125 ms per control point, this
+suggests that a and b are in the neighborhood of 30 milliseconds each;
+this in turn suggests a bit rate on the order of 64 bits per second
+for my handwriting.  I write about half as fast with the mouse, so
+perhaps 32 bits per second.
+
+This suggests that it should be safe to round drawing movement
+coordinates to about 64 bits per second.  For explicit placement of
+anchor points with separate clicks, this is straightforward to apply:
+if the time since the last click is 250 ms, round it to 8 bits each of
+x and y for a total of 16 bits, but if it was 283 ms, use 9 bits each,
+and at 313 ms, use 10 bits each, etc.  (4 Hz is about as fast as I can
+click with a mouse.)
+
+I’ve rigged up a primitive experiment with the mouse and some SVG and
+JS to present me some circles to click on, and the [data from the
+experiment](../liabilities/fitts-data-cleaned.csv) is surprising.
+Fitts’s Law does seem to hold, broadly speaking, but there’s a lot of
+variability, like, a lot of residuals are on the order of half of the
+height of the trend line — variability gets bigger as task time gets
+bigger, maybe because I have a hard time hitting the tiny circles with
+the mouse or sometimes even seeing them.  The residuals are far from
+normally distributed.  A linear regression on 417 data points finds
+*a* = 220 ms, *b* = 340 ms, *R*² = 0.7; this means clicking on circles
+that appeared centered under the mouse took about 220 ms; circles
+whose center was one diameter away from the mouse took about 560 ms;
+circles whose center was three diameters away took about 900 ms;
+circles whose center was seven diameters away took about 1200 ms; and
+so on.  What I did in R was this:
+
+    fitts.data <- read.csv('fitts-data-cleaned.csv')
+    fitts.data$fitts <- log(1 + fitts.data$D / fitts.data$W) / log(2)
+    model <- lm(MT ~ fitts, fitts.data)
+    plot(fitts.data)
+    plot(model)
+    plot(MT ~ fitts, fitts.data)
+    abline(model)
+    summary(model)
+
+This is dramatically slower than I had anticipated!  It suggests that
+my bit rate at moving the mouse to an area on the screen is closer to
+6 bits per second than to the 32 bits per second I was hoping for or
+the 64 bits per second I get with a ballpoint pen.
+
+(Further examination of the data suggests that the biggest residuals
+do come from the smallest circles, but in both upward and downward
+direction, so removing the smallest circles actually reduces the *R*²
+of the regression.)
+
+On the other hand, a better workflow may be to sketch a whole freehand
+curve with the mouse or other input device, and then optimize an
+overall representation for it, in terms of lines, splines, and
+corners.  I just opened Inkscape and scrawled “On the other hand, a
+better workflow may be to” in it, which took 163 seconds (4 wpm, a
+third of my speed with a pencil or ballpoint) and involved 37 glyphs
+(say this would require 300 control points), with rather larger errors
+(say D/W ≈ 3).  This is about two control points per second with about
+3b entry time (implying about 6 bits per control point, 12 bits per
+second) each, which is about 4 times worse than the estimate above
+from my normal handwriting, but still twice as good as the estimate
+from my SVG experiment.
+
+Going further in that direction, maybe the right approach is to sketch
+things on paper, photograph them, scan in the photographs, and
+construct low-Kolmogorov-complexity approximations of the images.  If
+I’m really getting 6–12 baud with the mouse, 45 baud with the
+keyboard, and 64 baud with a ballpoint pen, it would seem to make
+sense to just use the pen!  Otherwise I could easily end up spending
+an hour and a half on a sketch that could have taken ten minutes — or,
+more likely, not making the sketch at all.
+
+Vector encoding
+---------------
+
+If the objective is not to impede drawing but to minimize the Dercuano
+download size, it isn’t sufficient to avoid mixing in a bunch of
+unintentional quantization noise; we also need to think about how to
+represent the displacement vectors that make up the drawing as bits.
+
+### 8 bits per coordinate?  What, with fixed fields? ###
+
+Perhaps this could be a floating-point format with a sign bit, 2 bits
+of exponent (2⁰, 2¹, 2², or 2³ pixels per count), and a 5-bit
+mantissa.  Exponent of 0 would be “denormalized” pixel counts: 0 is 0,
+1 is 1, 2 is 2, etc., up to 31 is 31, but exponent of 1 and up would
+have an implicit leading 1, so 0x20 would be 32, 0x21 34, 0x22 36,
+etc., up to 0x3f, which would be 32+2×31 = 94, and then the exponent
+of 2 would similarly start at 0x40 for 64 and go up by fours: 0x41 for
+68, etc.  0x7f in that scheme ends up being 256+8×31 = 504 pixels.
+
+### Truncated Golomb coding? ###
+
+Golomb coding is a lossless encoding that concatenates an unary bucket
+identifier with a binary within-bucket index; it’s the optimal prefix
+code for the geometric distribution.  The buckets are (the intervals
+between) multiples of the bucket size parameter M; to encode a
+nonnegative integer, you do an integer division by M, encode the
+integer quotient q in unary (as, say, a series of q-1 1s followed by a
+0), and then append the binary encoding of the remainder, using the
+number of bits necessary to encode all nonnegative integers less than
+M.  That is, the remainder is a fixed-length field for a given
+parameter M.
+
+Suppose that we use M = 64 and truncate the result to fit in 7 bits.
+(We can, again, encode the sign bit separately.)  Numbers less than 64
+are encoded in binary as 0xx xxxx; numbers 64:128 are encoded with
+only 5 significant bits, thus rounding to even pixels, as 10x xxxx;
+numbers 128:192 are encoded with 4 significant bits as 110 xxxx, thus
+rounding to every fourth pixel; 192:256 are 111 0xxx, rounding to
+every 8th pixel; and so on until 111 1110 represents 384 and 111 1111
+represents 448.  Thus we have progressively worse resolution for large
+moves, rather than the fixed resolution Fitts’s Law would suggest.
+
+(You could omit the initial 1 of the unary code in this fixed-width
+context, but that doesn’t overcome the overall problem.)
+
+### How about truncated Elias delta or gamma coding? ###
+
+Gamma coding is a prefix code that represents an arbitrary positive
+integer as an excess-1 unary bit count (traditionally written as a
+number of leading zeroes, with no leading zeroes meaning the one-bit
+number 1) and then the number itself; so 5 = 101₂, is written as 00101.
+Delta coding is “flatter”; it uses gamma coding to encode the number
+of bits in the number and then appends the number (without the leading
+1), so the 5-bit number 10101₂ = 21₁₀ is written as 001010101.
+
+127₁₀ = 111'1111₂ is the longest number whose bit count fits in three
+bits, and so it is delta-coded as 00'111'11'1111, or 001 1111 1111 in
+the traditional 4-bit groups.  All larger numbers, and no smaller
+numbers, have three zeroes at the beginning.  So the probability
+distribution for which delta coding is optimal is one where numbers
+larger than 127 are ⅛ of the total universe of numbers, numbers larger
+than 65'535 are half of that, numbers larger than 4'294'967'296 half
+of that (one out of every 32 numbers), numbers larger than
+18'446'744'073'709'551'616 half of that (one out of every 64 numbers),
+and so on.
+
+1 is delta-coded as 1: zero 0s indicating a 1-bit length field, which
+is 1, followed by the number in binary, omitting its leading 1, which
+leaves the empty string.  2 is delta-coded as 0100, and 3 as 0101, and
+that’s all the 4-bit numbers.  Then 4 is delta-coded as 01100, five
+bits, and thus up to 01111, 7.  That’s everything that begins with 01,
+10, or 11, thus implicitly ¾ of all numbers, and then we’re into the
+001 territory that takes us all the way to 127.
+
+So even though Elias delta coding is able to handle very large numbers
+with moderate overhead over fixed-width binary (unlike Elias gamma
+coding, which uses double), it squanders ¾ of the probability mass on
+numbers 1 to 7 inclusive, which is not helpful for our goal of
+representing coordinate pairs at 64 bits per second, which almost
+guarantees that often we’ll want to encode relative coordinates in 4
+or 5 bits.
+
+### Jointly encoding pairs ###
+
+The Elias coding discussion didn’t even consider where we’re going to
+stuff the multiplier implied by the rounding, the one we earlier
+described as the exponent field of a floating-point format.
+
+Fitts’s Law suggests that the multiplier is almost independent of the
+resolution of the final result, in the sense that you could reasonably
+want 4-bit precision with a multiplier of 1, 2, 4, 8, 16, 32, or 64.
+However, there are a couple of dependencies.  If you have 4-bit
+precision, you don’t really need all those options; 1, 4, 16, or 64
+would work just as well, at the cost of reducing your effective
+precision to 3 bits at times.  Also, on a pixel screen you probably
+don’t want a multiplier of 1024 and a mantissa of 15, or for that
+matter a multiplier of 0.125 (though zooming in to clean up drawings
+may be useful at times). Moreover, if you have a fairly precise point
+where the mouse lingered long enough to give 8-bit precision, you
+don’t really need multipliers like 32 or 64.  And for compression it
+would be convenient to be able to make the ranges of the different
+precisions nonoverlapping, in the way the implied leading 1 does in
+non-denormalized floating point.  These interactions all seem too
+complicated to find a simple solution to right now, though, so I’m
+just noting them.
+
+Suppose we code the (logarithm of the) multiplier, shared between ΔX
+and ΔY, in a three-bit field, meaning a power of 4 between 1 and
+16384; and we have another three-bit field (biased by 2) for the
+length of the ΔX and ΔY fields, represented in 2’s-complement.  Then a
+minimally precise data point would be something like 010'000'00'01,
+which means +4 in the Y direction, +0 in X, and that’s 10 bits.  The
+size field 000 means one data bit per coordinate, and the 10-bit data
+with this size field form a family of 4×4 lattices of exponentially
+varying sizes, covering the points (-2, -2), (-2, -1), (-2, 0), (-2,
++1), (-1, -2), ... (+1, +1), multiplied by their respective
+multipliers.  All have the same (0, 0) point redundantly encoded.
+
+These 10-bit-coded pairs have their worst-case error at vectors like
+(+2.5, +2.5), which is in between the (+1, 0) and (+1, +1) of the
+smaller lattice and the (+4, 0) and (+4, +4) of the larger lattice.
+This vector would be thus encoded as (+1, +1) with an error of 2.12
+units, 60% of its magnitude; this level of error would be justified
+for movements so fast that they couldn’t hit a target whose D/W was
+more than about 1.2, which is to say movements of under a + 1.2b,
+which I estimated above as about 66 ms.  This gives a worst-case
+bandwidth for this encoding of about 160 bits per second, six times
+better than scrawling in Inkscape but almost three times worse than
+desired.
+
+If we can manage to encode points less frequently, as the 250 ms
+example I mentioned earlier, we can hit 64 bits per second with 16
+bits per pair.  Those 16 bits might look like 000'011'00110'11011,
+which would be +6 in X, -5 in Y.  The lattices of 16-bit-representable
+vectors overlap greatly, eliminating the holes in the
+10-bit-representable values, and the worst-case relative error is
+√2/32, about one part in 45, i.e., D/W ≈ 45, so a + 5b movement time.
+With my pen handwriting guess figures, that would be 180 ms, but the
+four times worse time with Inkscape suggests more like 720 ms.  So at
+this level our bandwidth is in the ballpark.
+
+(Is three bits of log₄ for the multiplier excessive?  If we only had
+two bits of this exponent, the multipliers would be 1, 4, 16, and 64,
+which last would need only 5 bits of mantissa to reach the edge of the
+screen, and we’d improve worst-case bandwidth by 10%.  Variable-length
+mantissas give us an escape hatch, though here they only allow us up
+to ±256.)
+
+### Successive approximations by alternately zooming in and out ###
+
+What if we represented these vectors not with a single data point but
+a series of movements?  If we’re looking at a square picture divided
+into nine subpicture, we could indicate which subpicture to zoom in on
+with a number from 1 to 9, after which we can make another move, or we
+could indicate that we want to stop zooming with the number 0.  This
+gives a base-10 prefix code that uniquely identifies any arbitrary
+recursively-divided square node.
+
+The same digits in reverse indicate how to get back to the original
+viewpoint from the zoomed-in viewpoint, so such a code can also
+represent an arbitrary zoom out rather than in.
+
+So if you want to indicate a sequence of points coupled with zoom
+levels, relative to some reference point, you could use a sequence of
+pairs of such codes: one to zoom out, then another to zoom in to the
+destination.  The null movement case is 00; zooming in to the
+upper-right corner is, perhaps, 090; zooming out by one unit and then
+in to the lower-right corner is, perhaps, 5030.
+
+Each digit takes 3.32 bits, so the minimal (null) movement is 6.64
+bits, while the four-digit example “5030” is 13.28 bits.  A movement
+that ends in a single zoom has a relative error of 0.5 either
+direction, i.e., D/W = 1, so the time is a + b, and each additional
+zoom (which must eventually be undone) gives you a factor of 3 (1.58
+bits) extra precision in both X and Y, i.e., each extra 1.58b of MT
+adds 6.64 bits, or 4.2 bits per b, which is reasonably close to the 2
+to 5 bits per b minimally needed.  At my pen-based estimate of b =
+30 ms, that’s 140 bits per second, but again the Inkscape results
+being about four times slower would give more like 35 bits per second.
+
+### Can we just punt to gzip somehow? ###
+
+Dercuano is compressed for download as a gzipped tar file.  What if,
+instead of coming up with an up-front hypothesis about the
+distribution of vectors in the drawings and then congealing it in a
+pile of bit-twiddling code, we just handle the rounding part,
+represent the vectors as bytes in some kind of straightforward way,
+and then let gzip handle the entropy-coding part?  Gzip can also do
+things like recognize common patterns (if they repeat exactly) which
+we haven’t contemplated above.  When it plows into the front end of
+the drawings, its entropy model is probably going to be attuned to
+HTML, but if all the drawings are together in the tar file, then it
+should have a pretty decent entropy model for drawings after a few
+kilobytes.
+
+I don’t know if this could actually work. I think the tricky part is
+really not the bit twiddling, but the decisions about which points
+should be in the “trellis” at each level of rounding.

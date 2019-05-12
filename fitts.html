@@ -1,0 +1,129 @@
+<!-- -*- mode: js3 -*- A Fitts's Law experiment apparatus; 1.4K gzipped
+/* --><!DOCTYPE html>
+<html><title>A Fitts's Law game</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
+<!-- taken from http://canonical.org/~kragen/81hacks/progeome -->
+<style>
+#board {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    top: 0;
+    left: 0;
+    touch-action: none;
+}
+</style>
+  <svg id="board"><g id="plot"></g></svg>
+  <input id="pos" />
+  <script>
+   /**/
+
+var $ = function(id) { return document.getElementById(id) }
+  , board = $('board')
+  , currentTarget = null
+  , nextTarget = null
+  , lastTargetChange = null
+  , currentPos = null
+  , currentD = null
+  , dataPoints = []
+  , loadHandler = setInterval(setup, 16)
+
+board.addEventListener('mousemove', function(ev) {
+  currentPos = {x: ev.clientX, y: ev.clientY}
+  $('pos').value = JSON.stringify(currentPos)
+})
+
+function setup() {
+  if (board.width.baseVal.value < 5) return
+  clearInterval(loadHandler)
+  currentTarget = randomCircle(board)
+  nextTarget = randomCircle(board)
+  lastTargetChange = +new Date()
+  updateCircles()
+}
+
+function randomCircle(board) {
+  var w = board.width.baseVal.value
+    , h = board.height.baseVal.value
+    , minR = 6
+    , maxR = Math.min(w, h) / 2
+    , rRoot = Math.random() * Math.sqrt(maxR - minR)
+    , r = rRoot * rRoot + minR
+    , wd = w - 2*r
+    , hd = h - 2*r
+    , x = Math.random() * wd + r
+    , y = Math.random() * hd + r
+  return svg(board, 'circle', {cx: x, cy: y, r: r})
+}
+
+function updateCircles() {
+  var hue = ~~(Math.random() * 360)
+  currentTarget.setAttribute('fill', 'hsla('+hue+',100%,40%,.8)')
+  nextTarget.setAttribute('fill', 'rgba(0,0,0,.2)')
+  currentTarget.addEventListener('mousedown', stepTargets)
+}
+
+function stepTargets(ev) {
+  var duration = new Date() - lastTargetChange
+  if (currentD !== null) {
+    var D = currentD
+      , W = currentTarget.r.baseVal.value * 2
+      , bCoef = Math.log(1 + D/W)/Math.log(2)
+      , dataPoint = {MT: duration, D: D, W: W, 'lg(1+D/W)': bCoef}
+    console.log(dataPoint)
+    dataPoints.push(dataPoint)
+  }
+  currentTarget.parentNode.removeChild(currentTarget)
+  currentTarget = nextTarget
+  nextTarget = randomCircle(board)
+  lastTargetChange = +new Date()
+  if (currentPos !== null) {
+    var dx = currentTarget.cx.baseVal.value - currentPos.x
+      , dy = currentTarget.cy.baseVal.value - currentPos.y
+    currentD = Math.sqrt(dx * dx + dy * dy)
+  }
+  updateCircles()
+  updateDataPoints()
+}
+
+function updateDataPoints() {
+  if (dataPoints.length < 2) return
+
+  var xs = []
+    , ys = []
+  for (var i = 0; i != dataPoints.length; i++) {
+    xs.push(dataPoints[i]['lg(1+D/W)'])
+    ys.push(dataPoints[i].MT)
+  }
+
+  var minX = 0, maxX = Math.max.apply(null, xs)
+    , minY = 0, maxY = Math.max.apply(null, ys)
+    , plot = $('plot')
+    , w = board.width.baseVal.value
+    , h = board.height.baseVal.value
+    , xm = w / (maxX - minX)
+    , ym = h / (maxY - minY)
+
+  while (plot.firstChild) plot.removeChild(plot.firstChild)
+  for (i = 0; i != dataPoints.length; i++) {
+    svg(plot, 'circle', { cx: (xs[i] - minX) * xm
+                        , cy: h - (ys[i] - minY) * ym
+                        , r: 2
+                        })
+  }
+}
+
+function svg(board, tag, attrs) {
+  var elem = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (var attr in attrs) {
+    elem.setAttribute(attr, attrs[attr]);
+  }
+  board.insertBefore(elem, board.firstChild);
+  return elem;
+}
+
+//</script></html>
