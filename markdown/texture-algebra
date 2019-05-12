@@ -1,0 +1,93 @@
+An algebra of textures for interactive composition
+==================================================
+
+I was thinking about the problem of composing graphical textures in a
+user interface, and it occurred to me that a neat formulation was
+possible using just functions of the form ℝ² → ℝ², which I will call
+“textures”.  The whole system functions by composing textures out of
+more primitive textures.
+
+(Perhaps I should recast this as functions of the form ℂ → ℂ?  That
+would conveniently provide rotation and a wide variety of conformal
+mappings, and it would substantially reduce the number of functions
+needed, though it would require the redefinition of ×, ÷, and \*\*
+(and compensating additions of their elementwise variants), and
+probably I should be renamed Z.)
+
+Visualization on the screen
+---------------------------
+
+The idea is that the inputs to a texture are coordinates representing
+the position on the screen, and the outputs represent in some sense a
+color.  To fully specify an RGBA color, you need two textures (I
+suggest using HSVA with one texture for HS and the other for VA, or
+YUVA with a YA/UV split), but you can quite reasonably visualize
+individual textures by using a constant for the other texture.
+
+Atomic textures
+---------------
+
+The most basic textures you start with are numeric constants, I, and
+T.  Constants such as 0.3 are interpreted as having that value
+everywhere for both components: λ(x, y) → (0.3, 0.3).  I, or meshgrid,
+is the identity function: λ(x, y) → (x, y).  T, or transpose, is
+almost the same, but returns the coordinates in reverse order: λ(x, y)
+→ (y, x).
+
+The standard functions abs, ln, exp, sin, cos, tan, asin, acos, and
+atan are also available as atomic textures, and they also apply
+elementwise; e.g., sin(x, y) = (sin x, sin y).
+
+You could imagine loading in (channels of) image files as additional
+atomic textures.
+
+Binary or combining operations
+------------------------------
+
+Two special shunting operations are provided: composition, written
+backwards with tightest precedence with “.”, and joining, written with
+loosest precedence with a comma, “,”.  Composition A.B is just λ(x, y)
+→ B(A(x, y)), while joining combines values from the different
+functions; if A(x, y) = (ax, ay) and B(x, y) = (bx, by), then (A,
+B)(x, y) = (ax, by).  The opposite combination can be achieved by
+composition with the aforementioned T texture, as (A.T, B.T) = (ay,
+bx).  (For convenience, we could define textures X as (I, I.T) and Y
+as (I.T, I), so you can write A.X to get just the X output of A on
+both channels.)
+
+A fairly standard list of binary arithmetic operations apply
+pointwise: +, -, ×, ÷, //, %, &, |, &^, ^, \*\*.  That is, given that
+a(x, y) = (xa, ya) and b(x, y) = (xb, yb), (a \*\* b)(x, y) =
+(xa\*\*xb, ya\*\*yb), (a & b)(x, y) = (xa & xb, ya & yb), etc.  In
+this way you can compute, for example, 3 + 4 * 5 * I % 1.  % is the
+modulo operation, // is integer division as in Python, \*\* is
+exponentiation, ^ is XOR as in C, and &^ is the and-not,
+set-subtraction, or abjunction operation, as in Golang.  Binary
+operations are applied to fractions as binary fractions.
+
+Comparison operations are also provided: ==, >=, <=, >, <, != all
+apply pointwise to textures and produce answers of 0 or 1,
+representing, respectively, true or false, as in C.  So, for example,
+(3, 4) < (3, 5) produces (0, 1).
+
+Finally, four-dimensional simplex noise is provided with the # binary
+operator.
+
+Interactive user interface
+--------------------------
+
+For playing with these textures, it occurred to me that you could
+probably usefully compile them into GLSL shaders for real-time
+display, and use an RPN-calculator approach like [rpn-edit] or
+[autodiffgraph] to provide instant feedback on each new atomic texture
+as it’s created; the multitouch approach described in file
+`interactive-calculator` might be more usable on hand computers.
+
+[rpn-edit]: http://canonical.org/~kragen/sw/dev3/rpn-edit
+[autodiffgraph]: http://canonical.org/~kragen/81hacks/autodiffgraph
+
+Additional atomic textures `t`, the current time, and M, the mouse
+coordinates, would facilitate simple interactive animations.
+Multitouch puppetry could be handled in a variety of ways, the
+simplest of which is something like variables t0, t1, t2, t3, t4 for
+the first five touches.
