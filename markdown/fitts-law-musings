@@ -349,6 +349,7 @@ could indicate that we want to stop zooming with the number 0.  This
 gives a base-10 prefix code that uniquely identifies any arbitrary
 recursively-divided square node.
 
+
 The same digits in reverse indicate how to get back to the original
 viewpoint from the zoomed-in viewpoint, so such a code can also
 represent an arbitrary zoom out rather than in.
@@ -370,6 +371,27 @@ adds 6.64 bits, or 4.2 bits per b, which is reasonably close to the 2
 to 5 bits per b minimally needed.  At my pen-based estimate of b =
 30 ms, that’s 140 bits per second, but again the Inkscape results
 being about four times slower would give more like 35 bits per second.
+
+Maybe a better approach here might be just to specify the number of
+levels to zoom out, rather than the specific direction to do it in,
+which doesn’t matter very much.
+
+Quite aside from the problem considered here of encoding a mouse
+selection in a data file, this approach could be used to encode a
+mouse selection on the keyboard, too, and it would enjoy
+Fitts’s-Law-like efficiency properties, which the conventional
+mouse-simulation approach of moving the pointer with arrow keys
+definitely does not.  Maybe it could even be faster than using a
+shitty mouse.  When I worked in a call center a quarter century ago, I
+was pretty quick on the keypad.  I could always enter people’s credit
+card numbers faster than I could convince them to say them.  I haven’t
+used keypads much since then, though, and in a quick typing test with
+typespeed(5) just now I was only able to reach about 1.49 digits per
+second; on a second trial I reached 1.66. which is about 5.5 bits per
+second, about the same as the 6-bit number I measured above for the
+mouse.  (By comparison, typespeed measures me at 5.84 characters per
+second, 70 wpm, on English words; in actual text I’m closer to 90.)
+So maybe at least this wouldn’t be much *slower* than an actual mouse.
 
 ### Can we just punt to gzip somehow? ###
 

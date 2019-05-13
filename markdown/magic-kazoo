@@ -1,0 +1,48 @@
+I thought I must have written about this in detail elsewhere, but I
+can’t find it.
+
+I propose the Magic Kazoo, an electronic musical instrument.  You use
+it by putting it in your mouth and singing into it; the pitch, volume,
+airflow, and tonal quality of your voice, together with buttons on it,
+control a synthesizer running on one or more microcontrollers to
+produce music emitted from a built-in speaker.  With live looping, you
+are a one-man band.
+
+Modern microcontrollers — even MSP430s and AVRs, but especially the
+ARM Cortex-M series — are powerful enough to do real-time audio
+synthesis easily, even running on tiny batteries.  We should expect
+the vast majority of the power consumed by the Magic Kazoo to be the
+power dissipated in its speaker.
+
+It has a headphone jack, and since you can breathe through your nose,
+it doesn’t need to be open to have air pass through it, and if you
+take that option, you can make music for yourself or a headphone
+listener by humming quietly.  This does remove the possibility of
+controlling a dimension of the music with airflow, though.
+
+Your voice recorded on a microphone that is actually inside your mouth
+is enough to saturate just about any normal microphone, and it’s
+reasonably sinusoidal, so you can get the frequency just by counting
+zero-crossings.  You can’t get the amplitude in the usual way, because
+it’s totally saturated and does a pretty good impression of a square
+wave.  You may still have 200–500μs or so in between saturated
+positive and saturated negative, though, and the slope in that 500μs
+(or equivalently its length) kind of tells you what the amplitude of
+the whole sine wave would be if you could record it.
+
+(The power of the sound is such that you might be able to use things
+that you wouldn’t normally use as microphones.  Like
+[high-barium-titanate ceramic capacitors][0], which are a lot cheaper,
+and which [can sometimes generate over 100mV][1] piezoelectrically, or
+even [over two volts when Dave Jones bangs them on wood like
+drumsticks][2].)
+
+[0]: https://e2e.ti.com/blogs_/b/precisionhub/archive/2014/12/19/stress-induced-outbursts-microphonics-in-ceramic-capacitors-part-1
+[1]: http://electronics.stackexchange.com/questions/128892/quantifying-the-piezoelectric-effect-of-ceramic-capacitors
+[2]: https://www.youtube.com/watch?v=KFCRB4d991E
+
+Anyway, given that, you can detect sound onsets with amplitude,
+measure the frequency with time between zero crossings, round to the
+nearest halfstep, and control a softsynth.  Maybe you can use the
+inferred volume contour of the sound to give you further control over
+the sound.
