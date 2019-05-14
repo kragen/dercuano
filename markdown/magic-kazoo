@@ -8,17 +8,17 @@ control a synthesizer running on one or more microcontrollers to
 produce music emitted from a built-in speaker.  With live looping, you
 are a one-man band.
 
+Real-time audio synthesis is no longer power-hungry
+---------------------------------------------------
+
 Modern microcontrollers — even MSP430s and AVRs, but especially the
 ARM Cortex-M series — are powerful enough to do real-time audio
 synthesis easily, even running on tiny batteries.  We should expect
 the vast majority of the power consumed by the Magic Kazoo to be the
 power dissipated in its speaker.
 
-It has a headphone jack, and since you can breathe through your nose,
-it doesn’t need to be open to have air pass through it, and if you
-take that option, you can make music for yourself or a headphone
-listener by humming quietly.  This does remove the possibility of
-controlling a dimension of the music with airflow, though.
+Pitch detection can be super simple; amplitude detection may be harder
+----------------------------------------------------------------------
 
 Your voice recorded on a microphone that is actually inside your mouth
 is enough to saturate just about any normal microphone, and it’s
@@ -29,6 +29,15 @@ wave.  You may still have 200–500μs or so in between saturated
 positive and saturated negative, though, and the slope in that 500μs
 (or equivalently its length) kind of tells you what the amplitude of
 the whole sine wave would be if you could record it.
+
+Given that, you can detect sound onsets with amplitude,
+measure the frequency with time between zero crossings, round to the
+nearest halfstep, and control a softsynth.  Maybe you can use the
+inferred volume contour of the sound to give you further control over
+the sound.
+
+Even ceramic capacitors might be adequate microphones in such extreme circumstances
+-----------------------------------------------------------------------------------
 
 (The power of the sound is such that you might be able to use things
 that you wouldn’t normally use as microphones.  Like
@@ -41,8 +50,65 @@ drumsticks][2].)
 [1]: http://electronics.stackexchange.com/questions/128892/quantifying-the-piezoelectric-effect-of-ceramic-capacitors
 [2]: https://www.youtube.com/watch?v=KFCRB4d991E
 
-Anyway, given that, you can detect sound onsets with amplitude,
-measure the frequency with time between zero crossings, round to the
-nearest halfstep, and control a softsynth.  Maybe you can use the
-inferred volume contour of the sound to give you further control over
-the sound.
+Interfaces to the outside world
+-------------------------------
+
+Aside from the speaker, it has a headphone jack.
+
+### Should air pass through it? ###
+
+Since you can breathe through your nose,
+it doesn’t need to have air pass through it, and if you
+take that option, you can make music for yourself or a headphone
+listener by humming quietly.  This does remove the possibility of
+controlling a dimension of the music with airflow, though.
+
+### Sliders, knobs, and buttons ###
+
+In addition to the continuously-variable frequency and amplitude
+inputs from your voice, the possible continuously-variable spirometry
+input, and the possibility of maybe detecting other aspects of your
+vocal-cavity resonances, the Magic Kazoo probably needs some further
+controls.  The variety of things you *might* want to control are
+endless: adjusting the volume, selecting from thousands of existing
+instrument sounds, recording a pattern to loop later, enabling or
+disabling existing patterns, starting or stopping a canned beat-box
+rhythm, adjusting tempo, and any of the endless variety of effects
+pedals out there; and if you’re using it to construct your own virtual
+instruments, you could start with adjusting attack, decay, sustain,
+and release, recording samples, autotuning them, and then selecting
+what part of the sample gets used, generating sounds from systems like
+Karplus-Strong and FM synthesis, and so on.
+
+There is, however, a very limited amount of space available on a
+kazoo-sized thing for the full set of controls you might want on a
+digital audio workstation, and even less screen space for feedback.  I
+have this little 8-color ballpoint pen here that’s about the right
+size; as mentioned in file `phase-change-soldering-iron`, it’s 17 mm
+in diameter and 130 mm long.  The eight colors are selected by eight
+sliders somewhat like the digit inputs on a Curta calculator, which
+slide about 25 mm; things that are more closely spaced than that
+probably aren’t too practical, and even those might be pushing it — I
+can’t move two adjacent sliders at once because my fingers are too
+big.  So controls need to be at least 13 mm apart to be simultaneously
+operable.
+
+For such a device, there are strong incentives in favor of capacitive
+touch sensing instead of physical buttons: moving parts break,
+especially on instruments played by children; physical buttons tend to
+let water in, which is a problem for an instrument normally partly
+immersed in saliva; the higher parts count and extra assembly steps
+for physical buttons raise the cost; and physical buttons are
+generally limited to detecting contact or non-contact, with no analog
+levels, until you go to potentiometers (which really exacerbate the
+other three factors).  But normal touch sensing is kind of a no-go for
+a musical instrument, because it generally requires looking at the
+thing and responding to what you see, which adds far too much
+cognitive latency.  It’s *really* important to be able to find
+controls with your fingers before you activate them.
+
+A possible solution is to expose the touch surfaces through holes in a
+touchable template, which allows you to find the “button” or “slider”
+hole you want by feel alone, then use a bit more pressure to squeeze
+your finger skin through the hole so it touches the surface.
+

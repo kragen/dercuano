@@ -1,0 +1,358 @@
+A language whose memory model is a bunch of temporally-indexed logs
+===================================================================
+
+The Mill CPU uses a randomly-readable queue instead of stacks or
+registers; the last *n* instruction outputs (I think *n* = 16?) are
+addressable as inputs.  This makes the instruction set encoding
+denser, due to the lack of need for output register fields in the
+instructions.  It also makes superscalar scheduling simpler, because
+inter-instruction dependencies are simpler to detect.
+
+Normal RAM is made of registers; imperative programming languages
+expose this in the language semantics, indeed centering it.  A
+register is a function from time to values, computed from a sequence
+of writes at different times; at any time *t* its value is the value
+written by the last write at time before *t*.  What if, instead of a
+RAM made of registers, we had a RAM made of belts, each storing the
+entire sequence of writes to that location?  Indeed, what if it were
+made of infinite belts?
+
+Similar language features
+-------------------------
+
+I was debugging some Octave† code today.  In Octave, an assignment
+statement like `x = y + z` generates a line of output by default
+saying something like `x = 5.4405`.  To suppress this, you have to
+append a semicolon, which is only legal on assignment statements.  So
+if you write a piece of Octave code without any semicolons and then
+run it, it outputs a history of all the values assumed by variables
+during its execution, interleaved by time, a trace which is very
+valuable when debugging.  If only one variable is thus semicolonless,
+the trace shows the history of its values.  By examining the overall
+behavior of the trace, you can often understand things about your
+program’s behavior that are difficult to see from its state at a
+single point in time.
+
+Of course you can do something analogous in almost any programming
+language with `print` statements, and this “printf debugging” or
+“logging” is a common tactic, superior to stepping in a debugger under
+many circumstances; my friend Charity is doing a very influential
+startup based on elaborations of printf debugging right now.  But in
+Octave, logging every new value assumed by every variable is a
+default.  You have to turn it off explicitly.  (Unfortunately, you do
+that by editing the code.)
+
+Another thing I’ve wanted to do frequently with Octave when writing
+numerical algorithms that compute a series of *xᵢ* values is to change
+the code between returning a vector *x* of all the values or just
+returning the last value *xₙ*.  Typically one direction of this
+transformation amounts to replacing `x =` with `x(end+1) =`, and `x`
+otherwise with `x(end)`.
+
+The DDD debugger frontend to the GDB debugger also has facilities to
+capture values of specified variables every time a given breakpoint is
+hit; then you can plot or list the logged values.
+
+Bret Victor has done a couple of experimental programming environment
+sketches which log each new value produced and annotate your source
+code with them, placing time on the horizontal axis — one aimed at
+defining and exploring recurrence relations, another intended to make
+imperative looping more understandable to new programmers.
+
+Python and ES6 have a “generator” feature in which you can define
+lazily-computed sequences of values by writing an imperative function
+to `yield` them one by one; for example:
+
+    def lc_words(fileobj):
+        for line in fileobj:
+            for word in line.split():
+                yield word.lower()
+
+    def pairs(seq):
+        last = next(seq)
+        for item in seq:
+            yield last, item
+            last = item
+
+† Octave is a free-software clone of MATLAB.
+
+A language with nondestructive assignment statements
+----------------------------------------------------
+
+What if assignment statements like `x = 3` still changed the value of
+`x`, but left its previous values accessible, say, as `x@1`, `x@2`,
+and so on?  Then you could inspect all the previous values when you
+were trying to debug a program.  Moreover, you wouldn’t have to do
+anything special to enable my iterative-calculation Octave functions
+to return their whole list of values — though if the number of
+iterations wasn’t known ahead of time, they’d have to return the
+length of the list, too.
+
+Many DSP algorithms would become slightly simpler to write, since you
+could just write `x` when you wanted the latest value of *x*, and
+`x@1`, `x@2`, etc., when you wanted *xᵢ₋₁*, *xᵢ₋₂*, etc.
+
+The downside is that refactoring would become somewhat trickier; `x =
+f(y); x = f(x)` would no longer be equivalent to `x = f(f(y))`, `x =
+0; if (g(n)) x = n` would no longer be equivalent to `x = g(n) ? n :
+0`, and functions would expose the entire value history of their
+return value, not just its final value, even if only the final value
+was intended to be used.
+
+As described in file `scicalc-usability`, writing down numerical state
+machines in such a notation is very convenient.
+
+It might be worthwhile to provide an `#x` operation to tell you the
+total number of values that have been written to *x* so far.  This
+would allow you to note `#x`, call some function that appends things
+to *x*, and then subtract from the new `#x` when its execution
+finishes to see how many values it produced.  I think this is probably
+pretty bug-prone, though, since it tempts you to write code that
+assumes that nothing has ever written to *x* previously, and puts you
+in danger of writing code that will break if `#x` has some unexpected
+value.  Maybe if `#x` starts at 1'000'000 or something, that would
+ameliorate this problem. (Alternatively, you could set `#x` to 0 in
+the language model for local variables `x`.)
+
+In the framework of _Essentials of Programming Languages_, the
+*expressed values* of the language, those that expressions can
+evaluate to, would still be atomic values like numbers and characters,
+but its *denoted values* would be integer-indexed limitless logs of
+such atomic values.
+
+There’s no way for a subroutine in such a language to reduce its
+memory consumption; all previously produced values are available for
+inspection.  So it probably needs to be short-lived.
+
+Could we get by without any other kind of indexed memory addressing?
+--------------------------------------------------------------------
+
+If the memory in our language’s virtual machine consists not of
+registers but of limitless logs of past values, any single variable
+can then contain an entire array, and indeed a limitless number of
+arrays one after the other.
+
+For the first ten or twenty years, say from 1945 to sometime between
+1955 and 1965 in different lineages, the memory addresses to access
+(typically “registers of the store”, at the time) were hardcoded into
+the instruction.  This made it hard to write loops like this one:
+
+    int total = 0;
+    for (int i = 0; i < n; i++) total += x[i];
+
+That’s because the different items of `x[i]` are stored at different
+memory addresses, and the same addition instruction has to access all
+of them.  So you had to modify the instruction.  Typically you would
+add the index to it, since the source address field was typically
+stored in the least significant bits of the instruction, though this
+could obviously cause surprising effects if the arithmetic generated
+carries out of that field.
+
+The solution to this problem was the “index register”, and later also
+“base registers” and “pointer registers”, which are just CPU registers
+whose values enter into the computation of the effective address.
+This allows you to compile code like the above without generating
+self-modifying code — you just store `i` in an index register, or
+maybe even `&x[0]` if the index register is wide enough.  (C goes
+further and declares array indexing to be merely a matter of pointer
+arithmetic.)
+
+Could we replace array and structure indexing entirely with this kind
+of indexing into the past?  Maybe our instruction set could disallow
+indexing space and only allow indexing time.
+
+It turns out that you can, and it doesn’t really cost you performance
+except in the case of random indexed writes, for which it costs you a
+logarithmic slowdown.  Programs are arguably slightly clearer than the
+same programs written using index registers, but not as clear as
+programs written using indexing and field access in modern programming
+languages.
+
+### Arrays ###
+
+Well, if the memory consists not of registers but of infinite logs of
+past values, a single variable `x` can then contain the entire array:
+
+    int total = 0;
+    for (int i = 0; i < n; i++) total += x@i;
+
+This has the potential disadvantage that, as in core LISP, reading
+happens in the opposite order from writing.  For this case it doesn’t
+matter, but when it does, you can write `x@(n-i)`, for Octave-style
+1-based indexing, or `x@(n-i+1)` for C-style 0-based indexing.
+
+If `n` is a constant, you can access item *i* of the *j*th previous
+value of *x* with `x@(n*j - i + 1)`.
+
+On the other hand, if the past values of `n` are the lengths of past
+arrays stored in `x`, then we can index the *j*th of them with *O(j)*
+work; the length of the previous `x` array is `n@1`, and its latest
+value is `x@n`.  The one before that ends at `x@(n+n←1)` and is of
+length `n@2`, the one before that is `x@(n+n@1+n@2)` and is of length
+`n@3`, and so on.
+
+If we want random access to the past `x` arrays, we can store the
+prefix sum of their lengths instead of just the lengths themselves.
+If the prefix sums are stored in `s`, then the length of the latest
+`x` array is `s-s@1`, the previous one is `s@1-s@2`, and the one
+before that is `s@2-s@3` (and its last element is `x@(s-s@2)`).
+
+This storage scheme sort of prevents you from appending elements
+incrementally to the latest `x` array, which is maybe undesirable; in
+that case you can store its length in a variable `n` that you can
+increment, and only store the cumulative sum of the *completed* array
+lengths in `s`.  So then you have `n+s-s@(j-1)` elements after the end
+of the *j*th-from-last array, for *j* > 0.
+
+If no typing discipline prevents it, you could get by with writing the
+lengths and their cumulative sums and whatnot to the same variable as
+the array values themselves, but that gets awkward to program.
+
+These schemes generalize with little difficulty to multidimensional
+arrays; if you want to regard the *n* last items of *x* as a
+two-dimensional *w*×*h* array, such as a grayscale image, you can
+index item (*i*, *j*) as, for example, `x@(w*i + j)`.
+
+### Statically-typed immutable heap records ###
+
+Consider structures less regular than arrays, though — binary search
+trees, for example.  You might have a single type of tree node with a
+key field and nullable left and right pointers.  You can store this as
+parallel arrays `K`, `L`, and `R`, and a count `n`.  (Parallel arrays
+really suck if you’re deleting objects, but fortunately that’s
+something we don’t have to worry about here.)  `L` and `R` can be
+integer indices.  You can’t mutate anything, but you can add new
+nodes, which is enough to allow you to create a new updated root for a
+new tree state.
+
+Here’s a binary tree search using this representation:
+
+    next = root
+    while next != 0:
+        node = next
+        if needle == K@(n - node): break
+        next = (needle < K@(n - node)) ? L@(n - node) : R@(n - node)
+
+Generally, though, when we have a bunch of records floating around in
+the heap with links to each other, we have multiple different types of
+records (classes of windows, productions of syntax, etc.), so we want
+dynamic typing.  Dynamic typing is a bit hairier.  Let’s call the
+structure formed by `K`, `L`, `R`, and `n` a “table”, and `K`, `L`,
+and `R` its “columns”.  For a sum type, we need one table per variant
+type, plus a sum-type table with a tag column (telling which table the
+real value is in) and a pointer column (giving its index in that
+table), or with one pointer column per variant type.  Optionally, if
+there’s some data in common among all variants, you can move that data
+into an extra column in the sum-type table, which gives you more or
+less the conventional RDBMS approach to inheritance subtyping if you
+continue it a bit further.
+
+(Syntactic sugar for this "table" construct might be necessary to make
+this approach actually usable.)
+
+### Random writing to arrays ###
+
+We’ve talked about reading from random indexes into arrays.  But what
+about algorithms that want not to *read* at random indexes but to
+*write* at them?  For example, suppose we want to draw a diagonal
+Bresenham line on the `x@(w*i + j)` grayscale image mentioned just
+above.  There’s no direct way to do this; we can only write to the end
+of `x`.
+
+You could, though, stick all your lines and other graphical primitives
+in a buffer and use the scanline rendering rasterization algorithm to
+compute the scan lines of the image in order.  This is potentially
+more difficult for hairier primitives like splines and IFS fractals.
+
+However, we can totally construct a sparse matrix in COO format — a
+table with columns `row`, `column`, and `value`.  You can append onto
+these things in whatever order you like.  Converting a COO sparse
+matrix to a dense matrix is conventionally done in linear time with
+random writes, but you can also do it by sorting the items and then
+traversing the sorted list.  This adds a logarithmic slowdown, but
+perhaps with a well-tuned sort, that would be tolerable.
+
+(Technically radix sorts are linear-time in input size because your
+number of distinct sort keys can’t approach infinity without their
+length also approaching infinity, but in the approximation where we
+have less than, say, 2⁶⁴ different sort keys, their execution time is
+more nearly linearithmic, like comparison-based algorithms.)
+
+Implementations in hardware or software
+---------------------------------------
+
+Programs written in this bizarre fashion have the pleasant feature
+that their memory writes are in some sense sequential, which — aside
+from whatever debugging benefits it may or may not provide — works
+well with WORM media (which are not very important at the moment, but
+may be in the future) and block-erased NAND Flash.
+
+However, it’s not really plausible that future computers will be
+without at least a few kilobytes of traditional register-style RAM,
+writing to which will be much cheaper than writing to WORM or Flash.
+So pushing the sequentiality of writing down to the atomic program
+operation level may not make sense.  Also, if you want to keep the
+writes actually sequential in real life, you can’t use a separate
+memory for each variable; you need some system that dynamically
+apportions blocks of data written to the sequential medium among the
+variables that are actually being written to, and adds enough indexing
+that you can index far into those variables’ past quickly, without
+using up too much space.
+
+Binary instructions (whether executed by software or in hardware)
+accessing a memory made of belts could use a smaller number of bits to
+select a belt in RAM than normal instructions use to select a byte or
+word in it.
+
+If you’re implementing this model in software on today’s hardware,
+with its supercharged multilevel SRAM caches and gigabytes of SDRAM,
+you probably should store the current value of each variable in a
+fixed memory location, allocating a page or so of buffer to log its
+previous values into; you may be able to take advantage of page
+faults, Electric-Fence-style, for overflow detection, and thus avoid
+the overhead of bounds-checking instructions on every write (at the
+expense of TLB pollution).
+
+Garbage collection
+------------------
+
+Generally, as I said, garbage collection is impossible, but there may
+be cases where some memory can be reclaimed.
+
+First, of course, if variables are local to a subroutine, they can be
+freed when the subroutine returns.
+
+The following presumes that there’s no Fortran-style array aliasing
+going on when we pass parameters to subroutines; otherwise, the
+problem becomes quite a bit hairier.
+
+Some variables may never be indexed at all; if their previous values
+are saved at all, it’s only for debugging purposes.  Some variables
+may only be indexed by constants, for example, in DSP code, so their
+previous values can be saved in a small circular buffer.
+
+Bounds on variable index expressions are more difficult.  It may be
+deducible that a variable *i* is always in the range [0, *n*), or is
+never negative; this would allow us to deduce that `x@(n-i)` can never
+index further back than *n*.  But for this to allow us to discard
+values of *x* older than *n*, we need to also be able to show that *n*
+cannot increase, or at least cannot increase any faster than *x* is
+extended.
+
+Instead of rigorously proving such bounds correct, you could try using
+relatively conservative allocation sizes for different variables, and
+restarting the program from a checkpoint if it suffers a bounds
+violation, indicating that it was trying to access values that it had
+already forgotten.  For code that generates the forgotten values in
+linear time — that is to say, at an asymptotically constant speed,
+rather than one that increases without bound — doing this with a
+multiplicative increase in the space for the bounds-violated variable
+is “only a constant factor” slowdown.  But it’s a constant factor
+that’s a multiple of the number of such variables, if you just
+increase the size of the one.  (Generating values at a speed that
+increases without bound is of course impossible; you can at most
+generate one value per instruction.)
+
+Alternatively, spilling memory to disk could permit your program to
+generate a terabyte or more of past values before any must be
+discarded.

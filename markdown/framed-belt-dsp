@@ -1,0 +1,47 @@
+Framed-belt-per-sample-rate signal-graph DSP on CPU
+---------------------------------------------------
+
+Lots of DSP stuff (time-domain FIR filters, IIR filters, Goertzel
+filters, PLLs, a lot of music synthesis stuff) can be formulated as
+computing a bunch of quantities for each input sample.  The quantities
+may depend on the input sample, the current values of other quantities
+(let's call them variables), or even past values of other quantities
+at some fixed lag into the past.
+
+For a given sample rate, I think you can store these quantities very
+efficiently in a ring buffer of “frames”.  Each frame has a specific
+fixed offset for each variable, at least those that are used in the
+future; they are like structs or function stack frames.  A piece of
+straight-line code computes the new contents of all of the variables
+of interest, storing them into their appropriate places in the frame;
+it can index off a frame base pointer to refer to other values in the
+current or previous frame (although hopefully it already has those in
+registers) or even earlier frames.
+
+When the ring buffer is close to being full, you must write each new
+frame in two places: a place near the end, and a place near the
+beginning.  In this way, when you need to reset the frame pointer to
+near the beginning of the buffer, you don’t need to copy a bunch of
+frames at that point, and your indexing operations don’t all need
+bitmasks on them in order to make the ring buffer circular.  The
+buffer must be at least twice the size of your processing window (the
+furthest into the past you ever need to reach, e.g. the number of FIR
+taps) for this to work.
+
+Perhaps there might be some values computed that you don’t save in
+this belt of frames, thus reducing the space needed.
+
+FIR filters implemented in this way will access memory with a larger
+stride than FIR filters implemented in the normal way, but I’m not
+sure that will cause memory bandwidth problems with modern CPUs.
+
+Any fixed topology of single-rate signal transformers can
+straightforwardly be transformed into a straight-line piece of code
+that works in this way.
+
+For image processing, where you generate a frame per pixel, you might
+want to arrange access to belts for previous rows as well.  The idea
+is that any reasonable (Δx, Δy, varname) tuple maps to some constant
+and reasonably small offset from the current frame base pointer.
+Tiling might make this more feasible, by preventing the Δy aspect from
+generating unreasonably huge offsets.
