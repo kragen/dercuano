@@ -1,0 +1,38 @@
+I’ve been trying to figure out if there’s a way, using salvaged
+electronics, to store a series of high-speed analog waveforms long
+enough to digitize them with a low-speed ADC, in order to make a cheap
+DSO.  To be more specific, I want to digitize a channel or two with
+signals at and above 20MHz, and thus a 40MHz Nyquist frequency, with
+perhaps 1000 samples, with at least 8 bits of precision, stored
+following an analog detection of a trigger signal, at varying sample
+rates, and then digitize them with an ADC of 6Msps or less, promptly
+enough to update an oscilloscope display many times per second.  So
+those 1000 samples might be 25 microseconds, or 250 microseconds (with
+elements up to 2MHz), or 2.5 milliseconds (at which point you’re only
+covering up to 200kHz).
+
+I considered a coaxial cable delay line, but 25 microseconds is almost
+4 kilometers of coaxial cable, which would impose a fatal degradation
+of signal-to-noise ratio.  I considered driving the deflector coils of
+a TV tube or computer CRT with higher frequencies, but for 20MHz, the
+inductance involved would require such high voltages that the coils
+would almost certainly fail (see file `tv-oscilloscope`).  I
+considered recording the analogue waveform on a hard disk (see file
+`disk-oscilloscope`) and then digitizing it during succeeding
+revolutions, which might work, but I don’t know enough about the
+linearity and SNR.
+
+So here’s another idea along those lines: use a laser-printer
+mechanism, electroconductive drum and all.  A 10ppm A4-size 600dpi
+laser printer must go through 210 mm × 297 mm of paper every 6
+seconds.  That paper works out to almost 35 megapixels, which means
+that the laser has to be modulated (and successfully recorded on the
+drum) at 5.8 megapixels per second.
+
+Unfortunately, this is not nearly fast enough, and of course the
+linearity of the system is terrible.
+
+Maybe the 64-microsecond acoustic delay lines that 1980s PAL
+electronics used?  Those could be hard to find.
+
+Better: see file `ccd-oscilloscope`.

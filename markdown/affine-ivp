@@ -1,0 +1,92 @@
+Can we improve the solutions of initial-value problems using affine
+arithmetic?
+
+An IVP consists of some set of differential equations, with all the
+derivatives given with respect to a single “time” independent
+variable, and a set of initial conditions that hold at some single
+point in time.  Standard ways to solve them numerically include
+Runge-Kutta integration.  I wonder if we can make some improvements by
+using affine arithmetic.
+
+Affine arithmetic
+-----------------
+
+Affine arithmetic is a generalization of interval arithmetic which can
+give tighter bounds under many circumstances, and additionally can
+capture some of the dependency of outputs on inputs.  Instead of
+representing each quantity as a±b, as interval arithmetic does, affine
+arithmetic represents each quantity as an affine combination of
+variables c₀v₀ + c₁v₁ + c₂v₂ + ... cₙvₙ + k.  Most of the vᵢ are
+assumed to range over some range like [-1, 1] or [0, 1], and initially
+they each represent the uncertainty associated with a given input.
+
+In ordinary affine arithmetic, a new vᵢ is introduced at every
+nonlinear or rounded calculation to represent the uncertainty about
+the result of that operation.  This allows the uncertainty due to a
+given input, calculation, or rounding to cancel: (c₀₀v₀ + c₁v₁ + k₀) -
+(c₀₁v₀ - c₁v₁ + k₁) = (c₀₀ - c₀₁)v₀ + k₀ - k₁, canceling the
+uncertainty due to v₁ (and some of the uncertainty due to v₀ as well,
+if c₀₀ and c₀₁ have the same sign).  Depending on the situation, this
+subtraction may introduce an additional variable to account for the
+rounding error of this subtraction; the number of such variables can
+increase without limit, making successive operations successively more
+costly.
+
+By contrast, in *reduced* affine arithmetic (“RAA”), all the extra
+uncertainty introduced during the calculation (due to rounding or
+nonlinear operations) is dumped into a special cₙvₙ which doesn’t
+cancel in this way, instead growing like ordinary interval arithmetic.
+This caps the computational cost of reduced affine arithmetic at the
+cost of providing more pessimistic error bounds — but maybe only very
+slightly more pessimistic, if most of the uncertainty of the result is
+due to the initially-present input uncertainty, not introduced during
+the calculation.
+
+Other variants of RAA may introduce new variables during the
+calculation at some times, but not others.
+
+IVPs with affine arithmetic
+---------------------------
+
+So I have some vague thoughts about how affine arithmetic might help
+with IVPs.  You can recursively divide the state space of your system
+into boxes and compute an affine approximation of the derivatives in
+question inside each box, rather than just approximations around some
+points.  Each box is a paraxial parallelepiped some of whose axes are
+dependent variables, but one of whose axes is the time variable.
+
+This allows you to compute trajectories of the system through this
+multidimensional state space; the arc through a given box is in
+general some kind of exponential, but you can of course approximate it
+with an affine form, subdividing the trajectory more finely than the
+derivatives if necessary.  Then, once you have an estimated result
+with its error bounds, you can consult its coefficients to see where
+the most uncertainty comes from — is it the value of x₃ in box 5, or
+the value of x₅ in box 8?  This allows you to intelligently choose a
+box to subdivide to improve the approximation.  Also, it allows you to
+intelligently choose a dimension along which to subdivide it to
+improve the approximation, which becomes progressively more important
+with larger dimensionality.  (Even if you have only a single
+independent variable, you might have a large state vector evolving
+along it.)
+
+This also allows uncertainty to be associated with the initial
+values — in effect you can compute the trajectory of not just a single
+point but an entire neighborhood of points.  This neighborhood, too,
+might need to be subdivided if the system distorts it into a
+shape whose nonlinearity exceeds your desired precision.
+
+Extension to BVPs
+-----------------
+
+Boundary-value problems specify known values at not just a single
+point but potentially many points, and possibly have many dimensions;
+liquid flow, for example, or heat flow might have boundaries where the
+flow is zero or the temperature or heat flow is constant.  You could
+similarly imagine recursively subdividing the state space, again
+partitioning it using both state variables and (now plural)
+independent variables, computing an affine approximation to the
+derivatives of the state variables for each box.  Perhaps the final
+result is a piecewise-linear approximation to each state variable,
+with the pieces being boxes defined over the independent variables,
+with error bounds on it.

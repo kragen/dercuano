@@ -1,0 +1,30 @@
+An NTSC video signal is 6MHz wide.  A VCR records it on the tape in
+the cassette with maybe one 60Hz field per diagonal pass of the head
+across the tape, with reasonably good analog fidelity.  A VHS tape
+uses a different modulation scheme, with about [3MHz of video
+(luminance) bandwidth and another 400kHz of chroma bandwidth][0].
+[S-VHS has 5.4MHz][1]
+
+[0]: https://en.wikipedia.org/wiki/VHS#Video_recording
+[1]: https://en.wikipedia.org/wiki/S-VHS
+
+The tricky part of making a decent (20MHz) oscilloscope out of garbage
+is high-speed signal detection: either direct analog display or
+analog-to-digital conversion.  Perhaps recording the signal on a video
+tape, perhaps with sped-up heads, would enable you to do the
+conversion over a longer period of time using a slower converter,
+converting different samples on each pass, with the tape paused.
+
+A NTSC VHS VCR head rotates at 1800 rpm, each rotation covering a 60Hz
+field, lasting 16.7 milliseconds. If you were to rotate it four times
+as fast, 7200 rpm, each such track would only last 4.2 milliseconds,
+but could plausibly have up to 12MHz bandwidth, or 21.6MHz for S-VHS.
+
+4.2 milliseconds is a ridiculously long recording time; at 60
+megasamples per second, it’s 250,000 samples, hundreds of times longer
+than is necessary for a storage oscilloscope.  So, if it were
+mechanically practical to speed the heads up further, it would be a
+good idea.
+
+(See also files `tv-oscilloscope`, `laser-printer-oscilloscope`, and
+`ccd-oscilloscope`.)

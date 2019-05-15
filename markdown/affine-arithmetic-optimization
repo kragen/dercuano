@@ -1,0 +1,54 @@
+Reduced affine arithmetic is an extension of interval arithmetic; it
+is a nonstandard semantics method for evaluating a computable function
+in the form f(x₀, x₁, x₂…xₙ) over some multidimensional interval x₀ ∈
+(x₀₀, x₀₁), x₁ ∈ (x₁₀, x₁₁), … xₙ ∈ (xₙ₀, xₙ₁) to get a conservative
+affine approximation k₀x₀ + k₁x₁ + … kₙxₙ ± kₙ₊₁ within which f is
+guaranteed to be contained; for arithmetic expressions, it normally
+takes a factor of n longer than simply evaluating the expression at a
+point, and for regular functions, in the limit, the error term kₙ₊₁
+diminishes quadratically with the interval size.
+
+(Can we apply RAA recursively once to get a reduced affine
+approximation of this error term, thus telling us which independent
+variables are not contributing any significant approximation error,
+and perhaps also getting a cheaper second-order approximation than the
+full O(N²) representation?)
+
+Mathematical optimization is the problem of finding the minimum of a
+“cost function” of some “design variables” within some given “feasible
+region”.  Usually this can be restricted to the problem of finding the
+function’s global minimum, because we can modify the function to
+guarantee its value outside the feasible region will be very large.
+
+For perfectly linear functions, reduced affine arithmetic computes a
+perfect approximation; it is only nonlinear operations such as
+multiplication, division, or conditionals that contribute error.
+
+(Can you apply RAA in other fields, such as GF(2)ⁿ with XOR, NOT, and
+either AND or OR?)
+
+Here is an algorithm for using reduced affine arithmetic to find the
+minimum of a function over some domain.
+
+Begin with a single interval covering the entire feasible region,
+perhaps (-∞, +∞) on every independent variable.  Compute the function
+using reduced affine arithmetic over that interval.  Store it in a
+min-heap of (interval, result) pairs indexed by least lower bound
+(i.e. the lowest value the function can possibly achieve on that
+interval).
+
+At each step, select the interval with the smallest least lower bound.
+Remove it from the min-heap and subdivide it in some way, for example
+into three subintervals along a randomly selected axis.  Compute the
+function for each subinterval, and insert the new subintervals into
+the min-heap.
+
+At any step, (one end of) the best interval on the heap is in some
+sense our best guess at the true global minimum of the function, but
+any other interval whose least lower bound overlaps its least upper
+bound may actually be better.  However, once the difference between
+the upper and lower bounds is within our desired tolerance, any one of
+those intervals is an acceptable answer.
+
+Note that, although it is not a gradient-descent optimization
+algorithm, it is still an anytime algorithm.

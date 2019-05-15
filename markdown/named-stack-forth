@@ -1,0 +1,149 @@
+Something occurred to me on the way back.  I was thinking about the
+lack of good notation for state machines, as opposed to pure
+functions; we don’t have anything equivalent to Haskell for state
+machines, unless you count Haskell itself.  But when you’re using the
+state monad in Haskell to write state machines, lots of stuff goes
+away: you can no longer reasonably write it in point-free style, for
+example.  I think.
+
+The closest we have is Forth, which lets you write state machines in
+point-free style, but only up to a certain point: once you have more
+than two or three live values, you start to get confused about stack
+depth and stuff.
+
+It reminded me of a thing I saw someone (Jeff Fox?) say a few years
+back about how stacks and registers are sort of duals at the level of
+CPU design: a stack lets you retrieve each value only once, but store
+many values, while a register lets you retrieve each value many times,
+but store only one value at a time.  And it occurred to me that a way
+out of this is to make variables in Forth work a different way: rather
+than simply pushing a memory address onto the stack, instead each
+variable could name a separate stack out of a potentially infinite
+variety of stacks, and uttering its name could switch future
+evaluation onto that stack (until future notice).  You’d need @ and !
+to store and fetch values from some special magic place that wasn’t on
+a stack: a register.  But you could still say N @ M ! to move a value
+from N to M.
+
+A couple of things that occurred to me about this notion:
+
+- /=, +=, *=, etc., are the fundamental operations in a sense.  N 3 +
+  is sort of the equivalent of n += 3; from C.
+- You get named local variables for free (naïvely, with shallow
+  binding) as long as you’re careful to store into them before you
+  fetch.
+- The return stack stops being special; it’s just another variable.
+- PICK replaces array indexing, as long as you don’t mind indexing
+  from the end of your array.  That is, all of your variables are, in
+  a way, aggregates (APL-style), although this competes with them
+  being automatically local.
+
+It occurred to me that this could maybe give you a notation for
+writing state machines with variables that was similar to RPN for pure
+math or regexps for state machines without variables.
+
+[Some text in this note is from me typing messages to someone who
+could see my screen, and who I could hear, but who could not hear me.
+That’s why it sounds like half of a conversation; it is.  I may come
+back and edit this out at some point.]
+
+Maybe interesting?
+
+How about the “largest prime factor”?  That’s sort of cheating, maybe,
+since I was thinking about it...
+
+So let’s see.  You have a sequence of letters, which we could push
+onto a stack as the argument; call it INPUT; then we want to switch
+between consuming whitespace and non-whitespace, incrementing a
+counter each time?
+
+I guess arguments should be like a default named stack?  Call it <>.
+What’s not needed?
+
+What does that look like if you want to, say, increment n?
+
+OK, so some of the things on the argument stack should be arguments to
+the function and others should be other stacks?
+
+You mean, put the state variable on the same stack as the input?
+
+Do you want to type that out?  Because I don’t understand still.
+
+So you use @ and ! to pop and push from the other stacks?  Then you
+have something almost exactly like Forth with shallow-bound local
+variables and the need to dup values on the stack instead of in
+variables, which could be interesting; let’s see if that’s fruitful in
+a bit.
+
+Hmm, { } from StoneKnifeForth is probably the wrong way to go, because
+most loops are better as while loops rather than do-while loops.  So I
+think Knuth's/Forth's BEGIN/WHILE/REPEAT is better; but I want to
+spell it { | }.
+
+    : wc-w 
+      n 0                           \ initialize counter to 0
+      { <> empty? ~ |
+        <> { dup isblank? | pop }      \ drop characters until we find a blank
+        n 1+                           \ here we switch to the n stack
+        <> { dup isblank? ~ | pop }    \ again, but until we find a nonblank
+      }
+      n @ <> ! ;                       \ return n
+
+    : isblank? dup bl = [ pop #t exit ]     \ [ ] are IF THEN, with no ELSE.
+               dup \n = [ pop #t exit ]
+               dup \t = [ pop #t exit ]
+               pop #f ;
+
+<> switches to the <> stack.  dup dups on the current stack, whatever
+it is, and immediately after executing <> it is the argument stack.
+
+It does seem kind of promising, no?  Somewhere I guess we have to
+declare n.  Oh, and it’s buggy because it always underflows the stack
+in the inner loops.
+
+Reformatted horizontally:
+
+    : wc-w  n 0  { <> empty? ~ | <> { dup isblank? | pop }  n 1+ 
+                                 <> { dup isblank? ~ | pop } }
+      n @ <> ! ;
+
+Suppose my text is in memory instead of on the stack?  It seems like
+we need a lot of dups in this notation, so I'm going to use “,” for
+dup.  This is looking suddenly a lot harder... how do I transliterate
+`while (n && isblank(*t)) t++, n--;`?
+
+`n , [ ... ]`, so far so good; if we press into service | for “else”
+as well as “while”, then we can end up with `n , [ ... | 0 ]`.  But
+then what are you doing inside?  You want to 
+
+That seems very promising!  It could even be a deterministic regexp,
+perhaps, so that you don’t have to handle backtracking.
+
+Backtracking is tricky in the presence of add1.
+
+Python itertools and family (not to mention Unix shell) show that you
+can do quite a lot by plugging together state machines that generate
+and consume sequences.
+
+    : wc-w  @ t !  <> @ n !  words 0
+      { n , | { n , [ t , c@ isblank? | t ++  n -- }
+
+Should exiting from a loop or conditional restore you to whatever
+stack you were working on when you entered it?
+
+What does this look like in Real Forth?  Is it simpler?
+
+Obviously.
+
+Do you want to plug yours in?
+
+I promise I won’t insert viruses in its firmware. :)
+
+It hurts.
+
+I’m going to Ruth’s house for vegetarian sushi tonight.  Would you
+like to come?
+
+But maybe not tonight.
+
+As you wish.

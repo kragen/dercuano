@@ -1,0 +1,100 @@
+I’ve been trying to figure out how to build an oscilloscope from
+e-waste (see files `tv-oscilloscope`, `vcr-oscilloscope`,
+`laser-printer-oscilloscope`, and `disk-oscilloscope`).  The
+difficulty is that a basic oscilloscope has frequency response up to
+20MHz, which means that if you want to digitize the signal you need a
+sampling rate of at least 40 megasamples per second, and such fast
+analog-to-digital converters (ADCs) are hard to come by.  To display
+it without digitizing it, you would need some kind of display device
+with response up to 20MHz, like an analog oscilloscope tube, which is
+challenging to construct and very rare to find in garbage streams,
+especially intact.
+
+I finally have an answer that I am confident will work: use a laser to
+store the analog signal on a CCD long enough to digitize it with an
+easily-available low-sample-rate ADC.  Discarded flatbed scanners
+contain linear CCDs, which are already connected to moderate-speed
+ADCs; discarded laser printers contain lasers connected to scanning
+mirrors. Point the laser at the CCD and modulate the laser brightness
+with the signal you want to measure as it passes across.  Then you can
+digitize the signal from the CCD at a lower speed in the usual way.
+
+Let’s consider a garden-variety 22ppm A4-size landscape-mode
+600×600dpi printer laser assembly.  A4 paper is 210 mm × 297 mm, so
+the paper moves at minimally 22x210 mm = 4.62 meters per minute, or
+77 mm/s.  600 dpi is 23.6 “dots” per mm, so the printer must scan at a
+bit over 1800 scan lines per second; if it uses a 6-sided spinning
+mirror, that’s 300 revolutions per second, or 18000 rpm, which is a
+pretty high speed.
+
+(And it seems like a pretty average speed.  The Samsung M2020W costs
+AR$2139 = US$134 and is 20ppm with fake 1200dpi in portrait mode; the
+HP Wifi Pro M12 costs AR$2900 = US$181 and is 18ppm A4 with 600dpi in
+portrait mode; a Xerox Phaser 3020 costs AR$1900 = US$119 and is 20ppm
+A4 with 600dpi, but I can’t tell if that’s landscape or portrait.)
+
+For a laser printer, the laser doesn’t need to be linear (it’s either
+on or off for each pixel) but it does to be modulated at a pretty high
+speed. Each of those 1800 scan lines is, hypothetically, 297 mm long,
+with 7000 pixels per scan line.  (In portrait mode you need more scan
+lines, but they are shorter, for the same number of pixels per page
+and per second.)  This means the laser needs to be turned on and off
+at a bit over 12 MHz to meet the 600 dpi spec, but possibly 12MHz is
+already past the low-pass 3dB point of the electronics hooked up to
+it.  However, laser diodes that can be modulated at many tens of MHz
+are easy to come by, and can be tested using a garden-variety
+photodiode and existing known-good oscilloscope.
+
+A 6-sided mirror sweeps the laser across some 120 degrees in each
+scan, which are linearized by some weird one-dimensional optics in the
+laser assembly.  They are linearized over a much longer region than
+the CCD from a scanner, which is typically as small as possible to cut
+down on silicon wafer costs, but which has its own set of optics to
+focus an image from typically the width of A4 or A3 paper onto it.
+Although it limits bandwidth, these two complementary sets of optics
+could be left in place with a sheet of paper between them as a
+diffuser, but maybe you could get better performance (lower “dark
+current” due to stray light) if you could eliminate them and just scan
+the reflected laser directly across the CCD, maybe using a mirror and
+a second laser at a different angle to cut the sweep angle down to
+30°, and compensate for the temporal nonlinearity across the CCD in
+software.  This allows you to scan the laser across the CCD several
+times (such as four, in this example), which keeps the CCD’s spatial
+resolution from being the limiting factor on the bandwidth.
+
+The number of points you can sample from the captured analog signal on
+the CCD presumably depends on the resolution of the original scanner,
+but even a shitty scanner is 300 dpi, which across a 210 mm A4 page
+gives you 2480 pixels.  A normal scanner is four times that; a
+high-end scanner is eight times that.  2480 samples is several times
+what you need for a decent DSO.
+
+I think there may be some “dead time” during which it is impossible to
+capture the signal, either because the scan angle is too large for the
+CCD or because the laser is hitting the corner of the mirror or
+because the CCD is going through some kind of reset process between
+frames or something.  There is definitely “dead time” on the laser end
+of the process, at least in the printers I've disassembled, where the
+laser is directed elsewhere than through the optics onto the page for
+part of the scan, thus getting lost.
+
+Any other kind of camera would also work for converting from spatially
+modulated light (integrated over some frame time) back into a signal
+temporally modulated slowly enough to be easy to digitize.  It’s just
+that the CCD from a scanner is high-quality (typically more than 8
+bits per pixel) and has a lot of pixels already in a line.
+
+If no lasers are available, a possible alternative is to use an LED
+viewed through a spinning mirror and focusing optics, i.e. take a
+picture of the spinning mirror in which the LED is reflected with a
+camera.  Many LEDs have relatively low junction capacitance and
+consequently can respond far more rapidly than they really need to for
+their intended use.
+
+If no mirror is available either, it may be possible to do the job by
+spinning the camera (relative to the LED) instead, although this
+involves potentially tricky electrical connections to the rapidly
+spinning camera or LED.  To avoid that problem too, you could nutate
+the camera or LED rather than rotating it, although that seems likely
+to be mechanically tricky and will also require trickier time base
+correction.

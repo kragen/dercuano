@@ -1,0 +1,137 @@
+Playing with this scientific calculator and thinking about the Mill
+CPU and write-once memory (such as, roughly, NOR flash), and then
+spending some quality time with Gnumeric and watching Joel Spolsky and
+Martin Shkreli coax magic from Microsoft Excel, it occurred to me that
+there was maybe an interesting and expressive programming model that
+captures pointwise calculations on vectors as well as generalized
+prefix sums over them.
+
+The programming model is as follows.  You specify a sequence of
+updates to apparently scalar variables, such as
+
+    x := y + 1
+    z := z + x
+
+These updates are run, in sequence, repeatedly.
+
+As syntactic sugar, we use → for assignment, put the variable on the
+right side, make the assignment an expression and return its value
+from the assignment expression (as in Lisp or C), and support
+augmented assignment operators as in C, but spelled +→, -→, ·→, and so
+on.  This allows us to abbreviate the above example as follows:
+
+    y + 1 → x +→ z
+
+By itself, this is just a formalism for deterministic dynamical system
+evolution rules.  But you might want to visualize a trajectory or the
+trajectories of a dynamical system, such as the famous Minsky circle:
+
+    x · k +→ y · k -→ x
+
+This allows us to consider the dynamical system as a function from
+initial values to trajectories, which we could conceptualize as
+vectors of successive values taken by the different variables.  From
+that point of view, we are no longer overwriting the previous value;
+we are merely appending to a vector of values.
+
+Note that in particular this expression has a somewhat APLish meaning
+in this interpretation:
+
+    x + y → z
+
+If x and y are vectors that something else is building at the same
+time, corresponding items in them will be added and the sums appended
+to z; if one of them is a scalar (i.e. a value that doesn’t change
+during the loop), then it will be added to each value of the other and
+the sums appended to z; if they are both scalars, then some
+undetermined number of copies of the sum will be appended to z.
+
+From this point of view, it is natural to add an operator to look back
+in history, like Git’s `~` operator; `HEAD` is the current value of
+`HEAD`, while `HEAD~1` is its previous value, and `HEAD~2` is the
+value before that (equivalent to `HEAD~1~1`).  For example, if we
+initially have two values in `x`, we could write linear extrapolation
+to the next value as follows:
+
+    2 · x - x~1 → x
+
+As a more complex example, we can write the Goertzel algorithm as
+
+    x + b · s - s~1 → s - c · s~1 → y
+
+where b is 2 cos ω₀ and c is exp(-i ω₀).  Note that this is
+potentially confusing in that the expressions `s` and `s~1` occur
+twice in the same formula with different meanings.  It might be less
+confusing to write this as follows:
+
+    x + b · s - s~1 → s
+    s - c · s~1 → y
+
+Now, in this form, this is sort of incomplete; if `x` decays to the
+latest value added to `x`, it only implements the Goertzel algorithm
+if stuff is getting added to `x` while the above code is running.
+
+There are a couple of different ways we could handle that.  One is
+that we could package the above code into a function, and define a
+function composition operation that implicitly gloms together the
+various state transition functions into a single evolution rule.  A
+more conventional alternative would be to provide a while or foreach
+construct.  In this case, due to the one-dimensionality of the
+temporal constructs described thus far, a foreach construct could pun
+the sequence with its iterator.  If we use `@`, we get:
+
+    x @ x + b · s - s~1 → s - c · s~1 → y
+
+This in some sense creates a new local variable `x` inside the scope
+of the loop (the right side of the operator) that is an alias for the
+nonempty prefixes of the original `x` on sequential iterations of the
+loop.
+
+Augmenting this with a `:` sequence-construction operator like
+Octave’s (but zero-based), we now have a way to control the number of
+iterations of something like Minsky’s circle algorithm; we can write,
+for example:
+
+    1→x→y
+    :1000@x·k+→y·k-→x
+
+However, I think it’s useful to consider evolution rules like
+`x·k+→y·k-→x` as entities in themselves rather than incomplete code
+snippets.  It may be useful to compose them, perhaps with β-reduction
+and α-renaming, as part of a larger evolution rule involving more
+variables, or to attempt to differentiate them with respect to their
+inputs, or to attempt to find inverses for them, in general or from a
+particular point.
+
+You could iterate over multiple sequences in parallel; vector dot
+product can be expressed as follows:
+
+    0 → t
+    u, v @ u · v +→ t
+
+Nested loops make sense in only a few circumstances without adding a
+way to store arrays with more dimensions, but for example, here’s a
+time-domain FIR filter convolving `x` with kernel `k`, storing
+intermediate sums in a variable `t`:
+
+    :#k → n
+    x[#k:] @ 0 → t
+             k, n @ x~n · k +→ t
+             t → y
+
+In an environment with very limited screen space, such as a scientific
+calculator or an Excel formula, you could write that without
+indentation, whitespace, or newlines:
+
+    :#k→n;x[#k:]@0→t;(k,n@x~n·k+→t);t→y
+
+That’s 36 characters, which should fit on the screen even on a fairly
+low-end scientific calculator.
+
+This data model is more convenient in many cases than Excel’s, but
+somewhat less powerful, because it doesn’t natively support
+two-dimensional arrays.  But maybe the right thing is actually to have
+this kind of merged native support for one-dimensional arrays and
+scalars, but require some kind of extra operation for two-dimensional
+arrays, the way C and Perl5 require an extra operation to dereference
+pointers.

@@ -1,0 +1,125 @@
+Several times I’ve started writing a mail reader.  More than once I’ve
+gotten something I used for a while, then stopped.
+
+Shape of the problem
+--------------------
+
+I currently have 4.8 gigabytes of incoming email on adjuvant, which
+goes back to 2014, and a 1-gibibyte sample on my laptop.  My laptop’s
+SSD is capable of 77 MB/s, or 13 seconds per gigabyte.
+
+### Compression for faster access ###
+
+lz4 can fail to compress 300 MB/s on its CPU, or compress a gibibyte
+of this mail by about 40% in about 20.0 seconds, of which only 3.1 are
+user time (suggesting the other 16.9 were waiting on the SSD).  The
+818-megabyte compressed file decompressed in 2.0 user seconds and 12.2
+wallclock seconds.  This suggests using LZ4 is capable of getting a
+modest storage speedup and saving about a gigabyte.
+
+gzip -1 gets it down to 638 megabytes, and can decompress it in 18.3
+seconds (16 seconds user, 2.5 seconds kernel).  This suggests that
+gzip is actually nearly as fast as the SSD!  pigz actually gets the
+time down to 11.6 seconds, suggesting that gzip -1 is actually
+*faster* than lz4 -1 here, because it gets substantially better
+compression and so can more effectively use the disk bandwidth.
+
+lz4 -9 takes 78" to compress the file down to 779 megabytes; the
+resulting file can be decompressed in 3.1 seconds from warm cache, but
+reading it from the disk still takes 14 seconds.
+
+pigz -9 compresses the file to 610 megabytes in 35", and the resulting
+file decompresses (with pigz) in 13.4" (10.6" user, 1.4" system).
+
+In sum, compression might be some kind of a win, but probably not much
+of one, and it’s easy for it to be a loss.  lz4 -1 is probably pretty
+reasonable, but it’s still slower than memcpy.
+
+### Linear access speeds ###
+
+I’d like to be able to do full-text search on the mailbox in a
+reasonable amount of time.  `grep ajgwio` takes 1.0 user seconds and
+1.0 system seconds (and 14.4 wallclock seconds) to read through the
+gibibyte (already in memory!) and find no matches.
+
+`grep '^From ' ` takes 110 milliseconds and finds 5838 messages,
+giving a mean message size of a bit under 200K.  However, this is
+wrong; `grep -a '^From '` gives 41630 messages and takes 870 ms
+wallclock, 500 ms user and 480 ms kernel, providing a more reasonable
+message size of 26K.
+
+`grep -a ajgw` yields some 25 random hits in 1300 ms wallclock, 820 ms
+user, 430 ms system.  These are entirely in base64 data.  `grep -a
+'zines de villa urquiza'`, a literal string that occurs in four
+subject lines, takes 730 ms wallclock, 260 ms user, 450 ms system.  It
+seems to be reading with read(), initially in 32768-byte chunks and
+eventually in half-mebibyte chunks, with some 17000 system calls,
+which seems like an inefficient approach in this case, but it does
+seem to be taking substantially less time with the longer search
+string.  And it avoids the problems of mmap().  Even `LANG=C fgrep -Ua
+'We still need more volunteers to watch the Tor community and report'`
+still takes 620 ms wallclock, 230 ms user, 400 ms system.
+
+Previous experiments on this laptop suggest 300 ns per system call
+plus 171 ps per byte, or 171 ns per kilobyte.  This suggests copying
+the data takes 184 milliseconds, and doing the system call entries and
+exits should take about another 5 milliseconds.  This is about half of
+the actual kernel time alone observed, so perhaps part of the problem
+is mere cache misses.
+
+Previous experiments on this laptop have found a memcpy speed of about
+3 gigabytes/second for files of a few kilobytes and 1.9
+gigabytes/second for larger files, which seems like it could easily
+account for the extra runtime.
+
+Probably this indicates that we could scan through data already in RAM
+at 6 gigabytes per second, but the laptop only has 4 gigabytes of RAM,
+so the mailbox won’t fit in RAM.  And reading it into RAM would take
+nearly a minute!  Even with pigz, it would take 45 seconds.  That’s
+not an acceptable keystroke response time.
+
+### Storing an index in LevelDB ###
+
+It’s clear that I can’t get by with just linear scans for searching,
+not with almost five gigabytes of email.
+
+LevelDB on my laptop can insert 62 million small records into a
+LevelDB in 3'24".  The result is 516 megabytes, or 8.3 bytes per
+record.  I haven’t measured how many queries per second it can handle
+but I assume it’s pretty adequate.
+
+I think this is probably inadequate performance for insertion, though,
+even assuming it remains constant for larger datasets.  A somewhat
+typical message contains 250 words of body text (more or less 250
+unique, too) in 5 kilobytes of message; perhaps a mean message
+contains 1000 unique words.  Then LevelDB will be able to handle the
+insertion of only about 300 messages per second.  The 41630 messages
+in my sample gibibyte would take a bit over two minutes; the whole
+mailbox would take about ten minutes.
+
+Actually, you know what?  Ten minutes to index my last three years of
+mail doesn’t sound unusably slow.  I should give it a try.
+
+### Syncing ###
+
+I need to be able to get the mail from the server, which means running
+some kind of code on the server.  I could upload a separate Python
+program, or I could send a bunch of shell commands, including over a
+pipe to an ssh process or something.  Or I could do something really
+weird like upload bytecode for some kind of immutable virtual machine.
+
+I also need some way to limit the amount of disk space I use locally.
+
+### Languages ###
+
+For writing workflow stuff I probably want Python, or maybe JS or
+something.  But for handling large volumes of data quickly, or for
+that matter for guaranteed UI responsiveness, I probably don’t.
+Certainly not Python, not even PyPy I think.
+
+I don’t know how much of a hassle it would be to call LevelDB via
+ctypes or cffi.  It’s pretty easy in C++, and writing a little
+C-callable C++ API that does what I need should be pretty easy, too.
+And then calling it from ctypes should be pretty easy.
+
+...there’s already a LevelDB binding for Python!

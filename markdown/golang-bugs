@@ -1,0 +1,114 @@
+I thought I’d try to keep track of the bugs I have in my Golang
+programs, including compile errors.  These aren’t bugs in Go, but bugs
+I wrote in Go.
+
+- Wrote `=` instead of `:=` (7×)
+- Wrote types before variables instead of vice versa (5×)
+- Forgot to `import "io"` (3×)
+- Forgot to discard the index when iterating over a slice `range` (2×)
+- Incorrectly thought `regexp.Compile` returned a `Regexp` rather than
+  a `*Regexp` (2×)
+- Accidentally referred to the variable `name` as `string` because it
+  was declared as `name string`, and the variable `data` as `byte`
+  because it was declared as `data []byte` (2×)
+- Tried to quote a string with apostrophes (2×)
+- Left off a `return` at the end of a function that had already
+  assigned its return values (2×)
+- Tried to pass a string instead of a []byte to net.Conn.Write (2×)
+- Used `%#v` instead of `%+v` even though I didn’t want hexadecimal
+  printing of my struct fields (2×)
+- Forgot to `import "log"`
+- Forgot to `import "strconv"`
+- Forgot to `import "fmt"`
+- Imported "os" unnecessarily
+- Imported "bytes" unnecessarily
+- Imported "io" unnecessarily
+- incorrectly assumed `print()` output goes to stdout, not stderr
+- Forgot to include quoted spaces around variable values in `print`
+  argument lists
+- Tried to pass a `[]byte` to `print`, which rendered as hex garbage
+- Tried to call `ioutil.ReadFile` with a file instead of a filename
+- Expected `ioutil.ReadFile` to return a string instead of a []byte
+- Tried to use `ioutil.ReadFile` on a 1GB file on a machine with only
+  4GiB of RAM
+- Left out a `range` in a `for`
+- Called `Regexp.FindAll` with no count argument
+- Confused `Regexp.FindAll` with `Regexp.FindAllIndex`
+- Left "\n" off a `print` call
+- Forgot to cast `int` to `int64` explicitly
+- Referred to `File.Name` instead of `File.Name()` in a `print`,
+  printing out a hex string
+- Failed to capitalize `os.Args`
+- Forgot to handle errors on `suffixarray.Index.Write`, which the
+  compiler doesn’t catch
+- Failed to capitalize `File.Read`
+- Didn’t remember the server needs to start out an RFB conversation by
+  sending the version banner
+- Did `copy(result[8:10], ...)` and then `result[11] =..` not noticing
+  the skipped item 10
+- Tried to use a `bytes.Buffer` instead of a `*bytes.Buffer` as an `io.Writer`
+- Tried to call my `putTo` method, which returns an error, as if it
+  were `Write`, returning two things
+- Tried to ignore only one return value from `bytes.Buffer.Write`
+  instead of two
+- Tried to call `panic()` with multiple arguments as if it were
+  `print()` or `log.Fatal()`
+- Forgot to cast len(name) to uint32 in a field initializer
+- Left off a trailing comma in a struct initializer
+- Wrote nonexistent variable names `width` and `height` rather than
+  the constants I intended
+- Called `log.Fatal` instead of `log.Fatalf`, which produced a
+  particularly confusing error because the last argument happened to
+  contain a "\r", overwriting most of the error message on the screen
+- Didn’t check the error return from `binary.Write`, since I was
+  writing to a `bytes.Buffer`, but it was actually trying to tell me,
+  “binary.Write: invalid type *main.NServerInit”.
+- Tried to use `binary.Write` on a struct whose fields weren’t
+  exported (no, that isn’t a bug, never mind; the bugs were those
+  below)
+- Tried to use `binary.Write` on a struct containing a pointer to
+  another struct, instead of containing the other struct by value
+- Tried to use `binary.Write` on a struct containing a `[]byte`
+- Oh actually you *do* need to export the struct fields for
+  `encoding/binary` after all!  But for `binary.Read`, not
+  `binary.Write`.
+- Tried to initialize a three-element struct with just one element
+  positionally, thinking that the other elements would default to
+  zero; I guess I have to use named struct fields for that?
+- Named a constant `type_SetPixelFormat` and then tried to `case
+  SetPixelFormat:`
+- Declared some byte-count-return variables that I didn’t use because
+  in one case `Reader.Read` was reading into a buffer of size 1, and
+  in the other case, `io.ReadFull` is guaranteed to read the right
+  number unless it fails (which I was handling already)
+- Used `%+v` instead of `%#v` even though I did want hexadecimal
+  printing of my struct fields
+- Tried to declare two variables of different types with a comma in
+  between, in a `var` statement
+- Tried to use a member variable in a method without a preceding
+  `self.`, as if I were in Java or C++
+- Used `log.Printf` instead of `log.Print` and got this `%!(EXTRA)`
+  error in my log message:
+        2018/09/13 19:51:58 closing %!(EXTRA *net.TCPConn=&{{0xc82006a0e0}}, string= because of error , *errors.errorString=EOF, string= in , string=message-type)
+- Forgot the first argument of `io.ReadFull`
+- Got the syntax for a map literal wrong; it isn't `var x map[foo]bar
+  = { ... }` but `var x = map[foo]bar { ... }`
+- Forgot to cast a uint16 to int in order to compare it to an
+  (implicitly declared) int
+- When aping a log.Printf() line that printed a variable, aped the
+  variable too and consequently didn’t print out the value I wanted
+- Left out an argument to `log.Printf` and got a `%!q(MISSING)` error
+  in my log message
+- Tried to change the type of parameters by shadowing them with `x, y
+  := uint32(x), uint32(y)` at the top level of a function, which
+  totally doesn’t work
+- Tried to use an int as a uint16
+- Wrote `:=` instead of `=`, unintentionally shadowing an outer-scope
+  variable with one of a different type
+- Passed a struct to `binary.Read` by value instead of passing a
+  pointer, which resulted in an error not caught until runtime (which
+  caused the VNC server to drop the connection)
+- wrote `format.big_endian_flag` when I meant `format.Big_endian_flag`
+- tried to use a byte as a boolean value
+- tried to call `string.SplitN` instead of `strings.SplitN`
+- tried to pass '\n' instead of "\n" to bufio.Reader.ReadString

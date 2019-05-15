@@ -1,0 +1,105 @@
+Comparison sorting is O(N log N) in the best case, using one of the
+standard sorts (mergesort, quicksort, heapsort, binary search trees,
+library sort, or a variant of one of these).  In large datasets, the
+log N factor can reach 20 or 30, which represents a significant
+slowdown.  But often people are comparison-sorting because they want
+the top M items: top 1, 10, 20, 30, or 100, say.  Surprisingly,
+getting the top 100 items can be done in linear time (O(N)) using
+quickselect!
+
+Quickselect is a version of quicksort that recurses only on one
+partition.  If you have a million items, the first pass will examine
+all million of them; the second pass will examine, typically, half a
+million; the third pass typically a quarter million; and so on, until
+the 30th pass examines just one item.  (I think there’s a little bit
+of a fudge factor, as with quicksort, which uses 1.39 N log N
+comparisons on average; but I will ignore that for the moment.)  This
+adds up to just under two million compares and half that many swaps.
+
+When quickselect is done, each of the pivot elements it chose,
+including its final result, partitions the array into items smaller
+and larger than itself.  So to get the top 100 elements, it is
+sufficient to invoke quickselect to select the 100th element, and then
+take the first 100 elements of the reordered array.
+
+The paradoxical complexity of sorting the top N
+-----------------------------------------------
+
+This has a sort of paradoxical result.  Suppose you have 256 elements
+and you want the top 64 of them.  Quickselect can give you this top-64
+result in about 512 comparisons and 256 swaps.  But now if you want to
+comparison-sort *just those 64 elements*, so that you get the top 64
+in order, you need 1.39 N log N comparisons, which is 534 comparisons,
+more than it took to find that top-quartile in the first place!
+
+This gets worse as the problem size gets bigger, if we hold the
+quantile fixed.  If you have four billion elements and you want the
+top quartile, you can get them in 8 billion compares, but fully
+sorting that top quartile will take you 42 billion compares, five
+times longer.  At that scale, even the top eighth is faster to find
+than to sort fully once you find it.
+
+Improving quickselect average-case time for extreme order statistics
+--------------------------------------------------------------------
+
+Median-of-median is a way to improve quickselect’s worst-case time
+(from quadratic to linear), but we can also improve the constant
+factor of the linear average-case time with one weird trick.  Using a
+variant of the median-of-3 pivot approach, you can improve
+quickselect’s linear-time average case by up to a factor of 2 by
+better pivot selection, especially when you’re looking for a fairly
+extreme order statistic.
+
+The improvement is limited to a factor of 2 because vanilla
+quickselect does less than 2 comparisons per element to start with,
+and computing an order statistic exactly will require examining each
+element at least once.
+
+You do this by picking a first-step pivot that has a high probability
+of reducing the next step by as much as possible.  For example, if
+you’re looking for the 0.1% quantile of a billion items, you can
+sample 2000 candidate pivots and take, say, the 0.2% quantile from
+them (using about 4000 comparisons if you just use regular
+quickselect), which is very likely to partition the billion-item list
+into a very large list that does not contain the candidate item and a
+very small one (only about two million items) that does contain it.
+This reduces the problem size from the first step to the second step
+by a factor of 500 instead of a factor of 2, and so you will need on
+average only 1.004004 comparisons per element out of the billion
+rather than almost 2 comparisons per element.
+
+This approach can, of course, be applied recursively, both in the
+pivot-selection step and on the reduced-size problem.
+
+Also, since this approach depends on the position of the desired
+element within the reduced window, it may work to improve
+quickselect’s performance significantly even for non-extreme order
+statistics.  For example, if you’re seeking the median, and your
+first-step pivot turns out to be very close to the median, then what
+was originally the median becomes an extreme order statistic in the
+first recursive call.  Perhaps you’re seeking the median of a million
+items, and your initial pivot turns out to be element #499000.  Now
+the value you are seeking is element 1000 out of the 501000 you’re
+selecting from in the next recursive call.  With this approach, you
+can sample 500 or so candidate pivots, and probably manage to reduce
+your problem size down to about 2000 elements in the next step, ending
+up needing only about 1 506 000 comparisons (I think) rather than the
+nearly 2 million you would need with vanilla quickselect.
+
+The expected improvement factor on any step is limited to about the
+square root of the number of elements.  That’s because finding a pivot
+to reduce the interval by some factor F is going to require selecting
+it from somewhere around F candidate pivots.  (I’ve used 2F in the
+examples above; I don’t know if 2 is the optimal factor.)  But once
+you’re examining more candidate pivots than the number of elements you
+expect to have remaining after partitioning with the pivot, you’re not
+winning any more; you’re losing.
+
+I’m not sure what the optimal number of candidate pivots to consider
+is, and I'm also not sure about the optimal size of the range to try
+to consider.  It seems like you’d want to have great assurance,
+generally, that your small range is big enough to include your target
+element in it, because otherwise you’ve just squandered an entire pass
+over the input data.  As the desired order statistic wanders toward
+the median, though, the loss from such a miss diminishes, and the
+potential gain becomes smaller.

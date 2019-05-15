@@ -1,0 +1,122 @@
+How can we do online pitch detection?
+=====================================
+
+These are my notes on pitch detection algorithms for three DSP
+projects I want to do: the Magic Kazoo, the R2D2 Light Switch, and
+Ultranarrowband Speech.
+
+The projects
+------------
+
+The Magic Kazoo is a synthesizer the size of a regular kazoo that you
+play mostly by holding it in your mouth and humming into it.  It does
+live looping, sampling, synthesis of a variety of instruments, rhythm
+accompaniment, harmony, and autotune.
+
+The R2D2 Light Switch is a light switch that you control by whistling
+at it to turn lights in your house on or off, or possibly dim them,
+change their color, or activate disco dancing strobe mode.  Instead of
+running regular speech recognition algorithms which require a lot of
+processing power and are easily confused by background noise, I’d like
+to use a small number of chirp-based whistle signals, maybe with
+analog components to control brightness.
+
+For the Magic Kazoo, I want to be able to do pitch detection on a
+distorted human voice, vastly outweighing any noise, with very low
+latency, like, under 10 ms, with relatively low computational cost,
+like under 50MIPS. For an R2D2 Light Switch, I want to be able to
+detect whistled pitch patterns even in the presence of substantial
+background noise, but I can tolerate latency up to maybe 200 ms, and
+it would be reasonable to use gigaflops if necessary.  For
+Ultranarrowband Speech, pitch estimation is a necessary element, and
+it operates under fairly strict latency constraints (traditionally up
+to some 40 ms).
+
+Why does the Kazoo need so little latency?  [Brandt and Dannenberg
+around 1997][0] say: “There do not seem to be published studies of
+tolerable delay, but our personal experience and actual measurements
+of commercial synthesizer delays indicate that 5 or maybe 10 ms is
+acceptable. This is comparable to common acoustic-transmission delays;
+sound travels at about 1 foot/ms.”
+
+[0]: https://www.cs.cmu.edu/~rbd/papers/latency98/latency98.htm
+
+Such low latency is particularly challenging because human voice
+pitches are often as low as 100Hz or even lower, which means 10 ms is
+a single period.  Worse, the precision needs to be pretty high; if we
+autotune, we can afford up to a quarter-step of pitch error, which is
+about 2.9%.  At 44.1ksps, 100Hz is a period of 441 samples, so the
+period estimation can be off by only up to about 13 samples.  This is
+definitely doable with either zero-crossing detection (with a
+sufficiently amplified waveform) or various kinds of
+autocorrelation-based measures (with low distortion).
+
+Ultranarrowband Speech is an effort to develop a comprehensible speech
+codec below one kilobit per second.  However, I have recently learned
+that such algorithms already exist, like David Rowe’s Codec 2, which
+manages comprehensible speech at 700 bits per second.
+
+The algorithms
+--------------
+
+### Zero-crossing counting ###
+
+Simple counting of zero-crossings, on the raw waveform or on variously
+filtered versions, is the simplest thing to try.  But to achieve the
+kinds of latency we’re talking about here, we need to use the lapse
+between the zero-crossings, not the number of zero-crossings during
+some predefined interval.  Perhaps the median lapse during the last
+10–20 ms or so would be the best measure to use for this.
+
+The downside of counting zero crossings is that you discard almost the
+entire wave, and that wave has a lot of information about the current
+phase which it would be better not to discard.
+
+### Quadrature encoding with the derivative ###
+
+Another approach that has occurred to me is to use the instantaneous
+amplitude and derivative to estimate a phase quadrant, which you can
+use like a quadrature encoder to count revolutions.  It also gives you
+phase information twice as often as simple zero-crossing counting.
+
+### Phase-angle tracking with the derivative ###
+
+Going further in that direction, you could imagine estimating a phase
+angle, and timing the first time the phasor reaches a given phase
+angle during each cycle.  At each new angle, you can measure the time
+lapse since it reached that angle during the previous cycle.
+
+Measuring the derivative can be done in a variety of ways, but it’s
+important to keep in mind that the derivative is proportional to the
+frequency, among other things.  So you have to multiply the derivative
+by something to get the phasor to follow a roughly circular pattern
+near your desired frequency (say, within an octave or two of it).  As
+long as you’re privileging a certain octave, you might as well run
+some degree of low-pass filtering over it as well — for example,
+differencing the latest sample from a simple moving average over the
+last N samples, or differencing a shorter moving average from a longer
+one.  The width of these moving averages provides a crude low-pass
+filter, and the lag between their centers provides a high-pass filter.
+
+### Particle filters ###
+
+Another approach is to maintain a variety of hypotheses in memory
+about what the waveform is doing, updating the probability of each one
+in a Bayesian fashion after each sample, then resampling the
+population of hypotheses according to the implicit distribution.
+
+The hypotheses can be things like “repeating the wave N samples back
+with M amount of Gaussian noise” or "silence" or “a new wave with a
+period around P Hz”.
+
+### Autocorrelation ###
+
+This is sort of the gold standard.  If you’re working on a 10-ms
+window at 44.1ksps, you need 441*440/2 = 97'020 multiply operations,
+most of which are multiply-adds.  You could maybe do this every
+millisecond, which ends up as 2200 multiply-adds per sample, 2.2
+million per second.  Then you need a bit more work to look at the
+autocorrelation spectrum and pick out the peaks.  This is probably too
+slow to do in real-time on many processors, but it’s an easy first
+thing to try, and provides a basis for comparison for other
+algorithms.

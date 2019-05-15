@@ -1,0 +1,71 @@
+Electronics hacker “GreatScott!” made [a video using a TV CRT as a
+“crude” oscilloscope][0].
+
+[0]: https://www.youtube.com/watch?v=aScAZReGQc0
+
+In the video he shows that the horizontal scan normally runs at some
+15kHz, and its return at the end of the scan is not very clean.  He
+demonstrates visualizing waveforms of a few times that frequency.
+
+One difficulty is that the deflection coils in a TV CRT produce a
+deflection that’s proportional to their current, but he’s driving them
+with a voltage signal, and they are primarily inductive loads — one
+consequence is that they more strongly attenuate higher frequencies,
+but another is that they produce frequency-dependent phase shifts (of
+nearly 90°) and thus badly deform the waveforms.
+
+It seems like a straightforward solution to this problem is to drive
+the coils from a current source rather than a voltage source, so that
+up to some potentially fairly high voltage the magnetic field will
+faithfully reproduce the desired signal.
+
+Scott’s TV originally used a -42V to +30V signal for the horizontal
+scan at a bit over 15 kHz (with a voltage waveform that was a
+distorted square wave, thus producing a distorted triangle wave of
+current for the scan), with a 600mΩ resistance and 210μH of
+inductance.  The vertical scan used -10 to +40V at 43 Hz, with 21Ω
+resistance and 20mH of inductance.
+
+In both cases there were strong harmonics in the signals.
+
+It seems to me that if you want to make this a useful oscilloscope
+tube, your best bet is to turn the screen sideways, because the
+“vertical” deflection of your signal basically always needs to have
+higher frequency components than the “horizontal” scan.  If a ±40V
+signal is adequate to recognizably reproduce a deflection of some
+150kHz, then by using a current source with compliance up to 40kV, we
+should be able to successfully reproduce 150MHz.  The coil probably
+would not survive 40kV, though, as special coil construction is needed
+to handle voltages over a few hundred volts, so we could probably only
+reach a few MHz in practice without rewinding the coil.
+
+At the 15kHz fundamental, the 210μH inductance represents about 20
+ohms (making its 0.6Ω real resistance insignificant at that frequency
+or above), so getting a full deflection requires on the order of an
+amp or two through the coil.
+
+Purpose-designed oscilloscope tubes differ in a few ways: they use
+electrostatic deflection, which I think is not a thing you can
+retrofit to the tube afterwards; are longer so that smaller angles are
+feasible; and have an axial voltage gradient to progressively
+accelerate the beam so that the electrons are moving more slowly as
+they go through the deflection plates than when they hit the screen.
+(In part this is to compensate for some disadvantages of electrostatic
+deflection: it deflects fast electrons less than slow ones, so the
+speed must be relatively low and consistent across all the electrons
+in order to get a large and consistent deflection.  Magnetic
+deflection does not have these problems; the radius of the electron
+track depends only on the magnetic flux density, not on its speed.)
+
+A computer monitor might be more promising.  This TV had only about
+350 lines per scan and a very low refresh frequency, so it could get
+by with a low horizontal scan frequency.  By contrast, the LG 710e
+monitor someone threw out the other day is reported to support
+1024×768 at 85Hz.  This means that its normal horizontal scan must run
+at at least 65kHz.  I don’t know if it uses a higher voltage than ±40V
+or not; it would seem like using a coil with half as many turns would
+give you a quarter the inductance but also half the field, which would
+be a win.
+
+(See also files `vcr-oscilloscope`, `laser-printer-oscilloscope`, and
+`ccd-oscilloscope`.)

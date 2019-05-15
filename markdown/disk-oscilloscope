@@ -1,0 +1,55 @@
+High-speed analog-to-digital conversion is very difficult, so a common
+way to make high-speed oscilloscopes is to store the signal after the
+trigger in an analog form for long enough to analyze it at leisure.
+This is of course a description of how entirely-analog oscilloscopes
+work, but for example a multi-gigahertz digital oscilloscope vendor in
+the early 1990s told me his scope stored the data in an internal
+CRT — a sort of analog version of the Williams tube — until it had
+time to analyze it.
+
+Oscilloscopes are a particularly tricky kind of thing to build out of
+random electronic crap you find in the junk pile because that crap
+typically doesn't include any ADCs over 10Msps (some scanners contain
+6Msps ADCs), and you really need at least 40Msps or 60Msps for an
+entry-level 20MHz oscilloscope.  (Keep in mind that an analog 20MHz
+oscilloscope isn’t incapable of viewing signals above 20MHz; that’s
+just its 3dB attenuation frequency.  Sub-nanosecond signals will
+probably be phase-shifted and badly attenuated but they’ll still be
+there.)
+
+So it occurred to me that maybe a discarded obsolete hard disk could
+bridge this gap.  Suppose we’re talking about a current 15krpm Seagate
+Cheetah with its 204MB/s data transfer rate, which (if it’s on one
+head) implies that the waveform at the disk surface includes
+significant, reliably recoverable components at up to 800MHz.  The
+disk is rotating at 250Hz.  Once a waveform is recorded, it is then
+repeated at the read head over and over again, every 4 milliseconds,
+until either the head is moved to another track or a new waveform is
+recorded.  We have 4 milliseconds of waveform recorded, which would
+amount to 3.3 million cycles of the highest frequencies recorded and
+could thus be fully digitized in about a second using the 6Msps
+scanner ADCs I mentioned earlier; but in a much more typical case, you
+only care about a few hundred or thousand sample points after the
+trigger event.  And you can digitize a few of them on every revolution
+until you have them all digitized.
+
+Considering digitizing 1000 points at 40 million samples per second,
+well, that’s 25 microseconds, which is 150 samples at 6 megasamples
+per second.  You can digitize points #0, #7, #14, #21, and so on on
+the first revolution of the disk; #1, #8, #15, #22, etc., on the
+second; and in this way after 7 revolutions of the disk (28 ms) you
+have digitized the whole event.  Digitizing at higher effective sample
+rates, or using a slower ADC, would require proportionally more
+revolutions.
+
+Even ordinary disks (5400 rpm, 50 MB/s) should still be capable of
+functioning effectively in this role.
+
+A problem with this pretty picture is that disks are not really
+designed for analog signal integrity, and so the signal may be
+corrupted with noise and subject to hard-to-characterize
+nonlinearities.  And of course you need to degauss the track before
+recording small analog signals on it.
+
+(See also files `tv-oscilloscope`, `vcr-oscilloscope`,
+`laser-printer-oscilloscope`, and `ccd-oscilloscope`.)
