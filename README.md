@@ -79,4 +79,7 @@ Time log
 2019-05-04 18:00 to 21:30 (3½ hours): add 71 more notes  
 2019-05-07 19:00 to 21:00 (2 hours): add ET Book font, tweak CSS to accommodate it  
 
-After that, I stopped logging my time.
+After that, I stopped logging my time.  Most recently, 2019-05-15, I
+spend 84 minutes importing 19 more notes, much of which was a matter
+of cleaning up the formatting; other parts were a matter of
+categorization.

@@ -14,7 +14,7 @@ Disclaimer, preface, and warning
 
 Mostly, I made
 these notes for myself, though with the intention of someday getting
-most of them into shape for publication, but lacking the discipline of
+most of them into shape for publication, but lacking the discipline imposed by
 regular publication, that’s probably not going to happen.  It may not
 happen anyway.  So, fuck it!  Here it is, incomplete as it is — I hope
 you enjoy it!
@@ -38,6 +38,8 @@ Much of what is written here is wrong in a variety of ways.
 - some of it, perhaps most of it, amounts to getting distracted from
   the most important aspects of an issue by some minor detail.
 
+On the other hand, some of it is correct.
+
 Most of these notes are about things I barely understood, or
 didn’t really understand at all, when I wrote the notes.  In some
 cases, I later came to understand them better, but in other cases I’ve
@@ -50,7 +52,7 @@ Many of the dates are only approximate.
 ### Size and public-domain dedication ###
 
 On 2019-05-15 as I write this, the Dercuano tarball is 2.0 megabytes
-and contains some 690,000 words in 322 notes,
+and contains some 700,000 words in 341 notes,
 about 2400 paperback pages’
 worth of text.  This is about 40% of the total amount
 of text I have here and intend to include.  I’m still importing notes
