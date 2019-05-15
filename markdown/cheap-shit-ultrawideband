@@ -1,0 +1,171 @@
+So, pulse radio, huh?
+
+If you want to do short-range wireless communication among really
+cheap circuits, maybe made out of garbage and running off batteries,
+you could in theory use something like CW oscillations at some
+arbitrary carrier frequency, like 101.3 MHz.  A Q=100 fixed-frequency
+resonator circuit is relatively easy to build (three or four
+components), will accumulate RF energy over some 100 oscillations, and
+will allow you a modulation bandwidth of about 100 times less than the
+carrier frequency, in this example 1MHz.  Then you could transmit
+pulses using, say, Manchester encoding, and do clock and data recovery
+in software.  Your filter circuit gives you some 20dB of rejection of
+wideband noise like lightning and sparks and stuff.
+
+This has a couple of big problems:
+
+* 20dB isn't very much, so you have to use a lot of power.
+
+* If you're using a single frequency, your signal will be easily
+  picked up by accident by e.g. standard FM radios for listening to
+  music.  This will provoke complaints if you happen to be close to a
+  standard radio station.
+
+* By the same token, if you're near a strong source of RF noise at a
+  given frequency, such as a radio station, it will make it impossible
+  to receive data.
+
+* Even though it's easy to build a fixed-frequency resonator with
+  Q=100, it's hard to tune its frequency to 1% precision, for thermal
+  and fabrication-error reasons.  That means you'll have a hard time
+  getting two such devices to communicate with each other without some
+  kind of tuning component, like a varactor, unless you use something
+  like a quartz crystal or a mechanical resonator for your filter.
+
+Instead, you could build a low-Q resonator and transmit occasional
+pulses spread across a wide band.  Here in ITU region 2, which
+includes the Americas, we have a 902–928 MHz ISM band (Q=35) commonly
+used for cordless phones, plus the 2.4–2.5 GHz ISM band (Q=25) also
+used by Wi-Fi and Bluetooth, both of which have reasonable penetration
+of building materials.
+
+The lower your pulse rate, the less interference you'll cause with
+other radio applications.  But now, instead of high-precision
+resonators, you need high-precision clocks.  A common quartz clock
+crystal oscillator has a precision of below 300ppm (I think 100ppm is
+actually typical) but most of this error is due to temperature and
+voltage variation.  If you can measure and compensate for the
+temperature and voltage, producing a "temperature-compensated crystal
+oscillator" ("TCXO") you can straightforwardly get precisions close to
+1ppm.  If you're counting cycles with a microcontroller, increasing or
+decreasing the cycle count is a simple way to compensate.
+
+(You don't really need the resonator to make the communication work,
+but it might help to prevent your generated RF interference from
+straying outside the ISM band.)
+
+If your average time between pulses is, say, 262144 clock cycles, then
+you can transmit up to some 18 bits per pulse.  If your clock rate is
+20MHz, easily achievable with off-the-shelf microcontrollers, you'll
+be transmitting an average of 80 pulses per second, working out to a
+maximum of 1.44 kilobits per second.  The 262144 is limited by the
+precision of your clock speed; you need an oscillator with a precision
+of 4ppm, which will require temperature compensation, to get such a
+sparse pulse rate.
+
+I think this is also the limit on your receiver selectivity --- those
+18 bits have to be allocated between rejecting interference and
+transmitting information.  You could get 50dB of receiver selectivity
+at the cost of only transmitting one bit per pulse; or you could get
+down to 3dB of receiver selectivity with the benefit of transmitting
+17 bits per pulse.
+
+I think it's reasonable to assume temperature compensation for the
+duration of a communication; the transmitter can transmit a series of
+pulses that allow the receiver to estimate the difference between
+their two clocks.  A reasonable initiating pulse pattern for this
+might include a series of exponentially-increasing intervals: first 2
+clock cycles, then 3, then 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128,
+192, 256, 384, 512, and so on, each pulse allowing the receiver to
+more precisely calibrate their expectations for the timing of the next
+pulse.  You don't even need to start at 2 cycles.  You could start at
+whatever you think the worst-case clock-rate skew is likely to be.
+Suppose you're reasonably sure your clocks are accurate to within
+1000ppm, for example; then you could start with 512 cycles between
+pulses and go up from there.
+
+Because of the need for coding-gain receiver selectivity, I think you
+probably need to transmit many more than 80 pulses per second to get a
+reasonable data rate.  For example, if you transmit an average of 1024
+pulses per second, a 16.777MHz clock gives you some 14 bits per pulse.
+If you allocate 11 of these bits to receiver selectivity and use the
+other 3 to encode information, you get three kilobits per second and
+33dB receiver selectivity.  Your signal could in theory also be
+rejected by some 30dB by someone using the same frequency band with
+frequency-division multiplexing, but this will be limited by their
+receiver Q.  If you're talking about a regular FM radio, I don't think
+you're going to hit 30dB.
+
+In a two-way communication, you could negotiate this allocation
+dynamically, so that you get higher data rates when there's less
+interference, in this case from fractional kilobits up to tens of
+kilobits.
+
+To improve rejection of narrowband interference, your receiver (but
+not your transmitter) could be several concurrent channels handled by
+different analog filters with slightly higher Q.  For example, you
+could divide the 902–928MHz band (Q=35) into four bands of some 6MHz,
+each handled by a separate Q=140 analog resonator.  Any single source
+of narrowband interference will be limited to only one or two of these
+four bands, and you can simply ignore that band when decoding.
+
+You may even be able to get some of your frequency selectivity from
+your antenna.  A 900MHz quarter-wave antenna is some 8.3 cm in length.
+Unfortunately, I don't know how much selectivity you can get out of an
+antenna.  Q=2, maybe?
+
+Such cheap-shit electronics might often need to maintain very low
+energy usage with extremely intermittent communication, for example in
+mobile-sensor-network applications.  Achieving this probably requires
+maintaining a very low duty cycle for the receiver circuit, which
+effectively means you need some kind of time-domain multiplexing, with
+each device only listening for transmissions to it inside of a narrow
+time window.
+
+Complicating this picture is the problem that the individual devices
+may be radio-isolated from each other for long periods of time and
+have clocks of limited accuracy, or even occasionally run out of
+power.  If you want them to still be able to communicate when they
+come in contact, one of them needs to happen to transmit at a time
+when the other happens to have its receiver turned on.
+
+A reasonable duty cycle for the receiver might be 1/1000 or so, if the
+receiver needs 1000 times the idle power of the rest of the device.
+
+If you can depend on clocks continuing to operate and on occasional
+contact, then you can just use large timeslots.  For example, if your
+worst-case clock drift is 15 seconds in a month, which is around what
+you'd get from a watch crystal, and your worst-case delay between
+resynchronization is a month, then each device can listen in a
+designated 30-second interval.  With a duty cycle of 1/1000, the total
+cycle will be about 8 hours.  So evidently this approach (which Elaine
+Chao told me about; I don't know if she invented it) works fine for
+wireless sensor networks that are relatively static, but it won't work
+well in the dynamic-topology case, unless 8 hours is "dynamic".
+
+Elaine's solution was that when a new device is joining an existing
+network, it keeps its receiver turned on all the time until it
+receives a beacon from an existing device, which lets it synchronize
+with the network's timeslots.  This could work well if you have mobile
+nodes with much higher available energy: they can listen constantly
+for beacons from fixed low-power nodes announcing their listening
+timeslots.
+
+A different approach, suitable for a more symmetric system, is to
+transmit beacons and listen at random.  Suppose we want a 10-second
+average-case synchronization lag; then we need to arrange for the
+transmitting node to transmit at the same time that the receiving node
+is receiving, on average, every 10 seconds.  Suppose that the fastest
+that you could notice that you might have received a beacon, and
+therefore ought to keep listening to see if it's a new node you can
+talk to, is 1 microsecond.  Now you have to coincidentally synchronize
+with a probability of about 1 microsecond in 10 million microseconds.
+If you listen a random 1/3000 of the time and the other node transmits
+a beacon another random 1/3000 of the time, then once every 9 million
+microseconds, you will happen to synchronize.
+
+This implies, however, that you're transmitting 3333 beacons per
+second, which is a lot, since the entire beacon frame will take a lot
+more than a microsecond.  If you're willing to accept a longer
+synchronization time, like 1000 seconds, then you can transmit only
+333 beacons per second and listen 333 times per second.

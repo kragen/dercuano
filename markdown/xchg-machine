@@ -1,0 +1,119 @@
+XCHG: An Archival Swap Machine
+
+Move machines suffer one big problem as a replacement for Brainfuck:
+the register operands are necessarily in pairs, which halves code
+density in some sense and means that reading the code can easily
+suffer from framing errors. $&@ might mean write to $ and then
+transfer & to @, or transfer $ to & and then read from @, depending on
+where we are.
+
+As a fix to this, I suggest a variant move machine with 26 directly
+nameable registers, one for each English letter, and two instructions
+for each one: a capital letter to read it into the accumulator, or
+perhaps subtract it, and a lowercase letter to write the accumulator
+to it. So Ab would copy A to B, and Abc would copy A to both B and C.
+
+A further convenience for compiled code would be to define the digits
+such as 4 as "multiply accumulator by 10 and add 4". This allows
+constants to be provided in a reasonable way.
+
+Subleq is a universal OISC. So we can get all arithmetic from just
+subtraction; a single subtracting accumulator is thus a sufficient
+interface for all arithmetic. You could memory-map it with a single
+location, which gives the current total when read or subtracts when
+written.
+
+Subleq, however, also includes a signed comparison and conditional
+jump. And to program anything more than state machines on it, you need
+self-modifying code, unless you make its output and one of its inputs
+indirectly addressed.
+
+To get around the state machine limitation, you can memory-map a
+pointer register and its pointee, like the PIC. And getting a jump
+requires memory-mapping the program counter. The combination almost
+gives you a conditional jump; all that's left is a way to get a
+Boolean to index with, like a < instruction that fills the accumulator
+with its sign bit. That way you can index to either the program
+counter or the word after it.
+
+This memory-mapping the PC thing means that your memory cells need to
+be more than a byte, so figure 32 bits.
+
+One final thing needed to make the machine reasonable: a subroutine
+return mechanism. Let's say that when writing to the program counter
+directly (not as a pointee) we swap the would-be new program counter
+value with the accumulator. Then the callee can save it upon entry for
+return later.
+
+Could that work as a general mechanism? It would eliminate the
+read-write distinction, but you would need a memory-mapped
+copy/discard device in addition to the subtractor, the pointer, the
+pointee, and the program counter. But you would get 80-some printable
+registers instead of 26. As a special bonus, you could claim the
+machine was "linear" or "reversible".
+
+You also need input and output devices. The traditional Brainfuck .,
+interface seems adequate, but should use the accumulator contents, and
+can reliably report end of file.
+
+I recommend writing code for this machine on fixed-width lines of 100
+characters in order to make subroutine calls work reasonably.
+
+This seems like a machine that should be nearly as easy to implement
+on most machines as Brainfuck, but much easier to generate code
+for. Let's take the always-swap option:
+
+; always reads as the last value written to :, discarding written data  
+, discards written data and reads as the next byte of input  
+. writes output and reads zero  
+0123456789 multiply accumulator by ten and add a digit  
+- reads the subtracted total and also subtracts the current accumulator from it  
+' is a register pointing to memory  
+" is an alias for the place ' points to  
+< sets the accumulator to -1 if it is negative, 0 otherwise  
+^ is the program counter  
+
+9 instructions and memory-mapped locations, not much worse than
+Brainfuck's 8 instructions. Alternatively, without the cutesy swap
+thing, except for jumps:
+
+Aa read and write bytes of input and output  
+0123456789 multiply by ten and add a digit  
+B reads the subtracted total  
+b subtracts the accumulator from it  
+C reads the value at the address written to D (maybe use B instead?)  
+c writes the value at the address written to D  
+Dd read and write a register that is normal except for controlling C  
+E reads the address of the next instruction  
+e sets the address of the next instruction, causing a jump, and also
+sets the accumulator to what the next instruction would have been  
+< fills the accumulator with its sign bit  
+Other letters read and write general-purpose registers.
+
+This is 7 to 10 instructions depending on how you analyze it. It seems
+to me that these two formulations are close to the same complexity to
+implement, but the first one is much more novel, and either might turn
+out to be easier to program with — by which I mostly mean write
+compiler backends targeting it. You have the capacity to do
+subroutines/functions, multiple threads, dynamic dispatch, array
+indexing, and so on.
+
+x = y + z is, with the swap machine, y-z--:;-;--x, I think, starting
+with a zero subtractor. We subtract y and z from zero to get the
+negated sum.  We store that in : to use it twice to make it positive,
+then read the sum and store it in x.
+
+Zeroing the subtractor is a challenge, because zeroing is
+irreversible. We need to subtract not only the subtractor's original
+contents, but also the accumulator contents that we folded into it in
+the process. After the sequence --, the subtractor has had its
+previous contents canceled, but it still has the negated original
+accumulator contents in it. :;--; saves these original accumulator
+contents in :, then wipes out previous : contents with ;. After --; we
+have wiped out the old - contents too, leaving the original
+accumulator contents negated in - and unnegated in : and the
+accumulator. Another - gives us the negated original in - and twice
+the negated original in -; now if we save the negated original in :,
+we can subtract it twice: :;-;- or in full :;--;-:;-;-. There may be a
+simpler way to zero the subtractor, but I think that way works.
+

@@ -1,0 +1,161 @@
+An idea based on watching Grant Thompson's description and demo video
+of his "Styro-Slicer" hobby hot wire cutter.
+
+As an alternative to laser-cutting wood or MDF, you could cut it with
+a hot wire, like the one in a hot-wire styrofoam cutter.  Some
+hot-wire styrofoam cutters are already capable of cutting soft woods
+with some difficulty.
+
+I am envisioning a sort of bandsaw in which an endless loop of thin
+wire is run through the kerf, heating up on its way into the kerf and
+then being quenched as it plunges into the material, dumping its heat
+into the wood.  Two conductive rollers, one above and one below, feed
+electricity through it; the distance between the rollers is so much
+shorter than the distance around the other part of the loop that the
+other part of the wire is not dangerously heated.
+
+To be concrete, let's consider 80-micron-thick (40 AWG is 79 microns)
+nichrome wire cutting 3mm MDF with 50 watts of power, leaving, say, a
+100-micron-wide kerf, with the two electrical-feed rollers at a
+distance of 45mm between them and an additional 900mm in the loop.
+[Nichrome's resistivity is about a μΩm][0] and apparently 800 mA is
+enough to keep an 80-micron wire radiating at 1100°, which is plenty
+hot enough.  In this case the resistance of the 45mm should be about
+1 μΩm * 45mm/((80μm/2)²π) or about 9 ohms, so you need about 2400 mA
+to get to 50 watts:
+
+    You have: micro ohm meter * 45 mm / ((80 microns/2)^2 pi)
+    You want: ohms
+            * 8.9524655
+            / 0.11170107
+    You have: sqrt(50 watts / (micro ohm meter * 45 mm / ((80 microns/2)^2 pi)))
+    You want: 
+            Definition: 2.3632718 A
+
+[0]: https://en.wikipedia.org/wiki/Nichrome
+
+This means your power supply needs about 22 volts, which is eminently
+feasible.
+
+The resistance of the 900mm part is 20 times greater, or 180 ohms, so
+it will be carrying 120 mA and dissipating about two or three watts
+--- enough to require management but not an overwhelming problem.
+
+This machine seems nearly feasible, but a problem with this is that
+the exposed 45mm of wire is going to be not only radiating like a
+motherfucker, perhaps losing most of its energy into the void, but
+also possibly getting rather hotter than the 1400° that it can in fact
+withstand before melting.  And don't forget that the MDF needs to have
+air blowing on it the whole time to keep it from catching on fire,
+which is also going to cool off the wire, although maybe this problem
+can be limited by careful management of the air blowing, so that it's
+only blowing in a very thin layer.
+
+So consider a revision: 127-micron-diameter (36-AWG) wire cutting a
+150-micron-wide kerf (still at only 50 watts) with only a 12-mm gap
+between the conductive rollers.  This drops the resistance per mm by
+2.5 and the distance by 4x, getting us down to about 930mΩ, which
+means that we now need 7 amps running through the wire, powered by
+about 7 volts, and a power-supply output impedance of below an ohm or
+so to keep efficiencies reasonable.  That's still hot enough to melt
+the wire if there's no thermal load on it, but I feel that it's
+possible to keep it running through the rollers fast enough to keep it
+passively safe, even without rapid-response electronic control to keep
+it from burning.  And it's mechanically strong enough that it might
+survive encounters with things that unexpectedly fail to burn on
+contact with it.
+
+(180-micron (33-AWG) nichrome wire is commonly used for
+styrofoam-cutting machines like the popular Argentine brand "Segelin".
+Thicker gauges are common; thinner gauges are somewhat exotic.  One
+Aldo Vignolo sells them on Mercado Libre here in Buenos Aires.)
+
+What do we do about splicing the wire?  One possibility is to simply
+not worry about it, instead merely reversing direction when the time
+comes, maybe turning off power to let the wire cool in between.
+
+How much thermal energy can be stored in the gap before the wire
+melts?  Nichrome has a specific heat of 450 J/kg/K and a density of
+8.4 kg/liter, which works out to 3.8 kJ/liter/K.  At 127 microns,
+that's 48 microjoules per millimeter per kelvin, or 67 millijoules per
+millimeter, or about 800 millijoules in all, to melt the wire in the
+gap.  The situation is slightly worse because nichrome's resistance
+increases slightly with temperature, so it can experience a kind of
+thermal runaway where hotspots heat up faster, and also slightly
+better because the hottest spots are also radiating away energy most
+rapidly.  Disregarding these, this means that keeping it passively
+safe at 50 watts involves feeding a gap's worth of wire onto a quench
+roller about every 16 milliseconds, a speed of about 750 mm per
+second.  But that's just to barely keep the wire from melting.
+
+I'm not sure that shortening the gap was a big improvement.  It does
+lower the amount lost in the other part of the loop, but it also
+reduces the heat capacity of the wire in the gap, thus requiring
+faster response if we decide to use active feedback for safety, and so
+it doesn't actually affect the necessary passive-safety wire speed.
+And, because it lowers the resistance, it requires a higher-quality
+power supply and heavier wiring.  And, because it raises the required
+current, it also increases the possibility of melting the wire ---
+resilience is likely of more value than efficiency here.
+
+A third revision, where we increase the gap size to the accursed 25mm,
+leave the wire thickness at 127 microns, and drop the power to 40
+watts, requires less current, only 4.5 amps:
+
+    You have: sqrt(40 watts / (micro ohm meter * 25 mm / ((127 microns/2)^2 pi)))
+    You want: 
+            Definition: 4.5020328 A
+
+This is low enough that it is *almost* passively safe even for copper,
+which melts at 1084°, even without the quench rollers.  The resistance
+in the gap is up to 2Ω, which means you need 9 volts, a very
+convenient number indeed.  You no longer need quite such big hairy
+power cables or a high-quality power supply; Duracell's spec for their
+[MN1604 nine-volt battery][1] lists a 1.7Ω impedance, so even that
+would be almost good enough; a dozen or so in parallel would do.  The
+gap can now hold 1.7 J of thermal energy before melting:
+
+    You have: 450 J/kg/K * 8.4 kg/liter * ((127 microns/2)^2 pi) * 25 mm * 1400 K
+    You want: J
+            * 1.675935
+            / 0.59668186
+
+[1]: http://ww2.duracell.com/media/en-US/pdf/gtcl/Product_Data_Sheet/NA_DATASHEETS/MN1604_6LR61_US_CT.pdf
+
+Lowering the power to 40 watts means that it takes 42ms to reach
+melting temperature in the absence of any heat-loss mechanism, such as
+radiation, conduction into the workpiece, or the quenching roller.
+For the quenching roller alone to be sufficient, the wire needs to
+move at 600 mm/s:
+
+    You have: 25 mm * 40 watts / (450 J/kg/K * 8.4 kg/liter * ((127 microns/2)^2 pi) * 25 mm * 1400 K)
+    You want: 
+            Definition: 0.59668186 m / s
+
+The 150-micron kerf I expect from this is not quite as good as the
+100-micron kerf I see from laser cutters.  Contrast this with the
+[Olson No. 2 spiral scroll saw blade][2], which nominally gives you a
+kerf of .035 inches in US folk units (890 microns), losing six times
+as much material and thus with six times as much opportunity for
+imprecision.
+
+I don't know if it will work as well as a 40-watt laser cutter at
+cutting wood, even if you blow air down the wire.  I think the laser
+cutter is usually heating up a tiny point rather than a whole contact
+surface, so it might heat the wood or MDF to a higher temperature.
+But maybe this will instead work better, since it has some mechanical
+sliding action and won't be impeded by smoke.
+
+[CNC foam cutters commonly use inconel][3] rather than nichrome.
+
+[3]: http://www.rcgroups.com/forums/showthread.php?t=436753&page=3
+
+[US patent 5,429,163][2] is relevant; it claims 600° to 800° is
+sufficient for cutting wood, and suggests using either a reciprocating
+or an endless wire.  It says the wood itself need only heat up to 240°
+to 270°, and that irregularities in the wood pretty much require
+closed-loop temperature control, and claims 10 to 21 mm/sec of cutting
+speed.  Unfortunately it doesn't go into any detail about power usage,
+preheat gap size, wire speed, or wire diameter.
+
+[2]: http://www.freepatentsonline.com/5429163.html

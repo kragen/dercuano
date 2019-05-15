@@ -1,0 +1,323 @@
+My friend Santi asked me why we divide by a fraction by interchanging
+the numerator and the denominator and multiplying; that is, why
+a/(b/c) = a(c/b).  I wasn’t quite sure how to answer, but after
+thinking about it, it turns out that there are many deep and
+fascinating answers that involve many aspects of the universe of
+mathematics.  Here are three different answers.  Sort of.
+
+Part of the problem is that it’s difficult to say what really counts
+as an explanation here, because, as Feynman explained in his famous
+BBC video on “Fucking magnets, how do they work?”, an explanation has
+to start with things that you already understand to be true.  In cases
+like this, it’s really easy to fool yourself into thinking that you
+have an explanation, when all you really have is circular logic.
+Here, let me demonstrate.
+
+An answer based on group theory
+-------------------------------
+
+A “group” is a set with an operation that have the four properties of
+closure, associativity, identity, and invertibility.  Nonzero
+fractions, together with multiplication, are a group.  It turns out
+that the divide-by-multiplying-upside-down thing isn’t limited to
+fractions at all; it’s a much more general property that applies to
+any group, including bizarre things like permutations under
+composition, three-dimensional rotations of polyhedra under
+composition, matrices under matrix multiplication, Gaussian integers
+under addition, bit strings of some fixed length under XOR, and
+integers under multiplication modulo a prime number!
+
+To explain, first I will explain the meaning of the group properties.
+Since I’m writing this mostly in ASCII, I’m going to use “G” to mean
+the set, other letters to mean elements of the set, “+” to mean the
+operation, and two other special notations which I explain below: “0”
+to mean the identity element of G, and “-X” to mean the inverse of an
+element X of G.
+
+**Closure**: if A and B are in G, then A+B is also in G.  This rules
+out things like “numbers 1 to 10 under ordinary addition”, because 9+9
+is 18, which isn’t in the set, and things like “integers under
+ordinary division”, since even though 6/3 is in the set, 2/3 isn’t.
+
+**Associativity**: (A+B)+C = A+(B+C), always.  This rules out
+non-associative operations like division or subtraction.
+
+**Identity**: There’s an element of G which I will call 0 which has
+the property that A+0 = 0+A = A, for all A.  We call it the “identity
+element”.  This rules out operations like “return the left argument”.
+
+**Invertibility**: Every element A in G has a corresponding inverse
+element -A such that A+-A = -A+A = 0.  This rules out operations like
+multiplication on rational numbers, since zero (not the identity
+element, real zero) is a rational number, the identity element for
+multiplication on rational numbers is 1, and there’s nothing you can
+multiply by zero to get 1.  (But multiplication on nonzero rational
+numbers is still fine!)
+
+You will note that commutativity isn’t one of the group properties,
+even though, say, integer addition is additive; and in fact there are
+lots of interesting groups whose operation isn’t commutative.  If you
+can prove a property of groups without depending on commutativity,
+then it applies not just to commutative groups like the nonzero
+rationals under multiplication, but also noncommutative groups like
+matrices under matrix multiplication and permutations under
+composition.
+
+The question we started out with was, “Why does a/(b/c) = a(c/b),
+when a is a rational number and b and c are nonzero integers?”  Here’s
+why that’s true not just for integers but actually for any nonzero
+rational numbers.
+
+### Our question, restated in generic group terms ###
+
+Let’s start by rewriting it in the notation I have above: ab becomes
+A+B, and a/b becomes A+-B.  So we’re trying to find out if, and why,
+A+-(B+-C) = A+(C+-B).
+
+Using the definition of invertibility (-), we can derive that:
+
+    B+-B = 0
+
+From there, we can replace B with B+0, using the definition of
+identity (0):
+
+    (B+0)+-B = 0
+
+Then, using the definition of invertibility, we can replace that 0
+with -C+C:
+
+    (B+(-C+C))+-B = 0
+
+The definition of associativity lets us move around the parentheses
+around + operations:
+
+    (B+-C)+(C+-B) = 0
+
+Now, if (B+-C)+(C+-B) is 0, then for any element Q, by the
+substitutability property of equality:
+
+    Q+0 = Q+(B+-C)+(C+-B)
+
+In particular, if we take Q to be -(B+-C), which we know exists by the
+properties of invertibility and closure, we have:
+
+    -(B+-C)+0 = -(B+-C)+(B+-C)+(C+-B)
+
+The right side now begins with a thing of the pattern -R+R, which we
+know from invertibility is 0, so we have:
+
+    -(B+-C)+0 = 0+(C+-B)
+
+And by the definition of identity, we now have:
+
+    -(B+-C) = (C+-B)
+
+This is a stronger form of what we wanted to prove in the first place,
+since it shows that for any A:
+
+    A+-(B+-C) = A+(C+-B)
+
+which is our original statement, but it also shows that you don’t even
+need the A.
+
+### Applying the result to other groups ###
+
+So that shows that a/(b/c) = a(c/b), as long as all three are nonzero
+rational numbers, and in particular if b and c are nonzero integers.
+It also shows that the same thing is true if, for example, a, b, and c
+are numbers in the range of 1 to 6, with the following tables for
+multiplication and division in Z/7:
+
+     *  1  2  3  4  5  6     /  1  2  3  4  5  6
+     1  1  2  3  4  5  6     1  1  2  3  4  5  6
+     2  2  4  6  1  3  5     2  4  1  5  2  6  3
+     3  3  6  2  5  1  4     3  5  3  1  6  4  2
+     4  4  1  5  2  6  3     4  2  4  6  1  3  5
+     5  5  3  1  6  4  2     5  3  6  2  5  1  4
+     6  6  5  4  3  2  1     6  6  5  4  3  2  1
+
+For example, if a=3, b=4, and c=5, then a/(b/c = 5) = 2, and
+a(c/b = 3) = 2 also.  Try it for any three of these numbers.  It will
+always work.  (It works in Z/p for any prime p.  See attached
+modmul.py.)
+
+Here’s a Python example of permutations using [my permutations
+module][1]:
+
+    >>> from permutations import cycle
+    >>> a = cycle(1, 2, 4)
+    >>> b = cycle(2, 5)
+    >>> c = cycle(2, 4)
+    >>> a * (b * c**-1)**-1
+    cycle(1, 2, 5)
+    >>> a * (c * b**-1)
+    cycle(1, 2, 5)
+
+Note that, since permutation composition is not commutative,
+a(1/b * c) is not the same:
+
+    >>> a * (b**-1 * c)
+    cycle(1, 2) * cycle(4, 5)
+
+[1]: http://lists.canonical.org/pipermail/kragen-hacks/2013-August/000560.html
+  "permutations (elements of a symmetric group) in Python"
+
+### Why this is a little bit bogus ###
+
+But wait!  All this is based on my initial assertion that the four
+group axioms apply to nonzero rationals under multiplication.  How do
+we know that’s true?  Maybe all of the above is begging the question,
+when it comes to the nonzero rationals, since how do we know that
+nonzero rationals even have multiplicative inverses in the first
+place?  I mean, if we assume that rationals including zero are a group
+under multiplication, then we can use the same argument to claim that
+rationals including zero can be divided in this way, but that turns
+out to be wrong.  So first we have to show that nonzero rationals are
+a group!
+
+Rational numbers as pairs of integers
+-------------------------------------
+
+Suppose we take as given that nonzero integers form a *commutative*
+group under multiplication, and we want to explore relations a:b of
+those integers, using the equality relation a:b = c:d iff an:bn =
+cm:dm for some nonzero integers m and n; and we define multiplication
+as (a:b)(c:d) = ac:bd.  What can we find out?
+
+First, we can prove pretty directly that ((a:b)(c:d))(d:c) = a:b, as
+long as neither c nor d is zero:
+
+    ((a:b)(c:d))(d:c) =
+        {definition of multiplication}
+    (ac:bd)(d:c) =
+        {definition of multiplication}
+    acd:bdc =
+        {commutativity of integer multiplication}
+    adc:bdc =
+        {associativity of integer multiplication}
+    a(dc):b(dc) =
+        {definition of rational equality}
+    a:b
+
+        (Bloviation 0)
+
+Which is pretty close to what we started out wanting to know.  But we
+can also show that nonzero rational numbers, defined in this way, are
+a group under multiplication.  We need to show closure, associativity,
+identity, and invertibility.
+
+**Closure**: (a:b)(c:d) produces ac:bd, and since the integers are closed
+under multiplication, ac and bd are integers.
+
+**Associativity**:
+
+    ((a:b)(c:d))(e:f) = (ac:bd)(e:f) = (ac)e:(bd)f
+    (a:b)((c:d)(e:f)) = (a:b)(ce:df) = a(ce):b(df)
+
+which are equivalent because integer multiplication is associative.
+
+**Identity**: (1:1)(a:b) = 1a:1b = a:b since 1 is an identity for
+integer multiplication.
+
+**Invertibility**: Bloviation 0 above shows that these relations have
+right multiplicative inverses (and how to compute them); you can carry
+out the same argument for left multiplicative inverses.
+
+So that shows us how to compute multiplicative inverses of pairs of
+nonzero integers with these weird definitions of multiplication and
+equality.  But how do we know that those pairs of integers are
+*really* “the rational numbers”?
+
+We can translate individual integers into this pair-of-integers form
+as follows: t(x) = x:1.  It should be straightforward to see that
+multiplication on these pairs corresponds to multiplication on the
+integers, i.e. t(x)t(y) = t(xy).  And, in math, that’s really all you
+need: it walks like the group of fractions, quacks like the group of
+fractions, so it’s the group of fractions!  There is no more “really”
+than that, in math.
+
+I guess this is the algebraic structure you get if you assume that
+nonzero integers must have multiplicative inverses, and then take the
+set of the integers and their multiplicative inverses and extend it by
+transitive closure of multiplication; it’s the smallest set that
+includes the nonzero integers and satisfies the group axioms.  I’m not
+immediately sure how to show that, but I’m pretty sure it’s true.
+
+An interesting thing here is that the proof above depends on the
+commutativity of (nonzero) integer multiplication, from which we could
+directly derive the commutativity of rational multiplication.  Integer
+multiplication is closed, associative, and has an identity, but it
+isn’t invertible, which makes it an algebraic structure called a
+“commutative monoid”.  I’m not sure what happens if your numerator and
+denominator are drawn from some other monoid that isn’t commutative,
+such as quaternions with nonzero integer coefficients, or nonzero
+square matrices of integers of some size n.
+
+A spatially-oriented intuitive answer
+-------------------------------------
+
+But that’s all very algebraic and abstract.  You could read all of the
+above and still think that there was maybe a flaw in the logic
+somewhere, that there might be some case where a/(b/c) isn’t really
+a(c/b).  What about everyday intuition?
+
+When we say n/m, we’re looking for a solution x to the equation
+mx = n; we want to know how many times we would have to add m to
+itself to get n, or looking at it another way, what number we would
+have to add to itself x times to get n.  Spatially, we’re looking for
+the length x of a stick of which we would have to lay m of, end to
+end, to add up to n, or the number of sticks x of length m.
+
+If m is a fraction, it’s easier to think of it as a length of a stick
+than as a number of sticks, so let’s go with that.  It’s clear that if
+m is a reciprocal of an integer, like 1/3 or 1/4, then that integer is
+the number of sticks you need to reach a length of 1; and if you have
+to go twice or three times as far, you need twice or three times as
+many sticks, so clearly x is going to be proportional to n.
+Similarly, it’s clear that if m is twice or three times as long, you
+need half or a third as many sticks to go the same distance, so making
+m be 2/3 or 3/4 will make x be half or a third of what it was when m
+was 1/3 or 1/4.
+
+So that kind of covers it: you can get to any fraction m by starting
+with the reciprocal of an integer (your denominator) and then
+multiplying it by another integer (your numerator), and if you watch
+how x changes as you do that, you can see that x gets multiplied by
+the denominator, divided by the numerator, and multiplied by n, your
+original dividend.
+
+modmul.py
+---------
+
+This Python script generated the multiplication and division table for
+Z/7 above.
+
+    #!/usr/bin/python
+    nn = 7
+    col = "  "
+    def num(xx):
+        print "%2d" % xx,
+
+    print " *",
+    for ii in range(1, nn):
+        num(ii)
+
+    print col, " /",
+    for ii in range(1, nn):
+        num(ii)
+
+    print
+
+    for ii in range(1, nn):
+        num(ii)
+        for jj in range(1, nn):
+            num((ii * jj) % nn)
+
+        print col,
+
+        num(ii)
+        inverse = (jj for jj in range(1, nn) if (ii * jj) % nn == 1).next()
+        for jj in range(1, nn):
+            num((inverse * jj) % nn)
+        print
+

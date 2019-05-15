@@ -1,0 +1,108 @@
+Not sure if this is a new IFS-rendering idea or not, but I was
+thinking about a recursive algorithm I'd written to render implicit
+functions using interval arithmetic, and it occurred to me that you
+can perhaps use it to do efficient escape-time IFS rendering.
+
+Interval arithmetic computes with intervals of real numbers rather
+than pointwise real numbers; (-1, -½) / (-3, -2) evaluates to (⅙, ½),
+for example, because any number in the interval (-1, -½) divided by
+any number in the interval (-3, -2) will give a number in the interval
+(⅙, ½); and, if there's no further relationship between the numerator
+and the denominator, it can give *any* number in that interval.
+
+This is a kind of very simple abstract interpretation; it gives you a
+conservative approximation of what values a function can range over,
+given a conservative approximation of its inputs.  If you're, say,
+just looking for zeroes of the function, you can disregard whole
+swaths of its domain once you've computed that the function's range
+over that part of its domain is strictly positive, strictly negative,
+or (in the case of multi-interval arithmetic, which is useful for
+handling division by zero) a union of the two; this can give you
+asymptotic speedups.
+
+My 2-D implicit rendering algorithm with interval arithmetic, inspired
+by my very limited understanding of Flórez Díaz's 2008 raytracing
+thesis, works as follows:
+
+1. evaluates the given function over X and Y intervals covering
+the entire canvas to be drawn;
+2. if the output interval it computed excludes zero, it is done;
+3. otherwise, if it is now evaluating deep-subpixel intervals, it
+simply draws white;
+4. otherwise, it divides the rectangle into thirds, and recurses on
+the thirds.  (Halves or fourths or any other number works too, but is
+less efficient.)
+
+So it occurred to me that you can compute a similar kind of
+approximation of an IFS's attractor by escape-time analysis.  You can
+run an IFS either forward (toward the attractor) or backward (away
+from it).  If you run it forward, regardless of which transform you
+choose, you will stay on the attractor if you're already there, and
+approximate the attractor more closely if you're not; while if you run
+it backward, even if you're in the attractor, most choices of
+transform will generally push you off of it, while there exists at
+least one choice (generally exactly one) that will keep you on the
+attractor.  This means you have to *search* for the correct choice.
+
+So I propose that you divide the canvas into a k-d tree, as in my
+implicit-function rendering algorithm, but one that remains stored, in
+which each node (bounding box, let's say, or just "box") is in one of
+three states:
+
+1. it's known to not overlap the attractor;
+2. it's known to be entirely inside the attractor, which I believe is
+   only applicable if the attractor has Hausdorff dimension the same
+   as the space we're working in;
+3. it's suspected to overlap the attractor.
+
+We iteratively look for nodes in state 3 that are still big enough to
+be interesting for our purposes, and we transform them with all of the
+transforms at our disposal, both forward and reverse.  If *any*
+forward transform leaves its image entirely inside a node in state 2,
+then this node also changes to state 2; if *all* reverse transforms
+leave its image entirely inside a node in state 1, then this node also
+changes to state 1.
+
+This also suggests that we should link nodes in state 3 to the other
+state-3 nodes that we have discovered to be able to transform to and
+from them, so that we can propagate state changes properly when we
+change the state of a state-3 node.
+
+Once this link structure has been discovered, though, we choose a
+state-3 node to divide into pieces, and transform it again.
+Presumably once the pieces are small enough, we will choose to stop
+subdividing, but smaller pieces might transform entirely within a
+state-1 or state-2 node.
+
+But how do we get any state-1 or state-2 nodes to begin with? If we
+can compute a conservative bounding box for the attractor to start
+with, then boxes outside that bounding box will be in state 1, but
+state 2 is a little trickier.  To find the fixed point of any of the
+transforms, we can solve some simultaneous linear equations, or just
+exponentiate the transform, since it's contractive.  But that still
+just gives us a point (a unique point, by the Banach fixed-point
+theorem) rather than an interval that could actually contain another
+interval inside of it.
+
+And indeed many IFSs will contain no such intervals that are entirely
+inside their attractors.  Others, however, do; consider the 1-D IFS
+f₁(x) = x/2, f₂(x) = (x+1)/2, whose attractor solidly covers the space
+between 0 and 1; or the 2-D IFS
+
+    f₁(x, y) = (x/2,     y/2)
+    f₂(x, y) = ((x+1)/2, y/2)
+    f₃(x, y) = (x/2,     (y+1)/2)
+    f₄(x, y) = ((x+1)/2, (y+1)/2)
+
+which I believe similarly solidly covers the square you would expect
+it to.
+
+State 1 and state 3 are clearly enough to render a fractal, but if
+your particular IFS has state-2 regions in it, then it will be
+exponentially more efficient to be able to recognize them, since
+you'll be able to focus on the boundary of the set instead of deeply
+recursing on the whole thing.  I just don't know how yet.
+
+Anyway, so I think this algorithm, even without state 2, should scale
+with an exponent very nearly the Hausdorff dimension of the IFS you're
+looking at, multiplied by the number of IFS transforms.

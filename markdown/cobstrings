@@ -1,0 +1,156 @@
+COBS ("consistent overhead byte stuffing") is a byte-stuffing method
+for avoiding NUL bytes in your packets so that you can use them for
+framing which has some interesting virtues.  You take your packet
+
+    f o o\0\0\1\0 x y z\0\7
+
+append a NUL to it so that it's a concatenation of NUL-terminated
+strings, then compute the lengths of all the NUL-terminated strings:
+
+    f o o\0\0\1\0 x y z\0\7\0
+    3       0 1   3       1
+
+Now you convert the NUL-terminated strings to counted strings with the
+counts starting at 1.
+
+    f o o\0\0\1\0 x y z\0\7\0
+    3       0 1   3       1
+    \4f o o\1\2\1\4 x y z\2\7
+
+So now your packet is the same length as before but contains no NULs,
+if we count the terminating NUL we added, through a reversible
+transformation that eliminates the NULs.
+
+But that's impossible, by the same pigeonhole principle that shows
+that file compression has its limits.  And indeed we run into the
+standard problem with counted strings: you run out of counts.  What do
+you do if you have more than 254 bytes between NULs?
+
+COBS solves this by reserving \xff for a 254-payload-byte prefix
+block, which does not have a terminating NUL; so a COBS string in
+general consists of a sequence of zero or more \xff-prefixed blocks
+followed by an excess-1-count-prefixed block, which may be empty.
+
+It occurred to me that this representation for in-memory strings has
+some advantages:
+
+1. Like C strings, it only requires a single extra byte of overhead,
+   at least in the cases where C strings are a good idea.
+2. Like C strings, you can cut a string into tokens in place by
+   overwriting separators in it with metadata.  (This requires
+   moving around later parts of the string if it's long, though.)
+3. Unlike C strings, it's 8-bit clean; it can store any byte,
+   including NUL bytes, avoiding security holes, among other problems.
+   This means COBS strings can be safely nested!
+4. Unlike C strings, appending to a long string (of a few kilobytes)
+   is reasonably efficient, as is taking its length; so `stpcpy` is
+   unnecessary.  And Boyer-Moore search is plausible.
+5. Unlike C strings, you can copy it several bytes at a time.
+
+It has a couple of disadvantages compared to C strings: code
+implementing fundamental string operations is a bit more complicated;
+you can't compute a suffix of a string without mutating it, which
+means that a number of standard library functions need an extra "start
+index" argument; and copying data into and out of the string requires
+special consideration for possible chunk boundaries.
+
+Here, I'm eliminating as unhelpful in this context the constraint to
+not use NUL bytes, so a \0 length byte is an empty string, a \1 length
+byte is a single-byte string, a \xfe byte is a 254-byte string, and
+the \xff byte prefixes 255 bytes of payload data.
+
+So a long string might look like this in memory:
+
+    FF C O B S ( " c ... s oSPFF t h a t ... s t a rFF t i
+     n g...SPSPBE / * c o bSP c h u n k ... \nSPSPSPSP}\n
+
+with the \xBE at the beginning of the final block both signaling its
+length and 
+
+I think these functions may be correct, but I have not tested them.
+
+    void cobcpy(unsigned char *dest, unsigned char *src)
+    {
+       while (src) {
+          memcpy(dest, src, cobclen(src) + 1);
+          dest += 256;
+          src = cobcnext(src);
+       }
+    }
+
+    void coblen(unsigned char *s)
+    {
+       size_t n = 0;
+       for (; s; s = cobcnext(s)) n += cobclen(s);
+       return n;
+    }
+
+    void cobcat(unsigned char *dest, unsigned char *src)
+    {
+       while (src) {
+          while (cobcnext(dest)) dest = cobcnext(dest);
+          cobaddbytes(dest, cobcbody(src), cobclen(src));
+          src = cobcnext(src);
+       }
+    }
+
+    /* returns index of first c in cob, or coblen if not found */
+    size_t cobchr(unsigned char *cob, char c) {
+       size_t n = 0;
+       while (cob) {
+          unsigned char *m = memchr(cobcbody(cob), c, cobclen(cob));
+          if (m) return n + m - cobcbody(cob);
+          n += cobclen(cob);
+          cob = cobcnext(cob);
+       }
+    }
+
+    int cobcmp(unsigned char *a, unsigned char *b)
+    {
+       for (;;) {
+          int n = cobclen(a), nd = cobclen(b) - n;
+          if (nd < 0) n += nd;
+          int d = memcmp(cobcbody(b), cobcbody(a), n);
+          if (d) return d;
+          if (nd) return nd;
+          if (n != 255) return 0;
+          a += 256;
+          b += 256;
+       }
+    }
+
+    /* append n bytes starting at src to cob */
+    void cobaddbytes(unsigned char *cob, unsigned char *src, size_t n)
+    {
+       while (cobcnext(cob)) cob = cobcnext(cob);
+       int available = 255 - cobclen(cob);
+       int to_copy = (n < available ? n : available);
+       *cob += to_copy;
+       memcpy(cobcbody(cob) + cobclen(cob), src, to_copy);
+
+       /* copy any remaining bytes into a new chunk */
+       cob = cobcnext(cob);
+       if (cob) {
+          int tail = n - to_copy;
+          *cob = tail;
+          memcpy(cobcbody(cob), src + to_copy, tail);
+       }
+    }
+
+    /* cob chunk next; returns NULL if there is no next chunk */
+    unsigned char *cobcnext(unsigned char *s)
+    {
+       return (cobclen(s) == 255 ? s + 256 : 0);
+    }
+
+    /* cob chunk length */
+    int cobclen(unsigned char *s)
+    {
+       return *s;
+    }
+
+    /* cob chunk body */
+    unsigned char *cobcbody(unsigned char *s)
+    {
+       return s+1;
+    }

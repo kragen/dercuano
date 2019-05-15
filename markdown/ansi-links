@@ -1,0 +1,272 @@
+We should totally have a way to render HTML-style links in terminal
+emulators.
+
+Why this is a good idea
+-----------------------
+
+Lots of terminal emulators already have a way to recognize URLs in
+free text so that you can visit them (ctrl-click in gnome-terminal, an
+option on the dropdown menu in both gnome-terminal and Konsole), which
+is useful.  But if you're chatting over XMPP with someone who's using
+HTML (like HipChat), they're probably going to embed links from time
+to time.  And they expect that when they say:
+
+> We'll go from my house to Facebook at around 10:00.
+
+where "my house" is linked to
+<http://maps.google.com/maps?client=ubuntu&channel=fs&oe=utf-8&q=1456+Edgewood+Dr.,+Palo+Alto,+CA&um=1&ie=UTF-8&hq=&hnear=0x808fbb0d745a65e9:0xfde4b05151805922,1456+Edgewood+Dr,+Palo+Alto,+CA+94301&gl=us&sa=X&ei=bZNCUbbuI62g4AOPyYDQDw&ved=0CDAQ8gEwAA>
+and "Facebook" is linked to
+<http://maps.google.com/maps?q=facebook&hl=en&sll=37.45392,-122.13933&sspn=0.007495,0.013797&gl=us&hq=facebook&t=m&z=16>,
+then you will see something like
+
+> We'll go from *my house* to *Facebook* at around 10:00.
+
+and not
+
+> We'll go from <http://maps.google.com/maps?client=ubuntu&channel=fs&oe  
+> =utf-8&q=1456+Edgewood+Dr.,+Palo+Alto,+CA&um=1&ie=UTF-8&hq=&hnear=0x80  
+> 8fbb0d745a65e9:0xfde4b05151805922,1456+Edgewood+Dr,+Palo+Alto,+CA+9430  
+> 1&gl=us&sa=X&ei=bZNCUbbuI62g4AOPyYDQDw&ved=0CDAQ8gEwAA>my house to  
+> <http://maps.google.com/maps?q=facebook&hl=en&sll=37.45392,-122.13933&s  
+> spn=0.007495,0.013797&gl=us&hq=facebook&t=m&z=16> Facebook at around  
+> 10:00.
+
+which is pretty annoying and hard to read.
+
+The proposed solution: `ESC [ _` and `ESC [ U < url >`
+------------------------------------------------------
+
+We define two new ANSI-compatible escape sequences, which ought to be
+proposed for the next version of ECMA-48 and the corresponding ISO
+standard:
+
+* `CSI _`, or `ESC [ _`, "LNK": to indicate the beginning of a
+  hyperlink to an URL.  All characters produced before the next URL
+  sequence form part of the link.
+* `CSI U`, or `ESC [ U`, "URL": to indicate the end of the link text
+  begun by LNK.  This sequence is followed by the unencoded text of
+  the URL to which clicking the link should take the user, preceded by
+  "<" and terminating before the next ">" or " ", which is part of the
+  escape sequence and not displayed.
+
+As an example, a link labeled "Canonical Hackers" linking to
+<http://canonical.org/> could be represented as follows, with `ESC`
+representing the ASCII escape character:
+
+    ESC[_Canonical HackersESC[U<http://canonical.org/>
+
+A literal rather than quoted version: [_Canonical
+Hackers[U<http://canonical.org/>.
+
+Rationale for the design of the escape sequence
+-----------------------------------------------
+
+Above and beyond the typographical possibilities of whitespace, we
+already have boldface, underlining, and different colors in our
+terminal emulators.  These are produced by "escape sequences",
+invisible sequences of characters typically beginning with the ESC
+character (character 27) followed by a "[", which change the state of
+the terminal so that subsequently displayed characters will have a
+different effect.  The `ESC[` sequence is called "CSI", "Control
+Sequence Introducer".
+
+So I think we should define an escape sequence to make the following
+(or preceding?)  sequence of characters into a clickable link to a
+given URL.
+
+It would be desirable if the escape sequence degraded into something
+that was human-readable when displayed on terminals that didn't
+support it.  This is only possible to a limited extent, since programs
+that try to be aware of screen layout will necessarily be confused
+about where the text is on the screen, but it is still somewhat
+possible.
+
+ANSI escape sequences can't contain sequences of arbitrary characters,
+while URLs can contain most characters.  Consequently the escape
+sequences for setting the terminal title aren't ANSI escape sequences:
+`ESC]0;new title^G`, where `^G` is the BEL character control-G
+(character 7) and can also be ` ESC\ `, and `0` can be replaced with
+`1` or `2`.  The `ESC]` sequence is known as "OSC" or "Operating
+System Command".
+
+xterm's parsing of the above sequence seems to consume anything
+following `ESC]` until the next `^G` or ` ESC\ `, even if it doesn't
+start with a digit, which is pretty unfriendly.  This suggests that if
+we wanted to use the same `ESC]` introduction sequence, incompatible
+xterm implementations would eat the URL if we terminated it with the
+same `^G`, and other things as well if we used a different terminator.
+Even if most people are now using other terminal emulators, this seems
+like a compatibility trap.
+
+Putting the link escape sequence *after* rather than *before* the text
+to be marked up offers a certain kind of safety; it's quite easy for
+an unterminated color escape sequence to set the next few pages of
+output to white on white, or flashing, or underlined, or whatnot.  It
+also probably improves matters on terminals that don't yet understand
+the escape sequence, as they could see
+"Canonical<http://canonical.org/>" rather than
+"<http://canonical.org>Canonical".  Since you presumably need two
+escape sequences anyway to indicate the boundary of the link, you
+might as well put the URL in the final one.  So you have one escape
+sequence to indicate "beginning of link" and another one to indicate
+"end of link; URL is xyz".
+
+For reasons of tradition and URL-safety, I would like the delimiters
+(particularly in the gracefully degraded form) to be `<>`.  Ideally
+the beginning and ending sequences would also have a pleasing visual
+and memorable symmetry, and would disappear from view entirely in old
+terminals.
+
+(In the following, `ESC` means the ASCII character 27, escape.)
+
+This suggests using one of the ASCII matching delimiter pairs
+``[](){}<>`'``.  `[]` are right out, since they're already in use.
+`ESC(` and `ESC)` cause rxvt to swallow the following character; I'm
+not sure what their meaning is, but they seem to be used.
+Treating ``
+`' `` as a matched pair is sadly out of style, due to the unfortunate
+but now nearly universal adoption from Microsoft Windows fonts of a
+vertical `'`.
+
+`ESC{` and `ESC}` disappear in rxvt and xterm, render as literal ESC
+character glyphs in gnome-terminal, overlaid on top of the {} in my
+font, and disappear in konsole while producing warning messages on its
+stderr.  `ESC<` and `ESC>` disappear in rxvt; the second disappears in
+gnome-terminal, while the first renders as a literal ESC character
+glyph; they disappear in konsole.  This suggests that perhaps `ESC<`
+and `ESC>` are already taken.
+
+A little looking around suggests that `ESC>` is "set numeric keypad
+mode" aka DECKPNM on VT100s, `ESC<` is "exit ANSI mode" on VT52s,
+while `ESC(` and `ESC)` are used by VT100s to change character sets
+(setaltg0, setaltg1, etc.)
+
+`ESC}` on VT100s is "invoke the G2 character set", according to
+<http://rtfm.etla.org/xterm/ctlseq.html>, although that's ignored in
+xterm and probably all other modern terminal emulators.
+
+So this suggests the following syntax:
+
+    ESC{Canonical.ESC}<http://canonical.org/>
+
+Actually, though, you could use valid ANSI escape sequences instead of
+`ESC{` and `ESC}`.  I wanted to use `ESC[a` for the "begin link"
+sequence (like `<a>`), but rxvt already uses it for a nonstandard
+"move right" sequence, an alternative spelling of `ESC[C`.  (See
+rxvt-2.6.4/src/command.c:2652, inside `process_csi_seq`.)  The full
+set of CSI-ending codes handled by rxvt seems to be
+``iAeBCaDEFG`dHfIZJK@LMXPT^ScmnrshltgW``, which is to say,
+``@ABCDEFGHIJKLMPSTWXZ^`acdefghilmnrst``.
+
+Argh, so what to use for the other escape sequence?  Wikipedia says:
+
+> For two character sequences, the second character is in the range
+> ASCII 64 to 95 (@ to _). However, most of the sequences are more
+> than two characters, and start with the characters ESC and [ (left
+> bracket). This sequence is called CSI for Control Sequence
+> Introducer (or Control Sequence Initiator). The final character of
+> these sequences is in the range ASCII 64 to 126 (@ to ~).
+
+This suggests that we could use "ESC[_", which konsole reports as an
+"Undecodable sequence" and drops, rxvt apparently drops (and isn't in
+rxvt's list of CSI codes), xterm and screen drop, and gnome-terminal
+displays literally.  "ESC[_" is nice and mnemonic: links are normally
+underlined.
+
+`ESC[U` would work for the "end link, begin URL" sequence, which could
+be followed by the URL wrapped in `<>`.  If the URL is specified to
+end at the next space or `>`, then this sequence would be unlikely to
+inadvertently gobble up a large quantity of text when random data is
+sent to the terminal that randomly happens to include `ESC[U`.  So
+that would give us:
+
+    ESC[_Canonical.ESC[U<http://canonical.org/>
+
+Here's a literal example: I am from the [_Canonical
+Hackers.[U<http://canonical.org/>
+
+Implementing the escape sequence
+--------------------------------
+
+You could write your own terminal emulator to support links, but it
+probably makes more sense to implement the feature in existing
+terminal-emulation software.  The popular free-software terminal
+emulators are tmux, screen, gnome-terminal, konsole, rxvt, xterm,
+Emacs, and whatever Apple ships, plus perhaps implementation in
+ncurses is necessary for much application software to use it.
+
+I looked through the available file on my Ubuntu box to see what other
+terminal emulators there are.  The relevant popularity metrics from
+<http://popcon.debian.org/main/by_vote> are:
+
+    #rank name                            inst  vote   old recent no-files (maintainer)
+    34    libncurses5                    137051 119786  7528  9710    27 (Craig Small)                   
+    448   libvte9                        65767 30960 26691  8033    83 (Debian Gnome Maintainers)      
+    499   gnome-terminal                 54405 27886 21381  5118    20 (Debian Gnome Maintainers)      
+    771   xterm                          77540 17077 50118 10317    28 (Debian X Strike Force)         
+    918   screen                         45241 12867 30602  1758    14 (Axel Beckert)                  
+    1078  libvte-2.90-9                  27674  9519 11363  5591  1201 (Debian Gnome Maintainers)      
+    1182  konsole                        16489  8229  6662  1590     8 (Debian Qt/kde Maintainers)     
+    1434  emacsen-common                 28896  5699 19961  2805   431 (Rob Browning)                  
+    1609  xfce4-terminal                  9368  4110  4360   896     2 (Debian Xfce Maintainers)       
+    2109  tmux                            6908  2154  4244   508     2 (Karl Ferdinand Ebert)          
+    2285  lxterminal                      5290  1803  2946   541     0 (Debian Lxde Maintainers)       
+    2739  terminator                      2158  1274   764   119     1 (Nicolas Valcárcel Scerpella)   
+    2766  yakuake                         2324  1242   972   110     0 (Ana Beatriz Guerrero Lopez)    
+    3073  guake                           1499   972   449    78     0 (Sylvestre Ledru)               
+    4913  tilda                            724   324   367    33     0 (Davide Truffa)                 
+    4920  eterm                           1189   322   787    80     0 (Debian Qa Group)               
+    5130  terminal.app                     830   294   509    26     1 (Debian Gnustep Maintainers)    
+    5289  rxvt                            2032   274  1634   124     0 (Jan Christoph Nordholz)        
+    6432  aterm                            972   180   761    31     0 (Debian Qa Group)               
+    6948  cutecom                          796   148   596    50     2 (Roman I Khimov)                
+    7207  gtkterm                          781   135   619    27     0 (Sebastien Bacher)              
+    7299  sakura                           299   132   155    12     0 (Andrew Starr-bochicchio)       
+    7376  ajaxterm                         251   128   116     7     0 (Julien Valroff)                
+    7855  mrxvt                            452   110   320    22     0 (Jan Christoph Nordholz)        
+    7768  picocom                          535   113   378    43     1 (Matt Palmer)                   
+    7975  mlterm                           628   106   448    73     1 (Kenshi Muto)                   
+    8386  fbterm                          1392    95  1097   199     1 (Nobuhiro Iwamatsu)             
+    8947  roxterm                          470    82    79     5   304 (Tony Houghton)                 
+    10260 pterm                            345    59   231    55     0 (Colin Watson)                  
+    10458 jfbterm                         1142    56  1007    78     1 (Debian Qa Group)               
+    10771 kterm                            560    52   497    11     0 (Ishikawa Mutsumi)              
+    13843 evilvte                          117    27    87     3     0 (Wen-yen Chuang)                
+    14563 microcom                         187    24   150    13     0 (Alexander Reichle-schmehl)     
+    14898 xvt                              212    23   177    11     1 (Sam Hocevar)                   
+    15979 termit                            71    19    49     3     0 (Thomas Koch)                   
+    19919 vala-terminal                     44    10    32     2     0 (Debian Freesmartphone.org Team)
+    24553 xiterm+thai                       36     5    28     3     0 (Neutron Soutmun)               
+    24634 bogl-bterm                        41     4    32     5     0 (Samuel Thibault)               
+    25809 pyqonsole                         31     4    24     3     0 (Alexandre Fayolle)             
+    45654 libterm-vt102-perl                 5     0     5     0     0 (Debian Perl Group)             
+
+(I thought Text::CharWidth might be relevant, but it doesn't seem to
+handle escape sequences anyway.)
+
+Now, libvte9 or libvte-2.90-9 is the actual terminal emulator library
+that powers a number of the above terminal emulators, at least
+gnome-terminal, sakura, xfce4-terminal, vala-terminal, tilda,
+lxterminal, gtkterm, and evilvte.  But from looking at the code of
+gnome-terminal and xfce4-terminal, each separate application built on
+top of libvte would probably have to write some code to handle clicks
+on link regions.
+
+It seems that once you add the feature to libncurses5 (in the termcap,
+at least), libvte9, and gnome-terminal, it's available to 20% of users
+of Debian and similar systems; if you add it to xterm, you get another
+12%, although it's perhaps dubious whether upstream xterm will accept
+such a patch; adding the feature to screen makes it available to
+another 9%, although some of them will still be using other terminals
+(such as MacOS X terminal) to connect to their screen; konsole gets
+another 6%; emacs ansi-color.el 4%; xfce4-terminal 3%; and tmux 1.6%.
+
+Security
+--------
+
+Some escape sequences of the past have been disabled for security
+reasons in modern software.  However, in general, it's safe to launch
+arbitrary URLs in a normal browser at the moment, or so we believe; so
+this should be safe.  It may, however, result in terminal users
+getting rickrolled.  It would be useful to have a way to see what the
+linked URL is before you click on it.

@@ -1,0 +1,111 @@
+So I'm doing this tree-growth simulation thing in slices, where
+theoretically we want the total cross-sectional area of the tree to
+stay constant through branch points.  That is, the branch before a
+fork should have the same total cross-sectional area as the two
+branches after it, and also that every intermediate point in the
+forking process should have the same cross-sectional area.
+
+The underlying structure is a set of branch center points that move
+around in the XY plane as a function of Z, but my current problem is
+how to convert that into a three-dimensional shape that has the right
+thicknesses, transitions smoothly from one layer to the next, and is
+approximately circular around the branch center points.
+
+I've been trying to fake this by putting a circle around each branch
+center point and inflating it in such a way that two overlapping
+circles with the same center will have twice the area as if there were
+just one of them, and doing a radius linear interpolation thing as
+their radii get further apart, until they have no overlap at all.
+This is not working super well for a couple of reasons: the circles
+intersect one another and don't have a way to find corresponding
+points to join with a mesh, so they're only a step toward the
+two-dimensional shell I want, not the final result; and when more than
+two of them overlap because two branch events happened close together
+in time or because circles were forced to collide, the resulting
+circles are too big, and sometimes discontinuously so.
+
+So it occurred to me that you could solve most of this problem with
+some variety of gradient descent.  You have a bunch of boundary points
+linked into a bunch of loops.  You're trying to optimize the
+following:
+
+1. The area of each loop is close to the sum of the weights of the
+branch center points contained inside it.
+
+2. The difference between the boundary points in this generation and
+in the last generation is small.
+
+3. The total length of each loop is as short as possible.
+
+4. The loops do not intersect or self-intersect.
+
+5. The loops have the right number of points: no more than necessary,
+but enough to keep their form well-defined.
+
+Most of these can be optimized by continuously varying the boundary
+points' coordinates, but sometimes you might instead split or join
+loops or reorder the points of a loop, which might be done
+heuristically.  If you can really differentiate the merit function
+with regard to the coordinates, you can do real gradient descent as
+such; otherwise, you're stuck with blind hill-climbing search or
+genetic algorithms.
+
+Implicit functions
+------------------
+
+Unfortunately most of those things require a lot of geometric
+algorithms, and Sedgewick has impressed upon me how tricky those are.
+As an alternative, maybe I could use an implicit function, a function
+whose zero is a circle of the correct area when it's fed with only a
+single branch center, which is computed from the sum of the functions
+of the different branch centers, and where the contribution of a
+branch center falls off rapidly to zero as you get far away from it.
+
+As an example, you could use a sum of Gaussians centered on each
+center point, scaled to match the branch's radius, and subtract 1 from
+the sum to get a function with useful zeroes.
+
+However, you'd also want it to be the case that the area of
+overlapping branches is the area that would be the sum of the
+individual branches, at least in the common case I'm looking at here
+where I divide a branch by making two new branches in the same place
+whose eventual cross-sectional area, once they separate, will sum to
+the cross-sectional area of the original branch.
+
+A necessary but not sufficient condition for this is that the
+gaussian-like function of the distance from the center have the
+property that doubling the function makes the distance from the center
+at which the sum falls to 1 increase by a factor of √2̄.  It happens
+that Gaussians do in fact have that property, at least if you double
+them!  You can show it by algebra, but you can also do the experiment:
+
+    import math
+    def gaussian(r): return math.exp(-r**2)
+
+    def search(f, v, min, max, tolerance):
+        fmin, fmax = f(min), f(max)
+        assert (fmin - v) * (fmax - v) <= 0
+        if tolerance >= abs(fmin - v): return min
+        if tolerance >= abs(fmax - v): return max
+        mid = (min+max)/2.0
+        fmid = f(mid)
+        if (fmid - v) * (fmin - v) <= 0:
+            return search(f, v, min, mid, tolerance)
+        else:
+            return search(f, v, mid, max, tolerance)
+
+This code shows that gaussian(.832554) ≈ 0.5, and 2*gaussian(1.17741)
+≈ 0.5.  The ratio between those two is indeed √2̄.  However, it is not
+true in general that gaussian(x)/2 = gaussian(x√2̄), although that
+shouldn't stop us from using it here.
+
+It seems like if there's an analytic function that has these
+properties (minimally, that in general f(x)/2 = f(x√2̄), that it's
+always positive and finite, that f(x) = 1 at exactly one positive x,
+and that its limit at infinity is zero) it should be unique.
+
+I've already written an interval-arithmetic package in JS that could
+be used to efficiently divide the canvas into an implicit k-d tree to
+search for zero pixels.  It may need to be enhanced somewhat to look
+harder for the zeroes, down into deep subpixel, in order to avoid
+false positives.

@@ -1,0 +1,475 @@
+An algebraic approach to 3D geometry
+====================================
+
+I was thinking about how to model objects for 3-D printing in a more
+flexible and generative way than OpenSCAD provides, and a very
+interesting factorization of 3-D geometry occurred to me.  It falls a
+little short of what I was hoping for, but it still seems like it will
+be somewhat useful.
+
+You can compose all the common primitive solids, plus a large number
+that are not common in 3D graphics but commonly occur in the world,
+from a small number of primitives, belonging to a smaller number of
+types (in the programming sense of data types) and primarily function
+composition.  Surprisingly, it might even be practical to compute
+things with.
+
+In particular, this approach derives lines, squares, circles, arcs,
+ellipses, cubes (and parallelepipeds in general), helices, cylinders,
+cylinder walls, cones (including frusta), spheres, ellipsoids,
+paraboloids, logarithmic spirals, discs, cycloids, spirographs,
+machine turning patterns, and tori from seven
+or eight relatively powerful primitives, each in about two lines of
+code.
+
+I say this is "algebraic" in the sense that I'm defining a set of
+primitive objects and operations on those objects that I think will
+map to the domain I'm interested in in a useful way.  You could also
+say that it's "algebraic" in that it represents the 3-D objects as
+symbolic expressions containing variables that can be evaluated to get
+coordinates.
+
+This is derived from some work Nick Johnson and I a few years ago for
+an algebra of two-dimensional paths for his sand-table plotter, which
+drew aesthetically appealing patterns in sand with a ball bearing
+controlled by a magnet below the sand.
+
+Examples
+--------
+
+I haven't tested these.  See section "The algebra" for a brief
+explanation of the notation, or read on for a fuller explanation.
+
+    K(r)  = r...r
+    Z(v)  = X(K(π/2)) . Y(v) . X(K(-π/2))
+    TY(v) = Z(K(π/2)) . TX(v) . Z(K(-π/2))
+    TZ(v) = Y(K(π/2)) . TX(v) . Y(K(-π/2))
+    SY(v) = Z(K(π/2)) . SX(v) . Z(K(-π/2))
+    SZ(v) = Y(K(π/2)) . SX(v) . Z(K(-π/2))
+    SU(v) = SX(v) . SY(v) . SZ(v)
+    step = 0...1
+    line = TX(step)
+    square = line * TY(step)
+    cube = square * TZ(step)
+    turn = 0...2*π
+    twistedcube = square * (TZ(step) . Z(turn))
+    disc = TX(step) * Z(turn)
+    cylinder = disc * TZ(step)
+    twostep = -1...1
+    parabola = TX(twostep) . SY(twostep) . SY(twostep) . TY(K(1))
+    paraboloid = parabola * X(turn)
+    cone = (Y(K(π/4)) . line) * Z(turn)
+    frustum = (Y(K(π/4)) . TX(1...2)) * Z(turn)
+    circle = TX(K(1)) * Z(turn)
+    helix = TX(K(1)) * (Z(turn) . TZ(step))
+    arc = TX(K(1)) * Z(0...π)
+    ellipse = TX(K(1)) * (Z(turn) . SX(2))
+    torus = (TX(K(2)) . circle) * Y(turn)
+    cylinderwall = circle * TZ(step)
+    sphere = circle * X(turn)
+    ellipsoid = ellipse * X(turn)
+    helicalramp = TX(1...2) * (TZ(step) . Z(0...8π))
+    logarithmicspiral = TX(K(1)) * (Z(0...8π) . SU(step))
+    zoscillation = SY(K(0)) . X(0...8π) . TX(K(1))
+    spreadingripples = (line . SZ(1...0) . zoscillation) * Z(turn)
+    spirograph = TX(K(1)) * (Z(turn) . TX(K(2)) . Z(0..12π) . TX(K(-2)))
+
+It's based on extrusion
+-----------------------
+
+"Extrusion" is a relatively general way of adding a dimension to a
+manifold.  If you have a point, or a set of points, extruding them
+along some path gives you a curve, or a set of curves; and if you have
+a curve, or a set of curves, extruding them along some path gives you
+a surface, or set of surfaces.  (If the path is discontinuous, you may
+discover points becoming sets of curves, or curves becoming sets of
+surfaces.)  For example, you can rotate a point into becoming a
+circle, and the circle into becoming a torus; or you can translate the
+circle to make the wall of a cylinder.
+
+A few years back, when I wrote a real-time 3D engine in JavaScript (XXX)
+with the 2-D canvas, this was where I stopped: extrusion took as
+parameters an object, a linear 3-D transform, and an iteration count,
+and gave you back an object made by extruding the original object
+through that transform an arbitrary number of times.  The result was a
+kind of faceted crude approximation to a torus, although I should
+really have twiddled parameters a bit to get some kind of more
+interesting shape, like a spiral or something; if you wanted a finer
+approximation of a torus, you could halve the rotation angle and
+double the iteration count, and you'd have more facets with duller
+angles between them.
+
+You'd think you could use this approach with arbitrary 3-D
+transformations, taking some kind of "square root" of the
+transformation in order to make a finer mesh where needed.  This turns
+out to be impossible because even a simple rotation transformation
+has, in some sense, lost the information about its angle: if it's 0.1
+radians around the z-axis, say, we have this matrix:
+
+    [ [ cos 0.1 -sin 0.1  0  0 ]
+      [ sin 0.1  cos 0.1  0  0 ]
+      [   0        0      1  0 ]
+      [   0        0      0  1 ] ]
+
+and if you want "half" of that rotation, it's equally valid to use sin
+and cos of 0.05, or of π+0.05; either one will work out to the above
+matrix when you double them.  (The fundamental theorem of algebra
+tells us that in general zⁿ = w has n distinct solutions for a given n
+and w, and multiplying by a complex number is a subset of the
+transformations we're interested in here.)
+
+So to get a smoothly interpolable representation, we can't simply use
+a structure of 12 real numbers; we need something that preserves more
+information about the functional relationship between those numbers
+and the parameter, or parameters, we'd like to interpolate.
+
+So how can we get there from a relatively small and usable set of
+primitives with reasonably tractable computation?
+
+This extrusion operator relies on a terribly general notion of "path".
+I mean, PostScript's "path" was already very general: it can be
+discontinuous and either open or closed, but at least it was just a
+one-dimensional manifold of two-dimensional points.  This notion of
+"path" seems to be a one-dimensional manifold of twelve-dimensional
+transformation matrices:
+
+    [ [ x0  x1  x2  x3  ]
+      [ x4  x5  x6  x7  ]
+      [ x8  x9  x10 x11 ]
+      [ 0   0   0   1   ] ]
+
+where the twelve variables inside the matrix are some kind of
+piecewise-continuous real functions of one real variable, t.  In some
+sense you can see the [x3 x7 x11] column as specifying a path in the
+more traditional sense, some kind of infinite sequence of points in
+3-space, along which a point transformed from the origin [0 0 0 1]
+could swoop and soar as t changes; the other 9 variables simply
+describe how a thing moving along the path gets stretched, skewed,
+rotated, and perhaps reflected.
+
+If we make these twelve variables, instead, functions of *two*
+parameters, we get a parametric surface, which we can sample as finely
+as we desire.
+
+Linear real functions
+---------------------
+
+First, and most basic, let's consider the linear real function
+y = mt + b.  You can compose this from two one-dimensional manifolds
+in a variety of different ways; let's say:
+
+    M(m) = mt + 0
+    B(b) = 0t + b
+
+These two *could* be composed with one another, but it is more useful
+to be able to add them (pointwise), because that lets us span the
+whole mt + b space.  So the function πx + π/2 can be written as
+M(π) + B(π/2).  These functions are closed under addition, but not
+composition or multiplication.
+
+If we consider transforming the interval [0, 1] through these
+functions, we can see that they can be used to represent arbitrary
+closed intervals on the number line; in this interpretation, the
+function above represents the interval [π/2, 3π/2], for example.  Of
+course there are an infinite variety of other possible
+interpretations, but this is the one I will choose.
+
+Frankly, though, this is a little silly; instead of M and B, I will
+use a single function of two real arguments:
+
+    I(x0, x1) = (x1-x0)t + x0
+
+which I will write as:
+
+    x0...x1
+
+Elementary paths
+----------------
+
+So let's consider the general 3-D linear transform that changes over
+time.  This is capable of scaling (nonuniform scaling and reflection),
+skewing, rotation, and translation.
+
+If we have rotations around two axes, we can get rotation around the
+third by composing them; if we have rotations around all three axes,
+we can get scaling along arbitrary dimensions by composing 90°
+rotations with scaling along a single dimension; and skewing happens
+if you use a non-90° rotation and then scale along a single dimension.
+Finally, composing arbitrary rotations with translations along a
+single dimension will give you arbitrary translations.
+
+So we have four elementary "paths", in the sense of path I described
+earlier — not just a point that varies with some parameter, but a
+general linear 3-D transform that varies over time:
+
+    X(v) = [ [ 1    0       0    0   ]
+             [ 0  cos v  -sin v  0   ]
+             [ 0  sin v   cos v  0   ]
+             [ 0    0       0    1   ] ]
+
+    Y(v) = [ [ cos v  0  -sin v  0   ]
+             [   0    1     0    0   ]
+             [ sin v  0   cos v  0   ]
+             [   0    0     0    1   ] ]
+
+    TX(v) = [ [ 1 0 0 v ]
+              [ 0 1 0 0 ]
+              [ 0 0 1 0 ]
+              [ 0 0 0 1 ] ]
+
+    SX(v) = [ [ v 0 0 0 ]
+              [ 0 1 0 0 ]
+              [ 0 0 1 0 ]
+              [ 0 0 0 1 ] ]
+
+So what is this v?
+
+You could think of e.g. T as being the entire X-axis, or X as being
+infinite rotation around the X-axis, in the sense that for any real
+value of v, they represent a particular real 4×4 matrix that
+translates the origin to that point on the X-axis or rotates to that
+angle around the X-axis.  And if you take some interval of real
+numbers [v0, v1] and transform it through T or X, you get some
+interval of translations along the X-axis or rotations around it.
+
+In particular, if we draw our v from the linear real functions
+described in the previous section, then as t varies from 0 to 1, these
+elementary paths will interpolate continuously and smoothly over some
+interval.
+
+We can multiply these matrices to compose the 3-D operations they
+represent.  This means we're multiplying these individual elements,
+which may be linear functions of t or transcendental functions of
+linear functions of t.  This will produce, unfortunately, relatively
+general algebraic expressions as elements of the matrices, which in
+the worst case can grow exponentially in the number of elementary
+paths in the matrix product: each variable rotation introduces two new
+transcendental functions of a potentially new linear function.  (It
+should be clear that Spirograph patterns can be computed this way
+easily, so you shouldn't expect much worst-case simplification.)
+
+This is a bit of a disappointment, since I was hoping for something
+that would occupy bounded space, or hey! at least linear space, after
+an arbitrarily large number of operations.  Not exponential space.
+
+I console myself with the thought that the alternative representation
+is often a triangle mesh, and it's going to take a pretty big formula
+to approach the amount of space a triangle mesh uses.
+
+Surfaces
+--------
+
+Suppose we have a curve defined as above, some arbitrary composition
+of elementary curves, each parameterized by some interval of the real
+number line; now we would like to extrude it into a surface, which
+might enclose a volume.  We can do this by transforming it through
+some other arbitrary curve, which can stretch and rotate and skew it
+as needed; all of this can be implemented simply by matrix
+concatenation, but with the variable t renamed to u in the extrusion
+path.
+
+This gives us a 4×4 matrix, 12 of whose cells are arbitrary algebraic
+expressions in t and u, combined with numbers, sin, cos, addition, and
+multiplication; but we probably really only care about three of those
+cells, [x3 x7 x11], the ones that give us the coordinates to which the
+surface has carried the origin.
+
+You might want to transform a surface by composing a path with it, but
+maybe not a path that depends on t or u; it's not clear what that
+would mean to me.
+
+The algebra
+-----------
+
+So we have five basic elements:
+
+* I(x0, x1: real): interval; written as x0...x1
+* X(v: interval): path
+* Y(v: interval): path
+* TX(v: interval): path
+* SX(v: interval): path
+
+And two, or arguably three, ways of combining them:
+
+* compose(a: path, b: path): path; written as a . b
+* extrude(a: path, b: path): surface; extrudes a by moving it along b;
+  written as a * b
+* extrude(a: surface, b: path): surface (or solid); makes two copies
+  of a, one at each end of b, one of them with its polarity flipped,
+  and connects them with a surface where the edge of a passed as it
+  moved along b.  Effectively this involves turning the edge of a into
+  a path and extruding that path as it moves along b.
+
+(Maybe instead: extrude or construct interval with ":", construct
+interval with "@", apply functions with simple concatenation or ".",
+compose with simple concatenation, ",", or ";", extrude with "/"?  I'm
+ending up with lots of noise in my expressions.  Maybe also use
+lowercase.)
+
+Internally, this builds trees of the following structure:
+
+* an expression is one of:
+    * a variable, t or u
+    * a real
+    * (a: expression) + (b: expression)
+    * (a: expression) * (b: expression)
+    * -(a: expression)
+    * cos (a: expression), or
+    * sin (a: expression). 
+* an interval is an expression.
+* a path is 12 expressions.
+* a surface is 3 expressions.
+
+You could restrict this further, since e.g. the argument of a
+transcendental function here will always be a linear one, but that
+doesn't seem to offer much benefit yet.
+
+Computations on the surfaces
+----------------------------
+
+The simplest and most obvious thing you might want to do is to sample
+the points on a surface to build a triangle mesh, which you can do by
+just evaluating the expressions for the surface points for different
+values of t and u.  The range for t and u is predefined as [0, 1], so
+it's just a matter of figuring out how much and where to subdivide the
+range.
+
+That's a bit of a problem, though.  You'd maybe like to keep your
+sampling mesh more or less uniform in density, so as to avoid wasting
+triangles on areas without much detail.  (On a sphere, for example,
+there will surely be a point where one or the other of the parameters
+doesn't give you any extra information.)
+
+You can use bounding-box arithmetic ("interval arithmetic") to find
+3-D bounding boxes of parts of the mesh, recursively bisecting the
+mesh until your 3-D bounding boxes are small enough that
+you are satisfied with your triangle size.  Interval arithmetic is
+explained in a section below.
+
+Additionally, for smooth shading (Gouraud or Phong), vertex normals
+can be helpful.  You can calculate these by partially differentiating
+the surface vector with respect to t and u and normalizing the cross
+product.
+
+Calculating the area of a surface may be useful for some purposes:
+maybe for paint coverage or heat loss or adsorption or something.
+It's reasonably feasible to approximate numerically with a simple
+double integral over the parameter space.
+
+Interval arithmetic
+-------------------
+
+This is a sort of abstract interpretation of numerical formulas,
+introduced to me
+as an exercise in SICP, using [min, max] pairs to produce a
+conservative approximation of a function's range over some interval.
+For our case, we can use the following evaluation rules:
+
+* a constant number k becomes [k, k]
+* [a, b] + [c, d] = [a+c, b+d]
+* -[a, b] = [-b, -a]
+* [a, b] * [c, d] = [a*c, b*d] if all four are nonnegative; otherwise,
+  use identities to transform the expression into the tractable
+  all-nonnegative form above:
+    * -[a, b] * [c, d] = -([a, b] * [c, d]); apply if a and b are nonpositive
+    * [a, b] * -[c, d] = -([a, b] * [c, d]); apply if c and d are nonpositive
+    * -(-x) = x; apply if possible
+    * [a, b] = union([a, 0], [0, b]) if a and b have opposite signs;
+      apply if possible
+    * a * union(b, c) = union(a * b, a * c); apply if possible.  If
+      this is applicable, you need to start again from the top because
+      probably one of the new multiplication subexpressions contains a
+      negative-going interval.
+* union([a, b], [c, d]) = [min(a, c), max(b, d)] (remember,
+  conservative approximation!)
+* sin [a, b] may be:
+    * [sin(a), sin(b)] if a and b are in the same monotonically
+      increasing interval of sin;
+    * [sin(b), sin(a)] if a and b are in the same monotonically
+      decreasing interval of sin;
+    * [min(sin(a), sin(b)), 1] if a and b have a peak between them;
+    * [-1, max(sin(a), sin(b))] if a and b have a valley between them;
+    * [-1, 1] if a and b have both a peak and a valley between them.
+* Analogously for cos [a, b].
+
+These rules are conservative, but they are precise in the sense that
+if you subdivide a bounding box into smaller and smaller parts,
+eventually the bounding box of a union-free formula evaluated over it
+will have an arbitrarily small range.
+
+Applying these evaluation rules to the three expressions that give the
+x, y, and z coordinates of points on a surface, with interval values
+for t and u, will give you a bounding box in x, y, and z for that
+subsection of the surface.  If you use [0, 1], you get a bounding box
+for the whole surface.
+
+I write these bounding boxes as [a, b] rather than a...b because the
+meaning of the second is slightly different, but confusingly similar:
+it's a motion from a to b that varies linearly with t, while [a, b]
+might oscillate wildly between a and b as t and u vary, perhaps not
+even reaching them.
+
+Possible extensions
+-------------------
+
+Given a third parametric parameter, you could animate an unchanging
+object along a path.
+
+CSG — union, intersection, and especially subtraction — would
+dramatically increase the power of the system.  It might be
+particularly tricky to compute precisely, though.
+
+Piecewise functions would enable you to do things like splines.  You
+could imagine a sequence(a: path, b: path) operator (perhaps written
+"a; b") that evaluated as a(2t) on [0, ½) and then b(2(t-½)) or
+perhaps a(1)+b(2(t-½)) on [½, 1].  I think that the
+extrude-a-surface-into-a-solid functionality kind of depends on doing
+this anyway, since the resulting surface is a sort of composite of six
+different surfaces: the initial and final surface and the four
+surfaces produced by extruding the t=0, t=1, u=0, and u=1 edges.
+(Alternatively you could make a "surface" be an arbitrary set of
+parametric surfaces rather than just one.  Also this is making me
+think I should read Wouter's CUBE engine.)
+
+Piecewise functions potentially introduce a finite number of
+discontinuities, and many things might then need to get a list of
+discontinuities in an interval.
+
+Being able to read in geometry from external sources (STL files, DXF
+files, Hershey fonts, SVG logos, TrueType fonts, heightfields) would
+enable a lot more stuff.
+
+Being able to query geometrical results, KSeg-style or AutoCAD-style,
+or even just PostScript-style (flattenpath, pathbbox, charpath,
+pathforall), would make parametric modeling a lot more reasonable.
+
+If you're just generating an STL file for 3-D printing, the shape is
+all you need.  But for other purposes (displaying onscreen, using in a
+game, 3-D printing in color) you need a way of adding other
+attributes to your material.
+
+Another thing you might want to do with a surface, besides look at it
+or extrude it into a solid, is to "shell" it — build up a solid around
+it of a given thickness.  This is analogous to the "stroke" or
+"strokePath" operation in 2-D graphics.  I call it "shell" because if
+you use it on a surface that encloses a solid volume, the result is a
+hollow shell of some thickness.  (CATIA calls it "shell" too.)
+
+The approximate inverse operations of "shell" are "fill" (remove
+hollow spaces inside of) and "erode" (known as "inset" in Inkscape;
+take a given thickness off the surface all the way around).
+
+What are the equivalents of line dash patterns or halftone patterns in
+PostScript? Maybe honeycomb (and other) infill, or surfaces perforated
+to save plastic in 3-D printing?  Maybe embossed surface texture?
+
+I want to be able to query the volumes of enclosed or nearly-enclosed
+spaces for acoustic reasons.
+
+In general it seems like repeating shapes could be useful.  Like if
+you have an ellipsoid and you want to make sixteen of them evenly
+spaced.
+
+Perlin noise or midpoint-displacement surface roughness might be
+useful things to have; but how do you add things like that in a clean
+way?

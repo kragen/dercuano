@@ -1,0 +1,275 @@
+Every language seems to have string formatting as some kind of DSL.  C
+has its `%3.4g` nonsense. JS, Perl, and Python programmers often use
+the same thing.  C++ has iostream format manipulators `cout << setw(3)
+<< setprecision(4) << x`.  BASIC had `PRINT USING`.  Fortran had
+FORMAT.  Common Lisp has its own insanely powerful FORMAT, taking
+strings like "~3,4g", which means something almost, but not quite,
+completely unlike `%3.4g`.  Even Excel has its own numeric formatting
+language; if you want your lakhs and crores properly displayed,
+apparently you can say "Format Cells → Custom" and then
+`[>9999999]##\,##\,##\,##0.00;[>99999]##\,##\,##0.00;##,##0.00;
+[<-9999999](##\,##\,##\,##0.00);[<-99999](##\,##\,##0.00);##,##0.00`
+
+Forth's embedded domain-specific language for "pictured numeric output"
+-----------------------------------------------------------------------
+
+Forth "pictured numeric output" is, like C++'s approach, an embedded
+DSL, but much more direct in its functioning; the typical example is
+something like
+
+    : .pesos <# # #  [char] . hold  #s  [char] $ hold #>  type ;
+
+which has the format string actually backwards, because that's the
+order in which you do decimal conversion, and is also using
+double-precision fixed-point math because that's the way you do things
+in Forth.
+
+Because it's an embedded DSL, you can use the standard methods of
+abstraction.  For example, if you want more flexible currency display,
+you can factor out parts of your format string into subroutines or
+variables:
+
+    defer currency
+    : pesos [char] $ hold ;
+    : pounds C" £" dup 1+ C@ swap 2 + C@ hold hold ; ( assuming UTF-8 )
+
+    variable decimal-point
+
+    : .$ <# # # decimal-point @ hold #s currency #> type ;
+
+    : argentina  [char] , decimal-point !  ['] pesos is currency ;
+    : usa        [char] . decimal-point !  ['] pesos is currency ;
+    : england    [char] . decimal-point !  ['] pounds is currency ;
+
+    8.4300 7.8300 d+ d2/ d>s constant dolar-blue \ www.dolarblue.net 2013-03-31
+    1.5195 d>s constant £                        \ in dollars; xe.com 2013-03-31
+    : /$ 10000 swap m*/ drop s>d ;
+    : convert 2dup ." AR"    argentina                  .$
+              2dup ."  = US" usa     dolar-blue /$      .$
+              2dup ."  = "   england dolar-blue /$ £ /$ .$
+              2drop ;
+
+    cr 1500.00 convert   \ my rent in Buenos Aires
+
+You could even put a complex iterative state machine into your format
+string; in this case we take advantage of Forth's compile-time
+metaprogramming to factor out a duplicative control structure:
+
+    char , constant thousands-separator
+    : ?#  postpone #  
+        postpone 2dup  postpone d0=
+        postpone if  postpone exit  postpone then ;  immediate
+    : #,s  begin  ?# ?# ?#  thousands-separator hold  again ;
+    : #करोड़s  ?# ?# ?#  thousands-separator hold 
+      begin ?# ?#  thousands-separator hold  again ; ( for e.g. 1,00,00,00,000 )
+    : .,  <# #,s #> type ;   : .करोड़ <# #करोड़s #> type ;
+
+Forth's particular implementation of this concept is quite limited,
+though; you have to build the output string backwards, the buffer area
+is quite limited in size, and it's eager.
+
+The more usual approach of external DSLs
+----------------------------------------
+
+But, when it's a non-embedded DSL, the DSL only goes so far.  I seem
+to end up writing a lot of string formatting code that looks more or
+less like this:
+
+        def __repr__(self):
+            return 'Note(%r, %r, %r, %r)' % (self.instrument,
+                                             self.start_time,
+                                             self.pitch,
+                                             self.volume)
+
+        def __repr__(self):
+            return '[[ %r %r %r ]]' % (self.left, self.op, self.right)
+
+This is, in all likelihood, grossly inefficient.  Erlang's approach,
+which I used in [Ur-Scheme][], is called "IO lists", and it's similar
+to "ropes": represent strings with arbitrary unbalanced binary trees,
+waiting until I/O time to walk the trees in O(N) time.  This gives you
+O(1) concatenation, which makes string concatenation efficient, but it
+doesn't really solve the DSL problem.
+
+[Ur-Scheme]: http://canonical.org/~kragen/sw/urscheme
+
+(The description makes it sound complicated but the implementation is
+about 23 lines of code in Ur-Scheme, and it could have been shorter
+with a little more cleverness.)
+
+Here's a use of IO lists in Erlang:
+
+    join([])           -> "";
+    join([W])          -> W;
+    join([W1, W2])     -> [W1, " and ", W2];
+    join([W1, W2, W3]) -> [W1, ", ", W2, ", and ", W3];
+    join([W1|Ws])      -> [W1, ", ", join(Ws)].
+
+When invoked with `io:format("~s; ~s; ~s; ~s; ~s.~n",
+[commalist:join([]), commalist:join(["Apple", "Banana", "Carrot"]),
+commalist:join(["One", "Two"]), commalist:join(["Lonely"]),
+commalist:join("abcdefg")]).`, this produces, "; Apple, Banana, and
+Carrot; One and Two; Lonely; a, b, c, d, e, f, and g."
+
+Smalltalk's approach: output to a string (and capture it if necessary)
+----------------------------------------------------------------------
+
+Smalltalk has an interesting approach; in general, instead of
+concatenating strings (which is APLish `,` in Smalltalk) you
+sequentially write them to a stream, and if you need them in a string,
+you can use `WriteStream on: String new` for that string, and there's
+even a `String#streamContents:limitedTo:` method for this.  Here's the
+code that gets run from `Date today asString` in Squeak 3.9,
+eventually yielding '31 March 2013', with some added commentary in
+case you're not familiar with Smalltalk syntax:
+
+    asString
+        "Answer a string that represents the receiver."
+
+        "^, read 'answer', means 'return' and was once displayed as ↑."
+        ^ self printString  
+
+    printString
+        "Answer a String whose characters are a description of the receiver. 
+        If you want to print without a character limit, use fullPrintString."
+
+        ^ self printStringLimitedTo: 50000
+
+    printStringLimitedTo: limit
+        "Answer a String whose characters are a description of the receiver.
+        If you want to print without a character limit, use fullPrintString."
+        "The following declares a local variable limitedString."
+        | limitedString |
+        "_ is assignment and was traditionally displayed as ←.
+        Nowadays it is usually written := instead.
+        [:s | self printOn: s] is JS's function(s){return self.printOn(s)}.
+        So the following in JS would be
+        var limitedString = String.streamContentsLimitedTo(function(s) {
+            return self.printOn(s);
+        }, limit);
+        "
+        limitedString _ String streamContents: [:s | self printOn: s] limitedTo: limit.
+        limitedString size < limit ifTrue: [^ limitedString].
+        ^ limitedString , '...etc...'
+
+    printOn: aStream
+        self printOn: aStream format: #(1 2 3 $  3 1 )  "$  is space, #() array"
+
+    printOn: aStream format: formatArray 
+        "Print a description of the receiver on aStream using the format 
+        denoted the argument, formatArray: 
+            #(item item item sep monthfmt yearfmt twoDigits) 
+            items: 1=day 2=month 3=year will appear in the order given, 
+            separated by sep which is eaither an ascii code or character. 
+            monthFmt: 1=09 2=Sep 3=September 
+            yearFmt: 1=1996 2=96 
+            digits: (missing or)1=9 2=09. 
+        See the examples in printOn: and mmddyy"
+        | gregorian twoDigits element monthFormat |
+        "The #dayMonthYearDo: method strikes me as bizarre in this context:"
+        gregorian _ self dayMonthYearDo: [ :d :m :y | {d. m. y} ].
+        twoDigits _ formatArray size > 6 and: [(formatArray at: 7) > 1].
+        1 to: 3 do: 
+            [ :i | 
+                element := formatArray at: i.
+                element = 1
+                    ifTrue: [twoDigits
+                            ifTrue: [aStream
+                                    nextPutAll: (gregorian first asString
+                                            padded: #left
+                                            to: 2
+                                            with: $0)]
+                            ifFalse: [gregorian first printOn: aStream]].
+                element = 2
+                    ifTrue: [monthFormat := formatArray at: 5.
+                        monthFormat = 1
+                            ifTrue: [twoDigits
+                                    ifTrue: [aStream
+                                            nextPutAll: (gregorian middle asString
+                                                    padded: #left
+                                                    to: 2
+                                                    with: $0)]
+                                    ifFalse: [gregorian middle printOn: aStream]].
+                        monthFormat = 2
+                            ifTrue: [aStream
+                                    nextPutAll: ((Month nameOfMonth: gregorian middle)
+                                            copyFrom: 1
+                                            to: 3)].
+                        monthFormat = 3
+                            ifTrue: [aStream
+                                    nextPutAll: (Month nameOfMonth: gregorian middle)]].
+                element = 3
+                    ifTrue: [(formatArray at: 6)
+                                = 1
+                            ifTrue: [gregorian last printOn: aStream]
+                            ifFalse: [aStream
+                                    nextPutAll: ((gregorian last \\ 100) asString
+                                            padded: #left
+                                            to: 2
+                                            with: $0)]].
+                i < 3
+                    ifTrue: [(formatArray at: 4)
+                                ~= 0
+                            ifTrue: [aStream nextPut: (formatArray at: 4) asCharacter]]]
+
+And down inside of String:
+
+    padded: leftOrRight to: length with: char
+        leftOrRight = #left ifTrue:
+            [^ (String new: (length - self size max: 0) withAll: char) , self].
+        leftOrRight = #right ifTrue:
+            [^ self , (String new: (length - self size max: 0) withAll: char)].
+
+And the `Number#asString` method that's being used to do the actual
+conversions ends up writing to a string stream, then reversing it:
+
+    printStringBase: base
+        | stream integer next |
+        self = 0 ifTrue: [^'0'].
+        self negative ifTrue: [^'-', (self negated printStringBase: base)].
+        stream _ WriteStream on: String new.
+        integer _ self normalize.
+        [integer > 0] whileTrue: [
+            next _ integer quo: base.
+            stream nextPut: (Character digitValue: integer - (next * base)).
+            integer _ next].
+        ^stream contents reversed
+
+This demonstrates that Smalltalk code is not uniform in simply using
+`nextPutAll:`.  Indeed, since Smalltalk has garbage collection, code
+that uses string concatenation is simpler than code that repeatedly
+writes to an output stream; it's just less efficient.
+
+The streamContents:limitedTo: method mentioned earlier takes advantage
+of XXX
+
+    streamContents: blockWithArg limitedTo: sizeLimit
+        | stream |
+        stream _ LimitedWriteStream on: (self new: (100 min: sizeLimit)).
+        stream setLimit: sizeLimit limitBlock: [^ stream contents].
+        blockWithArg value: stream.
+        ^ stream contents
+
+The "limitBlock" here can be invoked from deep inside of whatever code
+runs from `blockWithArg`, leaping over many stack frames to discard
+half-completed execution and return the so-far-accumulated data.  (I
+assume it executes `ensure:` blocks on the way?)
+
+Coroutines for string formatting
+--------------------------------
+
+Instead of a buffer or a stack, use a channel, and run the
+string-formatting code as a coroutine.  That way you get the benefits
+of an embedded DSL, along with laziness, laziness which in this
+context will very often reduce memory usage rather than increasing it;
+and you can avoid generating intermediate copies of parts of the
+string you're generating.
+
+This requires efficient coroutine support in your language, and likely
+a certain amount of buffering: probably at least a machine word, if
+not a whole cache line.  Otherwise you need a coroutine context switch
+on every byte transferred, which will slow some applications
+significantly.
+
+
+

@@ -1,0 +1,228 @@
+Parallel arrays are bad because array indices are untyped, and
+sometimes because of storage management and locality of reference.
+But what if each array had its own `⎕IO` (APL's name for `OPTION
+BASE`)?  This could put each type of object ID into its own namespace,
+so that you'd get an index error if you tried to index an array with
+the wrong kind of object ID.  It's like how in a spreadsheet, maybe
+rows 1-40 are the employees, and rows 101-120 are the products, and so
+if you have an index between 101 and 120, you know it identifies a
+product and not an employee.  (Too bad that in an actual spreadsheet
+the column names will be the same in both cases.)
+
+You could actually index arrays using an (object type,
+zero-based-index) pair rather than combining the two into a single
+number.  This would give you many of the same type-safety and
+index-safety benefits of structs, aka records, without sacrificing the
+dubious benefits of aggregate operations.  (And if you can verify all
+the type stuff at compile time, you could drop them at runtime!)
+
+Element-by-element scalar functions should only work on arrays
+representing, in some sense, attributes of the same object.
+Operations like "grade up" and "compress" would create new index
+namespaces.
+
+"Interesting" functions from APL (not element-by-element) include
+monadic `⍴⍳,⌹⌽⊖⍋⍒⍉`, dyadic `∈⍴↑↓⊥⊤,\/⍳⌹⌽⊖⍉` and indexing [], plus the
+operators (scan, reduce, and inner and outer product).
+
+The details I've been able to work out follow.
+
+Since much of this is sort of about types, I'm going to write types in
+a Haskelly way: `a->b` means that something (a vector) takes as an
+argument (index) things of type `a`, and returns (has as elements)
+things of type `b`; and `X: T` is an expression which has the value of
+`X`, but asserts that that value is of type `T`.
+
+Multidimensional arrays
+-----------------------
+
+I'm going to try to work out the cases of zero and one dimensions
+first, before attempting to handle multiple dimensions.  An
+N-dimensional array for N>0 can be considered as either a homogeneous
+1-dimensional array of N-1-dimensional arrays, an array indexed by
+N-tuples, or an N-1-dimensional array of 1-dimensional arrays; both of
+the first two interpretations are common in APL.  Changing the nature
+of indexing is likely to interact with them in unpredictable ways.
+
+Indexing `[]`
+-------------
+
+Indexing `A[B]` (also `.` or simple juxtaposition in K, or `A@B` for
+another variant) should produce a value with the shape of B by
+indexing the elements of A.  That is, 
+
+    ((A: c->d)[B: e->c]): e->d
+
+It's like function composition.  So the elements of B need to be valid
+indices for A.
+
+Compress `/`
+------------
+
+Dyadic `A/B`, "compress", gives you one element of output for every
+nonzero element in A.  Its two arguments must have the same set of
+indices, and the left one must be boolean.  If you compress two
+vectors `B` and `C` with the same vector `A`, the resulting vectors
+need to be conformable, so you can write `(A/B) + (A/C)`, for example.
+
+In q/k/kdb+, I think this is written `B[where A]`, helpfully
+decomposing the operation into two steps, the first of which is
+constructing a vector of the positions where `A` is nonzero.  I think
+this is the right way to analyze this operation, because it constructs
+a *new index namespace*: 
+
+    (where (A: b->c)): d->b
+
+(This is a rather remarkable type, creating a new type out of whole
+cloth!)
+
+Indeed, this is such a common operation in APL that the Dyalog APL
+tutorial gives the APL spelling of it, `(V∈D)/⍳⍴V`, as their first
+example of an idiomatic APL expression.
+
+It's probably more accurate to write `(where (A: b->bool)): d->b`,
+since the
+
+Expand `\`
+----------
+
+I haven't written enough APL to know what the dyadic expand function
+is good for.  In a sense, it's the inverse of the compress function,
+but the compress function is lossy — it leaves out chunks of its right
+input, which the expand function will fill with zeroes.  It's
+guaranteed that `A/A\B` is the same as `B`, but not `A\A/B`.
+
+It seems rather difficult to type-check in a sane fashion: `A` needs
+to have exactly as many `1`s set as there are valid indices in `B`.
+
+Dyalog APL's expand function extends this to the case where `A` may
+contain things beyond just booleans, interpreting them as a repeat
+count (or, if negative, a zero count).
+
+The Dyalog APL tutorial gives the following common uses of expand:
+
+* to add blank or zero rows in between the rows of a matrix (for
+  example, to separate text output into paragraphs);
+* to repeat a scalar some number of times.
+
+It also gives as an exercise the problem of replacing a given letter
+globally with spaces: `'a' Whiten 'Panama is a canal between Atlantic
+and Pacific'` should return 
+`'P n m  is   c n l between  tl ntic  nd P cific'`.  The solution, 
+I suppose, is the `A\A/B` above, where `A` is just `~Letter = Phrase`.
+
+<http://aplwiki.com/AplIn20Minutes> may have some information.
+
+Grade-up and grade-down `⍋⍒`
+----------------------------
+
+These are used for sorting.  `⍋X` (`>X` in K) is a vector such that
+`X[⍋X]` is sorted ascending; `⍒X` does the reverse.  This is more
+useful than simply giving you the sorted results because, if you have
+another vector `Y` that can be indexed with the same indices as `X`,
+you can sort the elements of `Y` according to `X` with `Y[⍋X]`.
+
+It does not generally make sense to index `X[⍋X]` with indices that
+are valid for `X`, with the exception of things that are sort of
+coincidental; for example, 1 is probably a valid index for both of
+them.  But it doesn't make sense to say, for example, `(X > 3)/X[⍋X]`;
+that's almost certainly a bug.
+
+So grade-up and grade-down, like compress, creates a new index namespace: 
+
+    (⍋(X: a->b)): d->a
+    (⍒(X: a->b)): d->a
+
+This is maybe the point at which array indices might begin to have an
+advantage as object IDs over raw memory addresses: once you can start
+taking advantage of the sequence of the array indices.
+
+Reversal and rotation, monadic and dyadic `⌽⊖`
+----------------------------------------------
+
+`⌽X` is just `X` with the indices of its last axis in reverse order;
+`⊖X` is the equivalent for the first axis.  Analogously, rotation
+`3⌽X` rotates `X` three items to the right, which can be achieved by
+reversing `X`, reversing its first three items, and then reversing the
+remaining items.  On the face of it, it seems that these should also
+create a new index namespace; it doesn't make sense to write `(X >
+3)/⌽X`.
+
+However, I think this is not actually true.  The valid *range* of
+values is the same.  `1⌽X` gives you the `X` property of the
+(cyclically) following object in `X`'s index sequence; this is a
+useful kind of thing to be able to do!
+
+    ⌽(X: a->b): a->b
+    ⊖(X: a->b): a->b
+    (N: int)⌽(X: a->b): a->b
+    (N: int)⊖(X: a->b): a->b
+
+Shape and index generation: monadic `⍴` and monadic `⍳`
+-------------------------------------------------------
+
+`⍳`, aka "iota" or "index generator" (in K, `!` or `til`) counts from
+1 (0 in K) to a given number; but its primary use is to generate the
+valid indices of a vector given its size.  The size of a vector is
+generated with `⍴`, the "shape" operator (in K, `count`), so `⍳⍴V`
+gives you the indices of `V`.
+
+This use of `⍳` is so important that Dyalog APL's `⍳` applied to a
+vector generates a sequence of multidimensional indices, such that
+`V[⍳V]` is equivalent to V for any shape of V (which is impossible in
+traditional APL), and the "index origin" variable `⎕IO`, equivalent to
+BASIC's `OPTION BASE` can affect `⍳`'s operation.
+
+Although this form of `⍳` takes only one argument, it's
+straightforward to use it to generate values starting from any
+starting point, increasing by every step: `start + step * (⍳N)-1`,
+although of course the `-1` is a result of the default `⎕IO` being 1
+rather than 0.
+
+It seems to me that it's probably worthwhile to preserve the invariant
+that `⍳⍴V` produces the indices of a vector `V`.  If this is to work
+with `⍴V` producing a scalar or 1-vector in this case, which seems
+desirable to avoid complication for multidimensional cases, then it
+needs to be possible to extract both the length and the object type
+from that scalar; that is, `employees[301]` needs to be a single
+scalar object from which you can extract `employees` and 301.  If we
+represent `employees` as `employees[0]`, then it's sufficient to
+provide a function for extracting either of the two; ordinary
+subtraction suffices to produce the other, and ordinary addition is
+sufficient to recombine the two.
+
+So ⍴ produces a single-element vector:
+
+    ⍴(X: a->b): {0}->a
+    ⍳(X: a): int->a
+
+element-of `∈` and index-of, dyadic `⍳`
+---------------------------------------
+
+`A∈B` produces a boolean array of the shape of `A` indicating whether
+each item of `A` occurs in the vector `B`; that is,
+
+    ((A: c->d) ∈ (B: e->d)): c->bool
+
+The index type of `B` disappears entirely, because we don't care
+*where* the elements of `A` occurred in `B`; we're just using it as a
+set.  If we wanted their positions, we'd use the dyadic `⍳` function:
+
+    ((A: c->d) ⍳ (B: e->d)): c->e
+
+This is a little bit tricky, because for the elements of `A` that
+didn't occur at all in `B`, this function produces `1+⍴B` (or `⍴B` in
+the `⎕IO=0` case), which is not a valid index into `B`.  You could say
+it's not a member of `B`'s index type `e` at all.
+
+In K, the dyadic `⍳` function is written `B?A` instead.
+
+The things I haven't figured out how to handle yet
+--------------------------------------------------
+
+How do you get literal vectors in your program to have a reasonable
+type?
+
+What about take, drop, and catenate?  Some uses of take and drop can
+be reasonably handled by rotation, but others can't.
+

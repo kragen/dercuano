@@ -1,0 +1,290 @@
+Steampunk spintronics: magnetoresistive relay logic?
+====================================================
+
+I thought it was possible to do high-speed digital electronic
+computation with 19th-century materials and fabrication techniques,
+using the (ordinary) magnetoresistive effect and differential circuits
+to obtain nonlinear amplification.  This document explains why I thought
+it was possible.
+
+However, now I think it's *not* possible, because it involves using iron
+or otherwise ferromagnetic wires to carry the signals that need to be
+switched, and those wires, in addition to being magnetoresistive, are
+extremely self-inductive; the consequence is that they can only
+practically carry very slowly varying signals (1Hz or worse).  You could
+try to balance the heavy self-inductance with a coaxial sheath to add
+capacitance, but I'm not convinced that will work adequately.
+
+The rest of this document was written before I knew about this problem.
+
+Electromechanical relays
+------------------------
+
+Electromechanical relays are a relatively simple invention, once the
+idea is pointed out: an electromagnet pulling a springy bit of metal
+into or out of electrical contact, opening or closing an electrical
+circuit.  You can make one with a little fuss if you have some wire
+and ferromagnetic metal, and one version was invented in 1840 by
+Samuel F.B. Morse for his Telegraph.  They are sufficient for building
+Boolean logic devices to perform arbitrary digital computations, as
+shown by Claude Shannon in his thesis and extensively exploited for
+telephone switching in the early 20th century.  Indeed, since they're
+fairly close to ideal switches (very unlike bipolar transistors),
+logic circuits built using them are quite simple, using only one or
+two relays per gate or flip-flop, even without any elaborate
+mechanical tricks.
+
+However, for digital computation, relays have some serious drawbacks.
+Modern silicon semiconductor devices can operate comfortably in the
+4GHz range (i.e. 250ps per cycle) at room temperature; at higher cost,
+germanium, silicon germanium, gallium arsenide, ECL, and/or further
+cooling can push speeds higher, past 10GHz (100ps).
+
+By contrast, electromechanical relays typically can't operate faster
+than about 100kHz (10 μs, 10 000 000 ps).  This is a pretty big
+disadvantage, and it's the reason relays have been out of favor for
+digital logic since the 1940s.  The basic problem is that the metal
+contacts are macroscopic objects full of baryons, so you have to move
+an awful lot of electrons through one set of contacts to produce
+enough energy to move another set of contacts.  The vacuum tubes that
+replaced relays in the 1940s move only electrons, which have three
+orders of magnitude less mass per unit charge, and semiconductors
+share this advantage.
+
+(Relay coils also have substantial inductance which limits the speed
+at which current in them can rise and fall.)
+
+(Semiconductor devices also have the advantage of being very small,
+speeding up the timescale of anything, but this advantage could in
+theory be reproduced by other kinds of devices as well.)
+
+### A digression: relay logic circuits ###
+
+A normal single-pole double-throw relay has five terminals: 
+
+- `C1` and `C2`: two terminals on the coil;
+- `A`, an armature terminal;
+- `NO`, a normally open contact which gets connected to `A` after a
+  delay when there's current flowing through the coil; and
+- `NC`, a normally closed contact which is connected to `A` except
+  (after a delay) when there's *no* current flowing through the coil.
+
+There are any number of possible ways to do digital logic using
+relays.  This one is among the simplest.
+
+Let's us a kind of "open-collector" convention: we represent logic 0
+as a low-resistance path to ground, and logic 1 as the lack of a
+low-resistance path to ground.  In that case, you can construct a
+basic inverter as follows, with V+ being the power supply rail that
+doesn't represent logic 0:
+
+    X' = Not(X): Relay(C1=V+, C2=X, A=gnd, NC=X')
+
+This inverter is more than it appears: the normally-open contact `NO`
+is actually available as a buffered copy of the input `X`, and any
+number of outputs can be connected to the inverter's input and will be
+implicitly ANDed, providing fan-in, the ability to combine different
+pieces of information.  That is, this isn't just an inverter; it's a
+single-relay combination N-ary AND-NAND gate, or a buffer.
+
+(You can safely stick a resistor in series with the coil of each relay
+operated this way, since the coils are never placed in series with
+each other.)
+
+You can put together an RS latch in the usual way:
+
+    Q, Q' = RS(R', S'): Q' = S' = Not(R'); Q = R' = Not(S')
+
+That is, you hook up the two inverters in a loop, each inverting the
+other's output — wire-ANDed with an active-low asynchronous reset or
+set input.  This gives you a bistable circuit whose state you can
+change, which gives you memory, making sequential circuits possible.
+
+The fanout of this kind of relay logic will be limited only by the
+number of coils whose current can be run through a single set of relay
+contacts before the resistance of the point of contact creates a
+substantial voltage drop.  Typically the fanout provided in this way
+is very large.  As long as the fanout is greater than 1, you can build
+circuits that do universal computation.
+
+There are two more features crucial to digital logic: level
+restoration and inversion.
+
+Level restoration means that, if the input to an inverter only barely
+qualifies as a logic 1, the output needs to be a logic 0, but not
+"only barely" — it needs to be a better 0 than the input was a 1, or
+if the input was barely a 0, the output needs to be more-than-barely a
+1.  That is, you need a kind of "range compression" between the input
+and output.  Relays make this really easy: when the contacts are open,
+the resistance across them is some 20 orders of magnitude higher than
+when they are closed.
+
+Inversion is the ability to get a zero from an all-ones input, or a
+one from an all-zeroes input.  Some kinds of digital logic used in the
+past were capable of producing various combinations of AND and OR
+using only diodes and resistors, but not inversion, which requires
+some kind of amplifying element.
+
+So whatever kind of thing you use for digital logic will need memory,
+fan-in, fanout, level restoration, and inversion.
+
+The magnetoresistive effect
+---------------------------
+
+Kelvin (alias William Thomson) discovered what is now known as the
+"magnetoresistive effect" in the 1850s:
+
+W. Thomson, “On the Electro-Dynamic Qualities of Metals: Effects of
+Magnetization on the Electric Conductivity of Nickel and of Iron”,
+Proceedings of the Royal Society of London 8, 546-550 (1856-1857).
+<http://archive.org/details/philtrans05965210>
+<http://zapatopi.net/kelvin/papers/on_the_electro-dynamic_qualities_of_metals.html>
+<http://archive.org/stream/philtrans09842257/09842257#page/n0/mode/2up>
+
+He found about an 0.5% change in the resistivities of ferromagnetic
+metals when a strong magnetic field was applied, depending on whether
+the field was parallel to the current or at right angles to it.
+Importantly (and necessarily for the P-symmetry of the electromagnetic
+force), the resistivity change doesn't depend on whether the magnetic
+lines of force run in the same direction as the electrical current or
+the opposite direction.
+
+0.5% is a pretty small change, and Thomson had difficulty measuring it
+accurately.  (Wikipedia claims he got up to 5%, but I'm not seeing
+that in the papers he published.  Other sources claim you get 5% with
+a 90% nickel, 10% iron alloy, but I'm not clear on how sensitive that
+mixture is to impurities.)
+
+Speculation: ordinary magnetoresistance provides amplification
+--------------------------------------------------------------
+
+But I speculate that you can *almost certainly* use this "ordinary
+magnetoresistance" effect to produce a solid-state "relay" that
+provides amplification, using 1850s technology!  Better yet, you can
+produce a kind of low-quality radio detector, which was the crucial
+invention that made radio transmission of audio possible, replacing
+the electromechanical coherer invented in 1890.
+
+This speculation depends on the crucial assumption that the current
+running through the magnetoresistive element does not produce a
+magnetic field that tends to diminish the resistance — that is, that
+the magnetoresistive effect does not diminish at higher current
+densities.  If this assumption is wrong — and I'm still not sure,
+because I don't understand the physics — then it may not be possible
+to use a magnetoresistive element to control a larger amount of power
+using a smaller amount of power.
+
+I argue that this assumption is reasonable for two reasons.
+
+First, consider a long, thin, flat, wide insulated metal tape, folded
+in half the middle:
+
+    -------------------------------+
+                                   |
+    -------------------------------+
+
+An electrical current through this tape will produce magnetic fields
+that very nearly cancel, but the magnetoresistance (produced by an
+externally applied magnetic field) of each half of the tape should
+still be nearly the same as before you folded it in half.
+
+Second, resistivity is typically greatest when the current flows
+*parallel* to the magnetic field.  But in that case the magnetic field
+from the current is at right angles to the applied magnetic field, and
+so will not affect it in any way.
+
+These are not ironclad arguments: the "cyclotron orbits" pursued by
+the electrons inside the metal might still produce magnetic fields in
+unexpected orientations.
+
+### Balance: Wheatstone bridges to amplify output ###
+
+There's still the issue of the 0.5%, though.  If the difference
+between zero and strongest magnetic field you can provide changes the
+resistance of your magnetoresistive element by only 0.5%, then your
+current will vary by only 0.5%, or less still, which means that if you
+just use that current directly to create another magnetic field, that
+other magnetic field will vary by only 0.5%.  Which is to say, you
+completely fail at amplification.
+
+But that's not the only thing you can do with a variable resistance.
+If you balance the resistance of your magnetoresistor with a
+similar-sized resistor in a Wheatstone bridge configuration, the
+voltage across the middle of the bridge will be zero when the
+magnetoresistor is at its reference resistance, but nonzero when its
+resistance is perturbed by a magnetic field.  To be specific, if its
+resistance varies by 0.5%, the voltage across the middle of the bridge
+can be around 0.25% of the total voltage applied to the network.
+
+That doesn't sound like much, but that low voltage can be (by my
+assumption above) providing an arbitrarily large amount of current —
+current which can be used to energize another coil to an arbitrarily
+strong field, a field which will be zero when the bridge is balanced.
+
+This means that you can get amplification, which translates into the
+necessary overunity fanout.  Your amplification is limited only by the
+precision to which you can balance the Wheatstone bridge.
+
+### Magnetoresistive radio detectors ###
+
+As mentioned earlier, the perturbation in resistance depends on the
+absolute value and orientation of the magnetic field, not its
+direction; that means that the perturbation induced by a coil is
+symmetric around zero in the current applied to the coil.  You have
+some kind of slight resistance bump, up or down, centered on zero.
+
+Typically, this takes the form of "Kohler's rule", which says the
+extra resistance is proportional to the square of the applied magnetic
+field.
+
+That's a significant nonlinearity!  That means that the average
+resistance in the magnetoresistor is not the resistance in the
+magnetoresistor at the average current in the coil.  If you have a
+pure-AC current in the coil, that can still produce a significant
+magnetoresistive effect, which means you can demodulate AM radio.
+
+### Level restoration ###
+
+How can you do level restoration with magnetoresistive logic?  One way
+is to exploit the symmetry around zero (and indeed the zero derivative
+at zero implied by Kohler's rule) mentioned in the previous section.
+You can improve the zero level a bit further by biasing the minimum a
+bit with a permanent magnet, as described.
+
+You could use a cascade of two inverting magnetoresistive "relays" to
+restore both the 0 level and the 1 level, but there may be easier
+approaches; for example, magnetoresistance in many materials saturates
+at some flux density, and flux density in ferromagnetic materials
+saturates at some applied magnetomotive force.  (Every material tends
+to relative permeability of unity, in the limit of sufficiently large
+field strength.)
+
+### Inversion ###
+
+If the bridge is balanced so as to have zero potential difference and
+so zero current across the middle at zero applied field, you don't
+have inversion.  But if you balance it a little differently, you can
+have a potential difference at zero applied field, which shrinks to
+zero at the applied field corresponding to logic 1, then starts to
+grow again.  Alternatively, you can bias the field using a permanent
+magnet rather than the resistors, giving you a nice zero derivative
+in the neighborhood of logic 1.  Either way, you get inversion.
+
+### Fan-in ###
+
+How can you connect multiple inputs to a single output?  One fairly
+inconvenient way — analogous to what we do in TTL and the like — is to
+physically colocate multiple coils, driven by different inputs, to
+produce magnetoresistance in the same magnetoresistor.
+
+### Memory ###
+
+Aside from the usual feedback approach with a couple of inverters
+eating each other's tails, you might be able to use high-hysteresis,
+low-coercivity materials for a sort of ferrite core memory, with a
+nondestructive readout.  I'm not entirely sure how you'd erase it,
+though; perhaps you could saturate your magnetic storage core in
+either direction, but take the reading at a point where a permanent
+magnet interferes with the field, either constructively or
+destructively?
+

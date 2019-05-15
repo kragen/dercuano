@@ -1,0 +1,116 @@
+Clamp-on ammeters have a ferromagnetic "clamp" that encloses a wire in
+a closed magnetic circuit; the magnetic field induced in the
+ferromagnetic material is proportional to the total net current flux
+enclosed by the clamp, and you can measure this field precisely with a
+Hall-effect sensor, thus distinguishing wires carrying a load from
+wires that don't.
+
+You could use the same approach to build a low-power electronic device
+that powers itself by leeching energy from the magnetic field around a
+current-carrying wire, without needing a direct electrical connection.
+This could enhance safety and reliability and ease installation, since
+you can "plug in" such a device without making a direct electrical
+connection, and if the device shorts out, it won't cause an electrical
+fire.  Not only could it harvest power without ever coming in contact
+with the wire, it could harvest power without even coming near the
+wire; it need only enclose the wire with a loop of ferrite without
+also enclosing its return path.
+
+Effectively this is a clamp-on transformer, with the "primary winding"
+of the transformer having only one turn of wire.  If that wire is
+normally carrying, say, 100 amps, then the secondary winding of the
+transformer with, say, 1000 turns, could draw up to 100 milliamps; but
+if the total available voltage to be dropped through that one turn is
+240 volts, the secondary winding would need to handle 240kV, which is
+difficult.  If we limit the secondary winding voltage to 10V, then the
+voltage drop on the primary will be an insignificantly small 10mV, and
+the total power being transmitted can be up to 10mV * 100 A = 1 watt;
+the secondary winding then can draw up to 1 watt / 10 volts = 100 mA
+still.  That's enough power to allow the use of a very simple power
+supply (say, a diode, a small capacitor, and a 7805) and a relatively
+inefficient electronic device.
+
+If you don't enclose the wire in ferrite, but simply put a ferrite rod
+near the wire and perpendicular to it, you'll be able to harvest
+orders of magnitude less energy, but installation would be even
+easier.
+
+Inductive coupling is only one possible way to harvest energy from
+power-line fields.  Capacitive coupling is also feasible.  However,
+the 60Hz of typical line power presents an extremely difficult problem
+for capacitive-coupling energy harvesting.  If you manage 10pF of
+capacitive coupling to a power line field, which is probably about all
+you can hope for, your 1/ωC capacitive reactance is 270 megohms at
+60Hz.  The other side of your power-supply input is then going to be
+your capacitive coupling to ground at around 100pF, I think.  (Would
+it be better or worse if you had a wire to ground?  Better, I assume.)
+You're going to need a power supply with an input impedance in the
+hundreds of megohms in order to be able to take advantage of that.
+Megohms or tens of megohms is probably feasible with CMOS; hundreds of
+megohms is probably not.
+
+However, all is not lost!  Fluorescent lights and high-intensity
+discharge lights powered by AC produce much-higher-frequency
+harmonics, some one to two orders of magnitude higher in frequency.
+This brings the capacitive reactance down to the megohms to tens of
+megohms range you need.
+
+So you could parasitically capture a significant fraction of the line
+voltage, but only in the high-frequency harmonics produced by the
+discharge.
+
+Another approach, which would be more practical in areas without
+electrical lines, is to harvest atmospheric electricity, either from
+actual lightning strikes or directly from the atmospheric voltage
+gradient.  During a lightning storm, atmospheric voltage gradients can
+reach 100kV/m, only an order of magnitude below air's ionization
+strength.  In clear weather (the "fair weather condition"), it falls
+three orders of magnitude to some 100V/m.
+
+A lightning rod struck by lightning has some 30kA available, but only
+for tens to hundreds of microseconds.  If you erect a ten-meter
+lightning rod, you could in theory harvest up to a megavolt of the
+lightning's voltage --- a few megajoules per lightning strike.  If you
+put your lightning rod on a mountain top, you could perhaps get
+several lightning strikes per month, for a total average power on the
+order of a watt.
+
+Harvesting the energy of a lightning strike, however, seems like a
+really difficult problem.  A 1000:1 step-up transformer as discussed
+above could reduce your 30kA to some 30A, at the cost of boosting your
+megavolt to a gigavolt.  If you put a series of these transformers
+along the lightning rod's path to ground, you could drop only a tiny
+fraction of the voltage through each one, making the situation more
+manageable.  If you can dump this massive amount of power through a
+low-resistance path into some kind of resonating circuit, you could
+then store it for milliseconds up to seconds in order to harvest it at
+a more reasonable pace.
+
+Harvesting the atmospheric voltage gradient directly seems much more
+feasible, and I've heard you can do it as simply as holding up a spent
+fluorescent light tube in one hand in a thunderstorm.  In the absence
+of a separate source of ions, you need a corona discharge to couple
+your wire to the atmospheric charge, which means that you need points
+sharp enough that the electric field intensity at the point is above
+air's ionization strength.  If you're working with, say, only 1000
+volts, then you need micron-scale conductive sharp points to generate
+ionization, and preferably enough of them to support a substantial
+ionic current.  By contrast, if you have 400kV --- say, a two-meter
+fluorescent tube plus a two-meter-tall person, in a thunderstorm with
+100kV/m --- then any conductive point radius below around 40cm will
+produce a sufficient field, if I remember my electrodynamics
+correctly.  The points of the prongs on the end of the fluorescent
+tube are on the order of 0.4 mm in radius, so they should work down to
+about 400 volts.
+
+The question, then, is how much current and thus power you can expect
+to draw at these voltages.  It's observed that the fluorescent lamp in
+the thunderstorm experiment will simply flash periodically as the
+lamp's parasitic capacitance to ground charges sufficiently to ionize
+its contents and discharge the capacitance.  If I SWAG this, we have a
+1ms flash per 5 seconds at 40 watts with a 200V breakdown voltage,
+giving 40 microamps average charging current; or maybe charging a 1pF
+parasitic tube capacitance to 200V in 5 seconds, giving about 40
+picoamps.  This difference of six orders of magnitude suggests that I
+don't know enough about the problem even to guess.
+

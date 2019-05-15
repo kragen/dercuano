@@ -1,0 +1,396 @@
+In outgoing-notes-mail-01.
+
+I'm frustrated with the slowness of web browsers at navigating
+Wikipedia.
+Navigating Wikipedia
+is one of the most important tasks you can do on a computer;
+it provides access to
+a reasonable summary of
+all human knowledge.
+
+Ideally, there should be
+*no perceptible delay*
+between selecting a link
+and seeing the resulting page.
+The `links` browser can more or less realize this
+for pages it has in its cache,
+although only up to a certain size
+and without displaying images.
+More full-featured browsers,
+unfortunately,
+are not capable of such a feat.
+To some extent this is a consequence
+of the very powerful features of CSS and JavaScript
+which do not admit general efficient implementations,
+but in the case of Wikipedia,
+the use of CSS and JS is quite stereotyped
+and not at all essential to the main content.
+It's entirely feasible
+to provide no perceptible delay
+for Wikipedia pages.
+
+My current setup
+----------------
+
+I'm running `kiwix-serve`
+on an English Wikipedia snapshot
+and displaying it using links:
+
+    ./kiwix/bin/kiwix-serve --port=8000 ~/Downloads/wikipedia_en_all_nopic_01_2012.zim &
+    links http://localhost:8000/wikipedia_en_all_nopic_01_2012/
+
+This snapshot,
+which can be torrented,
+occupies 9.7 gibibytes of disk space
+and includes all the text and equations
+but none of the pictures
+from the English Wikipedia,
+not even the most popular pictures
+without copyright encumberment.
+(I think that an additional gibibyte or two of images
+could be extremely valuable.)
+It's deeply unfortunate
+that the version of `kiwix-serve` I'm using
+is not fully functional without JS in the browser,
+since the main reason for using `kiwix-serve` rather than `kiwix`
+is to be able to browse using an unusual browser.
+
+Back to the ideal:
+"no perceptible delay"
+could be operationalized as 200 milliseconds
+(a traditional number from my memory of HCI research)
+or 70 milliseconds
+(the length of a typical keypress: 
+you want to display the result page
+before the user finishes pressing the key)
+or 17 milliseconds
+(the screen refresh time of nearly all current computer monitors).
+
+70 milliseconds should be achievable
+------------------------------------
+
+Meeting any of these goals (17ms, 70ms, or 200ms)
+would necessarily require a local replica,
+if not a replica necessarily on my own machine;
+`ping en.wikipedia.org` from my location in Argentina
+reports 300ms average latency,
+so even a single round trip would blow it.
+In fact,
+I haven't found anyplace in Argentina
+with less than 250ms latency
+to anyplace in the US.
+
+I argue that a 70-millisecond response time is achievable,
+with no network server,
+using a reasonably powerful machine
+(a netbook from a couple of years back,
+or an Android phone with a large SD card).
+The minimal amount of work involved
+is displaying a screenful of data
+(around 0.6 megapixels, or 1.8 megs uncompressed)
+following a single random hard disk seek
+(a 10ms cost which goes away if you're using an SD card)
+after determining which
+of perhaps a few dozen links on the screen
+the user clicked on.
+That is,
+transferring three megabytes of data
+from a random location on the disk
+to the framebuffer.
+This is almost the same task
+that any movie player software
+performs in 17 milliseconds,
+except that it decompresses the frame from data in memory
+instead of loading it from a random location on the disk.
+
+A typical modern laptop hard disk
+transfers some 20 megabytes per second,
+or 20 kilobytes per millisecond.
+That means that in the 70 - 10 - 17 = 43 remaining milliseconds,
+it can transfer 860 kilobytes.
+So we could meet our 70-millisecond performance goal
+if we could compress the screen image to display
+by only a factor of two.
+However, we wouldn't be able to fit much of Wikipedia
+onto a typical netbook hard disk
+in that representation;
+so compression is necessary for reasonable coverage,
+as well as saving us much of those milliseconds
+to use for other things!
+
+A lot of work is needed.
+
+According to Chromium,
+`kiwix-serve` can serve up a typical page in
+under 400ms on my netbook,
+although it occasionally takes almost 500ms.
+I don't know how much of that
+is due to the LZMA2 compression used by the `.zim` file format,
+and how much is due to `kiwix` being suboptimal.
+
+Lossless image compression
+--------------------------
+
+I made a 1024×600 screenshot
+of `links` displaying a screenful of a Wikipedia page
+at 113×33 characters
+(3729 characters).
+This screenshot
+compressed as PNG
+takes 80 kilobytes,
+or 72 kilobytes after `optipng`;
+`pngtopnm`
+decompressing it to raw data
+takes 72 user milliseconds,
+although given that the clock time is around 250ms,
+I don't really trust that.
+(The gzipped PNM decompresses in 20ms.)
+A GIF version produced by ImageMagick is 63 kilobytes.
+This is to say,
+PNG or GIF compression
+reduces it to such a size
+that it needs about 3ms of disk transfer time
+to load.
+
+Here is the screenful, stripped of its highlighting
+and hypertext links,
+which should not comprise
+a significant fraction of its size in bytes:
+
+                                                                                   Banking in Switzerland (p2 of 17) 
+         * 8 International competition                                                                               
+         * 9 See also                                                                                                
+         * 10 References                                                                                             
+         * 11 External links                                                                                         
+
+    Overview                                                                                                         
+
+       Switzerland is a prosperous nation with a per capita gross domestic product higher than that of most          
+       western European nations. In addition, the value of the Swiss franc (CHF) has been relatively stable          
+       compared with that of other currencies.[3] In 2009, the financial sector comprised 11.6% of Switzerland's     
+       GDP and employed approximately 195,000 people (136,000 of whom work in the banking sector); this represents   
+       about 5.6% of the total Swiss workforce. Furthermore, Swiss banks employ an estimated 103,000 people          
+       abroad.[4]                                                                                                    
+
+       Swiss neutrality and national sovereignty, long recognized by foreign nations, have fostered a stable         
+       environment in which the banking sector was able to develop and thrive. Switzerland has maintained            
+       neutrality through both World Wars, is not a member of the European Union, and was not even a member of the   
+       United Nations until 2002.[5][6]                                                                              
+
+       Currently an estimated one-third of all funds held outside the country of origin (sometimes called            
+       "offshore" funds) are kept in Switzerland. In 2001 Swiss banks managed US$ 2.6 trillion. The following year   
+       they handled $400 billion USD less which has been attributed to both a bear market and stricter regulations   
+       on Swiss banking.[7] By 2007 this figure has risen to roughly 6.7 trillion Swiss francs (US$6.4 trillion).    
+
+       The Bank of International Settlements, an organization that facilitates cooperation among the world's         
+       central banks, is headquartered in the city of Basel. Founded in 1930, the BIS chose to locate in             
+       Switzerland because of the country's neutrality, which was important to an organization founded by            
+       countries that had been on both sides of World War I.[8]                                                      
+
+       Foreign banks operating in Switzerland manage 870 billion Swiss francs worth of assets (as of May 2006).[9]   
+
+    http://localhost:8000/wikipedia_en_all_nopic_01_2012/A/Banking in Switzerland.html#International_competition    
+
+This character data compresses to
+1158 bytes with `gzip -9`, 3.22 times smaller,
+1202 bytes with `bzip2 -9`,
+and
+1446 bytes with `compress`.
+
+None of these programs take a significant amount of time to decompress the data,
+but my measurement noise is around 4ms,
+so they might be taking as much as 4ms.
+
+Conclusion: compressed images are very heavy,
+and to be avoided if possible.
+
+Wikipedia size
+--------------
+
+As I mentioned, the English Wikipedia snapshot I'm using
+is 9.7 gibibytes.
+`kiwix-serve` reports that it contains
+"1,766,695MB (3,874,564 articles, 262,623 medias)",
+which is to say,
+1.8 terabytes
+in 3.9 million articles,
+or 460 kilobytes
+per article.
+I seem to recall
+that the text of a typical article
+is some tens of kilobytes,
+and almost none
+are over 100 kilobytes,
+so I assume that the bulk of that is the "medias".
+
+Five random Wikipedia pages
+(not in the snapshot)
+are 4, 6, 7, 7, and 10 such screenfuls in links,
+so I'm going to assume that 7 is a reasonable median
+and 20 is a reasonable guess at mean
+number of screenfuls.
+That means we have about 80 million screenfuls of text,
+or 300 gigabytes of text,
+uncompressed;
+perhaps it would be 93 gigabytes compressed.
+This seems surprisingly large,
+since the original Wikipedia source data
+is only about 9 gigabytes
+in bz2-compressed XML.
+Nevertheless,
+it's small enough to be feasible to store
+textual snapshots
+of this entire Wikipedia
+on a normal netbook,
+and you could retrieve any one of them with a single seek
+if you identified them by number.
+
+(If you printed out these 80 million 113×33 screenfuls
+in a square,
+they would be about
+800 thousand characters wide
+and 400 thousand tall;
+in a normal ten-point font,
+this would be about 500 feet square.)
+
+Since lossless image compression
+produced files that were some 40 times larger
+than text compression,
+we probably don't have room on the disk
+for precomputed images of the entire Wikipedia,
+pre-rendered.
+However, it's probably perfectly adequate
+to layout and render the text on the fly,
+within limits.
+
+Image selection
+---------------
+
+That doesn't help with things that aren't text,
+and in particular, math articles suffer badly
+from lack of diagrams.
+<http://en.wikipedia.org/wiki/Cantor_function>
+is rather hard to understand
+without the graphs,
+the first of which is an 8-kilobyte SVG
+drawn with Adobe Illustrator
+which gzips down to 988 bytes;
+the third is a 9-kilobyte PNG.
+If you included a single gigabyte of images,
+you could include a million images
+of the complexity of this SVG;
+you could include one such image per article
+in four gigabytes.
+
+Presumably you want to optimize some kind of cost-benefit ratio,
+perhaps using [page view counts][0] 
+or lists of [featured articles][1] or [vital articles][2]
+to estimate the benefit,
+and the file size
+(perhaps with an estimate of benefit due to compression)
+to estimate the cost.
+For example, [Georg Cantor][3] is a "vital article" 
+that is read some [700 times a day][4],
+and it uses a [diagram of bijection][5]
+which is 1.8 kilobytes gzipped
+and is also used on four other pages;
+perhaps the [27-kilobyte portrait of young Cantor][6]
+used on no other pages
+does not contribute 15 times as much
+to your replica of Wikipedia.
+If a picture is one of the 3196 [featured pictures][7]
+it's probably better quality.
+<http://commons.wikimedia.org/wiki/Commons:Picture_of_the_Year>
+<http://commons.wikimedia.org/wiki/Commons:Valued_images>
+<http://commons.wikimedia.org/wiki/Commons:Quality_images>
+<http://commons.wikimedia.org/wiki/Commons:Featured_pictures>
+
+[0]: http://dumps.wikimedia.org/other/pagecounts-raw/
+[1]: http://en.wikipedia.org/wiki/Wikipedia:Featured_articles
+[2]: http://en.wikipedia.org/wiki/Wikipedia:Vital_articles
+[3]: http://en.wikipedia.org/wiki/Georg_Cantor
+[4]: http://stats.grok.se/en/latest90/Georg_Cantor
+[5]: http://en.wikipedia.org/wiki/File:Bijection.svg
+[6]: http://en.wikipedia.org/wiki/File:Georg_Cantor3.jpg
+[7]: http://en.wikipedia.org/wiki/Wikipedia:Featured_pictures
+
+[Wikimedia Commons says][8] it has 15 million files,
+[which add up to][9] 22.5 terabytes.
+This is substantially larger than any of the textual Wikipedias,
+by about two thousand times.
+The great bulk of this,
+about 19.6 terabytes,
+is JPEGs,
+followed by
+880 gigabytes of TIFFs,
+600 gigabytes of PNGs,
+520 gigabytes of Ogg video,
+300 gigabytes of DjVu,
+and so on.
+
+These files range over a very wide range of sizes;
+even consulting statistics by MIME type shows
+that the 2597 MIDI files average 5.2 kilobytes
+while WebM video files average 27 megabytes,
+four orders of magnitude greater.
+That is, all the MIDI files put together
+are smaller than a single average WebM video,
+and of course within each category, there are orders of magnitude of variation.
+
+The [Commons metadata][10] is available for bulk download,
+currently totaling about 2.4 gigabytes,
+and could be used to measure the file size distribution more precisely.
+
+[8]: http://commons.wikimedia.org/wiki/Special:Statistics
+[9]: http://commons.wikimedia.org/wiki/Commons:MIME_type_statistics
+[10]: http://dumps.wikimedia.org/commonswiki/20130102/
+
+Most of the JPEGs
+are very large indeed,
+and a much smaller version
+would be more than adequate for initial page presentation;
+some random images I selected 
+using <http://commons.wikimedia.org/wiki/Special:Random/File> 
+were 
+0.3 megapixels,
+0.3 megapixels,
+3.1 megapixels,
+5.9 megapixels,
+and a 22-kilobyte SVG.
+Most of the time, however,
+images are presented in the page
+at a much smaller size.
+For example, I clicked the "random" link above until I got a big image:
+<http://commons.wikimedia.org/wiki/File:Ebensee1.jpg>, which
+is 7.7 megapixels,
+but where it's used on <http://de.wikipedia.org/wiki/Bezirk_Gmunden>,
+it's scaled down to 150×99,
+or 0.015 megapixels,
+500 times smaller,
+making it 7.5 kilobytes
+instead of 4.9 megabytes.
+
+(en.wikipedia.org has its own set of uploaded files,
+totaling 800 thousand to Commons's 15 million.
+I'm not clear if Commons images used on en
+are included in that total.)
+
+A quick sample of five random images
+finds one used on the Hebrew Wikipedia
+and none used in English Wikipedia.
+Four more
+finds one on nl.wikipedia;
+eight more
+finally finds [one image used on en.wikipedia as well as others][11],
+one used on es.wikipedia,
+one used on de.wikipedia,
+and [one more used on en.wikipedia][12].
+Naïvely, two out of 17 in the "sample"
+should mean that on the order of 15% of the files in Commons
+are used on en.wikipedia.
+Both of these
+are used at a reduced size in the articles,
+and have an en.wikipedia File: namespace page.
+
+[11]: http://commons.wikimedia.org/wiki/File:Railway-electrification_Europe_2005_en.png#globalusage
+[12]: http://commons.wikimedia.org/wiki/File:Bootham_Crescent_plan.jpg#globalusage

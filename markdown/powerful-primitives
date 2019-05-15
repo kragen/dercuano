@@ -1,0 +1,3056 @@
+XXX transactions are useful for reactive programming because they
+prevent ordering problems?
+
+In 2012 I wrote about “choosing powerful primitives for a simplified
+computing system”,
+including as examples gzip and other things, and speculating about
+automated cache management.  Well, since then, automated cache
+management has kind of gone mainstream in the form of "reactive
+programming" frameworks.  What other things could drastically simplify
+our software systems?
+
+My focus here is on what kinds of mechanism could support a wide
+variety of applications, eliminating complexity from the application
+code, without having to write and maintain separate, specialized
+versions of that mechanism in different parts of your computing
+system; and by so doing, make the system less complex, more
+approachable, and more adaptable to new situations.  I’m looking for
+candidate components with a high "strength-to-weight ratio", in the
+sense that their internal complexity is low compared to the
+functionality they provide, and also a low "surface-to-volume ratio",
+in the sense that they impose very little extra complexity on
+applications that use them, compared to their own internal complexity,
+so the application is simplified greatly by not containing its own
+reimplementation of their functionality.
+
+In particular, such mechanisms need to be acceptably efficient across
+their wide range of uses, rather than performance-optimized for one
+particular use.  If this isn’t the case, experience has shown that
+people will write customized versions of them for their particular
+application, rather than investing effort in further optimizing the
+general-purpose mechanism.  The result is that specialized mechanisms
+proliferate, overall system complexity explodes without a
+corresponding increase in power, composability suffers, and none of
+the specialized mechanisms receives enough attention to make it
+efficient.  This should sound familiar, since this is the tarpit we’re
+in today.
+
+I believe this matters for a few different reasons.
+
+One is that, as Dan Ingalls says, to be a medium for personal
+expression, a system needs to be comprehensible by a single person.
+And this is the vision that has motivated Smalltalk, the VPRI STEPS
+project, and Chuck Moore’s FORTH work.  It unfortunately suffers a bit
+from mostly appealing to very independent-minded people.
+
+A second reason is that this poor architecture results in decreasing
+returns to software work, which matters economically at a societal
+level.  People’s day-to-day lives are largely driven by what we might
+call economic factors: do you have to spend your time washing clothes
+by hand and sewing them up, or can you use machinery to make that
+easy?  Is your house warm?  Do you have running hot water and safe
+drinking water?  What do you have to do to make a living — does it
+compromise your health or moral integrity? XXX
+
+A third reason is that software freedom is fundamental to individual
+human rights, to collective economic justice, and to individual
+economic justice in the 21st century, but the freedom to study and
+modify software you can’t understand is only theoretical, and the
+power of that freedom is multiplied by the modifications and
+enhancements you actually can manage to make in your limited time.
+
+Software freedom is fundamental to individual human rights because
+whoever controls the software controlling your cellphone, your
+pacemaker, your hearing aid.  They can see photos of your genitals, if
+you ever take them, and from Snowden’s revelations we know that some
+of them pass them around the office for laughs.  They can trick you
+into thinking your friends hate you, that your husband is cheating on
+you, that the Jews faked the Holocaust.  They can judge you based on
+what you read or who you’re friends with, and secretly tell other
+people about those judgements, and those other people may be the
+police.  Once you have the pacemaker, they can kill you, and nobody
+will ever know it wasn’t natural.
+
+Software freedom is fundamental to collective economic justice because
+it allows every country or group of people to prosper independently of
+the rest.  Over time, we can expect the strong standardizing tendency
+of software to standardize on a small number of operating systems, a
+small number of web browsers, and so on.  Without software freedom,
+that will result in enormous economic returns accruing to the vendors
+of the dominant software, which can then extend their monopoly power
+into new areas of software: perhaps Apple, Microsoft, Google,
+Facebook, and Amazon, but just as likely, a few new companies that you
+haven't heard of yet, probably in China.
+
+Software freedom allows everyone to participate in production, while
+proprietary software moves us toward a world where, if you don’t live
+in Seattle, Shenzhen, or California, you can only consume, or at best
+source “user-generated content”, not produce or participate as an
+equal.
+
+Many governments have responded to this harsh reality by trying to
+pretend that software is just one industry among many, and they can
+import software just as they import oil, while focusing their domestic
+industry on shipbuilding or steel production or something.  But the
+truth is that your shipyards, your ships, and your steel mills will
+get most of their value from software — if not in 2015, then surely by
+2035.
+
+Software freedom is fundamental to individual economic justice because
+unless you were born to wealth, your other choices are joining the
+startup lottery, where almost all the participants end up worse off
+than if they hadn’t played, and being employed, where almost all of
+the value you produce will be skimmed off by your employer.  By
+contrast, when you write free software, nobody can ever take it away
+from you.  In fact, even when *other people* write free software,
+nobody can ever take it away from you.  (By contrast, when other
+people write free-in-theory-but-not-in-practice software, it can
+totally be taken away from you.  Like if the maintainer decides to
+stop supporting your platform, or bundle some kind of adware you
+hate.)
+
+Any economically productive activity that you can do with software
+becomes more productive when there is more free software out there for
+you to draw on.
+
+The World-Wide Web, for apps
+----------------------------
+
+The Web actually provides us with some tremendously powerful
+primitives that simplify a lot of applications, even as they make
+others more complicated.  Out of the box, a webapp gets:
+
+* a gentle learning path;
+* a typographic layout engine with a relatively powerful box model and
+  excellent Unicode support;
+* image and sound decoding and caching;
+* alpha compositing;
+* a hierarchical UI event system;
+* some degree of incremental relayout;
+* a high-level reflective prototype-oriented OO language with closures
+  and reasonably efficient implementations: JS;
+* sufficient robustness in the event-driven programming environment
+  that your app will probably still mostly work even if some features
+  are throwing exceptions;
+* a vector drawing library that's even easier to write in than
+  PostScript, which is saying a lot: SVG;
+* a compound document system where you can OLEishly embed one document
+  in another, including mutually untrusting documents;
+* a mobile-code system that downloads your webapp once and updates it
+  on the client only when it's changed, and potentially only the parts
+  that have changed (if you configure your server headers correctly or
+  if you use a cache manifest);
+* by far the best debugging tools I've ever used anywhere: Firebug and
+  the Firebug clone that comes with WebKit;
+* serialization of simple data for free with JSON;
+* simple persistence (e.g. using localStorage);
+* a SQL engine (although that's been deprecated);
+* sending some text over the network to a server in a single line of
+  code;
+* network protocols that provide you fault-tolerance by default as
+  long as you obey the REST constraints;
+* transparent network protocol compression;
+* a global namespace for remote objects that encompasses the actual
+  physical globe, not just your program's "global" namespace.
+
+I'm not sure that these primitives have a great "strength-to-weight
+ratio", in the sense of providing a lot of power for low
+implementation complexity, or for that matter even low interface
+complexity, but the difference between a JS webapp and, say, a Tk
+program to do the same thing is pretty big.
+
+Consider this "microblogging" program in ksh, like a non-networked
+version of Twitter:
+
+    while read line; do
+        ENTRY="$(date +'%d-%m %H:%M:%S'): $line" echo "$ENTRY" >> microb.log
+        clear; cat microb.log; echo -n "sup-> "
+    done
+
+Here's an equivalent in DHTML, with has better text layout, scrolling,
+search, navigation, and editing, and automatically live-upgrades
+itself to the latest version of the code after each post, although
+it's a bit more code and I think it runs slower:
+
+    <script>var ls = localStorage, d = document;
+    function add(name, html) { ls[name] = (ls[name] || '') + html }
+    function esc(text) {return text.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+    d.write(ls['microblog'] || '');</script>
+    <form onsubmit="add('microblog',new Date+': '+esc(this.line.value)+'<br>')">
+    <input name=line autofocus>
+
+If you take out the HTML-escaping code, the DHTML version also has
+rich text.
+
+Going back to how we would do things in 1995, a Tcl/Tk version of the
+same thing would have to take care of a lot of these things by hand.
+I started writing it, in the same ridiculously compressed style as
+above:
+
+    #!/usr/bin/wish -f
+    text .blog; label .sup -text sup; entry .e -textvariable e
+    pack .blog -side top -fill both -expand true
+    pack .sup -side left -fill x; pack .e -side left -fill x -expand true
+    bind .e <Return> blog; proc blog {} {
+        global e; .blog insert end "$e\n"; set f [open microb.log w]
+        puts $f [.blog get 1.0 end]; close $f; set e ""
+    }
+
+XXX include full version
+
+This is still lacking a bunch of things, even compared to the shell
+version, including reading the microblog file at startup, not losing
+data in machine crashes, making the textarea itself non-editable (?),
+adding the dates, focusing the text entry, not being an ugly gray, and
+so on.  And this isn't even hitting any of the web's strong points,
+like compound documents, networking, garbage collection, or SVG.
+
+If you wanted to replace the web as an application platform --- which
+is certainly what both Apple and Google are trying to do with their
+respective smartphone operating systems, but also the intent of
+platforms like VPRI's STEPS --- you need to understand the strengths
+of the platform as well as its excessive complexity.  Some of those
+strengths are in fact powerful primitives, like those mentioned above.
+Others are more subtle and in fact work against the VPRI vision of an
+overall system that is as simple as possible, such as the Principle of
+Least Power, the gentle learning path, and View Source.
+
+Other candidates
+----------------
+
+What other powerful primitives might have a high "strength-to-weight
+ratio" in a computing system, in the sense of enabling us to build
+much more powerful systems with very small amounts of code?
+
+### Content-addressable blob stores for persistent, self-certifying trees ###
+
+Traditional Unix-like and MS-DOS-like filesystems provide expandable
+virtual disks: "files," which are mutable sequences of bytes,
+supporting random-access read and write, plus appending data at the
+end.  Instead, a variety of more recent filesystems and related
+systems either do not permit modification of existing "files" at all,
+or only allow appending to them, and identify stored blobs by using a
+one-way hash of their contents; name-to-blob-hash mappings are
+typically stored in another blob.  Systems using one or another
+variant of this design include the Xanadu Ent, WAFL, Venti, GoogleFS,
+FreeNet, Wax, IPFS, Tahoe-LAFS, Bup, Jumprope, Nix/Guix, git-annex,
+and most importantly, Git and BitTorrent.
+
+This permits very efficient comparison of filesystem trees and storage
+of slightly-modified versions of existing trees, since deep equality
+can be performed by an inexpensive shallow equality test, just as with
+hash-consed in-memory persistent data structures.
+
+IPFS's author calls this the "Merkle DAG" model: parent nodes link to
+their child nodes with secure hashes, just as in a Merkle tree,
+without the linearity requirement of the tree.
+
+The one-way-hash "names" are "self-certifying" in the sense that the
+mapping from the name to the blob contents can be checked by the
+reader, so they do not need to rely on the storage provider.  Another
+kind of "self-certifying name" consists of a public key or a one-way
+hash of one, although there are tricky issues related to this.
+
+Avery Pennarun (the author of Bup) wrote a very compelling advocacy of
+the position that content-hash-addressable blob stores are such a
+powerful technology that they invert much of our conventional wisdom
+about data storage. XXX link it!
+
+Could you replace most or all of these blob stores with a single blob
+store?  Could you provide a single blob-store interface to write your
+application software on top of, allowing you to run it against any of
+these blob stores?  (Git-annex already kind of contains such a thing
+internally.)
+
+### Distributed hash tables ###
+
+These are worldwide key-value stores with some degree of resiliency
+against malicious participants, and much of the yearly [what is that
+thing where Boon Thau Loo published so many papers called?  IPTPS?]
+workshops focused on versions of these.  In concert with
+self-certifying names, they allow distributed blob stores to have new
+blobs added to them, and they allow participants with a common
+interest to exchange rendezvous information without depending on a
+central server.
+
+The earliest DHT work was "consistent hashing" at Akamai, but later
+systems include Chord and Kademlia.  BitTorrent uses a DHT to
+bootstrap "trackerless" torrents.
+
+DHTs are mostly only used for decentralized systems (that is, systems
+to which it is infeasible for any party to deny access to any other
+party), but their failure properties in the face of malicious
+participants are not well understood.
+
+Is it possible to use a single DHT implementation for many different
+applications?
+
+### Persistent data structures ###
+
+Unfortunately, "persistent" has acquired two confusingly similar and
+conflicting meanings, both of which have "ephemeral" as their antonym,
+because most people are illiterate troglodytes who never venture
+outside their cave to see what's happening in the larger world, so
+they invent confusingly conflicting terminology.  In this case, I'm
+not talking about your program's data surviving restarting it or
+restarting your computer (because the data is on disk or something),
+but rather data structures which might be in volatile RAM, but which
+you don't modify.  Instead, you make new, modified versions of them.
+If you use efficient persistent data structures, most of the structure
+will be shared.  This is the kind of "persistence" that pertains to
+most of the standard data structures in, say, Clojure.
+
+This pretty much requires a garbage collector or its moral equivalent,
+like reference counting or a linear type system.  RAII is not going to
+help you out here.  This also means you have no idea why your program
+is using so much RAM.
+
+There are a few different advantages to persistent data structures
+over their "ephemeral" cousins, the kind where you modify them in
+place.  One is that they're less bug-prone: no more aliasing bugs
+where you passed a dict to some function and then to another function
+and then the first function modified it.  Another is that you get
+"undo" without any extra complexity in your code.  This is pretty
+important if you’re, say, trying to do software transactional memory
+(see below) or backtracking.  A third is that if you actually are
+using a bunch of different versions of a data structure (like in the
+backtracking case) they'll probably use *less* memory.  A fourth is
+that you can access them without locking, and replicate them without
+fear (whether across the CPU caches of your different cores or halfway
+around the world) so they can give you better efficiency.  (They're a
+crucial enabling technology for CRDTs; see below.)  A fifth somewhat
+subtle performance point is that, if you *are* using a garbage
+collector, they prevent you from wasting CPU time on its write
+barrier, while mutable data structures have you beating on the write
+barrier all the time.
+
+I mentioned above that an immutable blob store is in a sense a store
+for persistent data structures.  Hopefully that is clearer now.
+
+"Hash consing" is a technique applicable only to persistent data
+structures: when asked to create a given data structure, you hash it
+to see if it already exists, and if so, return a pointer to the
+existing instance rather than making a new copy.  This allows you to
+perform deep-equality testing in constant (and small) time.
+Content-hash-addressed blob stores provide this feature, but only if
+you are careful not to include any extraneous data.
+
+Clojure's standard library already includes a wide variety of
+persistent in-RAM data structures that are simple to use and useful to
+many applications.  Could these be abstracted so that the same code
+also supports distributed and blob-store cases?
+
+### Pub-sub ###
+
+Publish-and-subscribe systems, also known as event-based integration
+systems or event buses, allow you to connect together
+very-loosely-coupled subsystems with real-time notification.  These
+are universal in financial institutions, but are also used in systems
+at a variety of scales to reduce coupling between modules.
+
+Typically, when a publisher publishes an event on a topic, all the
+subscribers to that topic receive a copy of the event, shortly
+afterward or possibly not at all.  The publisher is not informed of
+the success or failure, and does not know how many subscribers exist.
+
+The use of this technique in user interface programming goes back at
+least to MVC in the 1970s, where the model would notify all of its
+views that it had changed and they might need to redraw.
+
+As a current and local example, when I save this text file in my
+editor, the kernel sends an inotify notification to any processes that
+have registered to receive notifications for this file; this can
+trigger reindexing it in a full-text-search engine, updating a
+filesystem browser window, or output of extra lines from tail -F.  And
+of course group chat systems like IRC, Slack, and WhatsApp are a very
+direct application of pub-sub; and D-BUS is the center of a modern
+Linux desktop, for better or worse, mostly worse.
+
+Usually, these systems are capable of losing messages, because the
+desirable decoupling they provide between subscriber and publisher
+prevents them from applying backpressure to slow down a publisher who
+is publishing messages faster than some subscriber can process them.
+(It would, after all, degrade service to all the other subscribers as
+well.)  Lampson's Hint that a system must shed load to keep
+functioning in the case of overload constrains the overall system to
+lose messages in this case; typically this is done by discarding extra
+messages at an event-bus-providing server and possibly notifying the
+subscriber that messages have been lost.  In cases where the messages
+are being used for cache invalidation, recovery typically involves an
+expensive re-replication of state.
+
+(Content-addressable blob stores can make re-replication much less
+expensive!  So can rolling hashes, mentioned next.)
+
+One particularly simple way to solve that particular problem is to
+make each subscription one-shot: to receive another message, you must
+renew your subscription.
+
+Windowing systems almost universally support some kind of pub-sub
+notification, though sometimes synchronous and even with a reply
+capability built in.
+
+Could we replace the wide variety of pub-sub mechanisms in use, often
+intertwined with a horrific amount of application-specific policy,
+with one or a few pub-sub mechanisms?
+
+### Rolling hashes, or “the rsync algorithm” ###
+
+Rsync efficiently discovers duplicate file chunks between two replicas
+of a file, even in the face of insertions and deletions, by hashing
+one replica of the file by aligned blocks, then computing a "sliding"
+or "rolling" hash over all possible blocksize-sized blocks in the
+other replica, whatever their alignment or overlap with one another.
+This allows it, like magic, to transmit only the missing data over a
+(presumably slow) connection, despite not being able to directly
+compare the two versions of the file.
+
+This same approach is used by rdiff-backup to efficiently find a small
+delta to apply to a potentially large file, as well as by bup (for a
+similar purpose), zsync (a replacement for rsync that precomputes the
+block hashes on the server side and therefore requires no run-time
+computation on the server side, permitting efficient synchronization
+from a dumb blob store), Zbackup (an alternative to bup), ssdeep for
+computing and recognizing malware signatures, Jigdo, and Jumprope.
+
+Could we support all of these rolling-hash-based applications with a
+single distributed data structure?
+
+### Backtracking or nondeterminism ###
+
+From the depths of the 1970s, Prolog and SNOBOL come at thee!
+Nondeterministic programming is a lot like normal programming, except
+that parts of your program can "fail", and then if you've provided an
+alternative path, they will take it.  The most everyday version of
+this is the regular expression:
+
+    decode_pattern = re.compile("(.{11}) (\\d+)<([^>]*)>(\\d+)\n")
+
+This example, taken from a project I'm working on called Gab, matches
+lines like "m0oTzNujJpx 6<I=EInw>6\n".
+
+If you're not familiar with regular expressions, the "\d+" means "look
+for as many digits as possible without making the pattern fail".  If
+the pattern fails afterwards, the "\d+" will try matching fewer and
+fewer digits, until it can't match any, at which point it will itself
+fail.
+
+In one sense, this particular regexp is not a particularly great
+example because it's carefully written to be deterministic: it can
+never backtrack and then succeed.  If we were to replace the "[^>]*"
+with ".*", so that it could match any string at all and not just a
+string that doesn't contain the ">" symbol, then it would start by
+matching to the end of the line, then fail since it didn't find a ">"
+there, and backtrack until it did find one.  In another sense, this is
+a fantastic example of how, in practice, we work very hard to keep the
+poor performance of constant backtracking under control when we use
+nondeterministic constructs.
+
+Nondeterminism implemented by backtracking is fantastic for parsing:
+you write down a program that could *generate* the language you're
+trying to parse, and use nondeterminism to "execute it backwards": try
+all the possible paths of execution until you find one, or the one,
+that generated the string you're parsing.  PEGs, which are the most
+interesting advance in parsing algorithms in a decade or two, have a
+very simple semantics in terms of backtracking.  The "packrat"
+PEG-parsing algorithm guarantees linear-time parsing by memoizing
+partial parsing results.
+
+Database queries are easily conceptualized as nondeterministic
+programs.  `SELECT FOO.A, BAR.B FROM FOO, BAR WHERE FOO.C = BAR.C AND
+BAR.D > 10` has a very simple interpretation as a nondeterministic
+program.
+
+The everyday "diff" is also easily conceptualized as a
+nondeterministic program, but in this case it isn't sufficient to find
+*some possible* set of edits to get from the old version to the new
+version; we want *the smallest* or *nearly the smallest* set of edits.
+And the standard quadratic dynamic-programming LCS algorithm to solve
+it can be understood as a way to tame the exponential blowup of
+choices with memoization (see below).
+
+There are a large number of different ways to rein in the exponential
+complexity blowup that seems inherent to nondeterministic programming,
+mostly specific to one or another domain.  Packrat parsing uses
+memoization, limited context, and implicit limits on backtracking;
+practical Prolog programs use cut; Datalog uses stratified resolution,
+which is a lot like memoization; truth-maintenance systems note the
+proximate causes of failures; SQL systems use indices and hash and
+sort-merge joins; parsing systems in general use lookahead;
+regular-expression engines sometimes use DFA compilation, Boyer-Moore
+search for constant strings, and tables of the locations of improbable
+bytes in the string, and can also use suffix-table indices (see
+below); and so on.  It would be very useful to have a unified
+framework that avoids all this duplication of mechanism, and moreover
+can be applied to make nondeterministic execution in new domains
+reasonably efficient without needing to invent another special-case
+hack.
+
+Might such a general efficient nondeterministic-computing algorithm
+exist?
+
+### Memoization ###
+
+Several of the wild exponential nondeterministic domains are tamed by
+memoization; in the Packrat case, all the way down to linear time.
+(You could also view the lazily-constructed DFA approach to regexps as
+being memoization to get linear time.)  Memoization is storing the
+arguments and return value to a function in a "memo table" so that
+they can be returned next time without recomputing the function.  At
+the best of times, it magically makes your program go faster,
+sometimes astronomically faster in the presence of recursion.  It is a
+kind of computation caching, and it's also central to the
+Self-Adjusting Computation paradigm of incremental computation that
+I'll mention later.
+
+Memoization in practice can be tricky to win at, due to both false
+misses and false hits in the memo table, and also for efficiency
+reasons.
+
+False misses occur because the function is being invoked with data
+that it does not care about, which is not always obvious; perhaps it
+depends not on the exact value of some numeric argument, for example,
+but only on the number of digits in it.  This can be fixed by dividing
+the function into two functions, one of which reduces the input data
+to the necessary, but this modification seems artificial without the
+context of memoization.
+
+False hits occur because some data not considered for the memo-table
+lookup affects the return value of the function, or because the
+function has some other effect.  If the function has arguments that
+refer to some mutable data structure, mutating that data structure
+between calls to it may affect its results such that you wouldn't want
+to reuse the memoized result.
+
+Efficiency is tricky for a variety of reasons.  If the function is a
+thin wrapper around some other function, memoizing one or the other of
+them will probably give you the benefit of memoizing both of them, at
+half the cost.  Looking up the arguments in the memo table can be
+expensive if the arguments are large data structures and you aren't
+using hash consing.  If the arguments are mutable, you may have to
+copy them.  The memo table can use up a lot of memory.  If the
+function is rarely or never called twice with the same arguments,
+memoizing it will only make it slower.
+
+Under some circumstances it may make sense to share a memo table
+across runs of a program or even across a whole distributed system.
+Indeed, this is a major function of build systems like `make` and
+`ccache`, but it could potentially be useful for smaller computations
+as well.  I read a paper about using a precomputed distributed memo
+table of optimizations to enable absurdly aggressive compiler
+optimizations, for example.
+
+Could we provide generally useful memoization with one or a few
+memoization mechanisms, orthogonal to rather than mixed into the code
+being memoized?
+
+Memoization is closely related to deterministic rebuilding (see
+below).
+
+### Monads ###
+
+There are already too many tutorials on what monads are, so I would
+not try to explain, even if I knew.  I just want to point out that
+sometimes you can write a function with one monad in mind (lists, say)
+and then run it in another one (for example, backtracking, although in
+a lazy language there may not be so much difference).
+
+How often do we write code that is unnecessarily coupled to a single
+monad when it could instead be reusable across different monads?
+
+### Constraint solvers and logic programming (like SQL, but more so) ###
+
+I think I mentioned this in my original post (XXX did I?):
+SAT and SMT solvers are
+now powerful enough to replace a fairly wide variety of custom code in
+things like compiler optimization.  Maybe they could be the unifying
+approach to nondeterminism that I was saying was needed!  I don't know
+enough about them, though.
+
+They are also a crucial enabling technology for formal methods: you
+can use them to find test cases that will break your program, or prove
+that there are no such test cases.
+
+Unfortunately, I have no experience with SAT or SMT solvers, so this
+is very speculative!
+
+How widely can we apply SMT solvers to simplify our software?  What’s
+the simplest SMT solver that’s efficient enough to be useful in common
+cases?
+
+Truth maintenance systems, due to Stallman and Sussman as refined by
+Doyle, are a kind of nondeterministic constraint solver that notes
+what sets of assumptions have led to inevitable constraint violations
+(through a kind of relevancy logic), improving the performance of the
+search by large exponential factors by cutting off nonviable search
+branches early.
+
+This is a key aspect of modern SAT and SMT solvers.
+
+Prolog was the first logic programming language, introducing
+nondeterministic programming, and can be viewed as a kind of
+constraint solver.  It led to a lot of excitement in the 1970s and
+early 1980s as a general declarative system, but practical Prolog
+programs have to intersperse evaluation-strategy information rather
+intimately with declarative information in order to achieve usable
+levels of efficiency.  Consequently, Prolog and similar systems such
+as KL1 failed to fulfill the high hopes many had had for it, and in
+particular caused the failure of the Japanese Fifth Generation
+Computing Systems project, resulting in part in Japan’s continued
+failure of development in the software field.
+
+Will Byrd and his colleagues have been working on a new family of
+logic programming languages named Kanren, whose smallest member,
+[μKanren, from 2013][8], is 39 lines of Scheme, but even miniKanren is
+only 265 lines.  A version of miniKanren has been incorporated into
+Clojure’s standard library under the name “core.logic”.  miniKanren’s
+constraint solving is powerful enough to automatically enumerate, for
+example, quines or programs that produce a particular output, and
+there is a theorem prover written in a variant called αKanren which
+can not only search for a proof for a given theorem, but also the
+theorems that can be proved from a given set of postulates, including
+theorems matching a particular pattern.
+
+As the old miniKanren page explains:
+
+> KANREN is a declarative logic programming system with first-class
+> relations, embedded in a pure functional subset of Scheme. The
+> system has a set-theoretical semantics, true unions, fair
+> scheduling, first-class relations, lexically-scoped logical
+> variables, depth-first and iterative deepening strategies. The
+> system achieves high performance and expressivity without cuts.
+
+[8]: http://webyrd.net/scheme-2013/papers/HemannMuKanren2013.pdf
+
+PrecoSAT, [Armin Biere’s SAT solver][13], apparently was a
+competitive-performance SAT solver in 2010; it is only about 5300
+lines of C++.
+
+[13]: https://github.com/damelang/precosat
+
+### Array languages like APL ###
+
+In APL, I can write the following:
+
+    D ← A + B × C
+
+and it can correspond to any of the following in C:
+
+    D = A + B * C;
+    for (i = 0; i < n; i++) D[i] = A + B * C[i];
+    for (i = 0; i < n; i++) D[i] = A + B[i] * C[i];
+    for (i = 0; i < n; i++) D[i] = A + B[i] * C;
+    for (i = 0; i < n; i++) D[i] = A[i] + B[i] * C;
+    for (i = 0; i < n; i++) D[i] = A[i] + B[i] * C[i];
+    for (i = 0; i < n; i++) D[i] = A[i] + B * C[i];
+    for (i = 0; i < n; i++) D[i] = A[i] + B * C;
+    for (i = 0; i < n; i++) for (j = 0; j < m; j++) D[i][j] = A + B * C[i][j];
+    for (i = 0; i < n; i++) for (j = 0; j < m; j++) D[i][j] = A + B[i] * C[i][j];
+
+and so on.  That is, not only does the APL code avoid writing the loop
+out explicitly; it *abstracts over whether there's a loop at all*, as
+well as how many levels of loop there are, allowing you to use the
+same code in the loop case and in the loopless case.
+
+In many cases in C, we would actually write something like this
+instead:
+
+    int D(int A, int C) {
+        return A + B * C;
+    }
+
+perhaps using a global constant B, in which case the APL has saved us
+the overhead of a function definition --- not only syntactic, but also
+mental.  Note that if B stops being a constant, we need to modify the
+argument list.
+
+Given how often we find that something we thought was a constant is in
+fact a variable, this seems like a potentially very useful decoupling.
+
+Of course, vector languages like APL, Octave, and R are in some sense
+very much stuck in the 1960s: you have integer array indices all over
+the place, with no safeguard to keep you from accidentally indexing a
+nonsensical array with them; no useful garbage collection of indices
+is possible; and accidental performance bugs are ubiquitous.
+
+Note also that APL is not capable of interpreting `D ← A + B × C` as
+the following:
+
+    for (i = 0; i < n; i++) for (j = 0; j < m; j++) D[i][j] = A + B[i] * C[j];
+
+--- a limitation which is, to me, a direct consequence of the
+unprincipled and undisciplined hot integer-index action ubiquitous in
+array languages.  If the earlier-mentioned varying interpretations are
+in fact valuable, this one seems certain to be valuable as well.  But
+APL requires us to explicitly call it out as `D ← A + B °.× C`, since
+otherwise it has no way of knowing that the indices of B and C are
+semantically orthogonal, unless they happen to be of different
+cardinalities, in which case it barfs.
+
+Despite this, it is common for a function written with Python scalars
+in mind to work correctly elementwise on parallel Numpy vectors, or
+one written for vectors to work correctly on matrices.
+
+I feel that there is a very close connection between these
+vector-valued variables and the table-valued variables of SQL, or the
+variables in backtracking languages like Prolog which may have some
+arbitrary collection of values during a single repeatedly-backtracking
+invocation of a predicate (or function, if you’re not in Prolog).
+Each of these unusual semantics allows a single statement to be
+polysemically interpreted as an operation over an arbitrary-sized
+manifold, or just a single point on that manifold, according to
+context.
+
+Array languages explicitly expose parallelism that is implicit in
+other languages, and they directly provide operations such as
+reduction and scan which have nonobviously parallel algorithms
+available.  This has driven efforts to distribute array-language
+expression evaluation across clusters and to vectorize it on GPUs and
+using SIMD instructions.
+
+Despite all this, array languages have serious obstacles in their way:
+their effective lack of type-safety makes it difficult for them to
+provide useful error messages, or often any error message rather than
+a numerically incorrect answer; their unprincipled nature often
+converts programming in them into puzzle-solving, and limits the
+dimensional decoupling that is achieved in practice; and their
+potential for brevity is a seductive but fatal temptation.  To use
+them effectively, you more or less have to represent your data with
+parallel arrays, and those are unfashionable nowadays in part because
+of the lack of type-safety mentioned above, but also due to
+ever-present consistency bugs under update and clumsy support for
+dynamic and local allocation.
+
+(I have an unfinished essay coming up where I compare and contrast the
+dominant memory models of programming languages, which conveniently
+all can be identified with one or another programming language from
+the 1950s: FORTRAN’s parallel arrays, COBOL’s nested records, and
+Lisp’s object graphs.  Array languages are firmly in the FORTRAN camp,
+although Numpy has been adding record types.)
+
+Is there a formulation of array languages that would be broadly useful
+to many different applications, including exposing hardware
+parallelism in an easy-to-use form, without compromising the
+comprehensibility of the application code?
+
+### Probabilistic programming systems ###
+
+We can treat parsing by nondeterministic backtracking as attempting to
+simulate the execution of a program that could have generated the
+string we are trying to parse, conditional on the actual contents of
+the string --- we backtrack when the output conflicts with an
+observation.  Probabilistic programming systems are a generalization of this
+paradigm, or from the other side, a generalization of hidden Markov
+models: we begin with a prior probability distribution in the
+variables that we are trying to estimate, and we update it according
+to observations of the actual facts.
+
+A recent paper in the area by Kulkarni improves the state of the art
+in certain difficult computer vision problems, and matches it in
+others, by estimating the probability distribution in a simple
+probabilistic image-generation program:
+<https://mrkulk.github.io/www_cvpr15/1999.pdf>
+
+There are a number of probabilistic programming languages now
+available, but I've never tried any of them.  Could you use some kind
+of probabilistic computing system to replace backtracking
+nondeterminism in general?  Does it have a hope of being efficient?
+(This seems to be what Oleg Kiselyov and Yukiyoshi Kameyama did by
+implementing a logic-programming system using Oleg’s
+probabilistic-programming system Hansei, in their paper “Rethinking
+Prolog”.)
+
+Could you avoid coding the Viterbi algorithm for HMMs?
+
+miniKanren (see above, also written by Oleg, among others)
+has been extended to probabilistic logic
+programming as probKanren, using Markov Chain Monte Carlo evaluation.
+
+### Incremental or self-adjusting computation ###
+
+Umut Acar's self-adjusting computation algorithm is a mechanical
+transformation you can apply to a batch algorithm to get an
+incremental algorithm (one which, given a set of changes in its
+inputs, propagates them to changes in its outputs) that is in many
+cases optimally asymptotically efficient.  He uses ubiquitous
+memoization of a CPS-transformed version of the program, I think with
+hash consing, to do this, and uses a "virtual clock" to ensure that
+side effects do not invalidate the memoization when re-executing
+functions whose inputs have changed.  (I think.  I haven't managed to
+finish his dissertation yet.)
+
+That is, the idea is that you run the transformed algorithm once to
+get its output, and then to update the output for a changed input, you
+re-execute only the parts of the program that are affected by the
+changed input.  He's demonstrated speedups over the raw batch
+algorithm of several orders of magnitude, in exchange for a slowdown
+of a factor of 5 or so while running the trace of the initial
+execution.
+
+Hammer has been extending this work, and Jane Street recently
+published their implementation of SAC for OCaml:
+<https://blogs.janestreet.com/introducing-incremental/>
+
+This is a very interesting kind of decoupling: your code is decoupled
+from whether it is being used to compute the entire output or only a
+change to it.  This is potentially very useful not only for efficiency
+but also for debugging ("What parts of the program would change their
+results if this input changed?", leading to "What part of the input
+affected this part of the output?") and for dynamic program dataflow
+analysis in general.  You could imagine using such an execution trace
+to replace a scalar input with a vector, as in the array-languages
+item above, and to rapidly provide feedback to optimization algorithms
+which want to know which input changes will improve their utility
+function.
+
+Can we apply this kind of incrementalization to programs that were
+written without it in mind, as a compiler for nonstandard semantics?
+(I think that's been done!)  Does it subsume backtracking, if the
+decisions taken at nondeterministic backtrack points are treated as
+input?  Can we do all of this efficiently without using tens of
+gigabytes of RAM, perhaps by making more judicious choices of what to
+memoize?
+
+### Fully homomorphic encryption ###
+
+A lot of effort has gone into developing very clever cryptographic
+protocols to protect parties from one another in ways that would not
+be needed if they were willing to rely on the integrity of a common
+“trusted entity”, traditionally called “Trent”, because any person or
+machine you nominate as Trent is in fact corruptible.  As Szabo
+explains [XXX], FHE allows you to collectively create a “virtual
+Trent” that carries out any agreed-upon computation whose correctness
+and confidentiality all participating parties can verify.
+
+That is, if you have a practical FHE protocol, that protocol would
+subsume essentially all cryptographic protocols, in theory.
+
+The problem now is how to make FHE sufficiently efficient to be
+practical for anything.
+
+### Convergent replicated data types ###
+
+Also known as “CRDTs”.
+
+Eventually-consistent databases have been a topic of some interest
+ever since some PARC work in the 1990s argued that ACID was wrong for
+many applications, although of course Lotus Notes was an
+eventually-consistent database since its inception in the early 1980s.
+Interest in them exploded after Eric Brewer's CAP conjecture (later
+theorem), which showed precisely how high the price of ACID was, and
+about half of the NoSQL fad, including the influential Amazon Dynamo
+paper, which I STILL haven't read, was an exploration of the
+eventually-consistent design space.
+
+The problem is that with Notes, or Riak, or the git plumbing, the
+database doesn't reach consistency on its own.  It just tells you that
+you have a conflict and you need to resolve it.  It's up to your
+application code (in the case of git, the porcelain) to resolve the
+conflict, and probably in some cases to throw itself upon the user's
+mercy so they can resolve the conflict.  Even if the application
+contains ad-hoc application-specific code to resolve the conflict,
+that code usually gets tested pretty rarely, and it's not at all
+unusual to have subtle bugs in it that will sometimes resolve a given
+conflict incorrectly.
+
+CRDTs are a way of resolving update conflicts between different
+replicas that come with proofs of convergence: if your application (or
+database!) uses a CRDT algorithm to update a particular replicated
+data store, the merging process is guaranteed to always converge,
+always to the same state regardless of the order of merge operations,
+and generally without losing any data (although that depends on which
+CRDT!)  That is to say, “eventually consistent” becomes an automatic
+guarantee, not a statement of hope.
+
+CRDTs offer an automatic way of replicating data to keep it available
+in the face of node or network failure while compromising consistency
+guarantees to a lesser degree.
+
+A very simple CRDT which is foundational to most of the others is a
+set or bag to which things can only be added, not removed.
+Conflicting updates are simply resolved by taking the union.
+
+### AI optimization algorithms ###
+
+SAT is, in a sense, the problem of inverting a Boolean function.  You
+have a big propositional expression, which you know evaluates to true;
+you want to know what the values of the variables in it are, or at
+least whether there is any possible set of values for those variables.
+Similarly, nondeterministic and probabilistic computation can be
+viewed as other function-inverting problems.
+
+Optimization algorithms solve a related problem: they are trying, more
+or less, to *approximately* invert a *black-box* function, a function
+whose behavior we hope is in some sense orderly.  This is harder than
+SAT because we don't get to look at the code for the function, but
+also easier because the algorithm gets some indication of how close it
+is.
+
+(Actually they're usually trying to maximize or minimize the
+function.)
+
+There's a whole huge family of numerical optimization algorithms from
+AI: random sampling is the simplest, of course, but then you have
+hill-climbing (gradient descent), the simplex method for linear parts
+of the problem, simulated annealing, genetic algorithms, and so on.
+If you relax the black-box constraint and make your function
+differentiable (see automatic differentiation below), gradient descent
+becomes enormously easier, and the possibility of using something like
+Newton's Method to try to find zeroes opens up.  And, since
+optimization typically involves re-executing the same code repeatedly
+with slightly different inputs, self-adjusting computation may be able
+to speed it up by orders of magnitude.
+
+It is very common for it to be easy to evaluate the goodness of a
+solution to a problem, but algorithmically tricky to efficiently find
+a good solution.  Consider the particle-system text layout algorithm
+Alan Kay was so excited about in VPRI STEPS --- wouldn't it be better
+to just specify what a good paragraph layout looks like, then search
+for one, as TeX does?  Photogrammetry, structure-from-motion, point
+cloud coregistration, G-code planning for a 3-D printer, image
+dithering, lossy image or audio compression, lossless compression,
+edit-sequence computation (text diffing), place and route --- all of
+these are problems that can be easily cast into the numerical
+optimization mold.
+
+Michał Zalewski’s [afl-fuzz][1] combines genetic algorithms with
+compile-time instrumentation (see below) of object code programs to
+search through their execution paths, with the primary objective of
+finding bugs that lead to crashes, but has demonstrated the capability
+to generate valid SQL statements and JPEG files by probing SQLite and
+libjpeg.
+
+[1]: http://lcamtuf.coredump.cx/afl/
+
+How much can we abstract out these optimization algorithms to decouple
+them from the details of particular problems we are solving with them?
+How much code could we avoid writing if we can simply provide a
+computable utility function to optimize and apply a generic
+optimization algorithm to it?  Can we make that more efficient by
+automatically incrementalizing or differentiating it?  What's the
+relationship between SMT solvers and optimization algorithms?
+
+### Graph search algorithms ###
+
+A* search is a provably-optimal graph-shortest-path algorithm, which
+takes an “admissible” heuristic to possibly improve its choices,
+usually allowing it to beat the heck out of Dijkstra's algorithm in
+performance.  If the heuristic is admissible but not useful (for
+example, always returning 0), it decays to Dijkstra's algorithm in the
+worst case.  It's commonly used for pathfinding in video games, and
+commonly with an inadmissible heuristic, which can cause it to find
+suboptimal paths.  [Amit Patel has a fantastic presentation of it][0].
+
+[0]: http://www.redblobgames.com/pathfinding/a-star/introduction.html
+
+Many search problems can be conceptualized as graph search (or tree
+search, since a tree is just a graph that is sparsely connected in a
+certain way).  It’s necessary that the choices be discrete, or
+discretizable.
+
+What’s the relationship between A* and the optimization algorithms
+discussed in the previous section?  Can you use A* search efficiently
+for problems like dithering an image or superoptimizing a basic block?
+
+### Particle filters ###
+
+Particle filters attempt to approximate an evolving continuous
+probability distribution by sampling it with hypotheses or “particles”
+that concentrate in the more probable parts of the space under the
+information you have so far, allowing multimodal probability
+distributions.  Probably one of the various demos of this dynamical
+process on the web is better than some text at explaining it.
+
+Particle filters are currently being successfully applied to a variety
+of hard perceptual or inference problems, including beat-tracking in
+music, motion-tracking in video, robot localization from noisy sensor
+data in confusing environments, 3-D object tracking, and automatic
+electrical fault diagnosis.
+
+The same “importance sampling” mechanism used by particle filters also
+underlies some probabilistic programming systems (see above); for
+random variables drawn from a continuous distribution, even the random
+continuous drift that allows particle filters to explore points nearby
+in a continuous space might be useful.
+
+XXX I should probably see if I can find people relating these two
+things to each other and make sure my understanding of the terms is
+right.
+
+What else can we use particle filters for?  Software-defined radio
+filtering, clearly: the frequency, phase, and direction both of the
+desired signal and of the loudest sources of nearby-frequency
+interference should be quite amenable to particle-filter estimation.
+
+### Transparent persistence, or single-level store ###
+
+This is the other kind of persistence: storing your data on disk.  If
+you’ve programmed an AS/400 or Squeak or run things inside VirtualBox
+(see virtual machines, below), you already know what this is like: you
+need to explicitly separate your long-term persistent data from your
+ephemeral data in order to support code upgrade, but you don’t need to
+make that separation just in order to not lose data when you turn the
+machine off.
+
+Transparent persistence allows you to build a computing system without
+building a filesystem, and it supports fault recovery and process
+migration, and in particular it simplifies reasoning about capability
+systems, but it puts some extra demands on other parts of your system.
+Random number generators (like /dev/urandom) are not secure after
+restoring the system state from a snapshot (see below about
+snapshots).  Your garbage collector needs to be comfortable with the
+idea that you have terabytes of data.
+
+Without snapshots (see below), transparent persistence on
+spinning-rust disks poses certain problems of consistency: disk
+operations just before a power outage may have been reordered and some
+arbitrary subset of them may be lost.  There’s no guarantee that, when
+the machine reboots, the on-disk state will be consistent.
+
+This particular powerful primitive is in no way new, forming as it
+does the bedrock of Lisp, Smalltalk, and AS/400 systems since the
+1970s.  In those systems, it does simplify some aspects of software,
+but it may be that it is a feature that doesn’t pay its own complexity
+cost, except when used to implement features you can get no other way.
+Part of the problem is that most of the difficulty of persistence is
+not, in fact, the need to write serialization and deserialization
+code, but rather the need to distinguish irreplaceable data from
+dispensable data and to carry forward the irreplaceable data to new
+versions of the software.  Rails migrations and Spark RDDs (see
+“deterministic rebuilding”, below) may turn out to be bigger advances
+in persistence than single-level stores were.
+
+### Ropes ###
+
+Lots of programs manipulate lots of strings, some spend most of their
+time manipulating strings, and network packets and the current states
+of disk files, memory regions, entire disks, and all of memory are
+also strings.  With the usual terminated or counted array string
+representations, every string operation implicitly takes a potentially
+unbounded amount of CPU time, and many common operations, like
+replacing characters in the middle of a large string and appending
+large strings, do in practice take significant amounts of CPU time.
+And the standard string representation is not persistent (in the
+functional-programming sense; see above).
+
+There’s a heavier-weight representation of strings called “ropes”
+which *is* persistent, and in which most common operations are
+logarithmic-time or constant-time; in particular, concatenation is
+usually constant-time, although this varies a bit.  A rope is either
+an immutable array of bytes (or characters), a concatenation of two or
+more ropes, implemented with pointers to them, or sometimes a pure
+function that can be invoked to retrieve characters within that range.
+You need to memoize (see above) subtree lengths to ensure that
+indexing is logarithmic-time.  With hash consing, ropes enable string
+comparison to be done in constant time, too, which is particularly
+beneficial for memoization (see above).  (I think rolling hashes are
+necessary and sufficient to make hash consing of ropes efficient.)
+
+This is useful for two reasons: first, because string manipulation is
+*so* expensive that we add a lot of complexity to our program designs
+in order to avoid it, and ropes may offer the opportunity to avoid
+that; and, second, because memoization is a very-broadly-applicable
+optimization.
+
+Jumprope and bup are two rope-based storage systems that store their
+nodes in content-addressable block stores (see above) using rolling
+hashes (see above).  Rope-based disk storage is particularly helpful
+for machine state snapshots (see below) which are often large, with a
+great deal in common with previous versions of the snapshot.
+
+Erlang uses a very minimal kind of rope for I/O, called “IO lists”:
+the various byte output routines accept "IO lists", defined as either
+a "binary" (Erlang blob), a byte, a Unicode binary, a Unicode
+character, or a cons of IO lists.  This gives it constant-time
+concatenation among strings destined for output, which is enough to
+make it very fast at generating network packets.
+
+I’ve started working on a non-persistent (in the functional sense: not
+immutable) variant of rope I call “cuerda”, which I think has the
+potential to replace not just native string types but also
+filesystems, editor buffers, and most parse trees, including things
+like the accursed DOM.  (I would prefer it to be persistent, but I
+haven’t found a reasonably efficient way to provide certain other
+functionality I deem essential on persistent ropes.)
+
+In a sense, WAFL and other modern filesystems like it are
+ropes-for-storage, although they usually embody tree structures, not
+simple linear strings.
+
+XXX mention stratified B-trees?
+
+What if some kind of rope were the normal kind of string, and also
+your filesystem?  Could that simplify the whole system?  (With a
+single-level store (see above), they could be the very same tree
+structure, although that might be undesirable for performance reasons
+on spinning rust, due to how it demands much more locality.)
+
+### Snapshots of state, ephemeral and durable ###
+
+Unix creates new processes with the `fork()` system call, which
+results in two processes that are identical in nearly every way, each
+with its own private virtual memory space.  This used to be a fairly
+slow operation, especially before 3BSD, when it involved physically
+copying the process’s entire memory space.  However, modern Linux
+machines can carry it out thousands or even tens of thousands of times
+per second, because the virtual memory mappings are merely marked
+copy-on-write.
+
+afl-fuzz [takes advantage of this efficiency][2] to test thousands of
+random test inputs per second.  OCaml’s debugger uses the same
+facility in its debugger to “freeze” process execution at various
+points in the past, allowing you to step time *backwards* as well as
+forwards.
+
+[2]: http://lcamtuf.blogspot.com/2014/10/fuzzing-binaries-without-execve.html
+
+Similarly, QEMU, VirtualBox, and Xen support freezing the entire state
+of a virtual machine (see below), including its display, memory, and
+virtual devices, allowing you to back up to that checkpoint and resume
+execution from it later.  [Emacs does the same thing][3] to speed up
+startup; Squeak and other image-based Smalltalk systems do the same,
+as mentioned above under “transparent persistence”.  Xen’s “Remus”
+feature maintains a continuously-updated snapshot of the entire
+virtual-machine state on a remote machine, so that in the case of a
+hardware failure, you can continue executing on the remote machine
+without rebooting.
+
+[3]: http://www.xemacs.org/Architecting-XEmacs/unexec.html
+
+WAFL avoided (avoids?) filesystem corruption on power loss by only
+committing internally-consistent snapshots of the filesystem to
+spinning rust, once per second; as a bonus, the snapshots share
+storage, and so old snapshots are accessible.  This permits safely
+backing up a consistent snapshot of an active RDBMS transactional
+store.  The same functionality is provided by ZFS, ext3fs jbd, and
+various LVM systems, which can be used as layers underneath other
+filesystems and transactional stores to ensure that recovery to a
+consistent state is possible, both after a power failure and after a
+failed system upgrade.
+
+Git, of course, snapshots the source files it controls in your
+repository as a commit, storing them in its Merkle DAG in its
+content-addressed blob store (see above), which in turn is a CRDT (see
+above).  Nix is a package manager and Linux distribution (with a
+GNU/Linux variant called Guix) that uses the same approach for
+configurations of installed software.
+
+Some caution is needed: although snapshotting automatically converts
+ephemeral data structures (in the functional-programming sense) to
+persistent ones, they may not be *efficient* persistent ones, either
+in time or in space.  If you’re appending to an amortized-constant-
+time growable buffer, for example, and you snapshot its state just
+before it reallocates to twice the size and then repeatedly replay
+forward from that snapshot, it will rapidly become inefficient.  And
+if you’re snapshotting an object that references mutable objects, you
+need some way to convert them to immutable objects (and back to
+mutable objects when you revivify them), which generally involves
+copying, spending both space and time.
+
+What if you could efficiently snapshot any part of your running
+system, ephemeral or persistent, at any time, and freeze it and
+possibly duplicate it for later?  Could you implement this efficiently
+for mutable object graphs with help from the garbage collector’s write
+barrier?  How broadly could you apply this principle?  (Maybe you
+could use this feature to implement the clone() operation for a
+prototype-based object system.)  If you apply it to real-time mutable
+data structures, do you get guaranteed-efficient persistent data
+structures?  What if you had Git for in-memory objects?  What if all
+your software and data could be frozen and easily migrated between
+low-power handheld devices and more powerful laptops, or incrementally
+between data centers?
+
+### Virtual machines ###
+
+Unix processes are virtual machines, although their I/O architecture
+is not borrowed from any physical machines.  Unfortunately, they have
+access to so much system-wide state that it is often inconvenient to
+do what you want to do inside the confines of a single process; and
+there are programs you may want to run that are written using some
+other I/O architecture.
+
+Whole-machine or near-whole-machine emulation, as with QEMU,
+VirtualBox, or Xen, is now a common system administration technique
+again, as it was in the 1960s; it allows you to snapshot the machine
+state (see above), to pause the machine’s execution, to migrate it to
+a different host, to restart it from a snapshot, and to indirect its
+I/O through some virtual device.  It’s still very computationally
+expensive.  In the other direction, chroot and similar process-
+isolation mechanisms in Linux and FreeBSD are being beefed up, with
+things like Docker and the Nix/Guix isolated build environment (see
+below about deterministic rebuilding) to allow them to do more of what
+whole-machine emulation does.
+
+Perhaps more interestingly, MirageOS is a set of libraries for
+building “operating systems” that are really just application
+processes, running bare on top of a Xen or similar hypervisor, thus
+reducing the security attack surface of your system by eliminating the
+operating system’s TCP/IP stack, and allowing a transition to an
+overall simpler operating environment to proceed incrementally rather
+than all at once.  You could imagine running a self-contained simple
+system like Squeak or Oberon under a hypervisor like Xen,
+communicating with a Linux guest to run legacy applications such as
+Chrome.  Qubes is an OS project using an approach like this one to
+improve Linux security.  (Unfortunately, Xen still relies on Linux
+drivers to handle the hardware.)
+
+Virtual-machine emulation also provides crucial debugging capabilities
+that dramatically accelerate the first steps in the development of new
+operating system kernels, and potentially the debugging or analysis of
+existing ones.  Back in the 1990s, the “spa” SPARC Performance
+Analyzer was a very slow virtual-machine emulator that was used to
+deeply examine the execution of processes on a simulated SPARC, in
+some cases using techniques similar to compile-time instrumentation.
+
+(Virtual machines also have potential uses in information archival: a
+well-defined virtual-machine specification with emulators written in
+it capable of running other software could enable the recovery of lost
+software and the file formats implemented by that software.  Such a
+fictional scenario, centered around the “UM-32 Universal Machine”, was
+the premise for the ICFP 2006 Programming Contest.)
+
+Historically, we have often introduced virtual machine instruction
+sets not modeled on any physical CPU for a variety of reasons,
+including improving debuggability, allowing compilers to run their
+code on new machines without retargeting (the original excuse for the
+JVM, ridiculous now that HotSpot is much larger than javac),
+efficiently supporting operations not supported by the underlying
+machine (in the case of the WAM, for example), and stuffing more
+program code into limited memory (the reason for the Excel bytecode
+interpreter, the BASIC Stamp bytecode, the Microsoft BASIC-80, and to
+a significant extent, Smalltalk-80).  You could imagine in particular
+that a snapshot of a system could be more useful if it were portable
+between CPU architectures, allowing you to migrate running
+applications between your cellphone and your server, but I’m not aware
+of anyone having done this.
+
+Probably introducing new virtual CPU architectures will not simplify a
+computing system.  At this point, instead of emitting bytecode, you
+should probably emit machine code for a common CPU, like i386, x86-64,
+ARM, MIPS, PowerPC, or maybe MMIX or RISC-V, and run it under an
+emulator for that CPU if necessary.  You can emit really dumb machine
+code, and it will still run faster and be simpler than emitting and
+interpreting bytecode.  This also has the advantage that someone else
+has probably already written an efficient implementation of your
+“bytecode machine” for most popular architectures out there, and you
+can use object-code instrumentation and analysis to add new features
+either to code built with your own system or existing code.
+
+But maybe I’m wrong and there is some possible system simplification,
+even today, from designing an abstract virtual machine.
+
+### Automatic dependency tracking and deterministic rebuilding ###
+
+`make` is the standard Unix utility for avoiding unnecessary
+recompilation by memoization (see above), but it requires you to
+explicitly and statically specify the dependencies of each build
+target, and it almost invariably omits dependencies like the compiler
+executable itself and the Makefile rule.
+
+Meteor is a JavaScript framework in which you run your presumably
+deterministic “computations” in a sort of transaction (see below about
+transactions) that tracks what they read and write, intermediating
+their access to a remote database.  Then, if there is a change in any
+of the things they read (probably because some other computation wrote
+to it), they can re-execute your computation.  This automatically
+detects the things that could have changed the result of your
+computation, using exactly the same mechanism as Composable Memory
+Transactions.  In this way, you can construct a reactive dataflow
+computation with dynamic topology without ever explicitly specifying
+dependencies, and as long as your computation accesses no data that
+Meteor cannot audit access to.
+
+Debian, Nix, Guix, and the Tor Project are using a similar approach to
+get reproducible compilation products from possibly unreliable
+compilation machines: by knowing all of the inputs to the compilation
+process, including the compiler executable, they can detect and
+recover from a compilation process on one machine producing incorrect
+executables, either due to bugs or due to attackers attempting to
+inject malicious code.  Generally these reproducible-build systems
+identify the compilation inputs with a secure hash and store them in a
+content-addressed blob store.
+
+This reproducibility also makes it possible to memoize the compilation
+process (see above about memoization), avoiding actual runs of the
+compiler that are not motivated either to verify reproducibility or
+because the inputs have changed.  Vesta and ccache are two systems
+that work this way.
+
+(Acar’s Self-Adjusting Computation also, in some sense, works the same
+way, at a much finer granularity.)
+
+ccache even automatically tracks compiler inputs the way Meteor does,
+as does [Bill McCloskey’s memoize][3] ([now on GitHub][5]), which uses
+strace and is therefore slow.  [redo][4], implemented by Avery
+Pennarun, tracks inputs comprehensively and dynamically (like Meteor)
+but not automatically.
+
+[3]: http://www.eecs.berkeley.edu/~billm/memoize.html "Broken link."
+[4]: http://cr.yp.to/redo.html
+[5]: https://github.com/kgaughan/memoize.py
+
+Apache Spark is a system for scalable cluster computation which
+deterministically computes “RDDs” either from stored input files or
+other RDDs, and which records the “lineage” of each RDD, which is to
+say, all the inputs that went into creating it; this enables RDDs, or
+parts of RDDs, to be recomputed in the case of machine failure.
+
+RDBMSes do automatic dependency tracking to automatically update
+indexes and, if supported, materialized views.  However, I think
+RDBMSes typically use a different technique, which I’m calling
+algebraic incremental updates (see below), rather than rebuilding
+parts of an index or view from scratch when they have been
+invalidated.  If simple rebuilding could be made adequately efficient,
+which is kind of what Acar's self-adjusting computation claims, maybe
+RDBMSes wouldn’t need to support algebraic incremental updates.
+
+This kind of automatic dependency tracking could dramatically improve
+the efficiency of snapshots (see above): anything that could be
+automatically rebuilt does not need to be included in the snapshot,
+and indeed that is how we manage our source code repositories.
+
+If previous build outputs are stored in a distributed cache, they
+typically are stored in their entirety, perhaps compressed.  However,
+they are often very similar to one another.  Using a
+rolling-hash-based system like bup or Jumprope could conceivably allow
+the storage of orders of magnitude more cached build outputs, which
+could be a useful alternative to finer-grained dependency tracking
+like SAC.
+
+A common performance problem in C and especially C++ compilation is
+header-file parsing; due to recursive `#include` lines, it is common
+for a single source file to include tens or hundreds of megabytes of
+header files, which must all be tokenized.  A common approach to this
+problem in the past has been to add “precompiled header” support to
+the compiler, which serializes the state of the compiler to the
+filesystem at some predetermined point, and then attempts to use the
+serialized state only when it is safe to do so.  This tends to be
+bug-prone.  A possible alternative would be to snapshot the compiler’s
+runtime state several times per second during the compilation,
+annotating the snapshot with the set of inputs so far consumed; then,
+when a rebuild is called for, the old inputs can be compared to the
+new inputs, and the previous compiler run can be resumed from the last
+snapshot which had not yet read any changed data.  This will not speed
+up the compilation of one C source file using data from the
+compilation of another (except perhaps in the sense that the snapshots
+could share space due to after-the-fact substring deduplication in
+storage), since the compiler receives the differing command lines
+immediately on startup, but it will speed up the recompilation of
+modified files, potentially by a much larger factor than mere
+precompiled headers.
+
+A totally different alternative way to avoid precompiled headers would
+be to parallelize the tokenization process using a parallel prefix-sum
+algorithm; a third approach would be to make the token stream itself
+memoizable, so that you only need to retokenize any given header file
+when the header file itself or something it `#include`s changes.
+
+### Prefix sum, cumsum, or scan ###
+
+The prefix-sum problem is to compute, say, 1 3 6 10 15 21 from
+1 2 3 4 5 6, or 32 5 1 32 1 from 32 -27 -4 31 -31, or using max
+instead of addition, 1 2 2 4 4 4 4 8 from 1 2 1 4 1 2 1 8; each output
+item depends on all the input items at its position or earlier, but
+the associativity of the operation used to combine them allows the use
+of a variety of efficient parallel algorithms to compute it in
+logarithmic time.  This means that if you can cast your problem into
+the format of a prefix-sum with some associative operation, you can
+more than likely get reasonable parallelism out of it.
+
+Now, note that function composition is associative!  It might seem
+that this would allow you to simulate any sequential process in
+logarithmic time on a parallel machine, but in fact that is only the
+case if you have a bounded-space representation of the transition
+function over an arbitrarily long period.  For example, if you're
+concatenating millions of 3x3 matrices or simulating a 20-state
+Levenshtein automaton (or a lexer) over a gigabyte of text, this
+approach does indeed work!  But for, say, parallelizing the execution
+of a virtual machine, it probably won't.
+
+Prefix sums are included in APL and some other array languages as a
+fundamental operation, called "scan", "\", or "cumsum", but in some of
+these languages, it is not applicable to arbitrary associative binary
+operations.
+
+One of the standard parallel prefix-sum algorithms recursively builds a
+segment tree over the input array; if memoized, this provides an
+efficient logarithmic-time lazy incremental algorithm, even when the
+operation in question does not admit inverses (the common examples
+being max, min, or associative bitwise operations.)  The same segment
+tree can then be used for the range-minimum-query problem and its
+variants, even though RMQ is more general than the problem of
+returning an item from min-scan problem (since the range being queried
+need not start at the beginning of the vector).
+
+(If the operation does admit inverses, you can instead incrementalize
+it using algebraic incremental updates; see below.)
+
+This is a generally applicable strategy for incrementalizing
+algorithms expressible as prefix sums.  For example, if you use a
+finite state machine to syntax-highlight an editor buffer or
+conservatively approximate a CFG parse, you can build a segment tree
+of state mappings over substrings of the input, which allows you to
+update the entire output in logarithmic time after localized changes
+to the input, such as edits to an editor buffer.
+
+One of the standard applications for the plain-vanilla addition
+version of prefix sum is to rapidly compute box filters, also known as
+simple moving averages, sometimes as an alternative to mipmapping of
+images and in other DSP applications.  They can also be used to
+calculate arbitrary linear IIR filters.
+
+### PID control ###
+
+PID control is a fairly general linear control algorithm to push a
+system in the direction of the state you want.  You exert a push that
+is a weighted sum of three components: the difference between the
+desired and actual state (the Proportional component), one that is the
+Integral of the difference in order to correct offset errors, and one
+that is the Derivative (or differential) of the current state in order
+to damp oscillations which would otherwise result from the other two
+components in the presence of hysteresis or phase delay in the system.
+
+PID control is very widely used in the control of physical machinery
+in industry by microcontrollers or PLCs and even pneumatic controllers
+and analog circuits.
+
+(Hmm.  Maybe this is not actually that powerful?)
+
+### String similarity ###
+
+useful for compression, virus scanning
+
+### Suffix arrays ###
+
+A suffix array of a string is a permutation of the indices into that
+string, sorted so that the suffixes of the string starting at those
+indices are lexicographically sorted.  Any particular chunk of a
+suffix array lists the places in the string that a given substring
+occurs, lexicograhically sorted by what’s after it.  (Well, maybe a
+range of substrings.)  It's a lot like a KWIC index, except that it is
+fully comprehensive.
+
+Suffix arrays are a simplification of suffix tries, such as Patricia
+trees (I've never been entirely clear on whether Patricia trees are a
+particular kind of suffix trie, or just another name for suffix
+tries).  Once you have computed a suffix array for a corpus of text,
+there are a variety of queries you can execute efficiently on it: all
+occurrences of a given substring, the probability distribution of
+characters that *follow* a given substring, all matches of a
+particular regular expression, all approximate matches of a given
+string (using a Levenshtein automaton), and so on.  As you can
+imagine, this is useful for data compression, and, indeed, the
+Burrows-Wheeler Transform used in bzip2 is suffix-array-based.  Suffix
+arrays themselves are large compared to the text they describe (N log
+N bits for an N-character text, so commonly 5 or 6 bytes per byte of
+text) but there are suffix-array-based things I don't understand
+called “compressed indexes”, such as the FM-index, which represent a
+text in a compressed form and support both decompression and efficient
+search operations on it efficiently.
+
+Historically, suffix-array construction was very computationally
+expensive, which is one of he main reasons bzip2 is slow.  But now
+there are new suffix-array construction algorithms (SA-IS, the skew
+algorithm, and a third one which I think is called SA-IR) that are
+linear in time and use a reasonably small amount of memory, like, less
+than twice the space of the final result.
+
+This linear-time (“O(N)”) bound is particularly intriguing since
+comparison-based sorts have a proven (?) complexity bound of
+O(N log N) time.  It turns out that there is no contradiction: to have
+N distinct keys, each key needs to occupy at least log₂ N bits, so
+O(N log N) comparison sorting can actually be O(N) in the total size
+of the database.
+
+Often, though, it isn’t!  So suffix-array construction could
+conceivably be an absolute performance win as well as a simplifying
+tool.
+
+Most database sorting, indexing, and search problems are in some sense
+a subset of the substring-search problem.
+
+**Field search with suffix arrays**: If a record has the string
+“CA2777697A1” in the field “patentnumber”, most representations of it
+will also contain “CA2777697A1” as a substring, and probably not very
+many other records will.  Indeed, with appropriate choices of
+encoding, you can ensure that, for example, the string
+“&patentnumber=CA2777697A1&” will occur exactly and only in the
+representation of records with that string as the value of that field.
+This extends in an obvious way to prefix (`patentnumber like 'CA27%'`)
+queries and range (`year between '1972' and '1977'`) queries, although
+multi-column indices can only be emulated in this way if the column
+sequence is a substring of a column sequence strictly observed in the
+representation of every record.  On the other hand, this gives you
+N(N-1)/2 multi-column indices on N columns out of the box for free, if
+your table is in 1NF and you observe this ordering constraint, as well
+as suffix searches: `patentnumber like '%7A1'`.
+
+It’s also possible to do full-text fielded search in this way by using
+regular expression search (`/&body=[^&]*Argentina/`) but I don’t
+expect that to be very efficient.  It’s probably better to do
+full-text fielded search in some other way, such as by doing a
+full-text unfielded search and then examining each result to see if
+it’s in the right field, or if that’s inefficient, by concatenating
+the desired field into a separate corpus.
+
+(This approach, without the suffix arrays, was the basis of the cult
+PC database program askSam in the 1980s, 1990s, and into the 2000s:
+its “records” were free-form text; a “field” was just a field name
+followed by square brackets with text within, like
+`patentnumber[CA2777697A1     ]`; and it used a full-text index to
+support fielded search. askSam is still around, though somewhat less
+popular than before.)
+
+askSam was more like what we call a “document database” nowadays, like
+MongoDB; its records were not in 1NF.
+
+**Record sorting with suffix arrays**: clearly if you want to sort the
+“patentnumber”-containing records in the above table by patentnumber,
+you can simply look at the chunk of the suffix array for strings
+beginning with “&patentnumber=”, and find the beginning of the record
+each such substring falls within.  If you insist on ordering strings
+like “X”, “X%”, and “Xa” in that order, you can change the delimiter
+from “&” to ASCII NUL.  I suspect that using magical “out-of-band”
+“bytes” as delimiters is the easiest way to get this kind of thing to
+work correctly, although it’s no doubt possible to devise an escaping
+scheme that preserves collating order and allows this sort of reliable
+substring testing to find field boundaries.  (All three of the
+practical linear-time suffix-array algorithms cope well with odd-sized
+alphabets, and in fact use them internally.  Probably the best way to
+represent the out-of-band values in memory is by storing a list of
+their indices.)
+
+In the Canon Cat, Jef Raskin suggested that perhaps instead of seeing
+our data as a plurality of different files addressed by name, we
+should see it as one document, perhaps a very long one, divided into
+sections, which can be addressed by content, simply by doing substring
+searches.  (I’m not sure if his later work on The Humane Environment
+continued to attempt this.)  Suffix arrays make it possible to scale
+instant substring search up to at least hundreds of gigabytes of text,
+if not more.
+
+Aside from full-text indexing, sorting, and compression using
+suffix-array-based schemes like the BWT, suffix arrays have also been
+used for LZ77 and LZSS data compression, and compact infinite-order
+Markov-chain models of text.
+
+What else could you simplify in a computing system by using suffix
+arrays?
+
+### Levenshtein automata ###
+
+Levenshtein automata are finite-state machines that recognize strings
+with up to a given Levenshtein distance from a desired search string;
+in particular, you can simulate a Levenshtein automaton in parallel on
+a sorted or trie index (including suffix-array indices) to find all
+the fuzzy matches to a desired search string in a body of text.  The
+automata grow in complexity as the maximum Levenshtein distance grows,
+but for distances of 1, 2, and even 3, the nondeterministic
+Levenshtein automaton has relatively reasonable size.
+
+This is useful not only for words that someone might have misspelled,
+but also ssdeep forensic hashes of malicious code, nucleotide or
+peptide sequences,
+
+XXX
+
+### Formal methods ###
+
+“Formal methods” here means theorem-proving, specifically
+machine-checked proofs of the correctness of programs.  Although this
+line of research goes back to the 1960s, it has started producing
+major results in the last few years, as people have finally started
+getting it to scale to real-world programs, including the seL4 secure
+kernel, the CompCert C compiler, a security kernel for an experimental
+browser called Quark, and forthcoming work that reports having
+verified the crash recovery of a filesystem.  Essentially all of this
+has been done in a system called Coq so far, although other systems
+like Isabelle/HOL are intended as possible alternatives.
+
+Of course, proving your source code correct doesn’t help you much if
+the compiler introduces bugs in the process of compiling, which is why
+CompCert has been so central to this work.  But much of the machinery
+of languages like C, and especially C++, is intended to do the same
+kind of thing that things like Coq are good at — statically find bugs,
+and automatically select possibly-correct behavior (such as applying a
+floating-point multiplication operation to two floating-point numbers)
+instead of clearly-incorrect behavior (such as applying an integer
+multiplication operation to them).
+
+A recent paper from Kennedy, Benton, Jensen, and Dagand, “[Coq: The
+World's Best Macro Assembler?][6]”, investigates the consequence — 
+obvious in retrospect — that maybe we should just use write Coq code
+to generate the assembly or machine code, along with a proof of
+correctness.
+
+[6]: http://research.microsoft.com/en-us/um/people/nick/coqasm.pdf
+
+This approach also offers the possible promise of being able to verify
+properties that aren’t verifiable at C level, like a worst-case bound
+on the number of bytes needed for the stack, or execution timing for a
+timing loop; and it avoids the whole issue of proving the correctness
+of an inherently complex program like a C compiler.
+
+Myreen and Curello have also formally verified a bignum implementation
+in AMD64 machine code using the HOL4 theorem prover.
+
+Coq proof tactics are not Turing-complete — they are guaranteed to
+terminate — but they are capable of proving substantially more
+interesting safety properties of programs than the type systems of
+languages like C, Java, and even OCaml.  (I suspect that C++’s
+template system is Turing-complete, just very clumsy, in the same
+league as languages like BF.)
+
+This suggests a possible way to rehabilitate Forth, which is little
+more than an assembly language with expressions, compile-time
+metaprogramming, and reflection.  The problem with Forth, in my
+limited experience and in hearsay, is that it’s too bug-prone, and so
+you development starts to get slow pretty soon due to the bugs.  But
+it invariably takes less total code to do anything in Forth than in
+any other language, if you count the code implementing the primitives.
+Perhaps a Forth could constitute a useful penultimate level of
+intermediate representation, or even a better target language than
+assembly, for such a program of formal verification at the
+machine-code level.
+
+Could you extend this macro-assembler approach into a full convenient
+programming language embeded in Coq or a similar proof assistant?
+What else could you simplify with a good proof assistant?
+
+### Hash tables, expandable arrays, and sorting ###
+
+This, more than anything else, is the basis of languages like Python,
+Perl, Lua, Tcl, JavaScript, and arguably the Unix shell: two generic
+container types (or, in Lua’s case, just one) allow you to represent
+things conveniently, and make the language easy to learn.  Typically
+these use the Lisp object-graph memory model, in which all values and
+storage location are a single machine word in size, usually populated
+by a pointer.
+
+Original Lisp in itself can be seen as the first such language: even
+McCarthy’s 1959 paper had association lists in it, implemented
+FORTRANishly using parallel lists of keys and values, rather than in
+the now-standard alist representation of a list of pairs.  But Lisp
+lists are optimized for structure-sharing ("persistence") and
+recursion at the expense of rapid indexing, mutability, and
+memory-efficiency, and Lisp’s traditional representation of finite
+maps makes similar tradeoffs.  This disfavored imperative code.
+
+So Perl’s 1987 minimal combination of arrays, associative arrays, and
+a convenient imperative scripting language turned out to be an
+extremely useful combination, particularly combined with regexps for
+input processing and string interpolation for output.  Perl didn’t
+have pointers before Perl 5, more or less obligating you to use
+parallel arrays or parallel associative arrays, but it was still
+eminently practical for a huge collection of tasks.
+
+(REXX has “compound variables” which were associative arrays, which,
+like Perl4 associative arrays, couldn’t be passed as arguments.  REXX
+dates from 1979.  But it doesn’t have lists, and unlike Lua, there’s
+no way to find out how many items are in a numerically-indexed
+compound variable.)
+
+This kind of decomposition works best if the underlying
+implementations of the data structures are acceptably efficient across
+a broad range of uses; Lisp lists’ O(N) append-item
+
+Add sorting to arrays and associative arrays, as Perl did, and a whole
+host of traditional algorithms become simple.  Parnas’s famous 1972
+paper is about how a group of programmers could coordinate through
+formal specifications to implement a KWIC index, essentially the
+following Perl program, which he says “could be produced by a good
+programmer within a week or two”.  It took me about 20 minutes,
+although it wasn’t my first time.  It needs about ten or twenty times
+as much RAM as the size of its input.
+
+    while (<>) {
+        @w = split;
+        push @lines, "@w[$_+1..$#w] | @w[0..$_] $.\n" for (0..$#w-1);
+    }
+    print sort @lines;
+
+(I think this program works in Perl 4, but I don’t have a copy handy
+to test.)
+
+I took another hour or so to write a much more efficient, if nearly as
+obfuscated, version in Python, which can produce a KWIC index of the
+Bible in a few minutes on my netbook:
+
+    import sys
+
+    pos, aw, a = {}, [], []         # Each word is represented by index in aw
+    for r in sys.stdin:             # Build list of lists of word ids in a
+        b = r.split()
+        for w in b:
+            if w not in pos:        # Assign an id to the new word
+                pos[w] = len(aw)
+                aw.append(w)
+        a.append([pos[w] for w in b]) # Encode the line with word ids
+
+    g = sorted(range(len(aw)), key=aw.__getitem__) # Compute word sort permutation
+    v = [None] * len(aw)                           # Invert the permutation...
+    for i, j in enumerate(g): v[j] = i             # Now v[g[i]] == i.
+    a = [[v[w] for w in b] for b in a]             # Rewrite lines with permuted ids
+    cs = [(ln, wn) for ln, b in enumerate(a) for wn, _ in enumerate(b)]
+    cs.sort(lambda (lnx, wnx), (lny, wny): cmp(a[lnx][wnx:] + a[lnx][:wnx],
+                                               a[lny][wny:] + a[lny][:wny]))
+    p = lambda ws: ' '.join(aw[g[w]] for w in ws) # map back to original words
+    sys.stdout.writelines("%5d: %s | %s\n" % (ln, p(a[ln][wn:]), p(a[ln][:wn]))
+                          for ln, wn in cs)
+
+(This task, of course, is trivial and perhaps even unnecessary if you
+have a suffix array already computed (see above).  But it’s an
+excellent example of how powerful primitives reduce the complexity of
+previously complex tasks.)
+
+Smalltalk, perhaps the original exponent of “powerful primitives for a
+simplified computing system”, has OrderedCollection and Mapping (XXX?)
+types, but culturally it doesn’t emphasize them; instead, it has a
+wide variety of specialized collection types available, and it
+emphasizes defining new application-specific means of aggregating and
+finding things, perhaps wrapping an OrderedCollection or something.
+
+Python has in some sense decayed a bit from this ideal: added to its
+basic tuple, list, and dict generic containers, we now have sets,
+generators, an entire `collections` module with containers like
+defaultdict and deque, some of which are dangerously bug-prone.  While
+it’s very useful to be able to define application-specific collection
+types and use them via ad-hoc polymorphism, and often these
+specialized collections are significantly faster in particular uses, I
+worry this makes Python harder to learn than it used to be, and
+perhaps also reduces the power available by combining
+components — although at least these new collection types all support
+common sequence and iterable protocols.
+
+And of course bencode and JSON, and the systems based on them like
+BitTorrent and MongoDB, are entirely based on these two container
+types, plus primitive numbers, strings, and null.  Bencode goes an
+additional step and ensures that the mapping between data structures
+and serializations is one-to-one, like ASN.1 DER, allowing
+cryptographic signatures and the use of content-hash-addressable
+storage.
+
+Could we simplify our systems and improve their composability by
+designing them to handle more data in JSON-restricted forms?
+
+### Finite binary relations ###
+
+One alternative that has occurred to me to the hash/array/sort
+combination described in the previous item — or Lua/JS/REXX’s version
+where you use a hash of int keys instead of an array, or PHP’s version
+where the key-value pairs are ordered — is finite binary *relations*,
+as opposed to the finite binary *maps* provided by hashes.  Relations
+allow potentially more than one value for the same key; you can
+implement them as, for example, hashes of sets.
+
+I’ve written about a database query language based on binary relations
+at <http://canonical.org/~kragen/binary-relations>, but I’m still not
+sure if it’s a good idea.  But this is not about writing databases
+with query optimizers and queries and whatnot; this is about using
+binary relations as the standard container type in a very-high-level
+programming language.
+
+At the level of objects in a programming language, relations have some
+possible advantages over maps.  Relations are closed under inverse,
+composition, and transitive closure, as well as the set-theoretic
+operations union, intersection, difference, and symmetric difference,
+which operate on the set of their key-value pairs; furthermore, the
+inverse of the inverse of a relation is the original relation,
+relational composition is associative, the set-theoretic operations
+are commutative and associative, and there are various distributive
+theorems you can prove.  You can try to define analogous operations on
+maps, but I can’t think of definitions that support these properties.
+
+If your relations are implemented with some kind of search tree over
+the keys, rather than a hash table, then the keys can be efficiently
+traversed in sorted order at any time, even when keys are being added
+and deleted dynamically.  This obviates not only explicit sorting by
+keys but also explicit heaps; a search tree has the same asymptotic
+complexity for the usual heap operations.
+
+Considering the KWIC program again, let’s see what it would look like
+if Python had implicitly-ordered relations instead of dicts and
+“lists”.
+
+    import sys
+
+Now we don’t need two separate collections for the words, but we still
+do need to be able to rapidly map from a word to its id as we are
+building up the word-id-sequence representation of the input text.  So
+let’s store the words as the keys of a relation, their ids as the
+values, and use a counter.  (Actually, maybe I should have done this
+before.)
+
+    n, aw, a = 0, {}, {}
+
+    for r in sys.stdin:
+
+Do we want iteration in this Relational Python to be, in some sense,
+iteration over a relation?  That is, do we want sys.stdin to somehow
+present its lines as a relation, or do we keep the same iteration
+protocol, which iterates over a sequence of things?  I think we should
+keep the same protocol, because the nature of iteration isn’t
+changing, just the containers.  Iteration is still the execution of a
+block of code a sequence of times.
+
+        b = r.split()
+
+Now what does split() return?  Presumably a relation, but where do the
+words go — keys, values, or both?  And, if not both, what’s the other
+side?  I think the answer is that, since the field sequence in `split`
+is usually important, and we usually want to be able to do field
+lookups by number, it should be a relation from field numbers to
+words.  Here, we do care about the sequence of words eventually, since
+we need to do cyclic shifts of them eventually.
+
+But now we need to iterate over the words that don’t have ids, and we
+don’t really care what order that happens in.  This sounds like set
+subtraction, which we’ve already said is a fundamental operation on
+relations, but the set we’re subtracting isn’t exactly `aw`, the
+relation from words to their ids; it’s just `aw`’s keys.  But that’s
+potentially a very large set, and we wouldn’t want to do anything
+proportional to its size after every word.
+
+So we’re declaring that getting the set of keys of a relation is a
+constant-time operation, which seems plausible, since it doesn’t
+require building a new key tree; it just requires interpreting the
+traversal results slightly differently.  We’re also declaring that a
+set is represented as a relation that stores the single value `True`
+for each key.
+
+        for w in b.valueset - aw.keyset:
+
+(Since the keyset and valueset operations are so fundamental, it might
+be a good idea to provide syntactic sugar for them, like @b or aw@ or
+something.)
+
+We probably don’t want to have an `x[y] = z` operation for relations,
+since `x[y]` is an unordered set of things, and the fundamental
+operation is not replacing that set with a single item, but rather
+adding an item to that set.  (Although, in this case, we’ve just
+verified that that set is empty.)  So for now I’m going to use a
+method, although some kind of syntactic sugar might be better.
+
+            aw.add(w, n)
+            n += 1
+
+Now we are faced with the need to translate the line (a mapping from
+field indexes to strings) through the id table `aw` (a mapping from
+strings to ids) before adding it to `a` (a mapping from line numbers
+to sequences of word ids).  This is just relational composition, which
+I will represent with the infix operator @:
+
+        a.append(aw @ b)
+
+The order of the arguments to `@` is the traditional one for
+relational or functional composition: the range values of `b` are the
+domain values (keys) of `aw`, the range values of `aw` are the range
+values of the result, and the domain values (keys) of `b` are the keys
+of the result.  You could read this as "Values from `aw` at the keys
+from `b`.  It's kind of like `aw[b]` except that `b` has a whole
+sequence of indices for `aw` (in its values), not just one.
+
+One potential problem here is that relational composition is
+well-defined when the value on either side of the composition is
+missing: `{4: 5, 6: 7} @ {1: 2, 3: 4}` is just `{3: 5}`, silently
+ignoring the absence of any key 2 in the left relation and any value 6
+in the rightmost relation, while the Python expression
+`[pos[w] for w in b]` will instead raise an exception if `w` is not in
+fact found in `pos`, which is probably a programming bug and the kind
+of thing you would want it to catch.  We could define `@` to do that,
+but I’m not sure we should.
+
+This .append operation generates a new index by adding 1 to the
+previous greatest index in the relation, which is a thing that can be
+fetched in either constant time or logarithmic time.
+
+Next, we need to permute the word ids according to the words, in order
+to derive new word ids that will induce the correct lexicographical
+ordering of cyclically-shifted lines.  But, since relations are
+implicitly traversed in the order of their keys, this sorting is
+achieved by simple relational inversion, after which we get the new
+word ids by counting — using the `list()` function borrowed from
+Python, which in Relational Python turns an iterable into a relation
+with counting numbers as its keys:
+
+    g = list(aw.inverse())
+
+Then, we need to calculate the inverse mapping, from our original word
+ids to our new word ids, and use it to rewrite our representation of
+the text.
+
+    v = g.inverse()
+    a = list(v @ b for b in a)
+
+So far the program is slightly simpler than before.  Now, though, it
+gets slightly more complicated, because the original code used a
+comparator function instead of a key generation function to specify
+the sort order of the cyclic shifts, specifically in order to avoid
+the materialization of the entire universe of cyclic shifts in memory
+at once.  Using a key function instead of the comparator makes it run
+about three times faster on small datasets, but also use about 70%
+more memory on my example dataset.  (My Python code uses about 12
+bytes of RAM per input byte with the comparator optimization, and
+about 30 bytes of RAM per input byte using the key function.)
+
+However, it’s fairly simple to create a key class that lazily
+generates the key it wants to be sorted by, if we declare that
+relations use this __key__ method to compare and sort their keys, but
+don’t store their return values or leave an arbitrarily large number
+of them out there hanging in space unfinished.
+
+    class K(namedtuple('K', ['ln', 'wn'])): # line number, word number
+        def __key__(self):
+            return list(a[self.ln][self.wn:]) ++ a[self.ln][:self.wn]
+
+    cs = {K(ln, wn) for ln, b in a.items for wn in b.keys}
+
+Here I’m declaring that ++ is the list concatenation operator, which
+returns a new relation that is a superset of the first relation, with
+the values from the second relation assigned to new indices as per
+`.append`.  The list() call is needed because slicing a relation
+returns you the key-value pairs from that slice unchanged.
+
+The `{}` comprehension there is a set-comprehension, implicitly
+mapping each key to `True`; if it had a `:` after `K(ln, wn)`, it
+would be a relation comprehension.
+
+There’s a problem here, though, which is that `a[self.ln]` is actually
+an entire set of lines that happens to be, presumably, just one line.
+I need to figure out how to handle that. XXX
+
+The remainder of the code is simplified slightly from the Python
+version, although it omits the `|`.  It’s assuming a `key()` top-level
+function that invokes the `__key__` magic method.
+
+    sys.stdout.writelines("%5d: %s\n" % (k.ln, ' '.join(aw @ g @ key(k)))
+                          for k in cs.keys)
+
+I’m not sure exactly what kind of thing the tuple there in the
+string-formatting operation should be; is it a relation?  Should it
+not exist?  Should I be writing it with `{}` or `[]`? XXX
+
+### Transactions and transactional stores for concurrency ###
+
+Transactions are an architectural style for building systems, whether
+distributed or otherwise, that contains the effects of each
+computation inside a “transaction”, whose reads and writes are
+monitored, and whose writes are not visible to other transactions
+until it “commits”.  If it fails (according to arbitrary logic inside
+the transaction), it doesn’t commit, and therefore has no effect.  The
+system prevents transactions that had read data that was been written
+before they committed, either by preventing it from being written
+(perhaps by delaying or aborting the transactions that try to write
+it) or by automatically aborting and retrying the transaction that
+depended on the outdated data.  In this way, the transaction system
+achieves an illusion of pure serial execution, while in fact
+permitting great concurrency and even parallelism.
+
+Ideally, in fact, the transaction should never be able to read any
+data that were written after it started, in order to ensure that no
+implicit consistency constraints among different data that it might
+read are violated.  For example, a transaction calculating the average
+packet size on a network interface might read the number of packets
+transmitted and the number of bytes transmitted, then divide them.  If
+this result is to be correct, the number of bytes it is dividing must
+correspond to the number of packets it is dividing by.
+
+(This is obviously easier to achieve if you have persistent data
+structures, in the functional-programming sense.)
+
+This kind of transaction is known as ACID: it's “atomic”, in that
+either it has all of its effects or none of them; “consistent”, in
+that only transactions whose internal failure logic does not abort
+them will be committed; “isolated”, in the sense that concurrently
+executing transactions can have no effect other than perhaps aborting
+them; and, kind of unrelated to all of the above, “durable”, in the
+sense that none of these properties are lost if your computer loses
+power in the middle of the operation, and in particular no committed
+transaction will be lost.
+
+Practical transactional systems often relax some of these properties
+to some extent.  For example, it’s very common for database systems
+that can provide fully-ACID transactions to support lower “isolation
+levels”, perhaps permitting a transaction to see an inconsistent state
+of the database as it reads a sequence of different things.
+
+The “Composable Memory Transactions” paper from 2005 or so proposes
+using transactional *memory*, implemented in software, as a general
+concurrency control mechanism for threads.  The CMT transactions
+support nesting, and an outer transaction can react to the failure of
+an inner transaction by trying an alternate code path; this permits a
+more modular equivalent of the Unix select() call or the Win32
+WaitForMultipleEvents, simply by trying such an alternation of nested
+transactions that each fail when the event they await has not yet
+happened.  If any one of them succeeds, then the overall transaction
+continues; otherwise, it fails, and is later automatically retried
+when any of the data it read before failing have been modified.  This
+permits the automatic interconversion of blocking and non-blocking
+APIs, something not possible by any traditional means other than
+first-class continuations.
+
+> There’s an interesting correspondence between this kind of
+> transaction failure and failure in nondeterminism implemented by
+> backtracking.  When you hit a failure in a backtracking system, you
+> undo all the effects that led to that failure, back to the latest
+> backtracking point, and then try the next alternative from that
+> point.  This is exactly the same thing that happens in CMT when an
+> inner transaction fails: all of its effects are undone, and the
+> outer transaction can either fail in response, or try a different
+> alternative.  In both systems, only when the outermost transaction
+> succeeds do you get to see the set of assignments that it made.  One
+> interesting difference is that, in backtracking systems, the outer
+> transaction can fail the inner transaction after it has already
+> “committed”, possibly causing it to succeed with a different set of
+> effects.
+
+This kind of transactional-memory discipline probably isn’t reasonably
+efficient and effective without either hardware transactional memory
+support, or a sufficiently smart compiler or prover, to ensure that no
+effects escape a transaction before it is committed.
+
+Obviously you can implement this kind of transactional-memory
+interface with a networked server instead of stuff in the same process
+as the transactions; although you can’t prove that the stuff on the
+other end of the socket is respecting the requirement to have no
+effect if it gets aborted, having it in a separate process makes other
+kinds of isolation more plausible to implement, and the possible high
+concurrency may be more valuable when you can spread it across a whole
+network.
+
+Also, there’s a clear connection to automatic dependency tracking and
+deterministic rebuilding, as well as to reactive programming: the read
+and write tracking the transactional memory does is the same read and
+write tracking a reactive programming system like Meteor does, and
+indeed the re-execute-when-an-input-changes logic used by the CTM
+paper for transactions that haven’t committed is the same thing Meteor
+does for “computations” that are still live.  You could even imagine a
+nondeterministic search algorithm like a truth maintenance system
+implemented in these terms: if transaction A makes a write that
+results in a failure in a later transaction B, then transaction A is
+rolled back retroactively, along with all the things resulting from
+it, and re-executed with that write rigged to blow up — at which point
+A can either fail, or handle the error by trying a different write.
+
+All of this could be implemented at a number of different levels.  One
+interesting level, for interacting with current systems, would be
+running a shell script inside an isolated environment monitored by a
+transaction system; it can read files and directories, write files,
+and spawn subtransactions, and if it completes successfully, then its
+writes are committed and become visible to other scripts.  By itself,
+this would suffice to simplify certain kinds of system management
+tasks: you could abort long-running scripts halfway through without
+fear that they would leave things in an inconsistent state, and the
+transactional discipline would ensure that concurrent execution didn’t
+cause subtle bugs.  (And no more tempfile race holes!)  But the
+prospect that you could, later on, automatically re-execute the script
+if any of its inputs changed, perhaps with a frequency limit or extra
+wait time, and perhaps automatically deleting its previous outputs in
+the interim — that seems like it could simplify a lot of things.
+
+All of this shell-script stuff seems like it would work best with a
+blob store, in order to make it practical to distribute this work
+across machines, and also so that the operation of “committing” and
+making visible the output files can be done quickly.
+
+We normally think of ACID transactions as being incompatible with
+eventually-consistent and partition-tolerant databases, because of
+Brewer’s CAP conjecture (later somebody’s XXX theorem), which is that
+you can’t be consistent (in the sense of serialization), available (in
+the sense of always handling all requests), and partition-tolerant
+(maintaining these in the face of network partitions).  But the above
+suggests a way to achieve at least ACI transactions in an eventually-
+consistent partition-tolerant system: if you remember the entire
+transition history and dependency graph, then you can commit a
+transaction and, when you find that it was in conflict, later roll it
+back, along with everything that transitively depended on it, then
+re-execute them in a proper order.  This sounds pretty wild, but it is
+more or less the way that the US credit card and banking system work:
+any transaction can be disputed and rolled back for a month or three,
+which may result in rolling back other dependent transactions.  It
+kind of means that your system can never make any promises to the
+outside world, though, which is becoming a friction point for
+interactions between US financial institutions and things like Bitcoin
+and physical goods delivery, which do not support rollback.
+
+Re-executing the whole dependent sub-DAG of transactions at the
+timestamp when you discovered the conflict should be safe, at least if
+only one node is doing it.  Re-executing them at their original
+timestamps with the new data could result not only in them writing
+different contents to the same locations, which is harmless since that
+only affects other transactions in the dependent sub-DAG that you were
+going to re-execute anyway, but also writing things to locations they
+didn’t write to before.  This could result in the need to re-execute
+other transactions that weren’t originally part of the dependent
+sub-DAG.  I don’t know what the best choice is here.  (However, I’m
+deeply struck by the correspondence with Umut Acar’s self-adjusting
+computation algorithms, in which function calls are required to pass
+values around only by reading and writing memory, to read values from
+memory only at the beginning of a function, and you re-execute
+function calls if their inputs changed — and each function invocation
+is timestamped with a virtual clock in order, if I understand
+correctly, to allow safely memoizing functions that access memory.)
+
+This whole re-executing thing requires that the code that was executed
+in the transaction be preserved so that it can be re-executed later if
+the transaction needs to be rolled back and redone due to a conflict.
+In a distributed database context, you probably want to reference that
+code with a hash stored in a content-hash-addressable storage system
+rather than by saving a copy of your entire source base in every
+replicated transaction record.
+
+(Also note that if you’re saving and replicating the entire past
+history of transaction inputs, timestamps, and code, plus an initial
+database state, you have in effect turned your database into a CRDT;
+you replicate this history, perhaps using gossip (see below), and can
+then deterministically replay all the transactions to
+deterministically rebuild the current state of the database, and any
+node doing this will get the same results.  This may be simpler to do
+if you in fact execute the transactions serially, eliminating the need
+to track inputs and outputs at fine granularity, though the more usual
+transaction approaches may give you better performance.)
+
+This may be a foundation that simplifies operational-transform-based
+collaborative editing systems like Etherpad and Gobby.
+
+### Automatic differentiation ###
+
+> Automatic differentiation ... computes ... any derivative or
+> gradient, of any function you can program, or of any program that
+> computes a function, with machine accuracy and ideal asymptotic
+> efficiency.
+
+It’s an abstract-execution technique that executes programs on data
+that is annotated with its partial derivatives with regard to input
+data values, which is to say, the numerical Jacobian matrix of the
+program (and the Hessian, ad infinitum), evaluated at a point.
+[Alexey Radul wrote a comprehensive introduction][11].  It’s easy to
+implement; Conal Elliott [wrote a 2009 paper on this, where the first
+example shows how to do it for first derivatives of scalar functions
+only in 30 lines of Haskell.][7]
+
+[7]: http://conal.net/papers/beautiful-differentiation/beautiful-differentiation.pdf
+[11]: http://alexey.radul.name/ideas/2013/introduction-to-automatic-differentiation/
+
+The idea is that when you call a function and it produces some data
+structure full of values, you get not only the values, but also a lazy
+list of which inputs each of those values (locally) depends on, and
+what the coefficient of variation is between them at that point, and
+similarly for what that variation depends on, with minimal overhead.
+
+This could be particularly useful with AI optimization algorithms that
+are trying to find input values for a piece of code that will produce
+a given output value, such as zero, or a given image.  Gradient
+descent needs to know the gradient, after all.  The alternative is
+hill-climbing by groping around in various directions looking for a
+local improvement, like a caterpillar at the end of a twig, which can
+be very slow in a high-dimensional space.
+
+A lot of these are only feasible with what’s called “reverse-mode”
+automatic differentiation.
+
+There’s clearly also a relationship here with incremental computation,
+which exactly computes the new value of a function after an
+incremental change to the input by tracking which parts of the
+computation depend on that input; truth-maintenance-system constraint
+solvers, which trace back constraint violations they find to the
+minimal combination of nondeterministic guesses they made that will
+cause that constraint violation, in order to avoid wasting time with
+that in the future; probabilistic programming, which in some sense
+traces back observations of outputs to probability distributions over
+nondeterministic variables that would be needed to produce those
+outputs; neural networks (see below), whose “training” works by
+adjusting edge weights to reduce the difference between the output and
+the desired output, and indeed AD applied to neural-network evaluator
+does produce the backpropagation outputs; and interval arithmetic,
+which can produce conservative approximations that are much less
+conservative if it knows which uncertain input variables or
+intermediate computations an uncertainty bound depends on (consider
+b · b · b · b vs. b⁴).
+
+In particular, both incremental computation and automatic
+differentiation have to deal with the problem of preserving
+overwritten state when applied to imperative programs that use
+mutation internally; the body of knowledge that has developed around
+automatic differentiation is likely to be useful for implementing
+incremental computation.
+
+Automatic differentiation only determines the derivatives in the local
+neighborhood of the computation that was actually carried out, and so
+in particular conditionals are not reflected; automatic
+differentiation will compute that `x ? -y-z : w/2` has a nonzero
+derivative relative to either `y` and `z` or to `w`, but not relative
+to all three, and not relative to `x`.  For this reason, I expect it
+to be complementary to logical/symbolic search and deduction systems
+like miniKanren or SAT solvers or other constraint solvers, thus
+saving those systems from having to consider individual bits of a
+numeric result.  (An SMT solver, if I understand correctly, is just a
+SAT solver extended with such an external “theory checker”.)
+
+(Similarly, the original truth maintenance system in Stallman and
+Sussman 1977 was a nonlinear circuit simulation package, kind of like
+an early SPICE; it was used to search among combinations of cases for
+piecewise-linear circuit component models, each case considered then
+being solved by a linear constraint solver.)
+
+In the mathematically-oriented programming language Julia, [there are
+several automatic differentiation libraries][9], and one named
+ReverseDiffSource is used by the Markov Chain Monte Carlo engine Lora
+to compute gradients of statistical models for, as far as I can tell,
+probabilistic programming systems (see above).
+
+[9]: http://www.juliadiff.org/
+
+Interestingly, it turns out that [the Tapenade automatic
+differentiation system][10] uses program-state snapshotting (see
+above) and deterministic rebuilding (see above) to allow its
+reverse-mode automatic differentiation to work on imperative programs
+that overwrite part of their state during execution.
+
+[10]: https://www-sop.inria.fr/tropics/ad/whatisad.html
+
+“The [largest application to date][12] [to have been automatically
+differentiated] is a 1.6 million line FEM code written in Fortran 77.”
+
+[12]: http://www.autodiff.org/?module=Introduction&submenu=FAQ#6
+
+How widely can automatic differentiation be applied?  Does it indeed
+synergize with efficient constraint solvers like miniKanren or CVC4,
+as I speculate above?
+
+(I don’t really understand automatic differentiation, so I hope none
+of the above contains any grievous errors.)
+
+### Bitcoin ###
+
+Some years ago, after a conversation with Aaron Swartz, Zooko wrote a
+paper with an unmemorable title, now generally known as the “Zooko’s
+Triangle paper”.  He proposed that although we would like
+globally-unique names in computer systems to be human-readable,
+securely dereference to the correct referent, and not be vulnerable to
+a centralized authority, in practice we can only achieve any two of
+these three properties.
+
+Specifically, secure hashes, as used in content-hash-addressable blob
+stores, are not human-readable (the best we’ve been able to do is
+reduce them to about 80 bits and use representations like “able merit
+floor gower jerry jews sd”, “ADD RAKE BABY LUCK MADE GOLD FEET SEEN”,
+or “企琖鑣毐昕传”), and other kinds of global names are not
+"self-certifying", in Mazières’s sense, so it would seems that we have
+to trust some external authority to certify them.  Of course, fully
+homomorphic encryption (see above) could in theory enable this problem
+to be solved, but it's still not feasible, and when Zooko wrote his
+paper, it wasn’t even on the radar.
+
+Bitcoin, a variation on Nick Szabo’s property title clubs, came out
+some years later.  As Aaron pointed out, it demonstrated an
+alternative: a replicated global data store subject to nearly
+arbitrary consistency constraints that was not vulnerable to any
+particular participant, without having to figure out how to do FHE.
+
+Bitcoin and pseudonymous cryptocurrency systems like it may be the
+most powerful primitive in this list, to the point that I suspect they
+may be a bad idea — the reason I haven’t participated so far.
+Frictionless cross-border capital flows like those enabled by Bitcoin
+were expected to result from Chaum’s centralized anonymous "digital
+cash" systems, which instead failed in the market.  As Intel physicist
+Timothy C. May famously observed at the Hackers conference (perhaps
+Hackers 1989?), such flows seem likely to make taxation essentially
+voluntary, resulting in the collapse of governments.  As pointed out
+later on the cypherpunks list, they could also enable pseudonymous
+betting to be used to crowdfund political assassinations, something
+that John Poindexter tried in 2003 in the Total Information Awareness
+program, resulting in a Congressional inquiry; this also seems likely
+to result in the collapse of governments.
+
+I expect this to be a traumatic event, possibly resulting in the
+destruction of civilization.
+
+However, Bitcoin also can be applied to solve a variety of difficult
+distributed-systems problems, and civilization might survive it and
+therefore be able to apply it to them.  Naming is one; remitting money
+to your family overseas is another; email postage to stop spam is
+another; secure P2P rendezvous advertisement is another; 
+
+XXX
+
+### Deep neural networks ###
+
+### Conservative approximation ###
+
+of what?  parsing, say, or interval arithmetic.
+
+### Closures and Continuations ###
+
+This is the Scheme 1975 vision of powerful primitives: closures give
+you one single way to do ad-hoc polymorphism, by giving you in a sense
+first-class templated functions which you can press into service both
+as objects, as lazily evaluated values, and as basic blocks for
+control-flow constructs; and call-with-current-continuation gives you
+one single control-flow construct that subsumes threads, exceptions,
+Common-Lisp-style resumable errors, and backtracking, and allows you
+to invert control flow and turn blocking functions into nonblocking
+ones, and vice versa, which is kind of like the transactional memory
+concurrency constructs I mentioned above.  Raph Levien’s Io language
+provides a clean syntax that uses closure invocation even for
+statement sequencing.
+
+Unfortunately, in a sense these constructs are *too* powerful.
+
+If a continuation can be saved from anywhere, it’s unsafe to
+irreversibly clean up resources on exit from the block where they are
+used; a continuation invocation could transfer control back inside,
+for example to implement thread context switching.  At last I think
+`dynamic-wind` has been added to the Scheme standard, but it is
+substantially harder to use than `unwind-protect` or `try/finally`.
+Unrestricted multi-use first-class continuations can be implemented
+simply by allocating all your activation records on the heap, but
+implementing them *efficiently* more or less requires implementing
+segmented stacks, which makes every function call more expensive,
+although stack segmentation also makes threads a heck of a lot
+cheaper.
+
+And even very clever compilers are unlikely to match the [zero-cost
+exception handling][14] that’s standard in modern C++.
+
+[14]: http://mortoray.com/2013/09/12/the-true-cost-of-zero-cost-exceptions/
+
+In a sense, using one single construct for all of these things
+requires both the human reader and either the compiler or the runtime
+to reconstruct a conservative approximation of some knowledge that was
+in the head of the original author (is this a thrown exception, a
+backtrack, or a thread context switch?), but who didn’t write it down.
+
+The same problem attends the use of closures and tail-calls for all
+control flow.  The set of variables captured by a closure is purely
+implicit, so both the human reader and the compiler must reconstruct
+them; consequently, the lifetime of variables in a language with
+closures is purely implicit.  But the compiler needs this lifetime
+information to produce efficient code, the author needs it to write
+code that works, and a human reader needs it to understand the code.
+
+So I feel that, while continuations and closures are extremely
+powerful *semantic* primitives, and they have brilliantly elucidated
+many crucial aspects of compilation, their strength-to-weight ratio as
+*system-building* primitives is in doubt.  They do result in shorter
+source code, but they often don’t succeed in decoupling the code built
+on top of them from the aspects of the implementation they elide.
+
+You could make many of the same accusations about dynamic typing, of
+course.  I think the major difference is that while dynamic typing
+makes debugging easier (because the program mostly runs, and then when
+it crashes with a type error, you see an example of why), closures and
+first-class continuations make debugging harder.
+
+You could make a similar accusation about implicit imperative
+control-flow sequencing: your program implicitly specifies a total
+ordering of computational steps to perform, and then the compiler
+works hard to recover the partial order you actually had in mind, in
+order to be able to execute your code efficiently.  Nowadays, so does
+your out-of-order-executing CPU.
+
+### Collaboration facilities ###
+
+### Succinct data structures ###
+
+“Succinct data structures” are an extension of the compressed indexing
+work I mentioned under “suffix arrays”.  Unfortunately, I don’t
+understand them.  XXX
+
+### Interval arithmetic ###
+
+Interval arithmetic is a particular form of conservative approximation
+(through abstract interpretation), with two principal uses: preventing
+numerical errors and avoiding computation.
+
+Numerical errors are ubiquitous where we use floating-point math,
+because floating-point has finite precision, so its results are
+commonly approximate.  The IEEE-754 floating-point standard offers
+control of the rounding mode — you can request that calculation
+results be rounded, for example, up or down.  This allows you to, for
+example, calculate the sum of a list of numbers twice, once rounding
+up and once rounding down, and be sure that the true result was
+bounded by the two calculated results.
+
+In interval arithmetic, instead of calculating with individual
+numbers, we calculate with (min, max) pairs of numbers known to bound
+the true quantity.  Calculating (a, b) + (c, d) is quite simple: it’s
+just (a + c (rounded down), b + d (rounded up)).  Some other
+operations, like multiplication, are more complicated: (a, b) × (c, d)
+might be (a × c, b × d), but, for example, if a and b are positive and
+c and d are negative, it will be (b × c, a × d), with the appropriate
+rounding.  Division is a bit more complicated still: (a, b) ÷ (c, d)
+might be a neighborhood of infinity, if c and d have opposite signs.
+
+Interval-arithmetic libraries are available for bulletproofing your
+numerical computations by, as above, doing each operation two or more
+times, using different rounding modes.  This can save you a lot of
+numerical analysis.  These libraries are powerful and well-developed,
+but they are not really what interests me at the moment.
+
+The more interesting case, to me, is avoiding computation.
+
+SICP gives the example of approximating the zero of an arbitrary
+continuous, not necessarily differentiable, function, by recursively
+subdividing an interval in which it is seen to cross zero.  You can
+[extend this to find the zero locus of an arbitrary continuous
+multidimensional function][1] by using interval arithmetic to rule out
+intervals where the function cannot be zero.  But the technique has
+fairly broad applicability.
+
+[1]: http://canonical.org/~kragen/sw/aspmisc/intervalgraph
+
+Consider backface removal.  In rendering a solid bounded by polygons
+viewed from the outside, you can avoid half the occlusion computation
+if you eliminate the polygons that face away from the camera, since
+they will always be occluded by polygons on the near side of the
+object.  So you can compute the normal for each polygon and consider
+whether it’s facing toward or away from the camera.
+
+This still involves computing something for each polygon on each
+frame, though.  Interval arithmetic can save us.  Suppose that the
+surface mesh is recursively divided into regions, and we store
+intervals for the x, y, and z components of the normals of the
+polygons in each region.  Now, we can traverse this tree recursively
+and not even descend into parts of the surface all of whose polygons
+face away from the camera, or for that matter all of whose polygons
+face toward the camera.  It’s only the mixed regions that require
+examination.
+
+This saves us nearly all the computation for the backfaces, but we are
+still traversing the tree on each frame.  We can do better still.
+Suppose we are rotating the object at a fixed, slow speed.  Then, the
+rotation matrix for a given span of time can *also* be represented
+with interval coefficients, and we can multiply the normal intervals
+for mesh regions through this rotation matrix, discovering which parts
+of the surface don’t face the camera at all during entire time
+intervals.
+
+Somewhat similarly, when you’re rendering, if you can compute the
+color at a point on the screen, and then bounds on the *gradient* of
+the color in pixel coordinates for a region around that point, you can
+determine whether that area contains any detail that needs to be
+rendered.  If it’s just a smooth gradient (the d[color]/dx and
+d[color]/dy are tightly bounded), you can render just a smooth
+gradient.  And if you’re computing an animation, you can also compute
+bounds over time.
+
+(This is in some sense related to memoization and incremental
+computation: it allows you to change an input to a function slightly
+and retain its previous value, as long as you don’t move outside an
+interval for which you’ve computed the result.)
+
+I’m trying to remember the name of the guy who did his dissertation on
+precise interval-arithmetic rendering of implicit surfaces.
+
+This is a kind of wild generalization of the widely-known bounding-box
+culling technique in computer graphics, and it allows us to achieve
+enormous economies of computation by computing that entire regions of
+a space of possibilities are of no interest.  It’s common to get
+three, four, or five orders of magnitude speedup with this approach,
+which you can then apply to focusing in more detail on the areas where
+more detail is called for.
+
+It seems clear that this kind of possibility-bounding can work
+hand-in-hand with AI search algorithms (or simple nondeterministic
+search) and optimization algorithms, although I’ve never seen it
+applied in that way.  If your SMT solver is looking for a
+contradiction in a region, you may be able to rule out the entire
+region at once.  If you can place bounds on the “goodness” of points
+in an entire region of the parameter space, you may be able to quickly
+focus in on parts of the parameter space that are possibly of
+interest.
+
+This only works usefully for operations that are in some useful sense
+mostly continuous, where reducing the size of the domain you’re
+considering for an input will provoke a usefully reduced size of the
+range over which the operation’s outputs are to be found.  The
+bit-reversal function, for example, will tend to wreak havoc on
+interval-arithmetic approaches; you can only put useful (min, max)
+bounds on its output once its input is inside a very small range
+indeed.  An interesting question is whether you can extend the kind of
+tractability that interval arithmetic provides to other kinds of
+functions, perhaps by using different representations than simply
+(min, max) pairs.
+
+For example, earlier today I was optimizing a proportional-font
+word-wrap algorithm, which is one of the more expensive parts of a
+text-rendering system, simply because it has to examine every
+character of the text it’s wrapping to discover its glyph width.  You
+could imagine a precomputed general-purpose interval tree covering the
+text, consisting of statements like “characters from 1032 to 1040 are
+all in the alphabetical interval ‘a’ to ‘l’”.  From such an interval
+and a similar tree built over the font metrics, you could calculate a
+glyph-width interval: all the characters in that range then have a
+glyph width between 2 and 4, perhaps.  And that would allow you to
+bound the sum of those glyph widths to be in the range (8×2, 8×4),
+which means that it’s much less than the line width.
+
+You could imagine a word-wrap algorithm expressed in a higher-level
+form, seeking the last candidate linebreak character before the prefix
+sum of the glyph widths of the characters exceeded the column width,
+being executed efficiently by progressively approximating the
+width-exceeding crossover and the last candidate linebreak, avoiding
+examining most of the characters.
+
+But it seems obvious that such an algorithm, if it were useful (most
+likely it would only be faster than visiting every character once the
+lines became unreasonably long) would work *much better* if the
+interval tree over the text bounded the text’s *glyph widths*, not its
+*codepoint values*, because the mapping from codepoint to glyph width
+is so irregular.  As soon as your interval includes both ‘l’ and ‘m’,
+it spans the full range of possible glyph widths — even if the text
+itself is “the”!
+
+### Lempel-Ziv compression: an update ###
+
+### Gossip ###
+
+IPv4 provides you with a universal address space and a low-latency
+unreliable datagram sending facility.  Put the seven bytes of a
+destination IP address, protocol number, and port number into the head
+of an IP datagram, calculate the checksum, and hand it to your nearest
+router, and it’ll likely get delivered to its destination.  This is a
+seriously powerful primitive, enabling you to knit together all kinds
+of disparate unreliable transport networks into a single giant
+network: the inter-net.
+
+Unfortunately, the only application that this directly provides is
+voice-over-IP, or maybe unreliable instant messaging.  TCP is a little
+higher-level in some sense: it gives you a virtual serial-port
+connection or bidirectional pipe.  This is still very low-level for
+many applications.
+
+A gossip protocol is a way to share data among a group of participants
+despite unreliable and intermittent connectivity among them; whenever
+two succeed in rendezvousing, they interchange information.  Typically
+gossip is used to converge on a gradually-growing set, but you can
+substitute any CRDT (see above) for the graduallly-growing set.
+
+Gossip is no higher-level than TCP, and indeed many routing protocols
+are gossip-based.  You can run it on top of other protocols, of
+course, and Bitcoin (see above) distributes both transactions and
+mined blocks using gossip.
+
+Generally gossip protocols are resilient against information loss, but
+not against information flooding, and flooding can be the effective
+equivalent of loss.  This typically means that either you must be able
+to identify and disconnect flooders, for example in a gossip-net
+including only your laptop, your phone, and your server; or you must
+be able to drop messages when a flood is in progress, resulting in
+information loss.  Bitcoin ameliorates this problem using hashcash
+(the proof of work being the hash of the newly mined block) but this
+approach doesn’t ensure that legitimate messages will be propagated;
+it can raise the price of propagating them too high.
+
+### Algebraic incremental updates ###
+
+Several of the earlier items in this document talk about incrementally
+updating the result of a computation by means of memoizing small
+pieces of it and only re-executing the parts affected by an input
+change.  However, in some cases, a more efficient approach is
+available; Manuel Simoni wrote about it a few years back in the case
+of incremental MapReduce.
+
+Doing a MapReduce incrementally with the memoizing approach is
+possible, of course.
+
+The map function runs on an input chunk and produces a sorted
+mapped-input chunk in the filesystem; this file is in a sense a
+memoized result of the map function, or rather a whole pile of
+memoized results, and a small change to the input file generally
+should produce a small change to this output file, and it can do so
+efficiently if you can figure out what part of the output file
+corresponds to unchanged input.
+
+The reduce function is a bit trickier, since it’s running on an
+arbitrarily large set of mapped-input chunks with the same key.  We
+can take some advantage of the fact that those chunks are in an
+arbitrary order, so the reduction is more or less required to be
+associative and commutative, so we can apply the reduction operator in
+a tree topology, which is an optimal configuration for memoization to
+be able to minimize the work for an input change, to O(log N).
+
+However, in many cases, the reduce function is not merely commutative
+and associative; it also admits an inverse.  (Min, max, and other
+quantile functions are the usual exceptions.)  In these cases, a much
+more efficient approach is available, which processes input changes in
+O(1): when a mapped-input record goes away, you update the reduction
+function’s output with its inverse; when a new mapped-input record is
+added (“inserted” into reduce’s input), you simply update the
+reduction function’s output with it; and mutations can be handled as a
+removal composed with an insertion.
+
+This is also the way that relational databases normally handle index
+updates.  They do not recompute the index for a table when a value in
+an indexed column changes, not even reusing memoized mergeable index
+blocks built from unchanged blocks of records; they delete the old
+value from the index and insert the new one.  In this case, the
+“reduction” operation could be considered the updating of a sorted
+master file with a sorted update file containing insertions and
+deletions, and sometimes it is actually implemented this way,
+accumulating updates in a “side file” until they are large enough to
+be efficiently applied.
+
+I’m calling this approach to incremental updates “algebraic” because
+it depends on algebraic properties of the reduction function: that it
+is commutative, associative, and admits an inverse, making it an
+Abelian group operation, I think. XXX
+
+The old trick of compositing on-screen objects using XOR is another
+example of this: to move a sprite, you would first quickly XOR it with
+the pixels at its old position, and then at its new position, rather
+than calculating a bounding box for the update that needed to be
+slowly redrawn from some kind of scenegraph.  METAFONT’s
+representation of filledness (each pixel contains a count of how many
+times it’s been painted; 0 is white, anything else is black) would
+also be amenable to such an approach to animation, perhaps without the
+overlap artifacts that attended the XOR approach.
+
+Are there other cases where such an algebraic property of a reduction
+or combination function could be exploited to get rapid incremental
+updates of cached computation results?  Is there an automatic way to
+discover them, perhaps through abstract interpretation, thus avoiding
+the need to explicitly program the algebraic incremental update in
+each case?
+
+### Compile-time instrumentation and object-code instrumentation ###
+
+A lot of the techniques discussed here involve augmenting some kind of
+program with extra new functionality: maybe running it forwards and
+backwards, or changing its regular number arithmetic into arithmetic
+on intervals or Jacobians.  In an interpreted object-oriented
+language, that’s fairly easy: instead of passing in a Number object,
+you pass in an Interval object or whatever.  But what if you’re
+dealing with code that isn’t interpreted, maybe because you want it to
+run fast?
+
+You can abstractly interpret machine code, of course, amounting to a
+sort of augmented emulator.  Valgrind and AFL show two approaches to
+this problem: AFL inserts extra tracking code into the program at
+compile-time, and Valgrind inserts it into the program’s machine code.
+A framework for this kind of instrumentation allows you to perform
+such analyses on arbitrary programs, without having to build the
+programs around the particular kind of abstract execution that you
+want.
+
+I am not yet sure how useful this is, but I suspect that the answer is
+“very useful indeed”.  With this kind of technique, you can in theory
+build programs or subroutines with any existing toolchain that
+produces machine code, then treat them as any of a variety of abstract
+models.
+
+This might seem like a very difficult thing to do, and indeed Valgrind
+is a monument to great software engineering, but I think you can
+probably get a significant fraction of the way there with relatively
+little effort.  The /bin/ls installed on this netbook is about
+nineteen thousand instructions; half of those are mov, movl, or jmp,
+and getting to 18000 involves also call, lea, je, cmp, test, add, nop,
+jne, pop, sub, push, xor, ret, cmpb, movzbl, movb, sete, and or.  If
+you handled common instructions like those and the other control-flow
+instructions, and you were running on a 386-family CPU, you could
+probably have a slow general-purpose path for the instructions you
+didn’t write special handling for, simply by snapshotting the
+registers, jumping to a piece of code that has the instruction, and
+then snapshotting the registers again to see what changed.
+
+This is a fair bit of code, but a lot less than a decent C compiler.
+
+### Partial evaluation ###
+
+A lot of software optimization techniques have to do with specializing
+a generic algorithm for a particular set of circumstances.  A
+polymorphic multiplication is slow; a 32-bit by 32-bit integer
+multiply is faster; a 32-bit integer multiply by the number 10 is
+potentially faster still.  Automatically deriving these simpler
+versions, given the general case and an argument to hold constant, is
+“partial evaluation” or sometimes “specialization”.  A lot of the C++
+STL could be thought of as partial evaluation of ad-hoc polymorphic
+operations: you take, say, a generic sorting algorithm and you
+specialize it for a particular container type, which itself is a
+generic container type specialized for a particular element type.  In
+a language like Smalltalk, all of these algorithms and containers
+might be equally polymorphic, but with the type decisions made at
+run-time rather than compile-time.
+
+An interesting aspect of this class of optimizations is that they are
+often applicable at the source-language level, rather than requiring a
+separate lower-level language to express them in, as register
+allocation often does.
+
+The three Futamura projections are a particularly recursive
+application of this concept.
+
+In the first Futamura projection, an interpreter specialized for a
+particular input program becomes an executable version of that
+program, an approach which may be useful even in its crudest form if
+your objective is merely simplifying installation; but given the
+mythical Sufficiently Intelligent Optimizer, is a rigorous way to
+automatically derive an executable from a source program and an
+interpreter.
+
+Of course, automatically deriving an executable from a source program
+is compiling it.  So if you partially evaluate the partial evaluator
+(!) with respect to the interpreter argument, you have generated a
+compiler from the interpreter, again automatically.  This is the
+second Futamura projection.
+
+Thus, if you partially evaluate the partial evaluator, whose two
+arguments are a program and an input to hold constant, with respect to
+its program argument, you have generated a compiler-compiler, which
+will convert an interpreter for any language into a compiler for that
+same language.
+
+In a sense, this is cheating a little bit: your “compiler” can only
+run on the same platform the interpreter ran on (and which the partial
+evaluator was equipped to understand and optimize code for), so this
+doesn’t work for cross-compilers, and somebody had to write the
+executable code to perform each of the operations in the interpreted
+language — either using another compiler, or in machine code, or the
+code for whatever platform the interpreter was written for.  Typically
+people write partial evaluators for “nice” platforms like Scheme or C
+instead of hairy platforms like AMD64 or Forth, so this doesn’t really
+help you with compiler bootstrapping, by itself.
+
+It could help enormously with compiler optimizations, though, and
+compiler optimizations expand the scope of high-level constructs that
+you can write without an unacceptable loss of performance.
+
+Implementing partial evaluation in a useful way involves program
+slicing — tracing the flow of values through the program from the
+fixed argument — and also abstract interpretation, since often the
+useful statements that we can deduce about intermediate results in the
+program are not their exact values but merely particular predicates
+that are true of them at particular points in the program.
+
+From another point of view, mechanical partial evaluation allows us to
+move computation freely between compile-time and run-time, letting us
+metaprogram in exactly the same language our run-time program is
+written in, and indeed mixing code at the two times freely.  (Under
+some circumstances such an intimate commingling might be undesirable —
+for example, if you want to be able to predict the run time or memory
+usage of the output program.  But perhaps you could make queries or
+assertions about the compiler output to fill this gap.)
+
+A very similar kind of partial-evaluation-at-run-time is what’s behind
+Acar’s algorithms for self-adjusting computation: you have a hoard of
+precomputed results flowing from the input arguments that didn’t
+change, and you need only compute the results that flow from the
+arguments that did.  This suggests that cross-fertilization between
+the approaches may be fruitful: any techniques that can accelerate or
+simplify one of them are likely to be applicable to the other.
+Self-adjusting computation is in some sense more powerful, in that its
+hoard of memoized results allows an efficient response to a change in
+*any subset* of the inputs, rather than just *one particular subset*;
+but partial-evaluation systems can use specialized machine operations
+for the interactions between the fixed and variable subsets of values.
+
+In particular, you may be able to generate a partially evaluated
+program by taking an execution trace of a self-adjusting program with
+respect to a particular set of changed input values.  You may have to
+use either abstract execution (changing the input values to "unknown
+1", "unknown 2", etc.) or systematically explore the space of possible
+sequences of taken branches (like American Fuzzy Lop, perhaps, or
+perhaps using a more systematic approach of backtracking to before
+each branch and taking it the other direction, with some kind of
+conservative trace merging in order to keep trace proliferation
+finite.  You can either reason backwards from a branch condition to
+find inputs that will lead to it, or you can conservatively assume
+that if conditional X was computed transitively from input Y, then
+it’s possible for input Y to make it go either way, and force it to go
+the wrong way, thus generating a conservative approximation of the
+possible Y-driven control flows.)
+
+How wide a spectrum of optimizations can partial evaluation take over?
+What kind of language would be best suited for use with it?
+
+### Linear algebra ###
+
+Matrix multiplication, that kind of thing.  Maybe this is too obvious
+to mention, since it’s fundamental to 3-D rendering, to statistical
+computing, to scientific computing in general, and so on.  Still, it’s
+not applied to as many things as it could be, in part because it’s
+often considered purely numerical in nature.
+
+As one example, the table of defined symbols in an executable or
+library could be thought of as a vector along a dimension of symbols,
+with the signal’s definition (usually a memory address) at each point.
+The table of *undefined* symbols (unresolved relocations) in an object
+file (including an executable or library) is a (sparse) matrix whose
+rows are symbols and whose columns are memory addresses that refer to
+those symbols.  Multiplying the symbol table through the relocations
+matrix gives you a (sparse) vector of values to be added to the object
+file.  In this way, a general-purpose parallel, distributed, or
+incremental sparse-matrix-multiplication algorithm provides you with a
+parallel, distributed, or incremental linker.
+
+(In practice, you might have different relocation types, and on the
+386, the addresses might not be aligned, but you nevertheless need to
+compute carries, so it’s not quite as simple as regarding the object
+file as a large dense vector of words some of which contain memory
+addresses.)
+
+### Convolution ###
+
+Convolution is a well-established powerful primitive for digital
+signal processing and the mathematics of linear time-invariant
+systems, in particular because of two very useful properties for
+improving computational efficiency:
+
+1. **Closure under composition**.  Any linear time-invariant transform
+   of a signal can be represented by convolution with some kernel, and
+   convolution with any kernel is a linear time-invariant transform.
+   This means that convolutions are *closed under composition*.  In
+   particular, linear time-invariant transforms of *discrete* signals
+   can be represented by convolution with *discrete* kernels, and the
+   kernel representing the composition of some discrete kernels has a
+   length that is the *sum* of their lengths.  This means you can
+   compose together an arbitrary sequence of convolutions into a
+   single convolution, then apply that convolution in a single
+   operation.  This is analogous to the closure properties of matrix
+   multiplication, which is so useful to 3-D rendering; of arithmetic
+   operations on the generator representation of continued fractions,
+   as explained in HAKMEM, which is useful for exact arithmetic on all
+   computable real numbers; and of interval arithmetic.
+
+2. **Pointwise product implementation.** Convolution is homomorphic to
+   pointwise product under the Fourier transform, which is to say that
+   the convolution of two functions is the inverse Fourier transform
+   of the pointwise products of their Fourier transforms, which means
+   that convolution can perform frequency-selective filtering.  (This
+   is the “convolution theorem”.).  Also,
+   the Fourier transform of the pointwise product of two functions is
+   the convolution of their Fourier transforms, which you can
+   intuitively derive from the angle-sum trigonometric identities, and
+   which gives rise to useful properties like superheterodyning and
+   the limited bandwidth of the sidebands of amplitude modulation.
+
+3. **Commutativity**.  When the underlying pointwise multiplication
+   operation is commutative, convolution is commutative.
+
+Because of the product-multiplication property, the convolution `f*g`
+of kernels `f` and `g` will not contain any frequencies that are not
+present in both `f` and `g`.  (This may be useful for optimizing the
+implementation of the convolution operation by computing with
+downsampled versions of the kernel.)
+
+Entirely in the domain of time-domain signal processing, you could
+imagine an evaluator for a complex expression DAG of convolution
+operations, discrete samples, repetition operations, weighted sums,
+delay operations, and domain restriction that used strategies similar
+to those of a SQL query optimizer to find an efficient evaluation
+strategy for the expression within specified precision and performance
+constraints, using any number of the AI search techniques mentioned
+above.  I don’t think anyone has done this yet; typically the
+evaluation strategy is programmed manually by some dude in Matlab.
+
+Convolution is used in particular for signal filtering (including
+image blurring and sharpening) and for simulating the effect of some
+physical system, whether optical, electrical, or audio, in particular
+including audio reverberation.
+
+But there are domains a bit outside of what we usually think of as
+signal processing that could also benefit from convolution.
+
+You can synthesize a xylophone tune by convolving the score, a time
+and frequency representation composed of impulses whose dependent
+variable is note volume, with a instrument patch, and extracting the
+frequency=0 slice.  If frequency is represented using
+equal-temperament semitones, other parallel slices are transpositions.
+
+The scores for some simple kinds of canons are the convolution of the
+score for the dux with a repetition and transposition function.
+
+If, instead of using impulses, you use white noise all along the
+duration of a note, you can synthesize some kinds of sustained
+instruments, like violin and pipe organ, from windowed samples.
+
+Instead of compositing the “glyphs” of a “sound font” into a temporal
+representation, you can composite the glyphs of a font into a window
+by convolving the font with a signal whose (x, y, glyph-id) impulses
+place and color individual glyphs.  If you composite them into a 3-D
+opacity field instead, then you can get font resizing, drop shadows,
+pen width and shape, crude bolding, and glyph composition from
+features such as serifs, stems, and stroke thicknesses into the
+bargain, if you add an additional dimension of feature type or stroke
+thickness.
+
+Similarly, an animation could convolve cels with (x, y, z, t) paths,
+perhaps followed by the same kind of 3-D or 2½D projection to provide
+opacity.  It might be desirable to do the convolution in a space with
+five to seven dimensions, perhaps including rotation or even
+stretching, in order to express more of the desirable operations of
+animation.
+
+A potential great advantage of this kind of unified convolutional
+architecture is that it is relatively practical to allow the user to
+ask “Why?” about a thing they see and get a reasonably comprehensible
+answer, without incorporating a lot of special-purpose mechanisms for
+answering “Why?” in each case.
+
+Much of the above might not be practical with existing convolution
+code optimized for discrete samples, high density, and low
+dimensionality, but techniques based on interval arithmetic, query
+optimizers, and/or automatic differentiation (see above) could make
+them practical.
+
+*Discrete* convolution is an operation built from two fundamental
+operations, multiplication of corresponding elements and summing the
+products.  The associativity property that give rise to its closure
+under composition would seem to require some kind of algebraic ring to
+operate over, although I don’t know that it depends on *all* of the
+ring postulates.  Schönhage–Strassen multiplication is one application
+of convolution over a finite ring ℤ/nℤ (i.e. the Galois field GF(pⁿ)),
+but we could also imagine, for example, computing a convolution over
+quaternions or 4×4 matrices representing three-dimensional
+transformations.  (Such a convolution is not commutative.  Can you
+compute it with the Fourier-transform trick anyway?)
+
+But what about other data structures commonly used in programming?
+Can convolution be applied productively to things like polynomials,
+bits, strings, lists, binary relations, and finite maps (dicts), with
+some other operations standing in for multiplication and addition?
+
+The most common example is Elias and Viterbi’s convolutional coding
+for error correction, which XORs together certain plaintext bits from
+a sliding window to produce coded bits.  A 1:1 convolutional code is
+exactly a convolution of a bitvector kernel with the plaintext, using
+AND and XOR (which are multiplication and addition in ℤ/2ℤ), but by
+itself is useless; the normal procedure is to interleave several such
+1:1 codes, so that one bit from each code forms a “codeword”.  (And
+then, typically, you throw away some of the bits.)
+
+You could, again, consider the different kernels to be displaced along
+an axis perpendicular to the text, and then two-dimensional
+convolution in the bit ring produces the bits of the convolutional
+code spread out on a two-dimensional plane.
+
+<http://www.math.nthu.edu.tw/~amen/2011/101219-4.pdf> is about
+“polynomial division by convolution” XXX
+
+<http://stackoverflow.com/questions/22683195/boolean-convolution-algorithm>
+XXX points out that you can convolve bitvectors in O(N log N) time by
+using the number-theoretical transform (FFT in ℤ/nℤ) for a ring size
+larger than the shorter vector, and then saturate the results a the
+end.
+
+<http://mathoverflow.net/questions/10237/does-the-convolution-theorem-apply-to-weaker-algebraic-structures>
+says, “it is a major open question in discrete algorithms as to which
+algebraic structures admit fast convolution algorithms and which do
+not.” ... “A substantially subquadratic algorithm for (min,+)
+convolution would (to my knowledge) imply a subcubic algorithm
+all-pairs shortest paths in general graphs, a longstanding open
+problem.”  Also mentions infimal convolution.
+
+### Optimizing compilers to machine code ###
+
+Optimizing compilers are of course a standard tool in the programmer’s
+toolkit since FORTRAN I, but usually we use them, but our programs
+don’t.  But there are a lot of cases where our programs *could* use
+them.
+
+This is all mostly about constant-factor performance improvements, so
+you might want to skip it if you don’t believe in those.
+
+Suppose you’ve parsed a SQL query and derived the best query plan you
+can for it, but you estimate that it’s still going to have to examine
+5 million rows.  What should you do?
+
+Well, one possibility is to compile your query plan into C, then
+compile it into machine code with a C compiler, then run it.  TCC can
+compile hundreds of lines of code per millisecond, and even GCC can
+compile a few lines of code per millisecond.  The result typically is
+only faster than interpreted code executed by an optimized interpreter
+by constant factors, but the constant factors can be substantial, like
+5 to 30.  It can make the difference between executing the SQL query
+in 15 seconds and executing it in 500 milliseconds.
+
+There are a couple of obstacles to using this technique ubiquitously.
+One is that the result is potentially harder to debug, because of the
+extra level of indirection.  Another is that if you have to write the
+compiler yourself, it’s considerably harder than writing the
+interpreter, especially when you have to port to a new architecture.
+A third is that typically there are some fiddly bits relating to
+mprotect() and runtime dependency on the compiler and getting memory
+that’s both writable and executable.
+
+The main one, though, is the compilation speed.  If an ad-hoc SQL
+query takes 100ms to run interpreted, you can’t justify spending 200ms
+in a C compiler to get it to run in some shorter time.
+
+A simple technique that improves compilation speed substantially,
+especially at low optimization levels, is to emit an abstract syntax
+tree rather than a sequence of bytes.  This is the approach taken by
+Lisp environments that provide `eval`; its argument is an
+S-expression, which is essentially an AST.  Unfortunately, compiled
+Lisps are usually kind of slow.  Racket and Clojure may be shaping up
+to be exceptions.
+
+There are several different practical ways to do this today in
+different programming environments:
+
+- ObjectWeb2 ASM is a very widely used system for rapidly emitting JVM
+  bytecode, which is then “interpreted” by compiling it to machine
+  code and then, if it becomes a bottleneck, by running the bytecode
+  through an optimizing compiler.
+
+- LLVM, although its compilation is fairly slow, was originally
+  intended for this purpose, and it can still be used for it, even
+  though it’s been mostly retargeted for ahead-of-time compilation.
+
+- LuaJit compiles arbitrary code in a superset of Lua with many
+  low-level constructs added to machine code, for amd64, i386, or ARM.
+
+- TCC is very fast and supports most GCC extensions to C; it has a
+  compile-into-memory mode, or you can generate a .so dynamic library
+  and use `ldopen` to read it in.  The emitted code is on the order of
+  5 times slower than code emitted by GCC with optimization, and only
+  marginally worth than GCC without optimization.  Even GCC is capable
+  of compiling a few hundred lines of code in well under a second, as
+  long as you don’t `#include` big header files.
+
+- Even compiling machine code into memory yourself isn’t that hard,
+  though it’s nonportable; you can implement a simple system in C in a
+  few hours and a few hundred lines of code.  It’s handy to use `gcc
+  -fverbose-asm -Wa,-adhln=foo.lst foo.c` in order to see what
+  constructs GCC generates.
+
+- `eval` in PyPy also compiles Python code into optimized machine
+  code, and MyHDL uses this to get enormous speedups for simulating
+  digital hardware.
+
+Of course, compilers are related to nearly everything else I’ve been
+talking about.
+
+Memoization is such a helpful technique for compilers that we’ve been
+caching compiler output for decades (using automatic dependency
+tracking and deterministic rebuilding), and `ccache` is a
+content-addressable blob store for memoizing C compiler output.  A lot
+of the tradeoffs with compilation speed become less of a problem if
+you can memoize the compilation result, like a cached SQL query plan.
+
+There has been experimental work on building distributed compilers
+that save the optimizations they’ve discovered in a common
+optimization store so that they can be reused later without having to
+search for them.  (I forget who wrote that paper.)  Users sometimes
+switch browsers because of the performance of their JS compilers.
+Compilers tend to be heavy users of pointers, and they tend to not
+have to run under strict deadlines or tight resource constraints, so
+FP-persistent data structures are a good fit for them.  Incremental
+compilers, which would only recompile the part of your code that you’d
+edited, used to be popular; of course, it can be difficult to
+efficiently identify which part that was, and perhaps rolling hashes
+can help.  (Incremental linkers are still popular, and the boundary
+between compilers and linkers is somewhat fluid.)  Compilers
+frequently use backtracking search and constraint solving to find
+applicable optimizations, and memoized backtracking gives us PEG
+parsing.  Nondeterministic search over compiler executions (or,
+rather, interpreter optimizations) is what miniKanren uses to
+automatically generate programs with certain properties.  Not only can
+you use partial evaluation to implement a compiler; you can also use a
+compiler to implement partial evaluation.  Indeed, there is a very
+fine line between compilers from a language into itself and partial
+evaluators.  Some virtual machines, like QEMU (by the author of TCC),
+are implemented largely as compilers from the machine code of the
+guest machine into the machine code of the host machine.
+

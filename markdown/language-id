@@ -1,0 +1,247 @@
+In outgoing-notes-mail-01.
+
+I thought a fun tiny program would be something to identify languages
+from training data.  Some few N-grams are highly distinctive of
+particular languages; it should be possible to use a table of a few
+such N-grams to distinguish.  Stuffing an entire byte 3-gram into a
+machine register, a simple C program can tabulate about five megabytes
+of 3-grams per second on my netbook:
+
+    #include <stdio.h>
+    #include <ctype.h>
+
+    enum { n_threegrams = 256*256*256 };
+    int threegrams[n_threegrams];
+
+    static inline int
+    update(int threegram, char c)
+    {
+      unsigned char uc = c;
+      threegram <<= 8;
+      threegram |= uc;
+      threegram &= 0xffFFff;
+      return threegram;
+    }
+
+    int main(int argc, char **argv)
+    {
+      int threegram = 0;
+      int out_of_word = 1;
+      char cc;
+      int ii;
+      threegram = update(threegram, '-');
+      threegram = update(threegram, '-');
+      threegram = update(threegram, '-');
+      while (fread(&cc, 1, 1, stdin)) {
+        if (isalnum(cc) || cc == '\'') {
+          out_of_word = 0;
+          threegram = update(threegram, cc);
+          threegrams[threegram]++;
+        } else if (out_of_word) {
+          /* nothing */
+        } else {
+          out_of_word = 1;
+          threegram = update(threegram, ' ');
+          threegrams[threegram]++;
+        }
+      }
+
+      for (ii = 0; ii < n_threegrams; ii++) {
+        if (!threegrams[ii]) continue;
+        printf("%d %c%c%c\n", threegrams[ii], 
+               ii >> 16 & 0xff, 
+               ii >> 8 & 0xff,
+               ii >> 0 & 0xff);
+      }
+
+      return 0;
+    }
+
+The top 3-grams my program finds for Spanish in my Spanish dictionary
+file are:
+
+    4000 dor
+    4225  de
+    4336 a c
+    4609  n 
+    4936 te 
+    5006 nte
+    5537 ra 
+    5710 ado
+    6742 ent
+    8842 ar 
+
+For English from the KJV bible:
+
+    22273 d t
+    24569 to 
+    35631 of 
+    36735  of
+    43476  an
+    45407 and
+    59014 nd 
+    74898 he 
+    96843 the
+    121874  th
+
+In the KJV, 'ar ' was at 3638, some 40 times less common than ' th',
+while 'ado' was at 181, some 673 times less common; 'ra ' was less
+common still.
+
+Running it against the 20MB spanishText_10000_15000 from the Spanish
+WikiCorpus v1.0 yields somewhat different results:
+
+    109439  co
+    112939 en 
+    134011 el 
+    136181 es 
+    136930 la 
+    138318 as 
+    151942  la
+    195466 os 
+    251117 de 
+    319299  de
+
+In the KJV results, I got ' de' 4575 times, 'de ' 2851 times, and 
+'os ' only 45 times.  ' th' occurrs only 1354 times in the Spanish
+WikiCorpus text.
+
+So in Spanish text, 'os ' is 195466/1354 = 144 times as common as 
+' th', while in English text, ' th' is 121874/45 = 2708 times as
+common as 'os '.
+
+So it seems reasonable to guess that a text containing more 'os ' than
+' th' is Spanish if it's one of Spanish and English, and vice versa;
+and both are sufficiently common in their respective languages that
+even a very short sample of one of these languages is likely to
+contain an instance. 'os ' occurred about once every 100 bytes in
+Spanish, while ' th' occurred about once every 40 bytes in English.
+
+So you can probably do a reasonable job, on x86, of discriminating
+between these two languages as follows:
+
+    enum language { lang_en, lang_es };
+    enum { sp_th = ' ' | 't' << 8 | 'h' << 16,
+           os_sp = 'o' | 's' << 8 | ' ' << 16 };
+    enum language __attribute__((regparm(2)))
+    lang_id(char *text, int len) {
+      int englishness = 0;
+      for (; len; text++, len--) {
+        int threegram = *(int*)text & 0xffFFff;
+        if (threegram == sp_th) englishness++;
+        else if (threegram == os_sp) englishness--;
+      }
+      return englishness > 0 ? lang_en : lang_es;
+    }
+
+This works well, and compiles (with -Os -fomit-frame-pointer) to 22
+instructions, 53 bytes:
+
+    08048504 <lang_id>:
+     8048504:       53                      push   %ebx
+     8048505:       31 c9                   xor    %ecx,%ecx
+     8048507:       eb 23                   jmp    804852c <lang_id+0x28>
+     8048509:       8b 18                   mov    (%eax),%ebx
+     804850b:       81 e3 ff ff ff 00       and    $0xffffff,%ebx
+     8048511:       81 fb 20 74 68 00       cmp    $0x687420,%ebx
+     8048517:       75 03                   jne    804851c <lang_id+0x18>
+     8048519:       41                      inc    %ecx
+     804851a:       eb 0e                   jmp    804852a <lang_id+0x26>
+     804851c:       81 fb 6f 73 20 00       cmp    $0x20736f,%ebx
+     8048522:       0f 94 c3                sete   %bl
+     8048525:       0f b6 db                movzbl %bl,%ebx
+     8048528:       29 d9                   sub    %ebx,%ecx
+     804852a:       40                      inc    %eax
+     804852b:       4a                      dec    %edx
+     804852c:       85 d2                   test   %edx,%edx
+     804852e:       75 d9                   jne    8048509 <lang_id+0x5>
+     8048530:       31 c0                   xor    %eax,%eax
+     8048532:       85 c9                   test   %ecx,%ecx
+     8048534:       0f 9e c0                setle  %al
+     8048537:       5b                      pop    %ebx
+     8048538:       c3                      ret    
+
+You could squish this down quite a bit more; the eight-byte
+`sete;movzbl;sub` sequence is there to avoid a three-byte `jne;dec`
+sequence, if you swapped the functions of `%edx` and `%ecx`, you could
+use the two-byte x86 `loop` instruction instead of the five-byte
+`dec;test;jne` version; and you can probably skip the handling of the
+empty string with the unconditional jump to the end of the loop.  The
+untested 45-byte result is:
+
+            ## Distinguish English from Spanish in a text buffer.
+
+            .globl langid
+    langid: 
+            push   %ebx
+            mov    %edx, %ecx
+            xor    %edx, %edx
+    loop:   mov    (%eax), %ebx
+            and    $0xffffff, %ebx
+            cmp    $(' ' | 't' << 8 | 'h' << 16), %ebx
+            jne    test2
+            inc    %edx
+            jmp    incr
+    test2:  cmp    $('o' | 's' << 8 | ' ' << 16), %ebx
+            jne    incr
+            dec    %edx
+    incr:   inc    %eax
+            loop   loop
+            xor    %eax, %eax
+            test   %edx, %edx
+            setle  %al
+            pop    %ebx
+            ret    
+
+By factoring out the N-grams into a data structure (`for threegram, idx
+in features { if threegram == here { counts[idx]++ } }`) , you could
+probably extend this with another 4 bytes or so per language, up to a
+dozen or so languages, with reasonably good results, but you'd need to
+choose the N-grams with reference to all the languages; 'os ' and 
+'de ', for example, turn out to be common in a number of Romance
+languages, so you might end up using some other, less common N-gram;
+and as a result you might have to use more than one N-gram per
+language.
+
+As an example, here are the top 3-grams from 12 megabytes of Catalan
+(also from WikiCorpus 1.0):
+
+    56343 que
+    58327 en 
+    62273 ent
+    62702  el
+    67923  la
+    76707 el 
+    80647 la 
+    110601 de 
+    126960 es 
+    169507  de
+
+Compared to Spanish:
+
+    109439  co
+    112939 en 
+    134011 el 
+    136181 es 
+    136930 la 
+    138318 as 
+    151942  la
+    195466 os 
+    251117 de 
+    319299  de
+
+In the Catalan corpus, 'os ' occurs 15674 times, about once every 800
+bytes --- one-eighth as common as in Spanish, but common enough that
+you should probably pick a different 3-gram to distinguish between
+Spanish and Catalan.  ' i ' occurs much more frequently in Catalan
+than in Spanish (and ' i ' occurs not at all in the KJV) but I'm not
+quite sure what occurs much more frequently in Spanish than in
+Catalan.
+
+If you found a reasonable set of 3-grams (or even 2-grams or 4-grams)
+that distinguished the different languages in your set, you could
+perhaps search for a machine-code hash function that maps one or two
+of the desirable 3-grams into each of a few buckets.  This might take
+less space than storing the 3-grams themselves, since you could choose
+a set of 3-grams that happened to have a compact machine-code
+representation.

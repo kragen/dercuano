@@ -1,0 +1,677 @@
+In outgoing-notes-mail-01.
+
+Suppose you want to be able to execute the Visitor pattern
+as quickly as possible
+on some tree structure.
+You could compile your tree structure
+into executable code,
+each node a subroutine
+which invokes a method of the visitor object
+— traditionally each node type invokes a different method —
+and then passes the visitor object to each child node.
+
+Using the "quaject" approach described in Henry Massalin's "Synthesis" thesis,
+and passing the pointer to the visitor object itself in %ebx,
+the code to invoke the appropriate method on the visitor
+might look like this:
+
+        mov %ebx, %edx
+        add $20, %edx
+        call *%edx
+        jc 1f
+        ret
+    1:
+
+Here we are checking the carry flag
+to see if the visitor object
+is requesting that we skip child nodes;
+if so, we return immediately.
+
+The visitor "method"
+in this case is the code at offset 20 from the visitor base pointer;
+if its code is very short, it might be entirely inline at that point,
+but in many cases it will be longer,
+and only a call instruction will be present there.
+The called code will receive a pointer to the visitor itself
+in `%ebx`.
+
+However,
+we probably want to pass some additional information
+to the visitor method;
+for example,
+if we're a variable node
+in a program AST,
+we might want to pass the name of the variable,
+or if we're an element node in a DOM,
+we might want to pass the tag name and attributes.
+So the entire call might look like this:
+
+        mov $0xfe38d080, %eax
+        mov %ebx, %edx
+        add $20, %edx
+        call *%edx
+        jc 1f
+        ret
+    1:
+
+Following the call to the visitor method,
+we pass the visitor to the children.
+In the standard i386 GCC calling convention,
+`%ebx`, `%esi`, `%edi`, and `%ebp` are callee-saved registers,
+so if the visitor method follows this convention,
+we still have `%ebx` pointing to the visitor
+after it returns.
+So we can simply call our children one by one,
+implicitly passing them the visitor,
+then return:
+
+        call 0xfe381000
+        call 0xfe38d844
+        call 0xfe391daa
+        ret
+
+For many applications, though,
+the visitor needs to take some action
+at the end of each node
+as well as the beginning.
+Perhaps it could inspect the child count at the beginning,
+maintaining its own stack of remaining child counts,
+and invoke the appropriate code when a child count reaches zero;
+but it's probably simpler to just notify it explicitly,
+by invoking another method on it before returning.
+This suggests putting the node pointer in a callee-saved register too,
+such as %ebp.
+With this additional modification,
+our example node looks like this:
+
+       0:	55                   	push   %ebp
+       1:	bd 80 d0 38 fe       	mov    $0xfe38d080,%ebp
+       6:	89 da                	mov    %ebx,%edx
+       8:	83 c2 14             	add    $0x14,%edx
+       b:	ff d2                	call   *%edx
+       d:	73 0f                	jae    0x1e
+       f:	e8 fc 0f 38 fe       	call   0xfe381010
+      14:	e8 40 d8 38 fe       	call   0xfe38d859
+      19:	e8 a6 1d 39 fe       	call   0xfe391dc4
+      1e:	89 da                	mov    %ebx,%edx
+      20:	83 c2 1c             	add    $0x1c,%edx
+      23:	ff d2                	call   *%edx
+      25:	5d                   	pop    %ebp
+      26:	c3                   	ret    
+
+(Note that this version
+has acquired an unfortunate limit
+of 127 bytes of child nodes,
+which is to say, 25 of them.)
+
+That's 39 bytes for an executable representation
+of the data pointer `0xfe38d080`
+plus a variable-length list of child pointers
+that happens to contain three pointers;
+the most straightforward way to represent this
+
+    struct node { 
+      enum { document_node, element_node, text_node } nodetype;
+      struct nodedata *data;
+      int n_children;
+      struct node *child[0];
+    };
+
+would have needed 24 bytes,
+so making the data structure executable
+has cost us less than a factor of 2 in space.
+
+(In the case where the children are sufficiently small,
+we can inline them, eliminating another 6 bytes
+(16%)
+of call and return.)
+
+We can guarantee the visitor code
+a stronger calling convention than the usual;
+an executable tree built in the above fashion
+behaves in a very stereotyped way:
+of the caller-saved registers,
+it uses only `%edx`, plus `%eax` as an argument,
+so the visitor code is free to use `%ecx`
+as a private global variable,
+unless it calls some other code,
+in which case it must save it as usual.
+We can free up `%edx` too for the visitor's use as follows:
+
+       0:	55                   	push   %ebp
+       1:	53                   	push   %ebx
+       2:	bd 80 d0 38 fe       	mov    $0xfe38d080,%ebp
+       7:	83 c3 14             	add    $0x14,%ebx
+       a:	ff d3                	call   *%ebx
+       c:	73 0f                	jae    0x1d
+       e:	e8 fc 0f 38 fe       	call   0xfe38100f
+      13:	e8 40 d8 38 fe       	call   0xfe38d858
+      18:	e8 a6 1d 39 fe       	call   0xfe391dc3
+      1d:	83 c3 08             	add    $0x8,%ebx
+      20:	ff d3                	call   *%ebx
+      22:	5b                   	pop    %ebx
+      23:	5d                   	pop    %ebp
+      24:	c3                   	ret    
+
+This has the side advantage of saving us two bytes (5%),
+but it also means the visitor method
+is invoked with a pointer to the visitor method
+rather than the visitor object;
+it is likely to need to subtract the method offset
+and add it back later.
+This seems like a fair tradeoff
+for giving it two private registers
+instead of one.
+
+Additionally,
+the return value of the visitor method
+(that is, whatever it leaves in `%eax`)
+is either passed to the next visitor method called
+or is the return value of the entire node traversal.
+
+For whatever it matters in today's world,
+this also means that the per-node overhead
+for tree traversal
+is 14 instructions,
+which seems pretty small.
+It may blow up your icache, though,
+and its single conditional jump might be mispredicted
+more often than the several in a more traditional implementation.
+
+Consider this C implementation,
+listing generated as follows:
+
+    gcc -g -c -Wall -O4 -fomit-frame-pointer -Wa,-adhlns=nonquajectdom.lst nonquajectdom.c
+
+       1                            .file   "nonquajectdom.c"
+       2                            .text
+       3                    .Ltext0:
+       4                            .p2align 4,,15
+       6                    _visit_node:
+       7                    .LFB1:
+       8                            .file 1 "nonquajectdom.c"
+       1:nonquajectdom.c **** struct node { 
+       2:nonquajectdom.c ****   enum { document_node, element_node, text_node } nodetype;
+       3:nonquajectdom.c ****   struct nodedata *data;
+       4:nonquajectdom.c ****   int n_children;
+       5:nonquajectdom.c ****   struct node *child[0];
+       6:nonquajectdom.c **** };
+       7:nonquajectdom.c **** 
+       8:nonquajectdom.c **** typedef int bool;
+       9:nonquajectdom.c **** 
+      10:nonquajectdom.c **** struct visitor {
+      11:nonquajectdom.c ****   void *visitor_data;
+      12:nonquajectdom.c ****   bool (*document_callback)(struct visitor *self, struct nodedata*);
+      13:nonquajectdom.c ****   void (*document_end_callback)(struct visitor *self, struct nodedata*);
+      14:nonquajectdom.c ****   bool (*element_callback)(struct visitor *self, struct nodedata*);
+      15:nonquajectdom.c ****   void (*element_end_callback)(struct visitor *self, struct nodedata*);
+      16:nonquajectdom.c ****   void (*text_callback)(struct visitor *self, struct nodedata*);
+      17:nonquajectdom.c **** };
+      18:nonquajectdom.c **** 
+      19:nonquajectdom.c **** void visit_node(struct node *n, struct visitor *v);
+      20:nonquajectdom.c **** 
+      21:nonquajectdom.c **** static inline void visit_children(struct node *n, struct visitor *v)
+      22:nonquajectdom.c **** {
+      23:nonquajectdom.c ****   int ii;
+      24:nonquajectdom.c **** 
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+      26:nonquajectdom.c ****     visit_node(n->child[ii], v);
+      27:nonquajectdom.c ****   }
+      28:nonquajectdom.c **** }
+      29:nonquajectdom.c **** 
+      30:nonquajectdom.c **** static void _visit_node(struct node *n, struct visitor *v)
+      31:nonquajectdom.c **** {
+       9                            .loc 1 31 0
+      10                            .cfi_startproc
+      11                    .LVL0:
+      12 0000 83EC1C                subl    $28, %esp
+      13                    .LCFI0:
+      14                            .cfi_def_cfa_offset 32
+      15 0003 895C2410              movl    %ebx, 16(%esp)
+      16 0007 89C3                  movl    %eax, %ebx
+      17                            .cfi_offset 3, -16
+      32:nonquajectdom.c ****   switch (n->nodetype) {
+      18                            .loc 1 32 0
+      19 0009 8B00                  movl    (%eax), %eax
+      20                    .LVL1:
+      31:nonquajectdom.c **** {
+      21                            .loc 1 31 0
+      22 000b 89742414              movl    %esi, 20(%esp)
+      23 000f 89D6                  movl    %edx, %esi
+      24                            .cfi_offset 6, -12
+      25 0011 897C2418              movl    %edi, 24(%esp)
+      26                            .loc 1 32 0
+      27 0015 83F801                cmpl    $1, %eax
+      28 0018 7476                  je      .L4
+      29                            .cfi_offset 7, -8
+      30 001a 7224                  jb      .L3
+      31 001c 83F802                cmpl    $2, %eax
+      32 001f 750D                  jne     .L1
+      33:nonquajectdom.c ****   case element_node:
+      34:nonquajectdom.c ****     if (v->element_callback(v, n->data)) visit_children(n, v);
+      35:nonquajectdom.c ****     v->element_end_callback(v, n->data);
+      36:nonquajectdom.c ****     break;
+      37:nonquajectdom.c ****   case document_node:
+      38:nonquajectdom.c ****     if (v->document_callback(v, n->data)) visit_children(n, v);
+      39:nonquajectdom.c ****     v->document_end_callback(v, n->data);
+      40:nonquajectdom.c ****     break;
+      41:nonquajectdom.c ****   case text_node:
+      42:nonquajectdom.c ****     v->text_callback(v, n->data);
+      33                            .loc 1 42 0
+      34 0021 8B4304                movl    4(%ebx), %eax
+      35 0024 891424                movl    %edx, (%esp)
+      36 0027 89442404              movl    %eax, 4(%esp)
+      37 002b FF5214                call    *20(%edx)
+      38                    .LVL2:
+      39                    .L1:
+      43:nonquajectdom.c ****     break;
+      44:nonquajectdom.c ****   }
+      45:nonquajectdom.c **** }
+      40                            .loc 1 45 0
+      41 002e 8B5C2410              movl    16(%esp), %ebx
+      42                    .LVL3:
+      43 0032 8B742414              movl    20(%esp), %esi
+      44                    .LVL4:
+      45 0036 8B7C2418              movl    24(%esp), %edi
+      46 003a 83C41C                addl    $28, %esp
+      47                            .cfi_remember_state
+      48                    .LCFI1:
+      49                            .cfi_def_cfa_offset 4
+      50                            .cfi_restore 7
+      51                            .cfi_restore 6
+      52                            .cfi_restore 3
+      53 003d C3                    ret
+      54                    .LVL5:
+      55 003e 6690                  .p2align 4,,7
+      56                            .p2align 3
+      57                    .L3:
+      58                    .LCFI2:
+      59                            .cfi_restore_state
+      38:nonquajectdom.c ****     if (v->document_callback(v, n->data)) visit_children(n, v);
+      60                            .loc 1 38 0
+      61 0040 8B4304                movl    4(%ebx), %eax
+      62 0043 891424                movl    %edx, (%esp)
+      63 0046 89442404              movl    %eax, 4(%esp)
+      64 004a FF5204                call    *4(%edx)
+      65                    .LVL6:
+      66 004d 85C0                  testl   %eax, %eax
+      67 004f 7422                  je      .L8
+      68                    .LVL7:
+      69                    .LBB12:
+      70                    .LBB13:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+      71                            .loc 1 25 0
+      72 0051 8B4308                movl    8(%ebx), %eax
+      73 0054 85C0                  testl   %eax, %eax
+      74 0056 7E1B                  jle     .L8
+      75 0058 31FF                  xorl    %edi, %edi
+      76                    .LVL8:
+      77 005a 8DB60000              .p2align 4,,7
+      77      0000
+      78                            .p2align 3
+      79                    .L9:
+      80                    .LBB14:
+      81                    .LBB15:
+      46:nonquajectdom.c **** 
+      47:nonquajectdom.c **** void visit_node(struct node *n, struct visitor *v)
+      48:nonquajectdom.c **** {
+      49:nonquajectdom.c ****   _visit_node(n, v);
+      82                            .loc 1 49 0
+      83 0060 8B44BB0C              movl    12(%ebx,%edi,4), %eax
+      84 0064 89F2                  movl    %esi, %edx
+      85                    .LBE15:
+      86                    .LBE14:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+      87                            .loc 1 25 0
+      88 0066 83C701                addl    $1, %edi
+      89                    .LVL9:
+      90                    .LBB17:
+      91                    .LBB16:
+      92                            .loc 1 49 0
+      93 0069 E892FFFF              call    _visit_node
+      93      FF
+      94                    .LVL10:
+      95                    .LBE16:
+      96                    .LBE17:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+      97                            .loc 1 25 0
+      98 006e 3B7B08                cmpl    8(%ebx), %edi
+      99 0071 7CED                  jl      .L9
+     100                    .LVL11:
+     101                    .L8:
+     102                    .LBE13:
+     103                    .LBE12:
+      39:nonquajectdom.c ****     v->document_end_callback(v, n->data);
+     104                            .loc 1 39 0
+     105 0073 8B4304                movl    4(%ebx), %eax
+     106 0076 893424                movl    %esi, (%esp)
+     107 0079 89442404              movl    %eax, 4(%esp)
+     108 007d FF5608                call    *8(%esi)
+      45:nonquajectdom.c **** }
+     109                            .loc 1 45 0
+     110 0080 8B5C2410              movl    16(%esp), %ebx
+     111                    .LVL12:
+     112 0084 8B742414              movl    20(%esp), %esi
+     113                    .LVL13:
+     114 0088 8B7C2418              movl    24(%esp), %edi
+     115 008c 83C41C                addl    $28, %esp
+     116                            .cfi_remember_state
+     117                            .cfi_restore 3
+     118                            .cfi_restore 6
+     119                            .cfi_restore 7
+     120                    .LCFI3:
+     121                            .cfi_def_cfa_offset 4
+     122 008f C3                    ret
+     123                    .LVL14:
+     124                            .p2align 4,,7
+     125                            .p2align 3
+     126                    .L4:
+     127                    .LCFI4:
+     128                            .cfi_restore_state
+      34:nonquajectdom.c ****     if (v->element_callback(v, n->data)) visit_children(n, v);
+     129                            .loc 1 34 0
+     130 0090 8B4304                movl    4(%ebx), %eax
+     131 0093 891424                movl    %edx, (%esp)
+     132 0096 89442404              movl    %eax, 4(%esp)
+     133 009a FF520C                call    *12(%edx)
+     134                    .LVL15:
+     135 009d 85C0                  testl   %eax, %eax
+     136 009f 7422                  je      .L6
+     137                    .LVL16:
+     138                    .LBB18:
+     139                    .LBB19:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+     140                            .loc 1 25 0
+     141 00a1 8B5308                movl    8(%ebx), %edx
+     142 00a4 85D2                  testl   %edx, %edx
+     143 00a6 7E1B                  jle     .L6
+     144 00a8 31FF                  xorl    %edi, %edi
+     145                    .LVL17:
+     146 00aa 8DB60000              .p2align 4,,7
+     146      0000
+     147                            .p2align 3
+     148                    .L7:
+     149                    .LBB20:
+     150                    .LBB21:
+     151                            .loc 1 49 0
+     152 00b0 8B44BB0C              movl    12(%ebx,%edi,4), %eax
+     153 00b4 89F2                  movl    %esi, %edx
+     154                    .LBE21:
+     155                    .LBE20:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+     156                            .loc 1 25 0
+     157 00b6 83C701                addl    $1, %edi
+     158                    .LVL18:
+     159                    .LBB23:
+     160                    .LBB22:
+     161                            .loc 1 49 0
+     162 00b9 E842FFFF              call    _visit_node
+     162      FF
+     163                    .LVL19:
+     164                    .LBE22:
+     165                    .LBE23:
+      25:nonquajectdom.c ****   for (ii = 0; ii < n->n_children; ii++) {
+     166                            .loc 1 25 0
+     167 00be 3B7B08                cmpl    8(%ebx), %edi
+     168 00c1 7CED                  jl      .L7
+     169                    .LVL20:
+     170                    .L6:
+     171                    .LBE19:
+     172                    .LBE18:
+      35:nonquajectdom.c ****     v->element_end_callback(v, n->data);
+     173                            .loc 1 35 0
+     174 00c3 8B4304                movl    4(%ebx), %eax
+     175 00c6 893424                movl    %esi, (%esp)
+     176 00c9 89442404              movl    %eax, 4(%esp)
+     177 00cd FF5610                call    *16(%esi)
+      45:nonquajectdom.c **** }
+     178                            .loc 1 45 0
+     179 00d0 8B5C2410              movl    16(%esp), %ebx
+     180                    .LVL21:
+     181 00d4 8B742414              movl    20(%esp), %esi
+     182                    .LVL22:
+     183 00d8 8B7C2418              movl    24(%esp), %edi
+     184 00dc 83C41C                addl    $28, %esp
+     185                            .cfi_restore 3
+     186                            .cfi_restore 6
+     187                            .cfi_restore 7
+     188                    .LCFI5:
+     189                            .cfi_def_cfa_offset 4
+     190 00df C3                    ret
+     191                            .cfi_endproc
+     192                    .LFE1:
+     194                            .p2align 4,,15
+     195                            .globl  visit_node
+     197                    visit_node:
+     198                    .LFB2:
+      48:nonquajectdom.c **** {
+     199                            .loc 1 48 0
+     200                            .cfi_startproc
+     201                    .LVL23:
+     202                            .loc 1 49 0
+     203 00e0 8B542408              movl    8(%esp), %edx
+     204 00e4 8B442404              movl    4(%esp), %eax
+     205 00e8 E913FFFF              jmp     _visit_node
+     205      FF
+     206                            .cfi_endproc
+     207                    .LFE2:
+     209                    .Letext0:
+    DEFINED SYMBOLS
+                                *ABS*:0000000000000000 nonquajectdom.c
+         /tmp/cc4F3UeL.s:6      .text:0000000000000000 _visit_node
+         /tmp/cc4F3UeL.s:197    .text:00000000000000e0 visit_node
+
+    NO UNDEFINED SYMBOLS
+
+The above is really hard for me to read,
+so here's the disassembly from `objdump -d`:
+
+    /home/default/devel/aspmisc/nonquajectdom.o:     file format elf32-i386
+
+
+    Disassembly of section .text:
+
+    00000000 <_visit_node>:
+       0:   83 ec 1c                sub    $0x1c,%esp
+       3:   89 5c 24 10             mov    %ebx,0x10(%esp)
+       7:   89 c3                   mov    %eax,%ebx
+       9:   8b 00                   mov    (%eax),%eax
+       b:   89 74 24 14             mov    %esi,0x14(%esp)
+       f:   89 d6                   mov    %edx,%esi
+      11:   89 7c 24 18             mov    %edi,0x18(%esp)
+      15:   83 f8 01                cmp    $0x1,%eax
+      18:   74 76                   je     90 <_visit_node+0x90>
+      1a:   72 24                   jb     40 <_visit_node+0x40>
+      1c:   83 f8 02                cmp    $0x2,%eax
+      1f:   75 0d                   jne    2e <_visit_node+0x2e>
+      21:   8b 43 04                mov    0x4(%ebx),%eax
+      24:   89 14 24                mov    %edx,(%esp)
+      27:   89 44 24 04             mov    %eax,0x4(%esp)
+      2b:   ff 52 14                call   *0x14(%edx)
+      2e:   8b 5c 24 10             mov    0x10(%esp),%ebx
+      32:   8b 74 24 14             mov    0x14(%esp),%esi
+      36:   8b 7c 24 18             mov    0x18(%esp),%edi
+      3a:   83 c4 1c                add    $0x1c,%esp
+      3d:   c3                      ret    
+      3e:   66 90                   xchg   %ax,%ax
+      40:   8b 43 04                mov    0x4(%ebx),%eax
+      43:   89 14 24                mov    %edx,(%esp)
+      46:   89 44 24 04             mov    %eax,0x4(%esp)
+      4a:   ff 52 04                call   *0x4(%edx)
+      4d:   85 c0                   test   %eax,%eax
+      4f:   74 22                   je     73 <_visit_node+0x73>
+      51:   8b 43 08                mov    0x8(%ebx),%eax
+      54:   85 c0                   test   %eax,%eax
+      56:   7e 1b                   jle    73 <_visit_node+0x73>
+      58:   31 ff                   xor    %edi,%edi
+      5a:   8d b6 00 00 00 00       lea    0x0(%esi),%esi
+      60:   8b 44 bb 0c             mov    0xc(%ebx,%edi,4),%eax
+      64:   89 f2                   mov    %esi,%edx
+      66:   83 c7 01                add    $0x1,%edi
+      69:   e8 92 ff ff ff          call   0 <_visit_node>
+      6e:   3b 7b 08                cmp    0x8(%ebx),%edi
+      71:   7c ed                   jl     60 <_visit_node+0x60>
+      73:   8b 43 04                mov    0x4(%ebx),%eax
+      76:   89 34 24                mov    %esi,(%esp)
+      79:   89 44 24 04             mov    %eax,0x4(%esp)
+      7d:   ff 56 08                call   *0x8(%esi)
+      80:   8b 5c 24 10             mov    0x10(%esp),%ebx
+      84:   8b 74 24 14             mov    0x14(%esp),%esi
+      88:   8b 7c 24 18             mov    0x18(%esp),%edi
+      8c:   83 c4 1c                add    $0x1c,%esp
+      8f:   c3                      ret    
+      90:   8b 43 04                mov    0x4(%ebx),%eax
+      93:   89 14 24                mov    %edx,(%esp)
+      96:   89 44 24 04             mov    %eax,0x4(%esp)
+      9a:   ff 52 0c                call   *0xc(%edx)
+      9d:   85 c0                   test   %eax,%eax
+      9f:   74 22                   je     c3 <_visit_node+0xc3>
+      a1:   8b 53 08                mov    0x8(%ebx),%edx
+      a4:   85 d2                   test   %edx,%edx
+      a6:   7e 1b                   jle    c3 <_visit_node+0xc3>
+      a8:   31 ff                   xor    %edi,%edi
+      aa:   8d b6 00 00 00 00       lea    0x0(%esi),%esi
+      b0:   8b 44 bb 0c             mov    0xc(%ebx,%edi,4),%eax
+      b4:   89 f2                   mov    %esi,%edx
+      b6:   83 c7 01                add    $0x1,%edi
+      b9:   e8 42 ff ff ff          call   0 <_visit_node>
+      be:   3b 7b 08                cmp    0x8(%ebx),%edi
+      c1:   7c ed                   jl     b0 <_visit_node+0xb0>
+      c3:   8b 43 04                mov    0x4(%ebx),%eax
+      c6:   89 34 24                mov    %esi,(%esp)
+      c9:   89 44 24 04             mov    %eax,0x4(%esp)
+      cd:   ff 56 10                call   *0x10(%esi)
+      d0:   8b 5c 24 10             mov    0x10(%esp),%ebx
+      d4:   8b 74 24 14             mov    0x14(%esp),%esi
+      d8:   8b 7c 24 18             mov    0x18(%esp),%edi
+      dc:   83 c4 1c                add    $0x1c,%esp
+      df:   c3                      ret    
+
+    000000e0 <visit_node>:
+      e0:   8b 54 24 08             mov    0x8(%esp),%edx
+      e4:   8b 44 24 04             mov    0x4(%esp),%eax
+      e8:   e9 13 ff ff ff          jmp    0 <_visit_node>
+
+Let's slice that down to just the `element_node` case,
+which the listing above shows us begins at 0x90.
+
+    00000000 <_visit_node>:
+       0:   83 ec 1c                sub    $0x1c,%esp
+       3:   89 5c 24 10             mov    %ebx,0x10(%esp)
+       7:   89 c3                   mov    %eax,%ebx
+       9:   8b 00                   mov    (%eax),%eax
+       b:   89 74 24 14             mov    %esi,0x14(%esp)
+       f:   89 d6                   mov    %edx,%esi
+      11:   89 7c 24 18             mov    %edi,0x18(%esp)
+      15:   83 f8 01                cmp    $0x1,%eax
+      18:   74 76                   je     90 <_visit_node+0x90>
+      ...
+      90:   8b 43 04                mov    0x4(%ebx),%eax
+      93:   89 14 24                mov    %edx,(%esp)
+      96:   89 44 24 04             mov    %eax,0x4(%esp)
+      9a:   ff 52 0c                call   *0xc(%edx)
+      9d:   85 c0                   test   %eax,%eax
+      9f:   74 22                   je     c3 <_visit_node+0xc3>
+
+      a1:   8b 53 08                mov    0x8(%ebx),%edx
+      a4:   85 d2                   test   %edx,%edx
+      a6:   7e 1b                   jle    c3 <_visit_node+0xc3>
+      a8:   31 ff                   xor    %edi,%edi
+      (confusing multibyte nop padding removed)
+
+      b0:   8b 44 bb 0c             mov    0xc(%ebx,%edi,4),%eax
+      b4:   89 f2                   mov    %esi,%edx
+      b6:   83 c7 01                add    $0x1,%edi
+      b9:   e8 42 ff ff ff          call   0 <_visit_node>
+      be:   3b 7b 08                cmp    0x8(%ebx),%edi
+      c1:   7c ed                   jl     b0 <_visit_node+0xb0>
+
+      c3:   8b 43 04                mov    0x4(%ebx),%eax
+      c6:   89 34 24                mov    %esi,(%esp)
+      c9:   89 44 24 04             mov    %eax,0x4(%esp)
+      cd:   ff 56 10                call   *0x10(%esi)
+
+      d0:   8b 5c 24 10             mov    0x10(%esp),%ebx
+      d4:   8b 74 24 14             mov    0x14(%esp),%esi
+      d8:   8b 7c 24 18             mov    0x18(%esp),%edi
+      dc:   83 c4 1c                add    $0x1c,%esp
+      df:   c3                      ret    
+
+    000000e0 <visit_node>:
+      e0:   8b 54 24 08             mov    0x8(%esp),%edx
+      e4:   8b 44 24 04             mov    0x4(%esp),%eax
+      e8:   e9 13 ff ff ff          jmp    0 <_visit_node>
+
+I separated the recursive function from the entry point
+so that by making it `static`,
+GCC could pick a more reasonable calling convention for it;
+which worked, but only up to a point.
+
+Here our per-node overhead
+is 7 instructions of preamble,
+2 instructions of dispatch
+(by chance, GCC happened to make dispatch fastest for this case),
+3 instructions to call `element_callback`
+(using the three-byte `call` encoding optimized for function pointer tables),
+2 instructions to conditionally skip the child nodes,
+4 instructions of loop setup,
+6 instructions per loop iteration
+(which we can count toward the child node's cost),
+4 instructions to call `element_end_callback`,
+and 5 instructions of cleanup,
+for a total of (+ 7 2 3 2 4 6 4 5) = 33 instructions,
+of which four are conditional jumps,
+providing opportunities for branch misprediction.
+(However, the loop is simple enough
+that I imagine branch misprediction will be very rare.)
+
+The listing of the C code points out
+that if the visitor is not a quaject,
+just a regular struct with function pointers,
+then we can eliminate two `add` instructions,
+which probably don't matter,
+and 4 of the 37 bytes,
+which probably do,
+and also build visitors in plain C
+instead of assembly,
+at the cost of an extra indirection.
+That is:
+
+       0:	55                   	push   %ebp
+       1:	bd 80 d0 38 fe       	mov    $0xfe38d080,%ebp
+       6:	ff 53 04             	call   *0x4(%ebx)
+       9:	73 0f                	jae    0x1a
+       b:	e8 fc 0f 38 fe       	call   0xfe38100c
+      10:	e8 40 d8 38 fe       	call   0xfe38d855
+      15:	e8 a6 1d 39 fe       	call   0xfe391dc0
+      1a:	ff 53 08             	call   *0x8(%ebx)
+      1d:	5d                   	pop    %ebp
+      1e:	c3                   	ret    
+
+Now our executable DOM node
+is 10 instructions and 31 bytes,
+only 7 bytes more than the 24 bytes the struct needs.
+Of those 7 bytes,
+3 should properly be charged to the child nodes,
+so the overhead is more like 5 bytes
+and 8 instructions
+per node.
+
+<http://localhost:8000/wikipedia_en_all_nopic_01_2012/A/Dependency%20theory.html>
+has 512 elements,
+681 text nodes,
+and 17 other nodes.
+Traversing the whole thing
+should cost some (* 8 (+ 512 681 17)) = 9680 instructions,
+or about ten microseconds.
+The document text is 48962 bytes.
+The tree structure in this form
+should cost (* 21 (+ 512 681 17)) = 25410 bytes,
+plus the cost of the metadata
+(element names, string sizes and lengths, attributes).
+The entire document tree, then, nearly fits in the 32KiB L1 cache
+of my netbook,
+(although I think that's split, so only 16KiB is instructions),
+and very easily indeed in its 512KiB L2 cache.
+
+The C code might be more efficient if its tree were binary.

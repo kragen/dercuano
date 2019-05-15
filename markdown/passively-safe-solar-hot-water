@@ -1,0 +1,91 @@
+Suppose we want a solar hot-water-heating panel to never heat above 49
+degrees under normal circumstances,
+so that the water it heats never becomes dangerously hot.
+"Normal circumstances" might
+involve a temperature of, say, 35 degrees outdoors.  One way to do
+this would be to have a thermal resistance between the panel and the
+environment that allows a heat flux equivalent to the absorbed
+sunlight once there's a 14-kelvin difference: given,
+say,
+800 watts per
+square meter, you need a U-factor of 800 watts/14 kelvin square
+meters, or an R value of 14 kelvin m²/800 W, or R = 0.018 K m² / W;
+that's about equivalent to an inch of concrete.  However, typical
+outdoor air film values are around R = 0.03 K m² / W --- on each side,
+so 0.015 on both sides together.
+
+If that wasn't enough thermal conductance, you could reduce the
+sunlight by angling the panels or painting them gray or shading them
+or whatever so that they only collect 400 W/m² or something, and then
+you should be fine.  But there's another problem, which is that that
+14-kelvin difference above ambient is still a 14-kelvin difference
+above ambient when ambient drops to 0 degrees, which will give you
+14-degree "hot" water.
+
+That's not really acceptable!  To have a passively safe design that
+still provides adequate heat in winter, you need some kind of more
+consistent heat sink than the air.  Maybe radiating to the sky could
+work: you use some insulation to keep from losing heat to the nearby
+air, and radiate your extra heat as infrared into deep space.
+
+For this, you would have enough insulation to permit the difference
+from ambient air to be up to 50 degrees or so (R = 0.06 K m² / W,
+which should be achievable with nothing more than some trapped air
+spaces) while permitting infrared radiation to get to space, in
+particular around the ten-micron wavelength.  Transparent polyethylene
+film trapping air spaces will apparently work for this (see patent
+<http://www.google.com/patents/US5493126>), but it photodegrades
+rapidly enough that it would need replacement every few months.
+Acrylic (plexiglass) transmits near infrared; I think it transmits
+thermal infrared (LWIR) as well, but I haven't tested.  FT-IR spectra
+on the web for polyethylene terephthalate
+<http://deepblue.lib.umich.edu/handle/2027.42/32476> suggest that it,
+too, transmits LWIR well, and it can survive solar ultraviolet for a
+long time.
+
+Anyway, then, you just need to angle the panel so that it will be
+sufficiently coupled to the part of the sky that doesn't have the sun
+in it to shed the heat it acquires from the sun.
+
+A nice thing about this kind of radiative cooling is that the power
+transmitted is proportional to the fourth power of the temperature.
+So if you're transmitting 800 W/m² at 49 degrees (322 K), at 43
+degrees (316 K) you'll be transmitting 740 W/m², and at 30 degrees
+(303 K) you'll only be transmitting 627 W/m² --- you'll have a whole
+173 W/m² pushing you toward your target temperature.  Unfortunately
+this is still not enough to be very robust against efficiency losses
+in picking up the heat.  arccos(627/800) is about 38 degrees (of
+arc!), and arccos(740/800) is only 22 degrees --- so whenever the sun
+is further than 22 degrees from at right angles to the panel, it won't
+be able to heat the water above 43 degrees C.  Which means, at best, 3
+hours a day.
+
+But that's for a flat panel!  If the collector isn't flat (for
+example, if it consists of multiple flat panels at different angles),
+it will absorb heat from the sun at a more consistent rate throughout
+the day.  That solves the intermittency angle problem.  (The
+requirement that
+the thermal emission equal the sunlight at the maximum safe
+temperature can be met, as before, by adjusting the angle of attack to
+the sunlight.)
+
+The big problem with that approach is its low efficiency.  Heating
+from 0 degrees to 43 degrees, you start off with about 48% efficiency
+(1-(273/322)^4) but end up with 7% efficiency (1-(316/322)^4).  That
+means you end up with panels covering many times more area, for
+safety, than you would need simply to gather the appropriate amount of
+energy, simply because the vast majority of the energy gathered is
+re-radiated immediately.
+
+There might be a way to avoid this problem: creating a sufficiently
+selective surface.  Blackbody radiation has a fairly sharp cutoff at
+its top frequency, and absorption bands in plastics also have fairly
+sharp cutoffs.  It might be possible to put together a blend of
+transparent plastics that block essentially all radiation longer than,
+say, 8000 nanometers, but have one or two orders of magnitude more
+transmissivity for shorter wavelengths.  A black surface covered with
+such plastics would have an emissivity that jumped sharply (from, say,
+0.001 up to 0.1 or 0.2) upon reaching a target temperature.  A
+sufficiently large radiator of such a surface, backed by sufficiently
+good heat transport, would maintain a narrow range of temperatures
+over a wide range of heat flows.

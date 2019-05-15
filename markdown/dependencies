@@ -1,0 +1,170 @@
+Simple dependencies in software
+===============================
+
+Suppose we have a function to compute some value:
+
+    def f(a, b, c):
+        if get(a, 3) > 5:
+            return get(b)-get("x")
+        else:
+            return get(c)
+
+Now, we run this function in an environment where we will record its
+return value where we will record its return value for the results of
+pending or future calls to `get()`.  (So far I haven't specified how
+`f` gets associated with some value you can pass to `get`.)  We also
+record its calls to `get` as resulting from this invocation of `f` and
+may even throw exceptions from some of the `get` calls, for example if
+their values are not known yet, exceptions which will be caught by the
+context that invoked `f`.  Now we know which set of `get` invocations
+the current return value of a particular call to `f` depends upon:
+clearly `f(3, "/", "@")` invokes `get(3, 3)`, and if that returns 4,
+it will cause it toinvoke `get("@")`.  Now we can infer that the
+return value of `f(3, "/", "@")` depends only on `get(3, 3)` returning
+4 and on `get("@")` returning whatever it returned at the time; so
+it's valid to cache `f(3, "/", "@")` until one of those two values
+changes.  In particular, we do not need to worry about `get("/")` or
+`get("x")`, since they weren't invoked.  But if `get(3, 3)` changes
+its return value, then the cached value for `f(3, "/", "@")` is no
+longer valid, and when a new value for it is computed, it might have a
+different set of dependencies — it might depend on `get("@")`, for
+example.
+
+This allows us to write code in a fairly imperative style and
+automatically transform it into a reactive dependency-driven
+computation.
+
+Meteor's implementation
+-----------------------
+
+[Meteor's `Deps` facility](http://docs.meteor.com/#reactivity) is
+probably the most popular implementation of this in practice today,
+although I first encountered a variant of it in the paper that
+popularized software transactional memory, [Composable Memory
+Transactions](http://research.microsoft.com/pubs/67418/2005-ppopp-composable.pdf
+"Harris, Marlow, Peyton Jones, and Herlihy"), in 2005; and [The
+Trellis](http://peak.telecommunity.com/DevCenter/Trellis) is an older
+Python package that does the same thing.  `Deps` has a few surprising
+design choices, which are interesting in that they represent the
+experience of Meteor's developers and users using it extensively in
+practice over the last two years, rather than merely in theory:
+
+* Its implementation supports nesting;
+* If an exception is thrown the first time a computation is invoked,
+  it prevents the computation from ever being rerun in the future;
+  there's also an explicit `computation.stop()` API to prevent this.
+* Computations are rerun eagerly when their dependencies change, but
+  only once the system is idle or someone calls `Deps.flush`, which
+  you can't do from inside a Computation; this enables you to use them
+  to e.g. update the DOM in the page rather than just producing a
+  return value, and the delay-until-idle makes them serializable so
+  that one Computation doesn't see partial updates produced by
+  another Computation not having finished;
+* they additionally have an `onInvalidate` callback which is invoked
+  immediately when their result is invalidated;
+* Computations normally communicate with one another by writing to a
+  shared global store (e.g. the database, which is replicated onto the
+  MongoDB server) rather than by nested invocation, although nested
+  invocation is also supported;
+* dependency links have separate identity from the variables they
+  track:
+
+    > The reason Dependencies do not store data themselves is that it
+    > can be useful to associate multiple Dependencies with the same
+    > piece of data. … A Dependency could represent whether the weather
+    > is sunny or not, or whether the temperature is above
+    > freezing. `Session.equals` is implemented this way for
+    > efficiency. When you call `Session.equals("weather", "sunny")`,
+    > the current computation is made to depend on an internal
+    > Dependency that does not change if the weather goes from, say,
+    > `"rainy"` to `"cloudy"`.
+
+* Dependency links remove their dependent computations after
+  invalidating them, trusting that they will re-add the dependency
+  again if necessary.
+
+I've been told by Meteor users that Meteor doesn't have transactions,
+but the Computation and Dependency objects described here are
+essentially the same ones that implement transactions in a software
+transactional memory system: a Computation is a transaction, and its
+Dependencies are the variables it reads.  (It just doesn't support
+rollback, which would require at least logging the variables it writes
+in order to undo the effect.)
+
+Continuously changing variables
+-------------------------------
+
+Time changes continuously, so in the simplest possible system, any
+transaction that depends on the current time will be constantly
+invalidated, and thus constantly recomputed if you're using an eager
+re-evaluation strategy.  But, as the `Session.equals` example above
+from Meteor shows, in some cases you can make the transaction's
+dependency considerably more specific.  You could say `if
+time.between(nyc.hour(10,00), nyc.hour(10,05))":`, for example, so
+that your transaction would only be rerun upon crossing the 10:00 or
+10:05 boundary.
+
+This is difficult to generalize, but there are ad-hoc approaches that
+may work well in practice.  For example, you could sample a variable
+periodically, and assume that it doesn't change at other times.
+Meteor in fact does this on the server to detect MongoDB changes that
+aren't intermediated by Meteor itself.
+
+Dependencies with exceptions as a substitute for futures
+--------------------------------------------------------
+
+Futures are a mechanism for writing code that computes with data that
+aren't known yet — actually, several similar mechanisms.  The first
+was [proposed by Baker and Hewitt in AIM-454 in
+1977](http://dspace.mit.edu/bitstream/handle/1721.1/6095/AIM-454.pdf?sequence=2).
+They used "future" to refer to more or less what we know in Haskell as
+a "lazy value" — Baker and Hewitt were proposing that structuring the
+program's run-time state as a pure dependency graph, and then eagerly
+computing it in parallel while incrementally garbage-collecting the
+parts of the dataflow graph that had been cut off by a conditional,
+would be a good way to write parallel programs to efficiently compute
+on massive multiprocessors.  They turned out to be wrong about that,
+but nobody would actually build a massive multiprocessor until 1983,
+so we have to give them credit for trying.  (Besides, it's not too far
+off from `make -j 16`, which is an effective way to program moderately
+massive multiprocessors, and Stu Feldman wrote the first,
+non-parallel, version of `make` only the year before.)
+
+Basically their mechanism was that your computation would block when
+it attempted to apply a primitive operation such as arithmetic to a
+future, unblocking once the value was available.
+
+Composable Memory Transactions proposes that transactions can "block"
+by, essentially, throwing an exception (called `retry` in the paper)
+which aborts the transaction, marking it to be retried when one of its
+dependencies changes.  As long as the code inside the transaction
+really has no communications with the outside world that aren't
+intermediated by the transactional memory (a [problem cited by Joe
+Duffy in 2010 as one of the killers of
+STM.NET](http://joeduffyblog.com/2010/01/03/a-brief-retrospective-on-transactional-memory/)),
+then the effect is very similar to the transaction magically not being
+able to execute at all until one of the dependencies that would guide
+it toward the fatal exception is modified.  It's like the system knows
+that the transaction would fail, so it doesn't attempt it, and it
+magically knows what inputs the transaction takes.  (Of course this
+won't work in systems like Meteor that don't support rollback.)
+
+Consider this Python code to calculate how much a share of AT&T stock
+costs in pounds sterling:
+
+    def t_in_gbp():
+        quotes_csv = "http://download.finance.yahoo.com/d/quotes.csv"
+        data_url = lambda sym: quotes_csv + "?f=sl1d1t1c1ohgv&e=.csv&s=" + sym
+        t_data   = www.get(data_url("T"),        max_age=minutes(5))
+        gbp_data = www.get(data_url("GBPUSD=X"), max_age=minutes(5))
+        price = lambda text: float(csv.reader(StringIO(text)).next()[1])
+        return price(t_data) / price(gbp_data)
+
+You could implement this using blocking HTTP client calls, storing the
+result in a cache, and then, to get concurrency, spawn off a separate
+thread for each such computation, sharing the result between threads.
+As an alternative to threads, though, you could run `t_in_gbp` in a
+transaction and have `www.get` try to fetch the data from the cache,
+initiating the fetch and aborting the transaction if the cached data
+is stale.
+

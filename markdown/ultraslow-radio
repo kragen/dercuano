@@ -1,0 +1,453 @@
+In outgoing-notes-mail-01.
+
+Ultraslow radio
+===============
+
+Long-distance telecommunication is really important, and currently
+crucially dependent not only on the state of the global economy, but
+also on operationally centralized telecommunications companies, large
+telecommunications structures that are easy to bomb, and undersea
+cables.  What's the minimal digital telecommunications infrastructure
+that would usefully enable intercontinental communication?
+
+Possible communications modes
+-----------------------------
+
+### Shortwave radio ###
+
+Shortwave radio (1.5MHz-30MHz) reflects off the ionosphere and can be
+received intercontinentally.  This includes a couple of ISM bands in
+which unlicensed operation is permitted internationally:
+13553–13567 kHz (22 meters) and 26957–27283 kHz (11 meters).
+Wikipedia's "High frequency" article says, "The maximum usable
+frequency regularly drops below 10MHz in darkness during the winter
+months, while in summer during daylight it can easily surpass 30MHz."
+Wikipedia's "Skywave" article says, "Signals of only a few watts can
+sometimes be received many thousands of miles away as a result."  One
+hop off the ionosphere gets your signal up to 3500km.
+
+This means that, in theory, you could set up a single unlicensed radio
+station providing communications services to you in most of a
+7000-kilometer-wide circle.  Something over a dozen such receivers
+could provide you with global coverage.  Of course, you'd have to deal
+with interference: both decoding the received signals in the face of
+interference, and not generating so much interference to other users
+of the spectrum that they start to interfere with you in ways other
+than radio communication.
+
+(Transmitting in the 22-meter band, especially using time-domain radio
+with low-power code division multiplexing and a low duty cycle, would
+also make it practically difficult to locate the radio transmitter;
+and of course the receiver would produce even less evidence of its
+presence.)
+
+#### Possible bit rates for shortwave ####
+
+Shannon's Theorem, aka the noisy-channel coding theorem, has no
+minimum signal strength below which communication bandwidth is zero;
+the Shannon-Hartley limit is B log (1 + S/N), where B is bandwidth in
+hertz, and S and N are the power of the signal and noise.  In the
+"power-limited regime", when S/N is very small, this is linear in S/N.
+A somewhat counterintuitive result here is that, practically speaking,
+your bit rate doesn't depend on frequency selectivity much at all ---
+if you use twice as much of the spectrum, you double B, but you also
+probably double N.  This means you can choose your bandwidth to
+satisfy other considerations, such as minimizing interference with
+other users of the band, who are mostly still using frequency-division
+multiplexing, or minimizing device cost.
+
+So, supposing you can send one bit per second in the HF band using one
+watt over a few thousand kilometers, you can probably send about one
+bit per 1000 seconds using one milliwatt, or one bit per day using 12
+microwatts, and this regardless of whether your signal is 0.1kHz wide,
+14 kHz wide, or 28.5 MHz wide.
+
+Is one bit per second about right?  Digital Radio Mondiale in the
+shortwave bands uses at least 6 kilobits per second, but that doesn't
+tell us much, since this could be slammed through by using hundreds of
+kilowatts.  What we really need to know is how much background noise
+there is in these frequency bands, in an absolute sense, or how many
+words per minute people can send and receive with CW Morse code over
+what distance and what power.  One bit per second would be about 1.2
+"words per minute".
+
+It seems like the keyword for this kind of thing in current amateur
+radio operation is "QRP operation", which means around 5 or 10 watts
+or less.  QRPers consider anything below 1 watt as "extremely low
+power", or QRPp, and they consider a thousand miles per watt as a
+difficult benchmark to meet.  PSK31 is the digital code most commonly
+used at present for this kind of thing, and it operates at 31 baud and
+a bandwidth of 31.25Hz; it does a 180-degree phase shift during an
+amplitude null to represent a zero bit after encoding the digital
+signal into Varicode, a huffman code for ASCII.  There are 10-baud and
+5-baud variants in use.  PSK31 is commonly used down to the 160-meter
+band.
+
+If we figure that talking a thousand miles (1609 km) on a watt already
+puts you into the power-limited regime, and guess that you can get
+some 10 bits per second out of it, then using skywave bounce, you
+should be able to talk N thousand miles at 10/N bits per second.  For
+example, you should be able to talk 16000 km, about a third of the way
+around the world at one bit per second.
+
+### Lasermoon moonbounce communication ###
+
+You could illuminate the moon with a rapidly modulated laser at night.
+The moon's albedo is about 12%, it covers about half a degree of arc,
+and you can get cheap 5mW semiconductor laser pointers with divergence
+of less than that, indeed closer to a tenth of a degree, so that all
+of their power falls on the moon.  Similarly, an inexpensive lens
+focusing the moon's image onto a photodiode (which is faster than a
+phototransistor) can easily give you better than an arcminute of
+selectivity.  A square arcminute is about 85 nanosteradians, so this
+corresponds to about 80 dBi of "antenna gain" on the receiving end,
+but focusing more tightly than the original laser pointer spot isn't
+useful, so you only get about 60 dBi in practice.
+
+Against this you must weigh the fact that most of the light falling on
+the moon is reflected off into space.  You can probably reasonably use
+a one-meter-diameter plastic Fresnel lens, but you're about 380
+megameters from the moon.  This means that the light signal you get is
+about 176 dB weaker than the light signal sent from the moon, which is
+presumably most of the 500μW or so of light emitted from a 5mW laser
+pointer, minus about 9dB for the low albedo.  This means you're trying
+to detect a signal of some -188dBm, which is difficult but feasible.
+It's actually considerably more feasible than doing the same trick
+with radio waves, due to the higher "antenna gain".
+
+I think common laser diodes have a Q factor around 1000 --- their
+light is mostly contained in a range of wavelengths of less than a
+nanometer --- which means you could improve your SNR by up to about
+30dB by filtering the moon's image through a dichroic filter.
+
+This leaves the question of how much noise you're dealing with in the
+first place, particularly important if you might have significant
+"crosstalk" from brightly-illuminated parts of the moon, say because
+your camera is imperfect.  Sadly, I have very little idea how bright
+earthshine is, which is kind of the question.
+
+### Earth-mode communications ###
+
+Ultra-low frequency radio --- 300 Hz to 3000 Hz --- can propagate
+through the earth itself; there are apparently lots of NATO papers
+from the 1960s about using this for military purposes.  As far as I
+can tell, though, this involves running antenna cables a distance
+comparable to half the wavelength (100 km or more) or to the distance
+you want to communicate.  So I think this may be impractical.
+
+### Balloon radio ###
+
+Getting a balloon to 90km altitude is straightforward, at which point
+it has a line-of-sight radio path to anything within 9.57 degrees of
+arc (acos(r/(r + 90 km)), where r is 6371 km, the radius of the Earth)
+on the Earth's surface, about 1000 km; at this point it could quite
+reasonably communicate at gigabits per second using laser or
+highly-directional ultrawideband microwave to any of those points, if
+it can figure out how to align its transmitter and receiver.
+Furthermore, two such balloons will have a line-of-sight if they're
+less than twice the angle apart, or 2000 km.  Twenty such balloons
+could ring the earth along a great circle, so a frequency-four
+geodesic sphere would suffice to provide global coverage with a bit
+under 200 balloons.
+
+On the other hand, getting balloons to stay up there would be quite a
+challenging project.  In fact, just getting them to work at all while
+they're up there is no walk in the park.
+
+### Air mail ###
+
+In 1998, Laima, an Aerosonde, flew successfully across the Atlantic on
+5.7 liters of fuel in 27 hours.  Aerosondes weigh about 13 kg, about
+the same as a large swan.  One micro-SD card weighs about 500mg and
+can currently hold 64 GB of data, so a 2-kg payload would hold 256 TB.
+This would amount to a 21 Gbps transatlantic data connection.
+
+In 2003, the 5kg Spirit of Butts Farm made more or less the same
+3000km flight on under a liter of fuel, in just under 39 hours.
+
+On one hand, these bandwidths are orders of magnitude higher than the
+bandwidths reasonably achievable by the other technologies mentioned
+above.  On the other hand, the latency is also some five orders of
+magnitude higher, and also, this is a very unreliable way of
+transmitting data --- it is likely to result in the loss of the
+aircraft and its payload on a regular basis.
+
+A lower-tech approach for north-south communication would be to attach
+high-capacity store-and-forward radio-communication nodes to
+long-lived migratory birds.  When they came into communication range
+of other nodes, they would exchange messages via short-range,
+high-bandwidth radio.
+
+### Neutrino beams ###
+
+Particle accelerators can generate large quantities of neutrinos in a
+beam, by accelerating large quantities of pions or kaons to
+relativistic speeds and letting them decay; if the neutrino beam is
+directed at the earth, most of them will penetrate to the other side.
+Unfortunately, detecting a change in neutrino flux is very difficult,
+because they can easily penetrate things like the earth.  It's
+feasible using thousands of photomultiplier tubes and tens of
+thousands of tonnes of water or other transparent liquid deep
+underground, like the Super-KamiokaNDE and the Sudbury Neutron
+Observatory; such observatories see on the order of one natural
+neutrino decay per few days per thousand tons of matter included.
+
+This is clearly a feasible technique for communication, but it costs
+tens to hundreds of millions of dollars (which is to say, hundreds to
+thousands of person-years of work) and the result should be
+communication with bandwidth measured in fractional bits per day.  If
+it were possible to increase the number of neutrinos by several orders
+of magnitude, you could increase the bit rate substantially, and in
+the limit, you could have lower latencies for long-distance
+communication than communication methods for which the earth is an
+obstacle.
+
+### Sound in air or water ###
+
+Low-frequency sound can propagate for hundreds of kilometers in air,
+which is the principle behind the West African talking drums, which
+were used for long-distance digital communication for several
+centuries, up to the mid-20th century.  I think you can get up to tens
+of bits per second this way.  The talking drums could transmit several
+kilometers (8 km, says Wikipedia), but not tens or hundreds of
+kilometers.  Whistled speech can cover one to two km, and has in
+theory a higher bit rate.
+
+High-frequency sound is unusably attenuated by air in a few
+kilometers, but can cover thousands of kilometers in water, where
+whales use it; it also travels above 1km/sec.  There's the additional
+advantage that sound in the ocean tends to remain a few hundred meters
+from the surface, in a zone called the SOFAR zone or Deep Sound
+Channel, so its intensity falls off as 1/d instead of 1/d² over long
+distances.
+
+### Telegraph towers and cloud-bounced signal lamps ###
+
+A 1.6-km-tall mountain, such as Sandia Peak in Albuquerque, has a line
+of sight to some 140 km distance on a smooth-spheroid earth, and
+perhaps 100 km in real life.  Even a 100-meter-tall tower can see for
+36 km.  This principle was used in semaphore telegraphs throughout
+Europe in the decades before the development of the electric
+telegraph: a line of fortified stone towers at 30-km intervals
+provided about one bit per second.  If you put a cheap laser pointer
+on the tower, you can transmit over this line of sight at megabit
+speeds or better.
+
+Of course, you can also use a reflecting mirror to reflect sunlight
+instead of a laser; such a "heliograph" can transmit up to 300km under
+ideal conditions or 50km under normal conditions, using small,
+hand-sized mirrors.  Bit rates depend on how fast you can open and
+close some kind of "shutter", but at least hundreds if not thousands
+of bits per second should be attainable with inexpensive LCDs.
+
+As suggested in the Lasermoon section, you can do this same kind of
+long-distance communication even without going up on the mountain
+yourself; it's sufficient to illuminate it from afar.  Naval
+communication with Aldis lamps uses this trick to communicate by
+illuminating the bases of cloud formations, which enables
+communication at much greater distances; in theory, you could use
+cirrocumulus or cirrostratus clouds at their altitude of some 5–12 km
+to communicate to a station 500–800 km away, or perhaps even the
+23-km-high tip of a cumulonimbus cloud to communicate with a station
+1000 km away.  This is more practical than using the moon, since you
+only have to detect light diffusing from the cloud 500 km from you
+instead of 380 000 km from you, giving you 60 dB less path loss in the
+cloud-to-you path than in the moon-to-you path.  (As before, I think
+you can focus light onto the cloud well enough that effectively all
+the light you transmit reaches the cloud, so you effectively don't
+have any path loss.)
+
+Useful bit rates
+----------------
+
+Why would it matter if you could transmit a millibit per second?
+Well, one bit can still be a crucially useful thing to be able to
+transmit.  "I'm alive," for example, or "The killers weren't al
+Qaeda."  But even a Tweet is only 1120 bits, so a bit per 1000 seconds
+would let you you transmit a Tweet every two weeks.  The Annals of
+Spring and Autumn, 春秋, covers 541 years in 16000 characters; if each
+were 16 bits, that would be just over one bit per day on average.  The
+Chappe semaphore line system transmitted about one "symbol" per minute
+out of 92 possible symbols, giving a bandwidth of about 0.11 bits per
+second; it was credited with giving Napoleon a decisive military
+advantage.
+
+### One bit per second ###
+
+Consider the higher bandwidth of one bit per second, which I've
+hypothesized above requires about a watt of power over
+transcontinental shortwave.  Two bits is roughly one letter of
+compressed ASCII text [0], so this is about 7000 words of text per
+day; one to ten Wikipedia articles per day, for example, or a fairly
+in-depth summary of daily international news, or a couple of hours of
+writing email per day, or a book per month.  Furthermore, it's fast
+enough to permit someone to write a line of text in a chat system,
+transmit it, and get back a response from someone else within a couple
+of minutes.
+
+[0] bible-pg10.txt is 824 146 words and 4 452 069 bytes; its .bz2 is
+999 906 bytes, 1.80 bits per uncompressed byte; compressors other than
+bzip2 may be more efficient; but extremely high compression ratios may
+only be achievable with the transmission of large amounts of data.
+For example, if I split the same document into 64KiB chunks and bzip2
+each one independently, the result is 1 214 055 bytes, 2.18 bits per
+uncompressed byte.
+
+One bit per second, then, is a sufficiently rapid connection to permit
+real participation in the intellectual life of an invisible college;
+but it's less information than a person can read.  Furthermore, with a
+broadcast medium such as radio, it's reasonable to transmit the same
+information to many recipients at a time, Usenet-style.
+
+Commercially speaking, even one bit per second, or for that matter a
+thousandth of a bit per second, at low latency is enough to make you a
+hell of a lot of money in commodity arbitrage, if your competitors
+don't have access to equally fast communication.  A price to three
+significant figures is only ten bits, and it's straightforward to
+encode names for widely-traded commodities in 30 bits or less.  (This
+is why the stock ticker was such big business in the late 19th and
+early 20th century.)
+
+### Ten bits per second ###
+
+Ten bits per second would give you some 70 000 words of text per day,
+which is almost as much as you could read in real time; and it would
+be fast enough to permit real-time hypertext navigation with a
+stateful two-way protocol.  (If you're transmitting document contents
+containing the IDs of other documents in one direction, while
+transmitting the IDs of requested documents or document parts in the
+other direction, each ID will typically be within the last thousand
+IDs transmitted, so it can be encoded in ten or twenty bits.)  Ten
+bits per second at 2.5 bits per character works out to 240 characters
+per minute, or 48 words per minute, so it's at least theoretically
+possible for one person to type faster than ten bits per second on a
+sustained basis; but it's fast enough that one-to-one text chat would
+be more or less real time.
+
+### A hundred bits per second ###
+
+A hundred bits per second would give you some 700 000 words per day,
+an entire book.  This is enough that one person can no longer read all
+of it, if it's text, and eliminates the need for a stateful protocol
+for real-time hypertext --- although full HTTP might still be
+excessive.  It's about 480 words per minute.
+
+Acquiring one new book per day was an unachievable dream for nearly
+all individual scholars and the majority of libraries in most of the
+age of print.  If the books were new cheap paperbacks, it cost about
+US$1800 per year toward the end of the 20th century, within the means
+of most of the population of the developed world, but new hardbacks
+pushed the cost up by an order of magnitude, to US$18000 per year.  So
+a hundred-bit-per-second connection to a large data store could beat
+access to printing presses for all but the wealthiest.
+
+If one person were trying to consume a hundred bits per second, they
+would probably want to do much of it in the form of still images.  A
+high-quality color JPEG file typically uses about four bits per pixel,
+and black-and-white needs about half that.  So a hundred bits per
+second is on the order of 100 low-quality pixels or 25 high-quality
+pixels per second.  A low-quality 320×200 color image might download
+in 21 minutes.
+
+As of early 2012, the English Wikipedia articles without pictures
+total 10 399 030 471 bytes in a compressed Zim file.  At a hundred
+bits per second, this file would take 26 years to transmit.
+
+For much of the twentieth century, most Telex systems ran at 45.45
+bits per second.
+
+### A thousand bits per second ###
+
+A thousand bits per second is 7 000 000 words per day, some ten books.
+At this speed it's possible to receive text you don't intend to read
+yourself, just in case you want to read it later; but it's also fast
+enough that you don't need to if the connection is reliable.  You
+could download the Wikipedia archive I mentioned above in 2.6 years.
+
+It's also at the minimal lower limit where you can do real-time voice
+transmission.  Many voice codecs (from early LPC work in the 1970s to
+HVXC and Speex today) have modes between 2 and 3 kilobits per second.
+I think transmitting intelligible speech at 1kbps is feasible, but
+only barely, and I don't know if it's been done.
+
+At a thousand bits per second, you can completely kick the ass of
+printing-press-based communication systems, both providing instant
+hypertext access to faraway data stores and accumulating the
+equivalent of thousands of locally-stored books per year, plus, of
+course, email.
+
+### Ten thousand bits per second ###
+
+This is the speed at which much of Fidonet operated.
+
+Possible communications hardware and algorithms
+-----------------------------------------------
+
+The very low power levels involved suggest that it might be possible
+to do these ultraslow transmissions with extremely steampunk
+equipment, or not even that.  For example,
+for radio communication, perhaps you could trigger a
+static-electrical spark from a Wimshurst Influence Machine at
+intervals driven by holes in a rotating glass sphere, firing an
+electrical impulse into a dipole antenna.  But a Wimshurst machine can
+produce more than a watt of power; a simpler generator, such as your
+hair and a balloon, might be sufficient.  You just have to time your
+sparks correctly to make them interpretable by your (presumably much
+more capable) receiver, and successfully couple them into your
+antenna, maybe with a low-Q resonator containing a coil and a Leyden
+jar.
+
+(In theory, maybe you could decode such a low-bandwidth signal by
+hand, too, but it's not obvious to me how you'd do it.)
+
+(The earliest non-spark-gap radio, the Poulsen arc, used a carbon arc
+as a negative-resistance device to produce a dynatron oscillator; I
+think you could also use just about any gas discharge tube, such as a
+fluorescent lamp tube or even a fluorescent lamp starter.)
+
+Of course, multiple ultraslow radios could form a very slow
+packet-switching network.
+
+Moving further into the steampunk and cargo-cult direction, you could
+imagine a shorter-range purely passive radio transmitter, like a sort
+of switchable analog RFID tag.  The "receiver" would wait for the
+transmitter to be energized by electromagnetic pulses produced by
+nearby lightning strikes; then it would measure a variable set of RF
+resonances in the device.  A Leyden jar might have a nanofarad of
+capacitance, and a variable inductor with up to about a henry of
+inductance can be fairly easily constructed by hand, the two forming a
+tank circuit with a resonant frequency of as little as 5kHz and a Q of
+perhaps 100; a large number of such resonant circuits connected to an
+antenna will "ring" for tens or hundreds of oscillations when
+subjected to a radio impulse.  If their frequencies are chosen in
+accordance with some kind of error-correcting code, a distant detector
+will eventually be able to determine what those frequencies are, after
+detecting enough impulse responses.  Multiple receiving antennas could
+provide enough phase diversity to do beamforming.
+
+Such a device is fairly inefficient, since most of the energizing
+pulse energy will not coincide with a resonant frequency of the
+transmitter and will thus simply reflect from the antenna.  If you
+could store the pulse in some kind of device that allowed you to use
+it to continuously energize the resonators until it dissipated, you
+could use more of it.  For example, with a semiconductor diode, you
+could store much of the pulse in a capacitor, and use that to power
+active oscillator circuits; or if you could circulate it through some
+kind of delay line, such as a piezoelectric acoustic delay line, you
+could use any nonlinear but nondissipative circuit element to shift
+some of the remaining pulse energy into resonable harmonics or
+subharmonics on each circulation through the system.
+
+Pulse radio would allow for relatively reasonable decoding electronics
+and algorithms: while your average power might be, say, 100
+milliwatts, if you're only transmitting for 100 microseconds out of
+every minute, that transmission would be at 60 kilowatts.  (If it's a
+single 100-microsecond pulse, it would be a six-joule pulse; into a
+63-ohm antenna impedance, it would be a momentary current of 31 amps,
+driven by 2000 volts, which could be stored in 3 microfarads, so this
+wouldn't require any particularly exotic circuit design.)  Detecting
+the pulse at even a very substantial distance should not require
+particularly sensitive or highly linear analog electronics; the
+remaining task, then, is to figure out which subset of the detected
+pulses represent a decodable message.
+

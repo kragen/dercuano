@@ -1,0 +1,156 @@
+I've written before a bit about "transparency holograms" and how they
+might be useful as an archival medium for text.  Here I want to do
+some calculations on that.
+
+Let's suppose we're printing out on both sides of a 4-mil (102μm)
+Mylar transparency foil, using the simple grille pattern where all but
+one pixel is blacked out in each N×N square; I'll take N to be 7 in
+this case, and assume 600dpi, so the grille has a hole spacing of
+7"/600 = 296μm, or 85.7 dpi.  The other side of the foil has the
+pixels of 49 different 85.7 dpi pages interleaved.  (For the moment
+I'll assume this is for a viewing distance of infinity.)
+
+If we use a 6-pixel-tall font for text, which works out to 5.04 points
+at 85.7 dpi, each of the 49 pages has space for 157 rather long lines
+of text, about 208 characters each if we assume an average of 3.5
+pixels.  (I don't remember if this is the right average from
+bible-columns.png.)  That's about 1.6 megabytes of text on the
+transparency, and it should all be visible to the naked eye, hopefully.
+
+Do the viewing angles work out?  The angle between two pages needs to
+not be impracticably small, and the angle for the most extreme left,
+right, top, or bottom page needs to not be impracticably large.
+Mylar's index of refraction is about 1.6, so those 101.6 microns are,
+optically speaking, closer to 63.5 microns.  But our 600dpi page has
+42.3μm pixel spacing, which means that we have to go 25° to the left,
+right, up, or down to see the next pixel in that direction: 20 cm to
+the side at a viewing distance of 50 cm.  The refraction linearizes
+this somewhat, so the next page is closer to being 20 cm further to
+the side than to being 25° further; about 60cm to the side gets you to
+the third page.  So we can do 7×7 without extremely distorted viewing
+angles—barely!  At the extreme corners of viewing angle, the page is
+foreshortened by 36% in both X and Y dimensions.
+
+So at 600dpi on heavy-duty transparency film, it's barely doable; at
+1200dpi it's eminently doable, with more like 6 megabytes of text per
+page; at 300dpi you would need thicker transparency film.
+
+14-mil (356μm) and 7-mil (178μm) Mylar sheets are sold as art supplies
+for making stencils, pre-frosted on one or both sides, even.  This
+would work even with a 300dpi printer, but necessarily with a wider
+grille spacing.  "Matte Dura-Lar" is one brand name for double-frosted
+Mylar.  "Drafting film" is another way this kind of thing is sold.  I
+suspect that clear film will work better, though.  Grafix, the
+manufacturer of Dura-Lar, claims that neither inkjet nor laser will
+print on Dura-Lar, but other people claim success with inkjet, while
+claiming that the laser-printer heat curls up Mylar.
+
+A related idea: shrink film, like Shrinky-Dinks, might enhance the
+resolution of a printer at the same time as thickening the film; it
+shrinks 2:1 when heated, which should quadruple its thickness,
+initially 254μm.  But I don't know if it's available in transparent,
+and it's made of polystyrene, which is apparently not archival-safe if
+exposed to ultraviolet or, maybe, oxygen.  However, it seems that
+polystyrene's better-knn problem is that it's so stable that it can
+last a long time after being discarded, resisting biodegradation and
+photodegradation for up to centuries.  (Obviously you can't put shrink
+film through a laser printer.)
+
+Mechanically, though, polystyrene is far, far more fragile than PET.
+PET stick-on films are used to make windows smash-resistant and even
+mildly bullet-resistant.
+
+At the other end of the spectrum, polycarbonate ("bulletproof glass")
+can be recovered from CDs, and is, ounce for ounce, less fragile than
+almost anything, although it has a weakness for ammonia and other
+alkalis.  Melting CDs also causes them to shrink, just like
+polystyrene shrink film; but they're optically clear.  It's also an
+archival-stable plastic.
+
+A test
+------
+
+I snarfed rosettaproject_zul_gen-1.pdf (SHA1
+296b27e22a720a8d3c10fa971d262f798b27906d) from
+<https://archive.org/details/rosettaproject_zul_gen-1> and converted
+it first to PS with pdf2ps, then to 100dpi PNGs.  GhostScript by
+default just does point sampling rather than antialiasing, which is
+shitty and loses parts of letters entirely when rendering bitmaps at
+low resolution, so I antialiased by brute force with ImageMagick:
+
+    time gs -dNOPAUSE -r300 \
+        -sOutputFile=rosettaproject_zul_gen-1-large-p%d.png \
+        -sDEVICE=pnggray -dBATCH rosettaproject_zul_gen-1.ps 
+    time for x in rosettaproject_zul_gen-1-large-p*; do
+        mogrify -scale 827x1169! -threshold 90% "$x"
+    done
+
+827×1169 is from `units A4paper` telling me A4 is 210mm by 297mm, and
+that those work out to be 827 and 1169 pixels respectively at 100dpi.
+The `!` is to indicate that the images are to be stretched and
+squeezed as necessary to make them fit, because by default ImageMagick
+preserves aspect ratios and doesn't fit the box.  The `-threshold`
+option is to convert the image to bilevel, while dilating the
+letterforms somewhat to keep any lines from getting lost.
+
+Anyway, then I use the `interleave.py` I just wrote using PIL;
+unfortunately this is only 5 pages, so to get to 3×3, I had to
+duplicate some.
+
+    time ./interleave.py \
+        rosettaproject_zul_gen-1-large-p1.png\
+        rosettaproject_zul_gen-1-large-p2.png\
+        rosettaproject_zul_gen-1-large-p3.png\
+        \
+        rosettaproject_zul_gen-1-large-p4.png\
+        rosettaproject_zul_gen-1-large-p5.png\
+        rosettaproject_zul_gen-1-large-p5.png\
+        \
+        rosettaproject_zul_gen-1-large-p5.png\
+        rosettaproject_zul_gen-1-large-p5.png\
+        rosettaproject_zul_gen-1-large-p5.png
+    mv interleave-output.png bible-zulu-interleaved.png
+
+`interleave.py` took like 3½ minutes to do this, and the result looks
+okay.
+
+(Now I guess I need to turn that into a PDF so I can print it, plus
+printing the grille.)
+
+My theory on the numbers on this prototype is that, even if the number
+of pages changes, the size of the composite pixels shouldn't; there
+should still be about 86 of them per inch in each direction.  This
+image has 100 of them per inch in each direction, and only 9 pages;
+this should be less challenging in the dimensions of legibility,
+viewing angle delta, brightness, and maximum viewing angle.
+
+A thing that surprised me about this, but shouldn't have, is that some
+of the text is readable without the grille.  In particular, since page
+5 is repeated 5 times, it's quite readable despite the other four page
+images interfering.
+
+A second test
+-------------
+
+I downloaded Murray R. Spiegel's "Mathematical Handbook of Formulas
+and Tables" from
+<https://archive.org/details/MathematicalHandbookOfFormulasAndTables>
+(SHA1 efc83d86ae251e4ef7bf6ec852caeb95708ba98d) and extracted pp. 27,
+28, 30, 31, 37, 38, 39, 40, and 43 with Evince's "print; range;
+pages" to a PDF file.  Then I processed this into PNGs:
+
+    time gs -dNOPAUSE -r300 -sOutputFile=spiegel-select-p%d.png \
+        -sDEVICE=pnggray -dBATCH ~/Documents/spiegel-select.pdf
+    time for x in spiegel-select-p*; do
+        mogrify -scale 827x1169! -threshold 70% "$x"
+    done
+
+The 90% threshold came out shitty because this book contains gray
+halftoning with super important black text in it, but a 50% threshold
+washes out the text badly.  70% was better than either 66% or 75%,
+although it still has some problems.
+
+    time ./interleave.py spiegel-select-p*
+    mv interleave-output.png spiegel-interleaved.png
+
+It seems to have worked pretty well.

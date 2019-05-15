@@ -1,0 +1,288 @@
+In outgoing-notes-mail-01.
+
+A resistive-capacitive trackpad made from garbage and three ADC microcontroller pins
+====================================================================================
+
+(Not yet tested.)
+
+It occurred to me that you can probably make a resistive trackpad out
+of pencil lead on paper, sensing the position of a conductive probe in
+the conductive patch by measuring the resistance to various points
+around the edge many times per second.  This should be doable with a
+few tri-stateable digital GPIO pins and a capacitor whose discharge
+time we measure, or a few analog input pins.
+
+Perhaps you could even make this work with human fingers, even
+providing multitouch, even capacitively through a protective surface
+layer (say, a plastic shopping bag) to keep the graphite off your
+fingers, protect the microcontroller from static electricity, and
+maybe keep you from getting shocked by power surges.
+
+It turns out that, in theory, the resistance in a uniform flat sheet
+is low and highly dependent on probe contact area when your probes are
+close together, but then approaches some limit, determined by the
+resistivity and thickness, as your probes get further and further
+apart.  This might mean you need to have quite a number of probes.
+
+Normal trackpads work differently
+---------------------------------
+
+Normal resistive trackpads have a grid of wires, with the X and Y
+wires running in two separate layers and a resistive layer between
+them, which becomes less resistive under pressure.  Normal capacitive
+trackpads have a grid of wires, too, but use capacitive coupling to
+your finger instead of sensing pressure.
+
+This trackpad design doesn't have a grid of wires at all, just a
+resistive plane, which is much easier to fabricate.
+
+Resistance tests with pencil lead
+---------------------------------
+
+In my first test, I blackened a patch on a post-it note (Stick'N
+brand) rather thoroughly with an HB pencil, moving the post-it around
+a bit to blacken in different directions to avoid voids in the
+graphite caused by roughness of the desk surface, and measured with an
+ohmmeter resistances of some 2–5kΩ over distances of 1–4 cm, and as
+low as 1kΩ with probes close together (≈1mm).
+
+(As predicted by theory, the resistance depends strongly on probe
+contact area.  Using a couple of big coins, I was able to get
+measurements down to 300Ω, and the limit at larger distances was about
+2kΩ instead of 5kΩ.)
+
+In a second test, instead, I drew a grid which was about 90% empty
+space and 10% fairly dark lines with the same pencil.  With this, I
+was able to get readings of a few hundred kΩ on my ohmmeter over
+distances of a centimeter or so, but they weren't very consistent.
+
+In a third test, I gradually darkened a patch with the pencil until I
+started to get consistent continuity between different parts of the
+patch, at which point I was getting readings of 200–500kΩ over 1–4 cm,
+although I don't totally trust my analog ohmmeter at such large
+resistances.  Even with the probes separated by only 1mm or so, I was
+still getting 100kΩ or so.  This patch was much less dark than the
+other one, but the other one certainly did not contain 100 times as
+much graphite; so I assume that the majority of the graphite particles
+in this one are not participating in the conductivity.
+
+I hypothesize that you might be able to reliably get an even higher
+sheet resistance this way, but it might help if you have really smooth
+paper to start with — glossy magazine or inkjet-photo stock, say.
+
+Measuring distance to the capacitive patch where your finger is
+---------------------------------------------------------------
+
+If you press your finger against a layer of polyethylene on top of the
+pencil lead, your finger and the pencil lead form a capacitor.  (I
+thought about using paper instead of polyethylene, but it's six times
+as thick.)
+
+Your finger contact area might be 1.5cm², and a plastic shopping bag
+might be 13 μm thick, according to Multi-Pak's "Thick and Thin of
+Plastic Bags".  C = εA/d, and the permittivity ε of polyethylene is
+2.25 times that of free space ε₀, which is about 8.9 pF/m.  So we have
+8.9 pF/m * 2.25 * 1.5cm² / 13μm ≈ 220pF.
+
+Now, we'd like the circuit capacitive reactance to be close to the
+resistance of the pencil lead in the distance from the point of
+contact to the place where the measurement terminals are attached.  If
+the resistance is much greater than the capacitive reactance, the
+signal will be attenuated unnecessarily, making the circuit too
+susceptible to noise; if it's much smaller, the signal will reach all
+of the measurement terminals almost equally, and you won't be able to
+tell where on the paper the touch happened.  Let's say the pencil lead
+resistance is in the 1–30kΩ range, or 10kΩ, to be concrete.
+
+It turns out that people have about 1pF of capacitance to power lines,
+and also about 100pF of capacitance to ground.  If we use that
+capacitance to ground, then we can use an AC voltage we send into the
+trackpad ourselves, at a frequency chosen to optimize the capacitive
+reactance, and most of the circuit reactance will be from the 100pF
+reactance to ground.
+
+(Note that this depends on your skin.
+<http://dev.laptop.org/ticket/8071> reports that people with calloused
+hands had trouble with the early OLPC XO's capacitive trackpad because
+the dry callous put people's blood too far from the trackpad.  If
+we're depending on a dielectric thickness of 13 microns, we'll have
+the same problem.  I guess you can lick your fingers though.)
+
+So if we want 10kΩ of capacitive reactance out of 100pF,
+X_C = 1/(2πfC), so we have f = 1/(10kΩ * 2π 100pF) ≈ 160kHz.  It's
+trivial to generate a 160kHz square wave on pretty much any
+microcontroller, and if your VCC is 5V, it's pretty much 5V
+peak-to-peak and 2.5V RMS.  That should be easy as pie to sense: with
+14kΩ impedance, it's 180 microamps, -3dBm.
+
+To look at it in the time domain instead of the frequency domain,
+we're charging the patch of graphite under your finger up to 5 volts
+or whatever VCC is, through the resistance of the graphite between
+that patch and our probe.  The time it takes to charge it up will tell
+us the RC product of that system, and we expect it to be on the order
+of 6μs, which is a time that we can measure to about 6 bits of
+precision without even using an ADC.  If we do use an ADC, like the
+10-bit ADC on a lot of AVRs, we should be able to estimate the RC time
+constant of the charging curve to higher precision.
+
+The RC constant by itself tells us very little, because we don't know
+the area of the finger contact patch, and that's a factor of C.  But
+if we have several different probes in different locations, we can
+probe with each of them in sequence; we can assume the finger contact
+patch isn't changing much in 6μs.  This tells us something about the
+relative distances, from which we can estimate the position of the
+contact patch; and given that, we can estimate its area.
+
+It's common to have fewer pins capable of ADC input than capable of
+digital output.  But I think that doesn't need to be a limitation for
+this application; you can use one probe to measure the voltage the
+contact patch is charged to, while using another one to apply the
+charging pulse.  As long as the input impedance of the ADC pin is high
+compared to the impedance of the contact patch's path to ground, the
+ADC probe voltage should follow the contact patch's voltage very
+closely — unless it's too close to the active probe, in which case it
+will see some kind of weighted average of the active probe's voltage
+and the contact patch's voltage.  The ATMega328 datasheet
+(doc8161.pdf) says the input pin capacitance is a max of 10pF (p.321),
+so the ADC input capacitance shouldn't be a big problem.  It should be
+possible to separate out the weighted-average components, since
+they'll have two very different time constants.
+
+So I think you should be able to get by with three or four ADC pins at
+different corners of the touch area, with active probes in potentially
+more places; at least two active probes and, I think, three total
+probes will be needed to triangulate unambiguously.  So you need at
+least three ADC pins and two GPIO pins, but the ADC pins can double as
+GPIO pins.
+
+6μs might be *too* fast; while the ATMega328 can do a sample-and-hold
+more quickly than this, it needs much more time to do a complete ADC
+conversion.  So you might end up having to build up the picture of the
+complete charging waveform by sampling one point on each of a number
+of charging waveforms, by adjusting the "phase" delay between the
+initiation of a charging pulse and the ADC measurement.
+
+Alternatively, as described in the section above about my experiments,
+you might be able to simply establish a thinner film of pencil lead to
+further increase the R part of the RC time constant.  60μs should be
+plenty of time.
+
+You probably need at least four data points on each curve to untangle
+the effects of R, C, and the effect of resistively-coupled voltage
+from the active probe.  You're measuring, minimum, six separate
+curves, so you need at least 24 data points.  If you need 13 μs per
+data point, at which point the ATMega328 datasheet says the error is
+4.5 ulps (LSB), which I guess is ±, so you really only have about 7.5
+bits of accuracy, then you need 312 μs to take a full position and
+patch size measurement.  You can probably average your measurements
+over considerably more than that, which means you can measure many
+more points per curve.
+
+If your final measurements are a result of measuring each curve 64
+times instead of 4, giving you 5 ms latency, your estimates for R
+should be good to about 11 or 12 bits, and your estimates for C (since
+you're measuring it six times as often) should be good to about 14
+bits.  All in all, this gives you 6*11.5 + 14 = 83 bits of data, which
+is probably highly redundant, but which can hopefully localize your
+finger with great precision.
+
+Resistive-touchscreen style
+---------------------------
+
+Wikipedia explains analogue resistive touchscreens as follows:
+
+> two flexible sheets coated with a resistive material and separated
+> by an air gap or microdots.... during operation of a four-wire
+> touchscreen, a uniform, unidirectional voltage gradient is applied
+> to the first sheet. When the two sheets are pressed together, the
+> second sheet measures the voltage as distance along the first sheet,
+> providing the X coordinate. When this contact coordinate has been
+> acquired, the voltage gradient is applied to the second sheet to
+> ascertain the Y coordinate.
+
+This also seems like it might be a reasonable approach to use with two
+sheets of paper.  You could dump eraser crumbs or a few curly hairs or
+something in between them to keep them mostly apart when they're not
+being pressed.
+
+Alternative materials
+---------------------
+
+Pencil lead is one useful and easily available resistive material that
+can be easily deposited in a film, for example on paper; actual lead,
+aluminum, gold, and carbon black are four others.  Lead is about 50
+times more conductive than pure graphite, and pencil lead is only part
+graphite.  Aluminum and gold are another 10 times more conductive
+still.
+
+Aluminum has the potential advantage for this application that it's
+widely available in the garbage in large, highly uniform sheets
+sputtered onto Mylar, which are then coated with an insulating layer
+of plastic even finer than a plastic grocery bag.  These layers of
+aluminum are so thin that they're actually visibly transparent, when
+there isn't too much ink on top of them.  If you put LEDs behind them,
+you could make an actual touchscreen.
+
+However, I have so far been completely unsuccessful at making
+electrical connections to these aluminum layers.  Aluminum is
+notoriously tricky to connect to electrically at the best of times,
+due to sapphire spontaneously forming on its surface, and much more so
+when it's in the form of a sub-micron-thickness film inside a much
+tougher plastic film.
+
+Aluminum rubbed onto the surface of paper, like pencil lead or lead,
+might be more promising, especially if you drip solder or something on
+top of it immediately afterwards.
+
+Charcoal is, in theory, somewhat conductive, and you can rub it on
+paper, but in my feeble attempts with a burned match, I haven't been
+able to get it to conduct.  It's easier to come by in garbage than
+lead, graphite, gold, or bulk aluminum, so it might be worth further
+investigation.
+
+Gold is expensive, but gold leaf is so thin that it's cheap enough
+that people throw it away, or even drink it in Goldschlager.  I don't
+have any handy here, but it might work for this.
+
+Carbon black is conductive, and indeed is used in the microphone
+design that made the telephone practical, since its resistance varies
+with pressure.  It's also easy to deposit in a film on a surface: you
+burn something, anything carbon-bearing, with a flame, and the smoke
+deposits as a film.  (If the flame is too clean-burning, you may have
+to put an object actually inside the flame to get the carbon black to
+deposit.  You can do this with a cigarette lighter.)  I think you can
+get a more uniform film this way than by rubbing solid objects onto
+abrasive paper, but the film is very fragile, except where it's
+nestled down into a pore in a porous surface.
+
+However, its very fragility means that you can very easily cut very
+fine lines into it: if you deposit it onto glass or plastic, you can
+rub it off with your finger, or the end of a wire, or a piece of dry
+grass.  If you had a way to deposit some kind of insulating fixative
+on top of it (superglue? boiled linseed oil? dried eggwhite? glue down
+a shopping bag?) and deposit more carbon black on top of that, maybe
+you could make the grid of wires used in traditional capacitive
+trackpads.
+
+Paper, as I mentioned before, is another possible dielectric; its big
+disadvantage is that it's typically several times thicker than a
+shopping bag.  However, it might have advantages, too.  You can write
+on it more easily.
+
+It would be cool to have a transparent dielectric that can be
+illuminated from the edge, because then you could have like glowing
+letters and shit etched into its surface illuminated by total internal
+reflection, like the menu for every third tourist bar in this damn
+town.  Unfortunately, I don't think you can do that in a sheet of
+dielectric that's thin enough to leave a reasonable amount of
+capacitance between your finger and the graphite.  If it's 100 microns
+thick, the thickness of paper, the capacitance drops to 30 pF; if it's
+200 microns thick, it drops to 15 pF.  It might be hard to sense a
+mere 15 pF on top of the 7–10 pF on every AVR input pin and the ≈14pF
+of the sample-and-hold capacitor.
+
+If you find an unbroken LCD screen in the garbage, you ought to be
+able to use the transparent indium tin oxide ("ITO") electrodes
+deposited on the glass surface for a high-resolution grid of wires.
+But it might be cooler to use it as an LCD.
+

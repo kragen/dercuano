@@ -1,0 +1,344 @@
+How can we keep Nintendo games playable and WordPerfect 5.1 files
+readable in the 23rd century?
+
+There's a page on Wikipedia entitled "UVC-based preservation".  "UVC"
+stands for "universal virtual computer", and the idea is that you keep
+old file formats from becoming unreadable by writing readers for them
+that run on a virtual machine that never changes.  That way, if
+someone in 2251 discovers a long-lost WordPerfect 5.1 document
+containing crucial historical information, they can run it through a
+WP5.1 reader written in the 2010s to run on the UVC.  The UVC
+implementation they use in 2251 will be different from the UVC
+implementation we use in the 2010s, but they will be compatible.
+
+The idea here is to emulate the hardware platform WordPerfect ran on
+with a UVC program, which seems sensible, and the Koninklijke
+Bibliothee has been working on an x86 emulator using this approach,
+and they have JPEG and GIF87 decoders working.  They've also,
+bizarrely, been trying to develop file-format exporters that convert
+things from old file formats to XML.  (Raymond Lorie's reason for
+wanting this is that, you know, it's better to have the parse tree and
+text of the WordPerfect file than just the pixels that emulated
+WordPerfect puts on your emulated screen.)
+
+What's necessary for a UVC from the 23rd Century to be compatible with
+a UVC we write today?  It seems like the UVC itself needs to be well
+documented, contain a bare minimum of functionality, be easily
+testable for compliance, and have very, very few special cases in the
+specification, since special cases are opportunities for
+incompatibility; but despite that, it needs to be a reasonable target
+to write a compiler for.  Finally, I argue that a UVC ought to have
+predictable performance.
+
+The impracticality of Raymond Lorie's UVC
+-----------------------------------------
+
+Lorie's UVC is specified to some extent in his paper, "[A Methodology
+and System for Preserving Digital
+Data](http://old.hki.uni-koeln.de/teach/ss06/DL/material/p312-lorie.pdf)";
+he explains in his rationale:
+
+> In order to run the UVC on a future machine, an emulator of the UVC
+> on that machine will be required; but writing such an emulator is
+> much simpler than writing an emulator for a real machine....
+
+> What is important however is that it does not need to be implemented
+> physically. Therefore there is no actual physical cost. For example,
+> the UVC can have a large number of registers; each register can have
+> a variable number of bits plus a sign bit, the sequential memory,
+> also, can be as large as desired. Speed is not a real concern since
+> machines will be much faster in a distant future, and an emulation
+> of the UVC on a future machine will run faster, much faster, than a
+> machine language program running on today’s machines.
+
+And then:
+
+> Since a UVC interpreter will need to be written in the future, the
+> definition of the UVC must be precisely specified and
+> preserved. ... Only the UVC machine language is part of the
+> Convention (although we implemented a high-level assembler, and
+> could develop, at any time, a compiler supporting a high level
+> language in vogue.)
+
+But then he sort of loses the plot:
+
+> The design goal for the UVC was not to define a minimal
+> general-purpose computer. Instead, the idea was to develop an
+> intuitive computer with rather powerful and flexible instructions
+> for handling bit streams, and to take advantage of the fact that it
+> is virtual and that performance is of secondary importance. ...,
+> without secondary features often introduced for improving the
+> execution performance and the memory usage. It also tries to be
+> intuitive. ... The memory is bit addressable; there is no notion of
+> byte, word or alignment. This is extremely convenient for
+> manipulating bit streams. ... The interface allows for variable
+> length registers, allowing for manipulation of large addresses, and
+> of course, large integer data items. A register expands to the left
+> when needed. There is no overflow condition.  ... The instruction
+> length is also variable; it may have a variable number of operands.
+
+This seems rather strongly opposed to the primary goal of "Since a UVC
+interpreter will need to be written in the future, the definition of
+the UVC must be precisely specified and preserved."  Instead he has
+created a virtual machine specification that is unnecessarily
+difficult to implement, unnecessarily difficult to specify precisely,
+and impossible to test — while you can verify that an implementation
+of the UVC correctly handles, say, 128-bit integers or 256-bit
+integers, you can't test that it correctly handles integers of all
+possible lengths.  And in fact it is nearly guaranteed that it will
+not.  (The machine I'm typing this on has RAM and disk sufficient for
+a single 1.2-petabit integer, and is pretty much guaranteed to not be
+able to execute an operation involving two petabit integers.)
+
+Plauger explained in one of his books why the C standard only required
+compilers to handle things up to certain limits: block nesting up to a
+certain depth, variable names of a certain length, and so on.  Some
+earlier standard (I am guessing ALGOL-60 or perhaps Pascal) had
+required compilers to handle arbitrarily long names successfully.
+Somebody published standards-compliance test suites that included a
+test for long names, but since they couldn't test arbitrarily long
+names, they tested names of some large but finite length: 16 letters,
+maybe.  And all the compiler vendors made their compilers pass the
+tests.
+
+So, in effect, there was still a limited portable name length, even
+though the standard specified that there shouldn't be such a limit.
+This requirement in the standard simply resulted in the limit being
+undocumented.
+
+Lorie ends up with 21 machine instructions and a segmented memory
+model. The instruction encodings are not specified in the paper,
+making it impossible to implement a UVC interpreter from the paper.
+He admits that his UVC emulator limits registers to 32 bits, memory
+segments to 8 megabytes and 100 registers each, and so on.  Also, he
+neglects to mention crucial things like what happens when the "divide"
+instruction gets a division by zero.
+
+It seems to me that if you take seriously the ideas that "speed is not
+a real concern,", "the definition of the UVC must be precisely
+specified and preserved,", and "develop a compiler," you will end up
+with something quite different — something much closer to a "minimal
+general-purpose computer", with no thought whatsoever given to
+"powerful and flexible instructions" and "develop an intuitive
+computer".  Instead you'd want a virtual machine that was very easy to
+write an emulator for, very easy to test an emulator for, and unlikely
+to have subtle bugs or implementation-dependent behavor.
+
+In short, you'd want something much more like Brainfuck, Wireworld, or
+Urbit Nock, than like the UVC in Lorie's paper.
+
+Brainfuck
+---------
+
+Brainfuck (inspired by Wouter van Oortmerssen's FALSE) is specifically
+designed to be as easy as possible to write an emulator for.  The
+original implementation, written in 1993 by Urban Müller for AmigaOS,
+was 240 bytes, and was a compiler.  Several Brainfuck compilers under
+200 bytes have been written; [Brian Raiter's 166-byte Linux compiler is
+notable](http://www.muppetlabs.com/~breadbox/software/tiny/bf.asm.txt).
+It has 8 instructions with no operands, two registers, simple linear
+memory, and I/O.  The memory cells are guaranteed to be 8 bits, and
+you're guaranteed at least 30,000 of them.
+
+Brainfuck is very hard to program in (thus its name) but people have
+written real programs in it; Linus Åkesson wrote [the Game of
+Life](http://www.linusakesson.net/programming/brainfuck/), for
+example, and [Daniel B. Cristofani wrote a Brainfuck interpreter in
+Brainfuck](http://www.hevanet.com/cristofd/brainfuck/), and an
+anonymous author wrote a [implementation of DVD CSS decryption in
+Brainfuck](http://www.cs.cmu.edu/~dst/DeCSS/Gallery/css-brainfuck.txt).
+
+If you somehow managed to write an Nintendo NES emulator in Brainfuck,
+you could be sure that any future computer could play NES games as
+soon as it had a sufficiently fast Brainfuck interpreter.
+Implementing a Brainfuck interpreter is easy (I wrote my first one in
+22 minutes, in C, at 4 AM, and now I am running the Game of Life in
+it, veerrrry sloooowly) and so we can be sure that programmers in the
+future will be able to do it too.
+
+But Brainfuck, Turing-complete and I/O-enabled though it may be, is
+probably not a reasonable compilation target.  It lacks not only
+function pointers (as I think Lorie's machine does) but also functions
+and, in some sense, pointers, and it isn't clear to me how to, say,
+implement a linked list.
+
+And even Brainfuck has incompatibilities between interpreters.  Some
+interpreters, for example, provide bignum cells, which means you can't
+zero an arbitrary cell just by repeatedly incrementing or decrementing
+it until it reaches zero (e.g. with `[-]`); and there are different,
+incompatible, and ambiguous ways of handling end-of-file on input (0,
+-1, or unchanged, any of which could be a valid input byte).
+
+Brainfuck is also a challenge to implement efficiently; copying a
+value from one cell to another, for example, involves alternating
+between decrementing the value in one cell and incrementing the value
+in the other.  Recognizing this idiom can speed up your interpreter by
+a couple of orders of magnitude.
+
+Wireworld
+---------
+
+The Wireworld cellular automaton is, in some sense, even more extreme
+than Brainfuck: when you start, it's a challenge to figure out how to
+AND two bits together, adding two numbers is at least a one-day
+project, and even a single bit operation on a naïve implementation
+takes many thousands of instructions.  It has the unfortunate problem
+that your circuit has no external memory; it cannot expand.
+
+Wireworld also has even less predictable performance than Brainfuck,
+in the sense that a "smart" implementation can recognize progressively
+bigger patterns.
+
+Nock
+----
+
+The Urbit virtual machine named
+[Nock](https://github.com/cgyarvin/urbit/blob/master/doc/book/1-nock.markdown)
+is the first serious attempt I've seen to define a minimal
+computational machine for purposes of interoperability and
+preservation.  Nock, unlike Brainfuck, is pure-functional; its data
+model can be expressed in OCaml as:
+
+    type noun = Atom of int | Cell of noun * noun
+
+except that Nock, like Lorie's machine and unlike OCaml, uses
+arbitrary-precision integers.  (Yarvin writes that it's "common" to
+represent whole text files as atoms, so we should expect integers of
+hundreds of thousands of bits at least.)
+
+Nock has five instructions: `*` function invocation, `?` type
+dispatch, `+` increment, `=` equality testing, `/` array indexing; but
+function invocation has 11 opcodes defined (as the numbers 0 through
+10, as atoms) which do things like function composition, the S
+combinator, and the ternary operator.
+
+Open Firmware/OpenBoot
+----------------------
+
+Open Firmware defined a Forth bytecode "FCode" for non-x86 PCI card
+BIOS drivers.  However, its core functionality is ANS Forth, and as
+such, it's relatively large and complicated.  There's no chance people
+will stop introducing subtle changes in the semantics of Forth
+operations over the next few centuries.
+
+The λ-calculus and the ς-calculus
+---------------------------------
+
+In light of the above horrors, perhaps it might make sense to use
+something like the λ-calculus or core Lisp (cons, car, cdr, atom,
+null, cond, eq, nil, lambda, label, quote) as our UVC?  Or, if we were
+interested in human-editability, Abadí and Cardelli's ς-calculus or
+object calculus might be an almost equally simple choice?
+
+The problem with these as they stand is twofold:
+
+1. Implementing them on real computers, while achievable and in fact
+achieved many times over, is substantially less trivial than
+implementing Brainfuck.  Nobody is going to write a 166-byte
+λ-calculus compiler.
+
+2. You need to augment them with some kind of numerical operations.
+Brainfuck has increment, decrement, and while-nonzero.  Nock has
+increment and equality-test.
+
+Performance
+-----------
+
+Most of the things I've mentioned so far require loop analysis to get
+decent performance — adding X to Y by repeated incrementation will
+take X steps with a simple interpreter, but only 1 step with an
+interpreter that is able to analyze the loop's performance.
+
+While it's unavoidable that different implementations of a virtual
+machine will differ in performance by potentially large factors, I
+don't think it's unreasonable to ask them to be in the same big-O
+complexity class!  So I think you probably want at least addition in
+the basic operations.
+
+(In some sense, if your fundamental data items are limited in size,
+then this O(N) slowdown becomes an O(1) slowdown; 255 increments is
+still only a constant factor larger than a single addition.)
+
+So I think it might be worthwhile to consider RAM machines with some
+kind of built-in arithmetic.
+
+This also argues against including garbage collection in the basic
+model, which is necessary for computational models like the
+λ-calculus, pure Lisp, and Nock.  Maybe it's not a strong argument,
+though.
+
+SUBLEQ, an OISC
+---------------
+
+SUBLEQ is of the family of one-instruction-set computers.  It's an
+assembly instruction that is sufficient to construct arbitrary
+computations without needing any other instructions.
+
+The SUBLEQ or SBN instruction is "subtract and branch if less than or
+equal to zero": `SUBLEQ a, b, c`, where all three operands are memory
+addresses, subtracts the value at a from the value at b, branching to
+c if the result is negative.
+
+This instruction is sufficient for arithmetic, conditional and
+unconditional jumps, and memory transfer; but it does not, in itself,
+support indirection of either memory reads, memory writes, or program
+transfer.  So it doesn't give you pointers, arrays, structs, or
+functions.
+
+There are several ways to get them, though.  You can use
+self-modifying code to modify any of the addresses in an instruction,
+although not to pass a return address to a subroutine.  You can
+redefine the instruction's addresses to be indirect, or indeed support
+multiple addressing modes.  You can memory-map the program counter.
+
+MOVE machines
+-------------
+
+Once you start memory-mapping core parts of the processor, though,
+you're getting into MOVE machine territory (aka "transport-triggered
+architecture").  MOVE machines are another kind of OISC.  If you map
+the following things into fixed places in memory:
+
+* the program counter;
+* an index register;
+* the memory cell pointed to by the index register;
+* a "subtractor" register which subtracts upon write rather than overwriting;
+* a "signum" register which reads as -1, 0, or 1 after having a negative,
+  zero, or positive value written to it, or alternatively after the subtractor
+  produces such a result;
+
+then you have a Turing-complete machine that supports pointers, array
+indexing, function calls, function pointers, arbitrary arithmetic,
+loops, if-statements, structs, exception handling, multithreading,
+dynamic dispatch, and so on.  You handle a pointer by writing the
+pointer to the index register and then reading or writing the indirect
+cell.  You zero the subtractor by subtracting it from itself.  You get
+array indexing by subtracting an offset from the "base address" of the
+end of the array.  You get conditional values by array indexing with
+the signum register, and if-statements by moving such a conditional
+value to the program counter.  A function call copies the stack
+pointer to the index register, copies the program counter to the
+cleared subtractor register, adds a fixed offset to it, saves the
+subtractor output on the stack, and then moves a constant to the
+program counter.  And so on.
+
+You can try to cast that into a set of instructions and/or addressing
+modes, but you're going to end up with more than the five things
+listed above.
+
+Historically, MOVE machines have been parallel with tricky timing
+constraints that vary from one version to the next, and so they might
+not seem like great candidates for a UVC.  But this one is defined in
+a strictly serial fashion.
+
+Interrupts and I/O
+------------------
+
+Interrupts are arguably just an efficiency hack: instead of scanning
+the keyboard every so often (as the actual NES did) the keyboard
+invokes an interrupt handler, which context-switches away from the
+user code.  They're frequently a source of nondeterminism and behavior
+that varies between processor versions.
+
+I think that probably the right solution is just to have memory-mapped
+input and output ports.

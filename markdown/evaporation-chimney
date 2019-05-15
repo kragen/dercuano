@@ -1,0 +1,258 @@
+Fundamental principle of operation of an evaporative chimney
+------------------------------------------------------------
+
+A chimney is a bistable fluidic structure, sort of like a siphon: once
+the chimney fills with hot air, the higher pressure from outside the
+chimney forces the newly produced hot air up the chimney.  Hot air is
+a lot less dense than cold air.  Air at 275°C is half the density of
+air at 0°C, because it's twice the temperature.
+
+Drying things out is a major problem in day-to-day life: laundry or
+dishes after you wash them, fruit or other food you want to preserve,
+parts of your building you don't want to grow Stachybotrys mold and
+poison you, and so on.  Dryness, cold, and poison are the three major
+ways to inhibit life on media that could otherwise support it
+(e.g. mold, bacteria, insect predation), and of these, dryness is by
+far the preferred option in many cases.
+
+Room-temperature evaporation is usually adequate to dry things out
+enough that they can't support life.  Usually, the main determinant of
+the speed of room-temperature evaporation is air circulation.  With no
+air circulation, relative humidity rapidly reaches 100%, and
+evaporation stops.  Even a fairly weak draft is often sufficient to
+reach adequate evaporation speeds.
+
+But evaporation, like heat, decreases the density of air.  My
+calculations below suggest that you could construct an
+evaporation-driven chimney that would provide adequate air circulation
+even without a source of above-ambient temperature, probably using
+laminar rather than turbulent airflow.
+
+In a sense, this is an evaporative downdraft cooltower, meant to make
+things dry rather than cold and wet.  The only difference is that you
+saturate it with heat instead of humidity.
+
+Overall parameters and results
+------------------------------
+
+The [vapor pressure of water][] increases exponentially with
+temperature, which means that any such chimney device will have a
+critical temperature below which it will basically not work at all,
+and it's much harder to build one that will work at 0° (0.6 kPa vapor
+pressure) than 16° (1.8 kPa), 25° (3.2 kPa), or 35° (5.6 kPa) — you
+have an entire order of magnitude of density difference here.
+
+[vapor pressure of water]: http://en.wikipedia.org/wiki/Vapor_pressure_of_water
+
+It's probably a good idea to shoot for 16°, since 0° sounds too hard,
+and higher ambient temperatures in places where people live are often
+a result of humidity-induced greenhouse effect, so in practice the
+dryer may not work that much better.
+
+Of course, evaporation also cools the air and the thing from which the
+water evaporates, but you can passively warm the cooled air back to
+room temperature — it's just a matter of providing sufficiently high
+thermal coupling.  At sufficiently high airflow, this heat transfer
+can be the limiting factor in drying things out.  For this exercise, I
+will simply assume that heat transfer is adequate.
+
+With these assumptions, the device seems quite practical.  It seems
+that you should be able to maintain 25 cm/s airflow with a
+5.4-centimeter evaporation chimney, numbers which don't really depend
+on the chimney's height, according to the calculations below.
+However, it turns out you can get even stronger airflow by operating
+it as an evaporative downdraft cooltower!
+
+Fluid dynamics calculations
+---------------------------
+
+Water molecules weigh 18 daltons, while the other major air molecules
+weigh 30 and 32 daltons.  So pure water vapor weighs about 41% less
+than dry air.
+
+So at 16°, air at 100% relative humidity and one sea-level atmosphere
+(100 kPa) will consist of roughly 1.8% water, which means its density
+is decreased by 41% × 1.8% = 0.74%.  If your incoming air already has
+50% relative humidity, which is common, you're down to 0.37%; if the
+air density is 1.23 kg/m³, that's about 4.5 mg/ℓ, 4.5 μg/cc, or 
+4.5 g/m³.
+
+Okay, how much pressure can you get out of that?  At Earth surface
+gravity, it works out to about 45 mPa/m, which is a pretty tiny
+pressure!
+
+How much laminar airflow can you get out of that?  Well, it depends on
+your air duct size.  The Darcy-Weisbach equation says your pressure
+loss to friction is f[D] ρLV²/(2D), where f[D] is the Darcy friction
+factor (64/Re in the laminar case), ρ is the density of the fluid, L
+is the duct length, D is the diameter, and V is the velocity.
+
+Conveniently, or not, the chimney length here drops out: our pressure
+difference is L × 45 mPa/m, proportional to the chimney length, and
+the Darcy–Weisbach pressure drop is also proportional to the chimney
+length.  So we have 45 mPa/m = f[D] ρV²/(2D); if we divide both sides
+by the density of air, we get 0.037 m/s/s = f[D] V²/(2D).
+
+Will it be laminar?  Laminar flow dominates at Reynolds numbers below
+about 2000 or 3000.  The Reynolds number Re in a pipe is VD/ν, where V
+is velocity, D is diameter, and ν is kinematic viscosity, measured in
+e.g. m²/s.  The kinematic viscosity of air is about 1.5 × 10⁻⁵ m²/s,
+so the laminar-turbulent transition takes place (assuming Re = 2000)
+at around VD = .03 m²/s.  That is, if D is 3 cm, it takes place at 1
+m/s; if D is 30 cm, it takes place at 10 cm/s; if D is 1 m, it takes
+place at 3 cm/s.  So you can get it to be turbulent by using a big
+enough duct, even without changing the velocity.
+
+If we figure on a Reynolds number in the middle of the laminar range,
+giving us a comfortable safety factor, f[D] is about 0.06.  Solving
+for V², we get
+
+    V² = 2D × 0.037 m/s/s / 0.06
+
+or simplified
+
+    V² = D × 1.2 m/s/s
+
+so our actual air velocity is
+
+    V = √(D × 1.2 m)/s
+
+assuming that Reynolds number.
+
+So, uh, that assumption gives us a duct size, no?  I was assuming
+VD = .015 m²/s, so .015 m² = D√(D × 1.2 m).  Square both sides (adding
+meaningless complex solutions) and you get .000225 m⁴ = D³ × 1.44 m,
+so D = (.000225 m³ / 1.44)^⅓, or about 5.4 cm.
+
+Okay, so if you have a 5.4 cm wide evaporation chimney, you get
+√(.054 m × 1.2 m)/s = 0.25 m/s airflow from the tiny pressure
+difference from evaporation, which is pretty respectable.
+
+You can make the duct a bit bigger (up to twice the Reynolds number,
+which is growing as D×√D, so you can make it up to 59% wider: up to
+8.6 cm, which would have 2½× the cross-sectional area and 1.26× the
+flow velocity, for a total of three times the volumetric flow) before
+you hit a slowdown from turbulent airflow, at which point you have to
+make it a lot bigger to compensate.  Eventually, the total turbulent
+airflow will exceed the possible laminar airflow, but it's probably
+better to plan to stay well into either the laminar or the turbulent
+regime on the Moody diagram, avoiding the much lower airflow just
+above the transition.  If you want to stay in the laminar regime but
+need more total airflow volume, you can have a number of small
+chimneys, perhaps a grid of partitions inside a larger space.
+
+Such partitions would also help prevent the moist air coming up the
+chimney from mixing with dry air descending from above, which will
+reduce the pressure difference, but not the Darcy–Weisbach loss, thus
+reducing the flow rate.  In the limit of an infinitely large chimney,
+you will have a plume of water vapor rising slowly from your moist
+object and gradually diffusing into the air, while nearby air remains
+stationary or sinks.
+
+0.25 m/s × π × (.054 m/2)² = 0.00056 m³/s total airflow in one of
+these chimneys.  That's about 0.69 g/s of total air per second, of
+which 0.37% is the water we're extracting: 2.5 mg/s per chimney, or
+about 9.2 grams of water per hour per chimney.  So to evaporate a
+liter of water in four hours — suitable for drying laundry or fruit —
+you might need 27 such chimneys, perhaps a 6×5 grid inside a larger
+30×30 cm duct, for a total of .015 m³/s or 32 cfm, somewhat less than
+a standard bathroom ventilation fan.
+
+Startup
+-------
+
+As I said, chimneys are bistable: once they have a draft, they keep
+sucking (much like standing armies), but until they're full of the
+lower-density fluid, they don't suck.  So how do you start the
+chimney?
+
+The usual approaches are using a fan and using an inverted funnel.
+
+The fan works in the obvious way, but if you have the fan, you don't
+really need the chimney.  The chimney is quieter and uses less energy,
+though.
+
+An inverted funnel leading up into the chimney can capture individual
+chimneyless updrafts of moist air from below and fill the chimney with
+them.  This will only work if the moist air updrafts are sufficient.
+
+Materials
+---------
+
+It barely matters at all what materials an evaporative chimney is made
+from.  It could be sheet metal, paper (as long as it doesn't get
+rained on, or if it's greased to protect it), silk cloth, brick, or
+polyethylene sheeting.  Soft materials will need some kind of external
+support.
+
+If you're venting it outside, you might consider it desirable to curve
+the chimney at the top, or put a roof over it, so that rain doesn't
+fall into it.
+
+In many cases it might be beneficial to use a transparent material.
+
+Heat flow
+---------
+
+Earlier I said I assumed heat flow was adequate.  Is that reasonable?
+
+Heat flow is really critical for two reasons: first, the 0.5%/° change
+in air density with temperature could easily overwhelm the 0.4% change
+in air density with humidity, making your "chimney" work *backwards*;
+and second, if the thing you're trying to dry out is cold, water on it
+will evaporate really slowly, which will give it more time to rot
+before it dries out.
+
+Evaporating 2.5 mg/s of water is about 10.4 mW of heat dissipation, so
+you suck up about 10.4 mW of heat per chimney.  The earlier-suggested
+27-chimney assembly thus sucks up about 280 milliwatts.
+
+A glance at a [psychrometric chart][] shows that the temperature drop
+of the air at 15° and 50% humidity is about 5°.  Air is about 1.01
+J/g/K, so that's about 5 J/g, and at 0.69 g/s, that's 3.4 watts.  This
+differs from my calculation above by a factor of 12, so one of them
+must be completely wrong.  Maybe both.
+
+[psychrometric chart]: http://en.wikipedia.org/wiki/Psychrometric_chart
+
+You can deliver the heat from the environment by convection,
+conduction, and radiation.
+
+Room-temperature radiation is more than adequate to replace a few
+hundred milliwatts (it's on the order of tens of watts per square
+meter — Stefan–Boltzmann 57 nW/m²/K⁴ gives you 390 W/m² at 15°C, and
+perhaps more relevantly the derivative is about 5 W/m²/K), but only if
+the objects you're drying is mostly exposed to radiation from other
+objects that aren't drying.  That means they have to be spread out
+flat, and you don't want to put them under glass.
+
+Convection will replace the missing heat, but only at the cost of the
+five- or ten-degree temperature drop in the air, which will keep the
+chimney from sucking air up.
+
+Conduction is likely to be the best approach in many cases.  It can
+take several forms: metal plates maintained at room temperature by a
+flow of water or air on the non-wet side, say by running water through
+pipes or by funneling wind past them; thick metal fins connected to a
+large temperature reservoir; or even flat heat pipes.
+
+Backwards
+---------
+
+But wait!  If you have to struggle to overcome a 5° temperature drop,
+which produces a countervailing effect that's four times as strong,
+why not use the temperature drop?  Instead of a moist-warm-air chimney
+above your drying objects, you have a cold-air drainpipe below.  Your
+drying objects don't dry as fast, since they're colder.
+
+As a bonus, you get free cold air, which can be used by itself to cool
+things to retard decay, or to improve the efficiency and delta-T of
+a refrigerative cooler.
+
+Sunlight
+--------
+
+Yeah, if you have the chance, some sunlight on whatever you're trying
+to dry will help a lot.  Then you can get not only more-than-adequate
+heat flow, on the order of 1000 watts per square meter instead of
+tens, but also enough heat to make the chimney run purely on heat.
