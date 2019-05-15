@@ -1,0 +1,188 @@
+I’ve mentioned the problem of image approximation in a few different
+notes — file `topics-2014`, file `3d-ui`, and file `ideas-to-pursue`.
+Basically the idea is a specific application of mathematical
+optimization algorithms: making something look, visually, like some
+reference image.  But it turns out to be an interestingly fertile
+family of applications.
+
+There’s now a Twitter bot called something like “Minimal Pictures”
+which illustrates the idea; it applies some single graphical primitive
+(Bézier curves, translucent rectangles, or translucent triangles, for
+example) a few hundred times to get an image that looks similar to a
+reference image, but not so similar that you can’t see how it’s done.
+And in 2016 I wrote a [hill-climbing optimizer to approximate a given
+image with opaque irregular
+pentagons](http://canonical.org/~kragen/sw/81hacks/see), with
+stunning, but very slow, results.
+
+So here is an attempt to outline the space a bit.
+
+Design spaces
+-------------
+
+A design space is a set of variables the optimization algorithm can
+tweak to satisfy its objective of making the right image.  This can be
+pretty much anything.  Interesting design spaces include polygons
+(translucent or opaque); polylines; Bézier curves; points; DCT
+coefficients in a JPEG; images constrained in some way, such as
+sparsity, to be convolved with the known, estimated, or optimized OTF
+of some optical system; widths and/or slight displacements of a given
+set of lines, as in engraving or font hinting; toolpaths, or more
+generally robot movement plans; arrangements of a given set of pieces
+(overlappable or not, scalable or not, but generally rotatable);
+heightfields, 3-dimensional meshes, or other three-dimensional models
+such as collections of spheres; parameters controlling a model like a
+face puppet; or colors of pixels chosen from a small set, as on an
+inkjet printer.
+
+Similarity metrics
+------------------
+
+The simplest similarity metric to optimize is probably just the sum of
+squared pixel differences, but this leaves a lot to be desired.  A
+very simple alternative is blurring the images a bit first, but there
+are many other possibilities.  Transforming the images into Fourier or
+Gabor space and then weighting the different spatial frequencies
+according to perceptual salience might be an improvement.  A perhaps
+more interesting possibility is using the first few layers of a neural
+network trained for image classification or in a GAN; this would
+presumably put extra weight on things that are important to “real
+images” in some sense, and might do a reasonable job of simulating the
+first few layers of human visual perception, too.
+
+In some cases, perhaps something like Canny edge detection would be a
+useful step in the similarity function, if the visual similarity
+you’re going for isn’t purely literal.
+
+Other objective function components
+-----------------------------------
+
+The objective function you optimize might not be purely similarity; it
+might also include some kind of “cost model” for the design space.
+For example, if you’re planning a toolpath, you might want to prefer
+faster toolpaths; if you’re trying to approximate an image by deriving
+a sparse set of stars or other bright points that have somehow gotten
+convolved with a known or unknown OTF, you might want to prefer
+sparser sets; you might prefer heightfields that are mostly smooth
+rather than containing thousands of sharp spikes; for artistic
+purposes, you might want to minimize the number of graphical
+primitives used, just to keep the approximation from being too
+perfect; and so on.
+
+Simulation
+----------
+
+In many of these cases, you won’t know how well you’ve actually
+approximated the image until you set some kind of physical machinery
+in motion.  A robot wielding a pen, a hot wire, a FDM nozzle, or a
+milling cutter can produce somewhat unpredictable results.  Also, it’s
+slow.  A potentially worse problem is that its results aren’t
+differentiable — you can evaluate your objective function over them,
+but you may not be able to determine the gradient of the objective
+function with respect to your design variables.
+
+So in many cases you’ll want to do some kind of simulation, even if in
+the end what you’re optimizing is a physical process.  A numerical
+simulation, even of things like robots cutting things, can support
+automatic differentiation with respect to your design space, which
+enables the use of non-gradient-free optimization algorithms.
+
+Optimization algorithms
+-----------------------
+
+There’s been an enormous amount of work on variations of gradient
+descent in the last few years, largely with an eye to accelerating
+learning of parameters for deep neural networks, and there are also a
+substantial number of older variants.  This includes Nesterov
+accelerated gradient, AdaBoost, AdaGrad, Adam, and so on.
+
+Gradient-based algorithms have an enormous advantage in
+high-dimensional design spaces; they tend to slow down linearly with
+dimensionality, while gradient-free optimization algorithms commonly
+slow down exponentially with dimensionality.
+
+However, other metaheuristics other than gradient descent are
+applicable; for example, Nelder–Mead optimization, genetic algorithms,
+and simulated annealing.
+
+In some cases, the most appropriate optimization algorithm may
+actually be something like a particle filter.
+
+Purposes
+--------
+
+This family of techniques can be applied to many problems.
+
+The minimal-picture bot mentioned above has output that looks cool.
+
+Non-photorealistic rendering is a useful approach for avoiding the
+plasticky hard look of a lot of 3-D rendering.  Image approximation is
+a general approach to NPR — you ask for an approximation of a
+conventional near-photorealistic rendering, using a design space that
+only allows pencil drawing, for example, or pastel chalk painting, and
+perhaps using a similarity measure that privileges whatever you think
+is most important to preserve, such as edge orientations.
+
+In the opposite direction, a possible way for someone to specify a 3-D
+model that can later be used for photorealistic rendering, virtual
+puppeteering, or 3-D printing is to sketch it in a non-photorealistic
+way, maybe from a few different points of view, then optimize in an
+appropriate design space of 3-D models, using photorealistic rendering
+to generate the image to be compared to the sketch, and some kind of
+similarity metric that emphasizes the features that are likely to
+survive.
+
+Autotracing, vectorizing raster images, can be framed as an image
+approximation problem: you want to approximate the raster image as
+closely as possible with a polyine with a very limited number of
+control points.  Carrying this further, you could optimize a
+representation of a printed book that consisted of one or more fonts
+and a vector of (pageno, x, y, codepoint) tuples, subject to
+appropriate penalties for wiggly lines of text and fonts with too many
+glyphs, in order to simultaneously OCR the text and digitize the font
+used.  This is presumably not too far from what current bilevel image
+compression does.
+
+Star tracking for spacecraft orientation control can be viewed as an
+effort to approximate a series of images by estimating the camera’s
+OTF, the attitude of the spacecraft, and the contents of the galaxy
+(although we already have a pretty good prior on that).  Sun glare and
+Earth glare need to either be taken into account or somehow ignored by
+the similarity metric.
+
+Grid fitting and hinting of fonts can be viewed as an image
+approximation problem.  The difficulty with just doing
+nearest-neighbor things is that you can end up with uneven spacing,
+uneven widths, etc., which are more perceptually salient than what you
+got right.  Optimizing the rasterized glyphs according to a perceptual
+model, for example in Gabor space, should solve this problem.
+
+Dithering is the problem of approximating an image using only a few
+colors, and existing dithering algorithms face unappealing tradeoffs
+between edge sharpness and color precision.  By optimizing the
+similarity between the dithered image (which, note, is not a
+continuous domain) and the original image as measured by a perceptual
+model, you should be able to get substantially better results,
+privileging edges where those are more perceptually salient, and color
+precision where that is, for example where there are no edges.
+Dithering algorithms could even take into account LCD subpixels if
+it's just a matter of tweaking the similarity function.
+
+Lossy compression is, generally, the problem of approximating an image
+using some kind of sparse representation, and is of immense importance
+right now.  Again, optimizing the similarity between the original and
+decompressed images according to a perceptual model might give
+improved results.
+
+Resampling of images to different sizes could also be viewed as a
+process of image approximation, using a larger image to approximate a
+smaller one, or vice versa.  This requires a similarity metric that
+penalizes you if sharp edges get blurry when the image is enlarged.
+
+Structure-from-motion (SfM) and structure-from-shading can be
+formulated as image approximation problems; you want to approximate an
+image or series of images with a colored point cloud and a camera
+trajectory, or possibly some other kind of 3-D model like a
+heightfield.  In some cases lighting may be changing.  By using a
+sufficiently fancy renderer, specular reflections and refraction can
+provide information about 3-D structure.
