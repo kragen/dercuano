@@ -1,0 +1,70 @@
+Every program is a real-time program; late answers are wrong answers,
+because every system has a user, and users do not live forever, and
+they have a discount rate.
+
+A traditional way to ensure that your programs don't miss their hard
+real-time deadline is to calculate a worst-case run time for your
+algorithms, then ensure that your input doesn't get big enough to make
+your run time miss the deadline.  This requires analyzing the compiled
+program.
+
+A different way is to use anytime algorithms; these are algorithms
+that you can keep running until you are about to run out of time, then
+get an answer.  In general, if you don't run them long enough, the
+answer you get isn't very good, but in many cases it's still better
+than no answer.  And it's a *lot* easier to verify that an anytime
+algorithm hits its deadline.
+
+There are several different classes of anytime algorithms; two of the
+common ones are Monte Carlo algorithms and numerical optimization
+algorithms.
+
+Monte Carlo algorithms, such as particle filters, work by doing a
+large number of random trials and producing some sort of aggregate
+answer from them.  For example, if you're ray-tracing, you can shoot
+rays at random into your scene, ideally several per pixel.  This is,
+as far as I can tell, how Blender ensures that its visual feedback on
+rotation of complex objects will will always be instantaneous.  It's
+also the way people basically always do radiosity rendering, as far as
+I know.
+
+Numerical optimization algorithms seek to find an answer that
+minimizes some "error" or "loss" function by manipulating some "design
+variables" within a "feasible region", and they find better and better
+answers when you run them longer.  Large systems of linear equations
+these days are solved by successive over-relaxation, which is an
+example of such an algorithm, but there are a whole family of fairly
+generally applicable optimization algorithms:
+
+1. Random sampling: generate random sets of design variables,
+remembering the best one.
+
+2. Hill-climbing: incrementally mutate your best set of design
+variables at random, undoing each mutation that worsens the loss
+function.  Random restarts make this relatively robust against local
+minima.  If you decrease the magnitude of the mutations over time this
+is "simulated annealing".  It can be slow in a many-dimensional design
+space.
+
+3. Genetic algorithms: just like hill-climbing, but you maintain a
+bunch of different sets of design variables instead of just one at a
+time, and you cross them with each other, and you make more mutated
+versions of the ones that are doing best.
+
+4. Gradient descent: just like hill-climbing, except that you
+calculate the gradient of the loss function with respect to your
+design variables, so that you can incrementally mutate all of your
+design variables in the direction that decreases the loss function the
+most, instead of at random like in hill-climbing.  If your design
+space is many-dimensional, this is a lot faster than hill-climbing,
+but it requires you to be able to calculate the derivatives.  This is
+why automatic differentiation is so hot in the last few years.  It
+also benefits from random restarts, a lot of the time.
+
+5. Newton-Raphson iteration: vaguely related to gradient descent in
+that your next guess is where you would linearly extrapolate that the
+loss function hits zero according to the gradient.  This is *much*
+faster than gradient descent for some things.
+
+Obviously all of these can benefit from massive databases of existing
+designs and clever neural network stuff to speed them up.

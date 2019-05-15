@@ -1,0 +1,67 @@
+I'm suffering quite a bit from trying to use Linux, Windows, and MacOS
+on current hardware.  There's no reason, for example, for this laptop to
+spend thirty seconds or more to become ready for use when I want to use
+it.  Its video display holds perhaps 3 megabytes of data, and it's
+capable of reproducing 60fps fullscreen 1024x600 video, which means it
+can draw the full screen contents, including running the video codec, in
+16ms.  30 seconds is 1800 times longer than it ought to take to get to a
+useful screen.
+
+There are responsiveness and performance problems all over the place.
+It's totally unacceptable that Ubuntu's pretty main menu takes three
+seconds or more to come up when I press the Windows key.  Alt-tab
+between two windows that are already open has a noticeable delay, which
+means it's over 200ms.  And, although the machine has a gigabyte of RAM,
+it frequently runs into OOM kills and memory-shortage kernel panics.
+Even on Ubuntu machines that aren't suffering from that particular problem, the
+machine often has to swap for a few seconds in order for the screen saver
+to display its password prompt.
+
+And then there are things that just don't work.  The trackpad stopped
+working (maybe when I rebooted with Ubuntu 12.04).  The wireless
+disconnects and then won't reconnect without rebooting, a problem I also
+had with Ubuntu 8.04 on a Dell Vostro 9.  The machine doesn't sleep when
+I close the lid, and when I sleep with the sleep key, it doesn't wake up
+reliably --- sometimes it gets into a mode where the screen turns on
+after every keystroke for 100ms or so.
+
+I suspect that a lot of these problems are a result of the monolithic
+kernel design.  This kernel has 43 modules loaded, including modules for
+the sound, the wireless, the mouse, the nonexistent parallel port, and the
+nonexistent Bluetooth interface.  None of these can be restarted
+cleanly, and a bug in any of these subsystems can cause problems in the
+system as a whole, and although this is of course also the case with any
+driver that controls hardware that supports DMA, many pieces of hardware
+nowadays don't support DMA, or support DMA only in well-defined ways,
+e.g. via USBI UHCI.
+
+Furthermore, although it's often possible to work around bugs in these
+subsystems by rebooting the machine, the kernel that gets rebooted is
+also the kernel that's running all your applications, so your
+applications lose their state too --- even though there's really no
+possibility that vi, Emacs, the GIMP, Firefox, or GnuCash has runtime
+state that's so tightly coupled with your video card that it can't be
+reasonably preserved across a restart.
+
+On top of all this, sound often skips when playing MP3s if there's other
+stuff going on, like a compile or some web browsing.
+
+So I propose a new system architecture for end-user free-software
+systems:
+
+- a small hard-real-time hypervisor that's responsible for providing a
+  trusted path to a low-latency user interface, protecting access to
+  any DMA-capable hardware, and checkpointing and resuming
+  virtual-machine images running under it;
+- a display server running directly under the real-time hypervisor,
+  handling the keyboard, mouse, and monitor, which is unavoidably part
+  of the TCB because it provides the trusted user interface path;
+- a Linux kernel, or several, running under the real-time hypervisor to
+  handle other devices that need DMA; this is unfortunately part of the
+  TCB.
+- a separate Linux kernel, or several, running applications that don't
+  need direct access to hardware at all; these can be checkpointed and
+  resumed without knowledge of the applications.
+- other Linux kernels to run applications that need direct access to
+  hardware that doesn't do DMA.  These can't be checkpointed and
+  restarted, but they also aren't part of the TCB.

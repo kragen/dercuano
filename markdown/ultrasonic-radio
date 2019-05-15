@@ -1,0 +1,66 @@
+Suppose you set up a high-Q acoustic resonator strongly coupled to the
+air at, say, 102kHz, with its output connected to some kind of
+acoustic rectifier.  If your Q was 20, you could tune in to about a
+5100-Hz-wide band.  This would be enough to receive and demodulate an
+ultrasonic AM signal with "telephone quality", i.e. low-pass filtered
+to about 4kHz.
+
+It's feasible to focus a 102kHz ultrasonic signal in air to a spot
+about 0.3 centimeter across, or to transmit a low-loss collimated
+ultrasonic beam of such a frequency that's only a few centimeters
+across.  This could allow substantial-distance ultrasonic AM
+communication through air despite the way that air attenuates high
+frequencies (about [1.5 dB/ft at 100kHz][0], and increasing linearly
+with frequency from 0.5 dB/ft at 50kHz up to 5 dB/ft at 250kHz).  For
+example, if you started with a ten-square-meter dish or phased-array
+transmitter transmitting at 120dBa (1 W/m², 10 W total) and focused it
+on a square-centimeter receiver, you'd get an antenna gain of 50dB.
+If 40dB was an acceptable listening volume, and your "rectifier" was
+able to recover -10dB of the original signal, you'd need 50dB at the
+receiver, which means you could afford 120dB of attenuation along the
+signal path: 80 feet.
+
+At this distance, your Airy disk radius angle (1.2λ/d) is about 
+1.2 * 0.003 m / √10 m = 0.001, which at 80 feet gives you an actual
+radius of 3cm, or 6cm diameter.  So you're diffraction-limited by your
+transmitting antenna rather than scale-limited by the wavelength of
+the signal.  This limits your actual antenna gain to 40dB instead of
+the 50dB in the previous paragraph, so you'd only be able to actually
+transmit about 75 feet.
+
+If you could get by with a narrower-band signal, you could use a lower
+frequency.  At 51kHz, where you could transmit three times as far with
+the same path attenuation (at the cost of less antenna gain, since
+your Airy disk diameter doubles with the longer waves and triples with
+the greater distance to 18cm, making it 36 times greater in area,
+bringing the maximum antenna gain down to about 25dB), your Q=20
+receiver could handle a 2.6kHz band.  If you were only transmitting
+speech, you could probably get by with that with a simple hack:
+frequencies over 2kHz in speech are almost always part of a burst of
+white noise, such as a sibilant.  If you hook up a high-pass filter to
+the decoded signal and run its output to something nonlinear, you
+should be able to generate strong harmonics up to a few kHz, which
+would imperfectly approximate the high-frequency component of the
+original signal.  (I think this is the reason that audio clipping in
+walkie-talkies improves comprehensibility.)
+
+Being able to transmit comprehensible speech, to a passive receiver
+with no moving or electronic parts, anywhere in a 225-foot radius
+(comparable to Wi-Fi) sounds pretty cool, even if not a real
+improvement over just hollering.  The receiver needing to be 36cm
+across would seem to somewhat blunt that, though, although you could
+get a proportionally smaller receiver by making a proportionally
+larger transmitter.
+
+With this level of spatial demultiplexing, however, you might not need
+frequency division multiplexing at all.  Even at 26kHz, which ought to
+give you a greater transmission distance (450 feet?), your 10m²
+transmitter can focus down to a 1.5-meter-diameter spot.  A larger
+transmitter could both transmit more energy and focus it on a smaller
+spot.
+
+What if instead of transmitting the signal through free air, you
+transmitted it down a string, like a higher-tech version of paper cups
+connected with string?
+
+[0]: http://www.sensorsmag.com/sensors/acoustic-ultrasound/choosing-ultrasonic-sensor-proximity-or-distance-measurement-825

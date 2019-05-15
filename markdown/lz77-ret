@@ -1,0 +1,62 @@
+LZ77 compression uses backreferences of the form (distanceback,
+length).  You could think of this as a call to a subroutine consisting
+of a sequence of previously produced characters: the distanceback is
+like a PC-relative jump destination address.  But the length is
+curious: it tells how long the subroutine is!  In ordinary machine
+code, several different subroutines can share a common tail by having
+different entry points, each of which falls through into the next; but
+in LZ77-land, several different "subroutines" can share a common
+*head* as well, by being "called" from "callsites" with different
+lengths.
+
+This means, for example, that the word "compression" in the first
+paragraph here can serve as a source both for the prefix "com" in the
+word "common" later in the paragraph, and for the word "compression"
+in this paragraph.
+
+However, is it worth it?  It imposes the cost of indicating the length
+on the "caller", which seems like it might be dumb.  Consider if
+instead we had
+
+    'LZ77 '
+    X { Y { 'com' } 'pression' }
+    ' uses ... nes can'
+    Z { ' share a '; call Y; 'mon' }
+    'tail by having...nes" can'
+    call Z
+    '\n*head* as well'
+
+In this approach, there's still a count, but it's in the "callee"
+rather than the "caller", so the expense of storing it is amortized
+across callers.  Here I've written it as a "}" terminator rather than
+a count.  And you can see that we don't lose the ability to use common
+prefixes, but we don't save anything unless a particular backreference
+is used more than once.
+
+But what is the tradeoff?  It depends on how exactly we do the
+storage.  If we actually use a "RET" terminator, then we can share
+tails for free, just as in machine code.  But nesting isn't free:
+either we need a matching start marker, or we need to replace nesting
+with an explicit call.  X above can't be represented just as 'com' RET
+'pression' RET; otherwise when you called it, it would return too
+soon!  
+
+- It could be represented as { { 'com' } 'pression' }, which gives you
+  suffixes like "om" and "ession" for free, though not "ompression",
+  at the cost of needing both begin and end markers.
+- Or X could be represented as Y 'pression' RET, with Y defined
+  earlier outside of the main flow, but the extra invocation of Y is
+  probably larger than the begin marker.
+- Or, instead of using a terminator, we could just put the count into
+  the begin marker: "9:3:compression", counting the initial 3-letter
+  string as a single element of a 9-element sequence.  This loses the
+  ability to share tails for free.
+
+With any of these three possibilities, you also now have the
+possibility of representing the distanceback with an index into a list
+of defined subroutines, rather than a number of bytes back.  This
+should save a number of bits from the distanceback, effectively
+enabling much larger windows.
+
+This is a relatively obvious tweak to LZ77, so it's probably been
+tried before.

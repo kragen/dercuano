@@ -1,0 +1,74 @@
+Lots of people suffer from "seasonal affective disorder", or just
+think they'd function better, because they spend a lot of their awake
+time in environments illuminated at 50-500 lux, which is hundreds of
+times dimmer than full daylight.  10klux is the low end of full
+daylight; 32klux is the low end of direct sunlight; 130klux is the
+high end.
+
+What's the minimal amount of equipment I'd need to illuminate my body
+(including eyes, but other things just in case) at 10klux?
+
+A lux is a lumen per square meter.  At 555nm, the most efficient
+wavelength, a lux is 1.5 mW/m², so 10klux would be 15W/m².  I might
+have a surface area of about 2m², so I'd need about 30W of light, or
+20klm.  The most efficient light source is probably an LED; red-orange
+and green LEDs are around 95 lumens per watt, which means I'd need
+(20klm/(95 lm/W)) = 210 watts of LED power to reach that.  Common LEDs
+are closer to a third of that efficiency, so I'd need about 630 watts,
+and about US$600 worth of LEDs.  Cree Inc. supposedly has 200lm/W
+white-light room-temperature LEDs available, but Digi-Key only has up
+to 153lm/W.
+
+Cree's CXA2530-0000-000N00S40E7 ("Cree XLamp CXA2530 19mm white") LED
+array, in stock at Digi-Key, costs US$25.50 in quantity 1 and delivers
+4643 lm at 1.5 amps at 37 volts, for 84 lm/W; it gets above 100 lm/W
+at half the current.  (That's about 15% efficiency: 150mW/W.)  Getting
+20klm out of these guys would require five of them, costing US$127.50;
+they could then deliver 23klm at max current (278W), or 15.5klm at
+optimal efficiency (148W).  Linearly interpolating, that gives you
+20klm at 226 watts (+ 148 (/ (- 20000 15500) (/ 1 (/ (- 278 148) (-
+23000 15500.0))))).
+
+So you could probably cure seasonal affective disorder for the cost of
+US$130 plus a three-hundred-watt 37-volt power supply (say, US$50),
+plus 226 watts.  You make a chamber of mirrors with all-transparent
+furniture, stick the brilliant lightbulbs into it (maybe with some
+frosted glass to make them less harsh), and go sit in it, naked, for
+some 16 hours a day.  (You could imagine that this might cause some
+other kinds of disorders related to social interaction, though.)  226
+watts for 16 hours a day is 151 watts or 1320 kWh/year, or US$132 per
+year, assuming a 100% efficent power supply.
+
+Given the high power cost, so it probably makes sense to use six of
+the Cree 19mm LED arrays instead of five to improve efficiency: the
+cost for the LEDs jumps from US$127.50 to US$153, but the necessary
+power drops: if the output light from a single array in the 0.8 to 1.5
+amp range is 3095lm plus (/ (- 4643 3095) (- 1.5 0.8)) = 2211 lumens
+per amp, and 20klm is 2860lm per array, we can interpolate to (+ 0.8
+(/ (- (/ 20000 6.0) 3095) 2211)) = 0.91 A per array, or (* 37 6 0.91)
+= 202 W.  That means we can get by with a two-hundred-watt power
+supply and also reduces our power usage by more than 10%, to 1180
+kWh/year, US$14 less.  The extra array pays for itself in energy
+savings in less than two years, not even taking into account the
+likely parts savings from the smaller power supply, the increased
+resilience to part failure from having more redundant LEDs, and the
+lower junction temperature.
+
+From the datasheet, it doesn't look like you can significantly improve
+efficiency by lowering the current further.
+
+20%-efficient photovoltaic panels covering the roof of a 10-meter by
+10-meter house in a zone with 300W/m² average day/night insolation
+would give you 6kW average.  If you were powering your LEDs with
+photovoltaic panels, you could provide light for about 40 people.  Of
+course, during summer daylight hours, it would be more efficient to
+just put the daylight inside the house directly; then, instead of 20%
+efficiency at the panels times 15% efficiency at the LEDs, for a total
+of 3% efficiency, you'd have more like 80% efficiency.  Too bad that
+only works a small amount of the time.
+
+If you only want to illuminate your eye pupils at 10klux, well, your
+pupils are about 4mm in diameter, so they have a total area of about
+25 millionths of a square meter; a quarter of a lumen would suffice to
+illuminate them to 10klux.  You could get that out of 2.5 milliwatts,
+a hundred thousand times less than what I'm proposing above.

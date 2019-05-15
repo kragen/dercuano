@@ -1,0 +1,61 @@
+So, um, immediate-mode GUIs are pretty cool.  They allow you to avoid
+using data memory for objects on the display, which not only reduces
+your memory usage, but also prevents desynchronization and avoids heap
+allocation.
+
+One problem with IMGUIs is that they generally need an ID for each
+widget, which you can generate somewhat clumsily using `__LINE__` in C,
+[as explained by Jari Komppa](http://sol.gfxile.net/imgui/ch04.html).
+This clutters up your code a bit.  [Adrien Herubel's IMGUI
+library](https://github.com/AdrienHerubel/imgui) avoids this problem
+by maintaining a hidden `widgetId`; in imgui.cpp, for example:
+
+    bool imguiCheck(const char* text, bool checked, bool enabled)
+    {
+            g_state.widgetId++;
+            unsigned int id = (g_state.areaId<<16) | g_state.widgetId;
+        ...
+
+This means that instead of writing code like this:
+
+     toggle = imguiCheck(GEN_ID, "Checkbox", checked1);
+
+you can write code like this:
+
+     toggle = imguiCheck("Checkbox", checked1);
+
+But it has the problem that if you insert more widgets inside the same
+scroll area, for example because you have a variable-length
+subsequence of widgets, then your IDs will shift, and your widgets
+will get confused about which of them is active or hot.
+
+It's possible to avoid this problem by using a sort of DOM-tree-ish
+approach and expanding each widget identifier from a single ID number
+out to an entire path from the root of a widget hierarchy — perhaps
+you limit each level of the hierarchy to 256 elements, and then you
+can identify a widget up to 6 levels deep with 6 bytes.
+
+(Additionally if client code can increment the current widget ID up to
+some number after passing through a region of variable widget count,
+that could help.)
+
+The hierarchy need not correspond to any nesting of rectangles on the
+screen.  It can be entirely conceptual; in the environment where I
+came up with it, it was a menu tree, where only the innermost menu of
+your navigation was ever displayed.  It enables you to tell not only
+on which widget the current keyboard focus is, but also all of the
+things it's nested within.
+
+Many times, though, you'll have more possible widgets to display than
+you want to display at a given moment.  In these cases it would be
+nice to leap past all these widgets without, for speed, actually
+having to execute the code for each one — and if the number is
+arbitrary, executing the code for each one would take infinite time.
+So this containment hierarchy can serve as a way to efficiently
+disable different parts of the world.
+
+Sigh.  I'm not sure if this approach really generalizes well...
+
+I wonder what reactive programming has to offer here.  Meteor-style
+reactivity has a similar feel to IMGUIs; is there a unity between the
+approaches I'm not seeing?

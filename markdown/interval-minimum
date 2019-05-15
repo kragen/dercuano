@@ -1,0 +1,109 @@
+I don't have much time to write this, so I may end up sending out a
+version that's somewhat telegraphic.
+
+# Summary #
+
+There's an alternative to summed-area tables with a small, linear
+space cost and linear construction time providing worst-case
+logarithmic-time reduction over arbitrary intervals over arbitrary
+semigroups.
+
+# Explanation #
+
+## Summed-area tables ##
+
+Franklin Crow's 1984 paper, "Summed-area tables for texture mapping"
+calls them "summed-area tables", and Graphics Gems called them "sum
+tables".  More recently, they're known as "integral images".  In the
+one-dimensional case, they allow you to calculate the sum of values in
+an arbitrary interval in constant time by subtracting the values from
+the summed-area table at the ends of the interval: sum(f[m:n]) =
+-sat(f)[m] + sat(f)[n], where sat(f)[i] = sum(f[0:i]), for a suitably
+low value of 0.
+
+### Decimation ###
+
+As an extension, you can use a decimated summed-area table, with
+values only present every (e.g.) 16th or 32nd index, without losing
+the constant-time property.  You may have to consult the original
+array, but only up to 2*(16-1) or 2*(32-1) values of it, which is
+constant.  This dramatically reduces the space cost of the technique.
+
+### Generalization over operations ###
+
+You can generalize the sum-table idea beyond integer addition?
+Clearly they work fine for mod-N integer addition, vector addition,
+and the combination of the two (e.g. XOR).  I think your operation
+only needs the properties of associativity and left inverse, and to
+preserve the constant-time property, you need the constraint that the
+operation must be computable in constant time.
+
+(For the N-dimensional case, I think you may also need commutativity.)
+
+## A logarithmic-time alternative to sum tables for semigroups ##
+
+But what do you do if you're interested in an operation that doesn't
+have a left inverse?  For example, the "minimum" operation (or in
+general the meet operation of a meet-semilattice) can't have inverses
+of elements, because it's idempotent, so you can't compute it with a
+sum table.
+
+But you *can* compute it in logarithmic time with a tree.  Let
+
+    mint(f, m, n) = nil if m == n
+                  = (m, n, min(f[m:n]), mint(f, m, floor((m+n)/2)),
+                                        mint(f, floor((m+n)/2), n)) otherwise
+
+Now if you precompute mint(f, 0, f.length), which is a balanced binary
+tree with 2*f.length - 1 nodes, not counting the nils, and which can
+be computed in linear time, you can compute min(f[m:n]) for arbitrary
+m, n in logarithmic time given that tree.  That algorithm is
+straightforward.
+
+This algorithm applies to any semigroup over the elements; it can be
+used to calculate sums as easily as minima, although more slowly than
+using a sum table.
+
+### Space reduction: decimation ###
+
+Analogously to sum tables, if your leaf nodes represent spans of some
+16 or 32 elements instead of 1, you get a dramatic space reduction
+without losing the logarithmic-time asymptotic performance.
+
+### Space reduction: array storage ###
+
+The contents of the tree produced by the mint() function depends only
+on m and n, except for the min(f[m:n]); and if f.length is a power of
+2, it is a full binary tree.  A full binary tree can be stored, as in
+the classic binary heap, in an array a such that the children of the
+element at a[i] are at a[2i+1] and a[2i+2] (zero-based).  So you can
+store the minima for the tree in an array (without decimation, of
+2*f.length - 1 elements) rather than allocating numerous nodes on the
+heap.
+
+This requires a slight enhancement to the lookup algorithm to
+recompute the same (m, n) as the construction algorithm, rather than
+looking them up in the tree.
+
+### Constant-space bottom-up construction ###
+
+If you construct the tree recursively, in addition to the O(N) space
+for the results, you need O(log N) stack space.  But that is not
+necessary.  If you're using the array storage suggested in the
+previous section, you can fill the array starting from the end, so
+that the only auxiliary storage you need for the construction process
+is a simple counter.
+
+### Enhancement: indices ###
+
+In the case where the semigroup operation is exactly minimum or
+maximum over a totally ordered set, the value stored in each treenode
+will be the value of one of the items in the original array.  In this
+case it is strictly more powerful to store the index of that item
+rather than its value.  This may be useful if you have some other data
+that are indexed the same way.
+
+### N-dimensional case ###
+
+This generalizes easily to k-d trees, although the efficiency
+guarantees are not as good.

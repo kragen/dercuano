@@ -1,0 +1,139 @@
+I wrote an Arduino program to generate musical scores with the
+following strategy: first, generate M 4-beat measures, each beat
+containing a note or not; then generate M 4-measure sequences from
+those measures; then generate M 4-sequence supersequences of 16
+measures each; then generate M 4-supersequence hypersequences of 64
+measures each; then use one or more of these 256-beat hypersequences
+as your score.
+
+This worked reasonably well, fit the whole score into 128 bytes (I
+used one byte per sequence element and M=8, so each of the four levels
+was 8*4 = 32 bytes), and allowed me to encode the iteration state into
+a single byte.  If I'd pressed harder, I could have used three bits
+per sequence element, for 4×8×4×3 = 48 bytes, except that I actually
+was using four bits per note.
+
+It occurred to me that perhaps you could use this approach for other
+things, like general-purpose data compression or image compression,
+which I haven't tried yet, or building a pseudo-character-cell
+terminal with very low RAM requirements.
+
+A typical character-cell terminal, like a VT100 or H-19, had about
+25×80 character cells, each with about 5×8 pixels; and either one or
+two bytes of RAM per character cell, plus a ROM font containing
+something like 5×8×128 bits, say, 640 bytes.  Each scanline could be
+built on the fly out of bits read out of the ROM, indexed by some
+simple arithmetic, so you only needed some 2000 bytes of RAM instead
+of the 80 000 (400×200) you'd need for a full screen image.
+
+Suppose, instead, you used this quadtree scheme, but with a slightly
+unusual aspect ratio: 5×8-pixel characters, 16 lines, 128 columns, for
+2048 characters on screen.  Each character position would have a byte,
+as before, but instead of having a byte for each possible character
+position, you'd have M groups of four bytes for distinct 2×2 squares,
+where M was something less than 512.  You'd need four levels of these,
+with each block at each level corresponding to respectively 4, 16, 64,
+and 256 character positions, plus 8 bytes at the top level for the 8
+horizontal 16×16 chunks of the screen.
+
+What would M be?  You'd probably want it to be 256 or less in order to
+be able to fit the pointers to the next level into a byte; suppose it
+were 128.  Then each level of the hierarchy would be 512 bytes (128
+blocks of 4 bytes) and the total would be 2048+8 = 2056 bytes to hold
+the screen contents.
+
+So far this sounds stupid, because you've "compressed" 2048 bytes into
+2056 while losing the ability to have an arbitrary 2048 bytes on the
+screen!  But there are some interesting possibilities here:
+
+* You don't really need M=128 for the top.  The top level of quadtree
+  can only have a max of 8 of its nodes displayed at once.  This
+  approach means you could have M=8 and 32 for the top couple of
+  levels, cutting the memory usage almost in half, to (+ 8 (* 8 4) (*
+  32 4) 512 512) = 1192 bytes.  You can use some of those bytes to
+  give you "spare" blocks at the upper levels, to expand M further
+  beyond 128 for the bottom level (so you can have, say, 1024 bytes of
+  incompressible text at the bottom level).
+* Scrolling horizontally by a multiple of 16 columns just involves
+  changing the 8 data pointers at the top level, and possibly
+  constructing a new "blank node" at each lower level.
+* Scrolling by 8 lines, half a screenful, just involves modifying the
+  32 bytes that control the contents of the top-level quadtree nodes.
+* You can use the saved RAM for a soft font, which gives you the
+  ability to draw arbitrary graphics!  As long as they're repetitive
+  and compressible.
+* If your terminal is programmable, you could use video RAM you're not
+  using at the moment (because nothing points to it at the moment) for
+  buffers and code.
+
+It would probably make more sense to make your nodes horizontal
+instead of square.  This means adjacent lines of text no longer
+interfere with each other's compressibility.  Then you have:
+
+* level T0, 256 nodes of four consecutive characters per node;
+* level T1, 128 nodes of 16 consecutive characters per node;
+* level T2, 32 nodes of 64 consecutive characters per node;
+* level L1, eight nodes of two lines of 128 characters each;
+* level L2, two nodes of eight lines;
+* level L3, two bytes pointing to L2 nodes.
+
+Total is (+ 2 (* 2 4) (* 8 4) (* 32 4) (* 128 4) (* 256 4)) = 1706
+bytes, saving about 300 bytes over the traditional representation, at
+the cost of cutting the possible incompressible text on the screen in
+half.
+
+Suppose that, instead of using the 5×8 characters that were common at
+the time, you took the quadtree approach all the way down to the
+pixels, using 8×16-pixel characters, just with a higher clock rate.
+Then you'd have, say, three more levels:
+
+* Level P0: 4 8-pixel scanlines of a character, stacked vertically.
+* Level P1: 16 scanlines of a character vertically, i.e. an entire
+  cell.
+
+A typical font ROM would likely be highly compressible with this
+approach, since lots of characters contain blank lines (not containing
+ascenders or descenders, say) and other repeated features.  Suppose we
+have 96 ROM font characters, and each P0 node is used an average of
+twice.  Then we have 96*8 bytes for the P0 nodes and 96*4 bytes for
+the P2 nodes.  But that's assuming significant horizontal slices of
+characters are shared. That puts us at a total of 1152 bytes of ROM.
+
+Anyway, what I was thinking was that if you had another 32 nodes in P2
+that were in RAM (128 bytes), you could use that for a graphical
+character set, especially if you have another 128 bytes or so of P0 to
+play with.
+
+But what about the latency of all these levels of indirection?  We're
+talking about a total of eight indirections to get down to the pixels,
+now, right?  Wouldn't that cut way down on your effective dot clock?
+
+I think the answer is "no", because although there are lots of
+indirections, they're very *predictable* indirections, in lots of
+different memories, so you can pipeline them.  A four-byte FIFO at
+most levels would suffice: P0 needs only two 8-bit output registers,
+one of which is shifted to the electron gun, and a new output byte is
+latched into the "next byte" register; P1 similarly needs only a
+one-byte buffer, which feeds the next address to P0 for when it's
+ready; T0 fills up a four-byte FIFO going to P1 every 16 pixels of the
+scan line; T1 fills up a four-byte FIFO going to T0 every 64 pixels;
+T2 fills up a four-byte FIFO going to T1 every 256 pixels; L1 fills up
+a four-byte memory that T2 reads 32 times every 32 scanlines, or 32768
+pixels; L2 fills up a four-byte FIFO going to L1 every eight lines, or
+128 scanlines, or 131072 pixels; and L3 feeds L2 a byte every eight
+lines, or twice a screen.  Each of the next-pointer reads can be
+loaded into a double-buffered register as soon as the previous value
+is used, so it's not in the latency critical path.  P0, P1, and T0
+each need to read a random byte every 8 dot clock cycles; T2 every 64;
+L1 every 65536; etc.  So anything slightly over a single byte read per
+2 dot clock cycles should be sufficient.  Since we're talking about a
+(* 60 8 16 128 16) = 15 728 640 Hz dot clock, that would probably have
+involved separate hardware memories for some of these in the 1970s
+time period we're talking about, just to keep the RAM reads down to a
+manageable level, below 8 megabytes per second per channel.
+
+However, I think this approach should make it possible to do a
+megabit windowing system on a terminal with on the order of 6kiB of
+RAM, rather than the usual 128kiB.
+
+What about using this approach to generate random images?

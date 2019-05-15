@@ -1,0 +1,79 @@
+Suppose we want to do type inference on JS code so that we can run it
+faster or statically debug it or some shit like that.
+
+Now, some things are really easy to infer a type for:
+
+    var projectionMatrix = [ [1, 0, 0, 0]
+                           , [0, 1, 0, 0]
+                           , [0, 0, 1, 0]
+                           , [0, 0, 0, 1]
+                           ]
+
+That's clearly an Array of Arrays of Numbers, although you get into
+some weird subtyping stuff if you start caring about whether they're
+ints or not.  (In this case they're not, because it gets mutated later
+on.)  Also it happens that it's specifically a 4x4 array of arrays,
+and that matters in this case.
+
+There are things that are intermediate:
+
+    function evToPoint(ev) {
+      var ref = cvs.getBoundingClientRect();
+      // This is clearly wrong, but my theory is that maybe this will make
+      // it return SOME point within the canvas on old iOS.  Probably I
+      // should use pageX there instead.
+      return { x: (ev.clientX - ref.left) % cvs.width
+             , y: (ev.clientY - ref.top) % cvs.height
+             };
+    }
+
+This takes an object `ev`, which needs to have `clientX` and `clientY`
+properties (but might have other properties too), and they need to be
+Numbers (except that in JS `"fuck" - "you"` is actually valid and
+returns a NaN), and returns an object with exactly the properties `x`
+and `y`, which are also Numbers, presupposing that `cvs` has a
+`getBoundingClientRect` property that is a function of no arguments
+returning a thing with `left` and `top` Number properties, and also
+`cvs` needs to have Number properties called `width` and `height`.
+
+Now if it happens that all of these things are true, then we could
+probably use like a super optimized version of `evToPoint`.  But if
+some of them aren't true, we might still want to remain JS-compliant,
+and just skip the optimization part.  But if you can find all the
+calls to `evToPoint`, maybe you can prove that those properties are
+always true, so you can always use the optimized version and not even
+compile an unoptimized version.
+
+Other things are really hard to infer a type for.  Like `["x", 3]`, or
+`function(obj, prop, val) { obj[prop] = val; }`.
+
+How about an RJS, though?  Like RPython, but for JS.  A restricted
+subset of JS that doesn't allow you to do anything that interferes
+with type inference.  This seems feasible to me, although it's not
+going to be as simple as type inference for ML, because you
+unavoidably have some subtyping.
+
+In particular, I think you need OCaml's upper-bound and lower-bound
+types for objects with properties if you're going to have
+heterogeneous data structures: it's fine to pass {x:3, y:4, z:5} to a
+function that needs x and y to be numbers, but not fine to pass {x:3,
+y:4} to a function that needs x, y, and z to be numbers.  Along the
+same lines, integers are a subtype of numbers in general, and probably
+an important one (although JS normally does gradual overflow, I don't
+think I've ever seen a JS program where this would matter).  Once
+you're dealing with subtyping, maybe you could also deal with arrays
+of known size as a subtype of arrays of unknown size.
+
+I'm not sure how exactly to deal with mutability, although subtyping
+might help.  Immutable-array-of-integers is covariantly a subtype of
+immutable-array-of-numbers, and mutable-array-of-integers is a subtype
+of immutable-array-of-integers, but mutable-array-of-integers is not a
+subtype of mutable-array-of-numbers, because you can jam 1.5 into the
+latter.  Unless I'm confused about the subtyping relation.
+
+You probably also need to distinguish Objects used as hash tables
+(mapping strings to objects of some type) from Objects used as
+structs.  Given the RJS niche, you could simply forbid using an object
+in both ways; it's trivial to rewrite `x.y = 3` into `x['y'] = 3`.
+
+RJS wouldn't need to support inheritance.

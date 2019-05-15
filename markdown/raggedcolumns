@@ -1,0 +1,63 @@
+The standard C way of doing two-dimensional arrays accommodates two
+possibilities in the same syntax `c[i][j]`: arrays of arrays like
+`int c[10][7];` and arrays of pointers like `int *c[10];`.  The first
+representation wastes no memory on pointers, but requires each row to
+be the same length, while the second one allows each row to be of a
+different length, but spends a pointer and often a dynamic memory
+allocation on each row.  Also, it needs to store the lengths of the
+rows somewhere, unless they're NUL-terminated strings or something,
+which has problems of its own.  So the overhead is something like two
+or three words per row.
+
+Historically, array languages like APL and libraries like Numpy have
+preferred rectangular N-dimensional arrays rather than ragged ones.
+This isn't ideal for things like lists of strings, where each string
+may be of a different size.  I've been thinking about how to extend
+array languages consistently to such objects, both in abstract
+semantics and in practical machine implementation.
+
+Speaking of practical implementation, it occurred to me that if your N
+rows are stored one after another in a contiguous block, as in the C
+array-of-arrays case, but you have a pointer to the beginning of each
+one, as in the C array-of-pointers case, then for N+1 pointers, you
+can store N variable-size rows.  Like this:
+
+      _________
+     |_|_|_|_|_|    
+      | | | | |
+      | | | | \_________________________
+      | | | \___________________        |
+      | | \______________       |       |
+      | |               |       |       |
+      | |               |       |       |
+      V V               V       V       V
+      N v a r i a b l e s i z e r o w s
+
+Here, we've stored four strings with no delimiters between them, with
+an array of five pointers.  This allows optimally efficient
+multidimensional indexing with range-checking.
+
+> (As a digression, if you're really hard up for space, you could
+  block the array into 16-string-or-so blocks, store an array of block
+  start offsets, and store the 16 string lengths in another array,
+  either limiting each individual string to 64KiB or 256 bytes or
+  something, or using a variable-length encoding in the other array
+  and an array of pointers to every 16th string length.  Then a
+  typical block of 16 short strings like the above will cost you about
+  64 bytes of string data, 4 bytes of offset into the array, 4 bytes
+  of offset into the lengths array, and 16 bytes of string length
+  data, for a total of 88 bytes.  That is, assuming that no single
+  array is over 4 GiB.)
+
+This ragged-array thing can be multidimensional: you can store a list
+of variable-length lists of variable-length strings in the same way,
+with the first level of pointers pointing to the beginning of each
+string list pointer array, and the pointers in the string list pointer
+array pointing to the string starts.  Only three allocations and all
+the lengths available at run-time.
+
+Additionally, and importantly for use in array languages that tend to
+construct new large arrays by applying operations to existing large
+arrays, this multidimensional ragged structure can be constructed
+incrementally, one character at a time, without knowing ahead of time
+the size of any of the rows.

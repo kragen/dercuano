@@ -1,0 +1,86 @@
+(In this version of the dontmove archival virtual machine, Aa input
+and output a byte, Bb read the subtractor or subtract a number from
+it, Cc read and write the word in memory in the Dd register, and Ee
+read and write the program counter, the last of which leaves a return
+address in the accumulator.  Somewhere I had a sort of "signum"
+register but I forget where it is.)
+
+I was thinking about how to do an assembler for dontmove, and I think
+that the right thing to do is probably really a simple Forth compiler,
+one that pastes together chunks of code with known stack effects.  If
+we put the top of stack in Y, the down-counting stack pointer in X,
+the down-counting return stack pointer in W, and the return address
+(top of return stack) in V, assume Z is zero, and use U as a scratch
+register, then DUP is "BbXbBbbZ1bBdxYc", for example, and DROP is
+"BbZ1bBbbBuXdbBbbUbBxCy" or "BbXdbZ1bBbbBxCy".  Function calls are
+similarly obnoxious; the actual function call itself is simply
+something like "Z1234e", where 1234 is the address of the function;
+and function entry is simply "v", and function exit is simply "Ve";
+but before the call it is necessary to save V onto W, which is "WdVc",
+and decrement W, which is the painful "ZbWbBbbZ1bBw"; and after the
+return, restoring the previous V from W is also necessary.  (Perhaps
+leaf functions could avoid that, and in other functions it could be
+moved into the prologue and epilogue.)
+
+(Note, there's lots of confusion in the code both above and below
+about whether the pointers point to the last item pushed or the space
+for the next one.)
+
+If we had a way to simply set the contents of the subtractor, say "f",
+rather than subtracting from it, then these would simplify
+substantially, replacing lots of cases of "Bb...bBbb" with "...f".
+Also let's suppose we have a premade -1 in, say, T, which we can set
+up at some point with "Zf1bBt".
+
+* DUP: "BbXbBbbZ1bBdxYc" -> "XfZ1bBdxYc"
+* DROP: "BbZ1bBbbBuXdbBbbUbBxCy" -> "XfdTbBxCy"
+* save V onto W and decrement W: "WdVcZbWbBbbZ1bBw" -> "WdfZ1bBwVc"
+* restoring V from incremented W: "WfTbBwdCv"
+
+(On second thought, it might make more sense not to keep
+top-of-return-stack in a register; then non-leaf function entry is
+something like "vWdfVcZ1bBw" and non-leaf function exit is
+"WfTbBwdCe", needing no scratch register.  Without "f", non-leaf entry
+is, for example, "vBbWdbBbbVcZ1bBw".  Leaf entry and exit can still be
+"v" and "Ve".)
+
+At some point you might get to questioning whether it's worth maybe
+having increment and decrement instructions, distinct modes for
+reading memory (add to accumulator, subtract from accumulator, XOR
+with accumulator) but it doesn't take much to get to an abstract
+machine that's more complicated than a GreenArrays core.
+
+Forth "@" (memory fetch) is then "YdCy".  Store "!" is complicated by
+needing to pop the stack twice: "XfdTbBxCsYdScXfdCyTbBx", or something
+like that.  SWAP is easier due to the lack of arithmetic: "YuXdCyUd".
+OVER, which pushes onto the stack, is something like
+"XfdCuZ1bBxdYcUy".
+
+If we had an increment instruction "+" that would increment the
+accumulator instead of having "f", then store would become
+"XdCsYdScX+d+xCy".  DUP, DROP, and function entry and exit would
+similarly benefit from increment and decrement: "X-dxYc", "Xd+xCy",
+"vW-dwVc", and "Wd+Ce" respectively.  This + and - completely
+eliminate the need for "f" for these basic operations.
+
+Forth "+" then would be "BbYbX-dxCbBbbBy" and Forth "-" is
+"BbX-dxCbBbbYbBy".
+
+Bitwise AND is going to be a real bear, involving a loop that shifts
+bits to the left by adding a number to itself (something like
+"BbYbbBbb") and then somehow getting the most significant bit.
+
+This implies that we can probably do orders of magnitude better by
+adding a NAND operation.  Say it was Gg, behaving like Bb: g NANDs the
+input with what's already there, and you can read the result with G.
+Now "Gg" NANDs the current result with itself, bitwise inverting it,
+and "Zg" NANDs the current result with 0, setting it to all-1, which
+also means that it will bit-invert the next thing we "g" into it.
+Then we can AND registers Y and U with "ZgYgGgUgGgG": first putting
+the bit-inversion of Y into G, then inverting that with Gg, then
+NANDing U with Ug, inverting the result with anothe Gg, and then
+getting it with G.  Similarly OR of U and Y becomes "ZgUgGuZgYgUgG", I
+think.
+
+The more I think about this, the more I wonder if something like
+Calculus Vaporis is a better design.

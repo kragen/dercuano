@@ -1,0 +1,54 @@
+### Bayesian logic on graphical models ###
+
+Cox's theorem (or at least Jaynes' interpretation thereof) says that
+Bayes’ theorem is the only generalization of classical (or, maybe,
+intuitionistic?)  propositional logic to continuous truth-values that
+satisfies some relatively straightforward conditions.  What would it
+look like to program with Bayesian rather than Aristotelian logic?  Is
+this the same as probabilistic programming or different?
+
+I suspect that there’s an interesting connection here with interval
+arithmetic and non-monotonic reasoning.  Consider the propositions,
+from a HN discussion yesterday, “Birds can fly, but penguins can’t
+[and penguins are birds], but Harry the Rocket Penguin can [and he is
+a penguin].”  If we interpret each of these propositions
+probabilistically rather than by Aristotelian logic, things work out
+correctly: if we are told Hermione is a penguin, we might try to
+compute P(X can fly) from P(Hermione is a penguin)=0.99, but then we
+must deduce whether penguins can fly.  In the absence of P(X can fly |
+X is a penguin) = 0.99 from the explicit statement above, and for the
+1% chance that it’s false, we are reduced to attempting to compute P(X
+can fly | X is a penguin) from P(X can fly | X is a bird) = 0.99 and
+P(X is a bird | X is a penguin) = 0.99, which tells us that penguins
+can fly with about 50:1 odds.  But fortunately we have this other
+piece of evidence, which is that we’ve been *told* penguins can’t fly.
+(Given that, do we conclude that Hermione is 99.02% likely to be
+flightless, or more like 67%?)
+
+(A Gricean programming language, where the programmer is assumed to
+have followed the maxims of quantity and relation and not specified
+unnecessary information, might be interesting... but that’s very
+speculative!)
+
+Generalizing this a bit, you could consider the value of *any*
+variable to have some probability distribution; the traditional
+engineering and science use of “X±Y” confidence bounds is merely a
+simplification of the distribution, a simplification which (one
+interpretation of) interval arithmetic deals with.  But in reality we
+have, say, a Gaussian lump in the probability distribution centered on
+X with width 2Y (or Y/12 or whatever), and near-zero probability
+elsewhere.  This may pose problems for dynamic typing, since in the
+general case, taking as a specific example a computed latency for an
+internet connection, we would need to consider not only whether the
+latency was between 20 and 25 milliseconds, but also whether the
+latency was 20+3i milliseconds, 5 meters, a turnip in a field in Laos,
+or the Stoic conception of virtue as expressed by Marcus Aurelius.
+(Sound Bayesian reasoning prohibits you from excluding possibilities a
+priori, since doing otherwise leads to pathological reasoning
+breakdowns.  Unfortunately, it would seem to require that we *start*
+from what appear to be pathological reasoning breakdowns.)
+
+Practically speaking, we probably need to approximate the posterior
+distribution with some kind of sampling, as with particle filters, but
+perhaps in many cases we can sample *intervals* of the probability
+space rather than *points* in it.
