@@ -15,6 +15,26 @@ installed on this machine.
 Status
 ------
 
+At this point, the visual appearance of the text is about as good as
+can be expected from web browsers and importing mass quantities of
+Markdown; which is to say, it would look better with justification and
+hyphenation, but that’s not in the cards, and there are a lot of
+places where ASCII-art diagrams and tables are used instead of SVG
+diagrams or something and HTML tables (see
+[dercuano-drawings](markdown/dercuano-drawings) for some notes on this
+situation), and none of the source code samples are
+syntax-highlighted.
+
+The ET Book fonts I’m using, although generally much nicer than more
+everyday fonts, have some drawbacks, which hopefully I can improve
+(see [dercuano-stylesheet-notes](markdown/dercuano-stylesheet-notes)
+for more details.)
+
+Navigability leaves something to be desired, although it’s more
+navigable than the kragen-tol archives were.
+
+Over the last three weeks I've importe
+
 I’ve spent about 30 hours putting this together,
 which means that at this point it’s gone from an “afternoon hack”
 to a “week-long hack”, and now it’s looking kind of okay actually.  I have about
@@ -39,7 +59,8 @@ Dependencies
 ------------
 
 Dercuano depends on the Python Markdown module, the one started by
-Manfred Stienstra, and Python 2.  I’m using 2.7.12.
+Manfred Stienstra, and Python 2.  I’m using 2.7.12, but it seems to
+also work with 2.7.3 and 2.7.6.  It does not work with Python 3.
 
 Time log
 --------
@@ -57,3 +78,5 @@ Time log
 2019-05-04 14:00 to 18:00 (4 hours): add 50 more notes  
 2019-05-04 18:00 to 21:30 (3½ hours): add 71 more notes  
 2019-05-07 19:00 to 21:00 (2 hours): add ET Book font, tweak CSS to accommodate it  
+
+After that, I stopped logging my time.
