@@ -49,7 +49,7 @@ screen!  But there are some interesting possibilities here:
 * You don't really need M=128 for the top.  The top level of quadtree
   can only have a max of 8 of its nodes displayed at once.  This
   approach means you could have M=8 and 32 for the top couple of
-  levels, cutting the memory usage almost in half, to (+ 8 (* 8 4) (*
+  levels, cutting the memory usage almost in half, to (+ 8 (\* 8 4) (\*
   32 4) 512 512) = 1192 bytes.  You can use some of those bytes to
   give you "spare" blocks at the upper levels, to expand M further
   beyond 128 for the bottom level (so you can have, say, 1024 bytes of
@@ -77,7 +77,7 @@ interfere with each other's compressibility.  Then you have:
 * level L2, two nodes of eight lines;
 * level L3, two bytes pointing to L2 nodes.
 
-Total is (+ 2 (* 2 4) (* 8 4) (* 32 4) (* 128 4) (* 256 4)) = 1706
+Total is (+ 2 (\* 2 4) (\* 8 4) (\* 32 4) (\* 128 4) (\* 256 4)) = 1706
 bytes, saving about 300 bytes over the traditional representation, at
 the cost of cutting the possible incompressible text on the screen in
 half.
@@ -95,7 +95,7 @@ A typical font ROM would likely be highly compressible with this
 approach, since lots of characters contain blank lines (not containing
 ascenders or descenders, say) and other repeated features.  Suppose we
 have 96 ROM font characters, and each P0 node is used an average of
-twice.  Then we have 96*8 bytes for the P0 nodes and 96*4 bytes for
+twice.  Then we have 96\*8 bytes for the P0 nodes and 96\*4 bytes for
 the P2 nodes.  But that's assuming significant horizontal slices of
 characters are shared. That puts us at a total of 1152 bytes of ROM.
 
@@ -127,7 +127,7 @@ is used, so it's not in the latency critical path.  P0, P1, and T0
 each need to read a random byte every 8 dot clock cycles; T2 every 64;
 L1 every 65536; etc.  So anything slightly over a single byte read per
 2 dot clock cycles should be sufficient.  Since we're talking about a
-(* 60 8 16 128 16) = 15 728 640 Hz dot clock, that would probably have
+(\* 60 8 16 128 16) = 15 728 640 Hz dot clock, that would probably have
 involved separate hardware memories for some of these in the 1970s
 time period we're talking about, just to keep the RAM reads down to a
 manageable level, below 8 megabytes per second per channel.
