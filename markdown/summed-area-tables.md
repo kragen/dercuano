@@ -1,9 +1,6 @@
 a logarithmic-time alternative to summed-area tables for reducing arbitrary semigroup operations over arbitrary ranges (a generalization of RMQ segment trees)
 ====
 
-Kragen Javier Sitaker <kragen@canonical.org>
-Thu Dec 6 03:37:01 EST 2012
-
 ## Summary ##
 
 There's an alternative to summed-area tables with a small, linear
@@ -228,70 +225,3 @@ to the least-common-ancestor problem, but I don't understand it yet.
 ## Thanks ##
 
 To John Cowan, Gian Perrone, and Seth David Schoen for discussion.
-
-<link rel="stylesheet" href="greyonbeige.css" />
-
-<style>
-/**************************************** paragraph layout, typography */
-
-body {
-     font-family: Optima, sans-serif;
-     font-size: 1.3em;
-     margin: 1.3em;
-}
-
-p {
-     line-height: 1.5em;
-     text-align: justify;
-     max-width: 40em;
-     margin: 0 0 0 2em;
-     text-indent: -1em;
-}
-
-pre {
-    margin-left: 2em;
-    max-width: 100%;
-    overflow-x: auto;
-}
-
-/* versals; commented out:
-
-p:first-letter { font-size: 3em; float: left; line-height: 1em; margin: 0 0.1em 0 -0.333em }
-p + p:first-letter, pre + p:first-letter { font-size: 1em; float: none }
-body p { text-indent: 0 }
-body p + p, body pre + p { text-indent: -1em }
-
-/**/
-
-
-/**************************************** headers */
-
-h1, h2, h3, h4, h5, h6, .addtoc_title {
-      font-family: Palatino, serif;
-      font-weight: normal;
-      font-variant: small-caps;
-      margin-left: 0.25em; margin-right: 0.25em;
-}
-
-h1 { letter-spacing: 6px; padding-bottom: 6px; font-size: 1.5em; }
-h2 { letter-spacing: 6px; padding-bottom: 6px; font-size: 1.25em; }
-h3 { letter-spacing: 4px; padding-bottom: 4px; font-size: 1.1em; }
-h4 { letter-spacing: 3px; padding-bottom: 3px; font-size: 1em; }
-
-
-/**************************************** table of contents */
-
-body .addtoc_toc {
-     float: right;
-     background-color: inherit;
-     color: inherit;
-     border: 0;
-     width: 16em;
-     margin-left: 1em;
-}
-
-.addtoc_toc li { line-height: 1.5em }
-
-</style>
-
-<script src="http://canonical.org/~kragen/sw/addtoc.js"></script>
