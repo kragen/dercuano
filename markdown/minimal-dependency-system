@@ -1,0 +1,58 @@
+A minimal dependency processing system
+======================================
+
+(See also file `minimal-transaction-system`.)
+
+This is a miniature operating system in which computations are
+executed in response to changes in the filesystem, and which in turn
+can create more changes in the filesystem.
+
+Transactions run.  How they were started, I do not know; but they do
+run.  A transaction looks at some part of the filesystem, then creates
+more files, then exits successfully, making its output files available
+to other transactions.  The input files and dirents that went into
+creating them are automatically recorded; if any of them change, the
+transaction is re-executed, updating the files.
+
+When a file is created, its creator specifies an invalidation policy.
+With the default invalidation policy, the invalid version of the file
+remains available while the transaction is being re-executed, and if
+the transaction doesn’t change the file’s contents, then transactions
+that depend on that file won’t be re-executed either.  There’s also a
+“strict” invalidation policy which immediately invalidates any
+transactions that accessed the file, re-executing them afterwards.
+Attempts from outside of transactions to access a strict file that’s
+being recomputed will block or give an error, I don’t know.
+
+(I’m not sure whether I need the same thing on read edges.)
+
+A pure memoization variant
+--------------------------
+
+The fundamental operation is to apply a function to an argument,
+producing, eventually, a result.  The argument and the result are
+namespaces — filesystem directories, basically; the function is a
+blob, a program.  The system monitors which parts of the argument are
+accessed by the function and what system resources it needed and
+caches the production of the result on that basis.
+
+On Linux, the minimal grain size for process execution is on the order
+of a millisecond; a fork/exit/wait loop takes about 130 μs per
+iteration at best on my laptop, up to a few milliseconds with large
+memory maps or on slower processors.  If a function is going to take
+much longer than a millisecond, it should farm out the work to
+subfunctions as much as possible, enabling both caching and
+distribution.  We might be able to do better and get down into the
+deep submillisecond range.
+
+130 μs is about 200 base cases of `fib = lambda n: 1 if n < 2 else
+fib(n-1) + fib(n-2)` in Python on the same machine.
+
+How much data are we talking about caching?  `yes` can feed data to
+`dd` at about 800 MB/s, or 800 kB/ms.  `seq` can generate about 128 MB
+of numbers per second (128 kB/ms) and `gzip -9` compresses them by
+about 4× at about 1.8 MB/s (1.8 kB/ms) output, or 7.2 MB/s (7.2 kB/ms)
+input.  So the individual output files we’re caching could reasonably
+be from about a kilobyte up to about a megabyte, but of course larger
+results will contain many such files together.
+

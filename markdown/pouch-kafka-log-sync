@@ -1,0 +1,94 @@
+Suppose you want to build an offline-first browser app.  A simple way
+to structure this is using a Kafka-like approach: all of the data in
+the app is stored in some set of append-only logs (or “feeds”, as
+Secure Scuttlebutt calls them, or “topics”, as Kafka calls them), each
+corresponding to a single writer (or “producer”, as Kafka calls them,
+or “identity”, as SSB calls them; for example, a particular profile in
+a particular browser on a particular user account on a particular
+computer).  Synchronization of these logs is very simple, as long as
+there are never conflicting writes: for nodes A and B to synchronize
+log L, one tells the other the last entry they have in log L, and the
+other responds either by requesting the entries they don’t have or by
+sending the other entries:
+
+    <A> my last entry in log L is 3258
+    <B> please send entries in L from 3201 to 3258
+    <A> entry 3201 in L is “joajgoiagjaesog”
+    <A> entry 3202 in L is “jogwj03280t02380”
+    ...
+    <A> entry 3258 in L is “320820231di0w02”
+
+or
+
+    <A> my last entry in log L is 3258
+    <B> entry 3259 in L is “302808gwahjg0saigj”
+    <B> entry 3260 in L is “]0ga0gjewagj0iew”
+
+As long as there are never two machines creating conflicting entries
+in L, this protocol is simple, correct, and eventually consistent,
+regardless of the topology.  SSB ensures this by requiring a
+public-key signature on each entry (“message”) to prevent the
+propagation of unauthorized messages, and a previous-entry hash in
+each entry to prevent the log owner from propagating modifications to
+previously published messages, although they can still provoke
+desynchronization.
+
+Nodes A and B might be a server and a browser, a browser and a server,
+or two browsers.  As long as they are careful never to share
+information with anyone who isn’t authorized to have it (SSB
+implements this by encrypting anything nonpublic, so that untrusted
+nodes can safely forward any message) it doesn’t matter.
+
+By itself, this provides, essentially, a group chat application.  But
+an append-only data store can be used for any application.
+
+For example, you could implement a centralized key-value store in a
+single log by appending (key, state, value) entries to it, where
+“state” is either “existing” or “deleted”.  The current state and
+value for a given key is just the most recent one in the log.  This
+allows read-only slaves, and if you are sufficiently confident in your
+failover mechanisms, it could even allow for recovery after the loss
+of the master node.
+
+If you want to allow multiple writers, though, you can achieve this
+with multiple logs, but you probably want to be able to at least
+detect lost-update conflicts; this requires expanding the entry tuple
+to ((key, parent), state, value), where “parent” is some
+ABA-problem-proof identifier of the previous state of the key, such as
+a secure hash of the entry that state was set in.  If there are ever
+two entries with the same (key, parent), those entries are in
+conflict; the conflict must be resolved, through some application-
+specific mechanism.  (In Git, this is done with a commit that has two
+parents; in Bitcoin, you instead use the block with the longest chain
+length from the root.  The Git mechanism has the advantage that it
+records explicitly that the conflict has been resolved rather than
+forgotten.)
+
+You could imagine a more sophisticated conflict-detection mechanism;
+for example, to commit a transaction, you could write some (key,
+transactionid, state, value) entries for the values modified, some
+(transactionid, entryid) entries for the entries that were read during
+the transaction, and finally a (“commit”, transactionid) or
+(“rollback”, transactionid) entry.  Two or more committed transactions
+conflict if there does not exist an ordering in which none of them
+read versions of data that had been overwritten by a previous
+transaction.
+
+A convenient way of structuring a key-value store program that uses
+this data store is to have it iterate over the entire history at
+startup time, constructing, say, an in-memory hash table of the latest
+value associated with each key — essentially replaying the history of
+the database.  To reduce startup time, it could checkpoint a snapshot
+of the hash table along with the current entry numbers in each log;
+then, upon restart, it need only replay the entries since those
+offsets (as Kafka calls them).  Indeed, it could store these snapshots
+in its own private log.
+
+For some applications, it’s reasonable to store the entire history of
+the application, either because the total volume of data is relatively
+small, or because the total amount of relevant data grows almost as
+fast as the entire history does.  In other applications, it is
+necessary to forget old data because it takes up too much space.
+Kafka’s approach is to, usually, store only the most recent data.
+This is probably the only approach compatible with the simple
+synchronization algorithm given above.

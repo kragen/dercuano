@@ -1,0 +1,142 @@
+I was considering how to specify finite state machines, and some
+interesting ideas occurred to me.
+
+Introduction and outlook
+------------------------
+
+A synchronous sequential digital circuit is a finite state machine,
+FSM.  At each clock cycle i, it has exactly one state Sᵢ ∈ Σ, and on
+each transition of the clock, it enters a new state
+Sᵢ₊₁ ∈ Σ = F(Sᵢ, Iᵢ₊₁), where Iᵢ₊₁ ∈ Υ is its input at the end of
+clock cycle i, and F ∈ Σ × Υ → Σ is its “state transition function”.
+In this way, it generates a word in Σ\* of letters from Σ from an
+initial state S₀ and a word in Υ\* of letters from Υ.
+
+(This is “circuit” in the sense of an electronic device, not in the
+theory-of-computation sense of a DAG of combinational logic.)
+
+For example, here’s an execution trace of a finite state machine that
+transliterates from lowercase Greek into titlecase Roman letters:
+
+    Iᵢ:   π λ α τ ο ν ␣ κ α i
+          ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
+    Sᵢ: ℵ→P→l→a→t→o→n→␣→K→a→i
+
+It should be noted that, since Σ and Υ are finite, so too is Σ × Υ to
+which the domain of the state transition function F belongs, so it is
+possible to list F explicitly as an exhaustive case analysis.  The
+state transition function for the above example would include cases
+like these:
+
+    (ℵ, π) → P
+    (P, π) → p
+    (P, λ) → λ
+    (Q, λ) → λ
+    (ℵ, λ) → Λ
+    (n, ␣) → ␣
+    (␣, λ) → Λ
+    (␣, κ) → K
+
+In this case the input alphabet Υ and the state alphabet Σ are not the
+same; although they each include a symbol represented as ␣ here, that
+is just a notational pun — it doesn’t make sense to say that those
+symbols are the same symbol or that they are different symbols, since
+they belong to different alphabets.
+
+A full exhaustive case analysis here, supposing that Υ contains the 24
+lowercase Greek letters plus ␣, and Σ contains the 26 uppercase modern
+Latin letters, the corresponding 26 lowercase, ␣, and the initial
+state S₀ = ℵ, would require 25·54 = 1350 cases.  This table is awkward
+to write out by hand, but it is small enough to be easily manipulated
+by computer.  However, nearly all circuits of interest have far too
+many possible transitions to fit such a table in the memory of a
+conventional computer.
+
+In the registers of the circuit we store a Sᵢ, represented as some
+arrangement of bits; we interpret the set of inputs as Iᵢ₊₁; and we
+represent the state transition function F as the RTL of our circuit,
+which can be realized with LUTs, combinational logic made of DAGs of
+gates (the theory-of-computation meaning of “circuit”), an EPROM, or
+whatever.
+
+To design the circuit, it is not necessary to list the registers or
+even Σ — they can be inferred from F and S₀.  The representation of Υ
+can be specified or free for the optimizer to optimize.
+
+Thus we can design a sequential digital synchronous circuit simply by
+specifying its state transition function.  Since that function’s
+domain is finite, it is possible to do so by enumerating all its
+cases.  However, usually it is preferable to use a more powerful
+language to be able to compose the desired function from sub-functions
+that are separately understandable, verifiable, and reusable.
+
+It bears repeating that these are not the “functions” of JS or C, that
+is, subroutines.  Subroutines are executed over some period of time,
+possibly terminating and possibly crashing.  I’m talking about the
+mathematical object called a function: a mapping from each domain
+value to exactly one range value.
+
+I will outline here a design for a langauge for specifying such finite
+functions that, I think, combines a number of advantages in a way no
+previous design I’ve seen does.
+
+Design goals
+------------
+
+Concision, flexibility, tractability, simulability, synthesizability
+
+Relational algebra
+------------------
+
+Termination of transitive closure over finite domains
+
+Regular expressions
+-------------------
+
+Concurrency
+-----------
+
+Nondeterminism
+--------------
+
+State trees
+-----------
+
+Example: XOR from NAND
+----------------------
+
+Example: J-K flip-flop
+----------------------
+
+Example: divide by 2 counter
+----------------------------
+
+Example: 3-bit magnitude comparator
+-----------------------------------
+
+Example: ring counter
+---------------------
+
+Example: quadrature decoding
+----------------------------
+
+Example: quadrature step counting
+---------------------------------
+
+Example: bit-serial addition
+----------------------------
+
+Example: bit-parallel addition
+------------------------------
+
+Example: simple ALU
+-------------------
+
+Example: Single-port RAM
+------------------------
+
+Example: Dual-port RAM
+----------------------
+
+Example: 16-bit multiplier
+--------------------------

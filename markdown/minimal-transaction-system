@@ -1,0 +1,110 @@
+A minimal transaction processing system
+---------------------------------------
+
+(See also file `minimal-dependency-system`.)
+
+The data store is a key-value store that supports set(k, v), get(k) ->
+v, and getNextAfter(k) -> (k, v) operations; keys and values are
+arbitrary bytestrings, and keys are ordered lexicographically.
+
+You start with a transaction running as an isolated virtual machine.
+It has the above-mentioned data-store operations available, plus
+sbrk(n), commit() (which exits), fail(), and fork(), which commits the
+current transaction and creates two new coequal transactions with
+copies of the same memory, though one is running a different
+subroutine.
+
+It starts by reading through a section of the key-value store (perhaps
+`"tx/" < k && k.startswith("tx/")`) where it expects to find source
+code for transactions to run.  For each key of source code found, it
+fork()s a child transaction that reads that source code, compiles it
+into memory, and starts running it.  When it finds no more source
+code, it invokes fail().
+
+When a transaction invokes fail(), its writes do not become visible to
+other transactions, but the set of get() and getNextAfter() calls it
+made is remembered.  If the data store changes in a way that would
+change what those calls saw, the transaction is retried.  The system
+has the option to transparently checkpoint the transaction at any
+point and rerun it from there, rather than from the beginning — this
+is why fork() commits, because the child transactions are externally
+visible side effects.
+
+These initially compiled transactions are mostly “servers”.  They look
+for messages in some section of the key-value store and, like the
+initial transaction, fail() if nothing is there.  But if something is
+there, they spawn a child transaction to process it (and then fail if
+it’s still there, to avoid repeatedly processing the same thing
+repeatedly.)
+
+A transaction that has not yet committed will also be pre-emptively
+fail()ed by the system if it has previously read data that has now
+changed — when it attempts to commit(), if nothing else.
+
+Initially I thought that after fork() the parent transaction should
+continue as before, but then I realized that it might fail, so either
+fork() needs to commit, or the child transaction needs to be nested,
+which would prevent writing servers.  Then I resigned myself to the
+idea that, since the server must commit on every iteration, it
+wouldn’t be automatically restarted if its source code changed.
+
+Now, though, I realize that it is possible to have my cake and eat it
+too: ancestor transactions’ read sets can be included in your read
+set, so if your source code changes, you can be instantly rolled back
+and recompiled, even though your committed ancestor transactions won’t
+be rolled back.  I think.  I’m not sure how to make that work with
+message queues yet.
+
+This form of IPC implicitly and modularly supports a wide variety of
+different communication patterns and both batch and interactive
+computing.  If you want to wait for a message at either location a or
+location b, you do this:
+
+    a = get("a");
+    b = get("b");
+    if (a == null && b == null) fail();
+
+If you instead want to wait until both messages are present before
+proceeding, you do this:
+
+    a = get("a");
+    b = get("b");
+    if (a == null || b == null) fail();
+
+If you want to get a message if one is present, but continue anyway if
+one is not, then you can handle nullness by a method other than
+failure:
+
+    c = get("key");
+    if (c != null) { /* handle keypress */ }
+
+Because it doesn’t support nested transactions, you can’t directly
+turn blocking subroutines into nonblocking ones as with the orElse
+operator in the Composable Memory Transactions paper; if you want to
+be able to make a failure blocking or nonblocking, you should return
+that failure up the stack to the point where you actually want to make
+that decision.  For example, the first example above might read as
+follows, assuming a context where a successful return value cannot be
+null:
+
+    a = get("a");
+    b = get("b");
+    if (a == null && b == null) return null;
+
+You could spawn off a blocking subroutine into a child transaction
+that stores its result back to you somewhere that you’re looking for
+it in a nonblocking fashion, but because fork() commits, this
+interferes with modularity.
+
+This system is very simple, with only seven system calls (three of
+which take no parameters), full ACID transactions, and no explicit
+deadlock, although of course you can arrange communication patterns to
+provide deadlock.  It should be possible to implement it extremely
+efficiently.
+
+The definition of the store as a simple byte-blob key-value store is
+not essential to the system; it could have nearly any form
+whatsoever — relational, hierarchical, with private namespaces,
+graph-structured, message queues, tuple spaces, seekable files, a
+distributed transactional store, typed values, whatever.  The
+byte-blob key-value store is just a minimal approach.

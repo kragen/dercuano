@@ -1,0 +1,96 @@
+The direct stiffness method of the finite element method turns a
+system of springs into a system of linear equations, imposes boundary
+conditions by removing some of the variables to make the system
+nonsingular, and then solves the system.
+
+If we restrict our attention to systems of Hookean springs in one
+dimension connected at nodes, we have essentially two relationships:
+
+- The net force from the springs on any node, except for those held
+  fixed by boundary conditions, is zero.
+- The force through a spring is its rigidity times the difference in
+  displacement between its endpoints.
+
+This immediately suggests comparison to electric circuits.  For example:
+
+- The net current from the resistors into any node is zero, except for
+  those connected to current sources.
+- The current through a resistor is its conductance times the
+  difference in voltage between its endpoints.
+
+And the resulting series, parallel, and bridge laws are the same for
+springs and for resistors.
+
+This suggests extending the analogy {force = current, rigidity =
+conductance, displacement = voltage, springs = resistors} to other
+components.  In this analogy, a dashpot, whose force is its
+“dashpoticity” times the rate of change in the displacement between
+its endpoints, or equivalently the difference in velocity between its
+endpoints, is analogous to a capacitor, whose current is its
+capacitance times the rate of change in voltage between its endpoints.
+This extends the analogy to the following:
+
+    | Mechanical         | Electrical  |             |                   |
+    |--------------------+-------------+-------------+-------------------|
+    | force              | current     | F = kd      | I = GV            |
+    | stiffness/rigidity | conductance | k = F/d     | G = I/V           |
+    | spring             | resistor    |             |                   |
+    | displacement       | voltage     | d = F/k     | V = I/G           |
+    | dashpot            | capacitor   | F = x dd/dt | I = C dV/dt       |
+    | dashpot-stiffness  | capacitance |             | C = Q/V = ∫I dt/V |
+
+For reasons of conservation of energy, an inductor has no passive
+mechanical equivalent in this analogy; it would need to have a
+displacement proportional to the rate of change of force.
+
+But that’s not the only possible analogy, since other linear circuit
+elements (inductors and capacitors) combine in series and parallel in
+the same way.  For example, making capacitors instead of resistors
+analogous to springs:
+
+- The net charge at any node is zero, except for those connected to
+  current sources.
+- The charge across a capacitor is its capacitance times the
+  difference in voltage between its endpoints.
+
+That is:
+
+    | Mechanical             | Electrical              |     |     |
+    |------------------------+-------------------------+-----+-----|
+    | spring                 | capacitor               | ??? | ??? |
+    | compliance? stiffness? | capacitance? elastance? |     |     |
+    | velocity               |                         |     |     |
+    | force                  |                         |     |     |
+
+In this analogy (force = charge, displacement = voltage, rigidity =
+capacitance) if we differentiate with respect to time, we find that
+velocity is rate of change of voltage and FUCK I HAVE NO FUCKING CLUE.
+It seems like inductors should be masses, what?  Since they’re 180°
+away from springs?  On a mass, the derivative of velocity is force
+divided by mass.  On an inductor, the derivative of current is voltage
+divided by inductance.  So does that mean {velocity = current, force =
+voltage, inductance = mass}?
+
+Presumably you can make the analogy equally valid in exactly the
+opposite direction, with springs representing inductors, masses
+representing capacitors, and dashpots representing resistors.  In this
+analogy, I think charge represents displacement, velocity represents
+current, and force represents voltage: the rate of change of
+displacement of a mass is its velocity, and the rate of change of
+velocity of a mass is the force divided by the mass, thus {force =
+voltage, velocity = current, capacitance = mass}.  This is exactly
+contradictory to what I came up with in the previous paragraph, so
+clearly I am smoking crack.
+
+This analogy has:
+
+    | force        | voltage     |               |               |        |
+    | velocity     | current     | v = dd/dt     | I = dQ/dt     |        |
+    | displacement | charge      |               |               |        |
+    | spring       | inductor    |               |               |        |
+    | dashpot      | resistor    |               |               |        |
+    | mass         | capacitor   |               |               |        |
+    | stiffness    | inductance? | k = F/(dv/dt) | L = V/(dI/dt) | !?!?!? |
+    |              |             |               |               |        |
+
+Fuck, I have no idea.

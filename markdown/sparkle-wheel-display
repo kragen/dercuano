@@ -1,0 +1,93 @@
+Maybe this should be called a “disco ball display”.
+
+If you scatter some sparkle sparsely on an uneven black plate and
+illuminate it with a point source, each fleck of sparkle reflects a
+beam off in some quasirandom direction.  If you rotate the wheel
+around its axis, the beams from different flecks will scan in a
+rotating pattern; if the light source is on the axis of the sparkle
+wheel, the pattern is a cone, but I don’t think that’s the case in
+general.
+
+But I don’t care that much, because what I care about is what this
+looks like from a single, somewhat arbitrary point of view, an eye.
+It looks like sparkling, which is to say, brief pulses of light coming
+from apparently random sources scattered around the disk.  If you
+watch long enough without moving your eye, the sparkle pattern
+repeats.  Most of the glitter flecks have scan patterns that miss the
+eye entirely, but those that do not only illuminate it once.
+
+If you map out the pattern of sparkling for a full rotation, you can
+turn the light source on and off at chosen times to select which
+flecks appear.  With this approach, you can generate a moving image
+with a single LED, a glitter disk mounted to spin repeatably, and some
+sort of apparatus for reliably positioning your eye.
+
+Multiple flecks that are simultaneously visible are a problem.  If you
+illuminate while they are visible, you add noise to the image; if you
+do not, you have even lower efficiency.  So ideally the number of
+flecks would be small enough that the average number of flecks
+simultaneously visible is somewhere around 1.0.
+
+In the limit of perfectly parallel light, perfectly flat and
+infinitesimal flecks, and a perfectly infinitesimal viewing pupil,
+this would not be a problem, because each fleck would be visible for
+an infinitesimal period of time, so almost all would be at unique
+times.  You could pulse the light source with a Dirac delta function
+in order to fit nonzero light into this zero time, so you could still
+see it.
+
+But of course light sources have divergence, glitter flecks have size,
+flecks are curved, and pupils have size.  Picking some numbers, a
+laser pointer might have 1.2 milliradians of divergence and 2mm of
+light source diameter, and might be mounted 2 meters from the spinning
+plate; glitter flecks might be 200 microns in diameter and not have
+significant curvature; and your eye might be “mounted” 1 meter from
+the spinning plate and have a diameter of 4 mm.  Given these numbers,
+it seems like the 4-milliradian pupil is almost certainly going to be
+the limiting factor (and so you might as well use 4-millimeter or
+8-millimeter flecks), but perhaps you could fix it by using a small
+(less than 2 mm) peephole.
+
+You should be able to get up to 4π milliradians of angular scanning
+out of the apparatus, depending on the relative angles of the light,
+your eye, the axis, and the flecks.  Unfortunately that still only
+gives you about 3142 pixels at 4 milliradians, which is a shitty
+display.  Illuminating only part of the plate doesn’t help; spinning
+the plate faster doesn’t help; the issue is that you need each pixel
+to get its own separate timeslot in the rotation, and the timeslots
+are .004/(4π) of a full rotation.  Making your pupil smaller will
+help, and if you can make different rotations different, that will
+help too.
+
+If you add more light sources, that will help a lot, because the
+different light sources can activate different flecks simultaneously
+with no interference.  Alternatively you could move the eye, the axis
+of rotation of the plate, or the light sources, in a controlled
+fashion, so that different rotations are different in a repeating
+pattern.  So, for example, if you use an 8x8 array of light sources, a
+2mm peephole, and rock the axis of rotation of the plate around at 4×
+slower than the rotation of the plate, you might be able to get
+3142·8·8·2·4 = 1.6 megapixels.  Now we’re talking!
+
+If you rotate the plate at 5400 rpm (90 Hz) and revolve its axis of
+rotation at one-fourth that, you get 22½ “frames” per second.
+
+You might think that the contrast ratio between the glitter and the
+black background will be a problem, but I think that you can enhance
+that contrast ratio arbitrarily by getting further away — until the
+beam from the glitter fleck is as wide as your pupil, at which point
+you stop winning.
+
+Then it’s just a matter of mapping out which light source illuminates
+which spots on the disk at which position in the rotational cycle.
+
+As displays go, this is grievously inefficient.  If your disc is 50mm
+across and only the light falling on a 200-micron-square portion of it
+is being used, and that only half the time, then 62499/62500 of the
+light is lost.  But with a sufficiently bright light source, that
+should be okay.
+
+Using this approach backwards, you can recognize the fleck pattern of
+a particular position with a camera in order to detect the rotational
+position of the disc: a rotary encoder, potentially with three degrees
+of freedom.
