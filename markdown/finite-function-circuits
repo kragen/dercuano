@@ -76,9 +76,172 @@ possibly terminating and possibly crashing.  I’m talking about the
 mathematical object called a function: a mapping from each domain
 value to exactly one range value.
 
-I will outline here a design for a langauge for specifying such finite
+I will outline here a design for a language for specifying such finite
 functions that, I think, combines a number of advantages in a way no
 previous design I’ve seen does.
+
+Notes from the paper notebook
+-----------------------------
+
+I started writing this file in 2017, and then never finished it; I
+just found it again now in 2019.  But I have some notes from a paper
+notebook, in Spanish, which I am attempting to transcribe here.  I
+appear to have been working from them when I originally wrote this
+file.
+
+The expression notation for algebraically composing binary relations
+is fairly similar to Binate; you have relational composition,
+transitive closure (which, as a note later in this file points out, is
+necessarily terminating on finite sets), Cartesian product, union,
+intersection, set subtraction, relational inverse, relations car and
+cdr for dissecting Cartesian products, and notations for constant
+functions and primitive relations consisting of pairs of elements.
+
+It’s not a particularly tiny algebra — it has ten primitives, of which
+two are primitive relations, one constructs a relation from an
+element, one constructs a relation from two elements, two more
+construct a relation from another relation, and the remaining four
+construct a relation from two relations.  And, implicitly, there’s the
+tuple-creation operator, which constructs an element of A × B from an
+element of A and an element of B.  But, at least for finite
+relations — which are all we care about for specifying combinational
+logic! — it is complete (which really only requires ↦ and ∪) and I
+think may fulfill the desiderata I laid out below of being concise and
+flexible, and is certainly tractable, simulable, and synthesizable.
+
+Then I use the union and primitive pairs to build up boolean NOT, and
+then without mentioning elements again, build up bitwise identity, the
+universal relation on bits and from pairs of bits to bits,
+restrictions of car and cdr to relations from pairs of bits to bits
+(called L₂ and R₂), their bitwise inversions, and something that makes
+no sense called NI₂.  I’m pretty sure this is what I was thinking
+about in the “Example: XOR from NAND” section below: build up all the
+primitive gates from just a NAND relation (rather than from NOT and
+AND as I was trying on paper).
+
+My comments about which relations are finite and which are infinite
+suggest that I was worried about infinite sets popping up and making
+algorithms fail to terminate, as does my use of set-subtraction \\
+rather than simple negation.
+
+I think the idea then was that you can consider a binary relation to
+be a specification of a combinational logic function, and you can
+consider that combinational logic function to be a specification of a
+sequential logic behavior (if you can identify which parts are state
+and which are inputs, anyway); but, that under other circumstances,
+other forms of behavior specification, such as the
+sequence/alternation/repetition operations of regular expressions, are
+more convenient; and that other ways of combining finite state
+machines, such as (some unspecified form of) concurrency, (some
+unspecified form of) nondeterminism, and (some unspecified form of)
+state trees, are sometimes more useful.
+
+You could conceivably treat an FSM (S₀, F) as a relation from input
+strings to output strings — a function, if deterministic, but in any
+case a relation — and attempt to handle them with the same algebra of
+relations.  But I’m not sure I had that in mind, and it may not be a
+useful way to compose finite state machines.  I suspect I just had in
+mind that you would construct primitive finite state machines using
+binary relations to specify their transition function, then use the
+other mechanisms to combine these primitive state machines in series,
+in parallel (note that tconcurrency was a heading not in the paper
+notebok), nondeterministically, and in trees of state (perhaps as in
+Harel statecharts, although I didn't know about those then).
+
+### Componer FSMs
+
+* Intro [link]
+* Relaciones [link]
+* Expresiones regulares
+* No determinismo
+* Arboles de estado
+
+### Intro
+
+Un circuito digital sincrónico es una máquina de estados finitos, FSM
+por sus siglas en inglés.  En cada momento tiene un estado Sᵢ ∈ Σ, y
+en cada transición del reloj entre un nuevo estado Sᵢ₊₁ ∈ Σ = F(Sᵢ,
+Iᵢ) donde Iᵢ es su entrada en momento i, y F es una función ∈ Σ × Υ →
+Σ.  Así genera una palabra en Σ\* a partir de una palabra en Υ\* y un
+estado inicial S₀.
+
+    π λ α τ ο ν ␣ κ α i
+    ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
+    P→l→a→t→o→n→␣→K→a→i
+
+Cabe destacar que, ya que Σ y Υ son (ilegible) así también Σ × Υ, así
+(ilegible) hacer un listado de F.
+
+> No incluidos:
+>
+> - H Z (Hi-Z?)
+> - open-collector
+> - asyncronia
+> - variables (registros o pseudo-registros con nombres)
+
+En los registros del circuito almacenamos Sᵢ, representando como un
+conjunto de bits, interpretamos el conjunto de entradas como Iᵢ, y
+representamos F como el RTL del circuito, que se puede realizar con
+LUTs, lógica combinacional de DAGs de compuertas (un "circuito" de
+teoría de computación), un EPROM, lo que sea.
+
+No es necesario especifcar los registros ni Σ — se pueden inferir de F
+y S₀.  La representación de Υ puede ser especificado o libre para
+optimizar.
+
+Así que podemos diseñar un circuito digital secuencial sincrónico
+especificando su función de transición nomás, y ya que es finita, lo
+podemos hacer enumerando los casos.  Pero para la mayoría de
+circuitos, nos conviene usar un lenguaje más poderoso para poder
+componer la función deseada de sub-funciones separadamente
+entendibles, verificables, y reutilizables.
+
+Cabe repetir que ésos no son las "funciones" de JS o C, es decir,
+subrutinas, que pueden ejecutarse y así tomar tiempo.
+
+### Relaciones
+
+* (a, b) ∈ A ∧ (b, c) ∈ B ⇒ (a, c) ∈ A∘B
+* (a, b) ∈ A ⇒ (a, b) ∈ A\*
+* (a, b) ∈ A ∧ (b, c) ∈ A\* ⇒ (a, c) ∈ A\*
+* (a, b) ∈ A ∧ (a, c) ∈ B ⇒ (a, (b, c)) ∈ A × B
+* (a, b) ∈ A ⇒ (a, b) ∈ A∪B
+* (a, b) ∈ B ⇒ (a, b) ∈ A∪B
+* (a, b) ∈ A ∧ (a, b) ∈ B ⇒ (a, b) ∈ A∩B
+* (a, b) ∈ A ⇒ (b, a) ∈ A⁻¹
+* *tachado* (a, (b, c)) ∈ A ⇒ (a, b) ∈ ←A
+* *tachado* (a, (b, c)) ∈ A ⇒ (a, c) ∈ →A
+* ((b, c), b) ∈ car
+* ((b, c), c) ∈ cdr
+* (a, b) ∈ A ∧ (a, b) ∉ B ⇒ (a, b) ∈ A\\B
+* (a, b) ∈ K(b)
+* (a, b) ∈ a ↦ b
+
+Así con ↦, K, car, cdr, ⁻¹, ∩, ∪, ×, \*, y ∘, podemos
+combinar relaciones para formar otras relaciones, y podemos construir
+cualquier relación finita.
+
+> (ilegible) va al (incentar?) (ilegible) dominio inf(ilegible) es
+> brindar una operacion A ÷ B = A ∘ B⁻¹.  Pero no ayuda con car y cdr
+> (pero pueden ser sus propias operaciones.)
+
+De éstas operaciones, car, cdr, y K(x) son relaciones infinitas, y los
+otros solo general relaciones infinitas a partir de relaciones ya
+infinitas.
+
+NOT es 1 ↦ 0 ∪ 0 ↦ 1.
+
+AND es (0, 0) ↦ 0 ∪ (0, 1) (ilegible) (1, 0) ↦ 0 (ilegible) a partir
+de NOT sin ↦.
+
+* NOT ∘ NOT = I₂
+* NOT ∪ I₂ = U₂
+* U₂₂ ∩ car = L₂
+* U₂₂ ∩ cdr = R₂
+* (U₂ × U₂)⁻¹ = U₂₂
+* NOT ∘ L₂ = L̄₂
+* NOT ∘ R₂ = R̄₂
+* (L₂ ∘ R₂) = NI₂
 
 Design goals
 ------------
