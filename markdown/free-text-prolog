@@ -1,0 +1,160 @@
+Literal facts
+-------------
+
+So, I’ve been thinking about a sort of free-text Datalog or Prolog
+system that uses string matching.  At the most basic level, you can
+put literal facts into it (what Datalog would call ground facts) in
+free text:
+
+    Romina Vasconcelos lives at Colón 2014 #8.
+    Valeria Lemmi lives at Suipacha 825.
+    Valeria Lemmi dances contact improv.
+    Glenda Quesada dances contact improv.
+    Glenda Quesada’s phone number is +54 11 4777 4909.
+    Glenda Quesada lives at Hidalgo 979.
+    Lunch with Glenda Quesada on 2017-11-22 at O’Higgins 1255.
+    Lunch with Romina Vasconcelos on 2017-11-23 at Billinghurst 3236.
+    Valeria Lemmi’s phone number is +54 11 2560 6898.
+    Glenda Quesada and Valeria Lemmi are friends.
+    Valeria Lemmi and Juan Pablo Suracco are friends.
+
+Simple searches and joins
+-------------------------
+
+And you can search it, at the simplest level, with just a pattern like
+'%Valeria Lemmi%' or '% dances contact improv.'  That is already
+pretty useful, though not very high tech; it’s basically `grep`.
+
+The next level, though, is to relate two or more such facts with
+patterns containing a common variable.  For example:
+
+    Lunch with @who on @when at @where.
+    @who’s phone number is @phone.
+
+This finds a single viable assignment of variables out of the above
+facts, still based entirely on substring matching:
+
+    who             when        where           phone
+    --------------  ----------  --------------  ----------------
+    Glenda Quesada  2017-11-22  O'Higgins 1255  +54 11 4777 4909
+
+Deduction or inference rules
+----------------------------
+
+At a third level, we can add deduction rules.  For example, with the
+premises above the line and the conclusions below:
+
+    @a and @b are friends.
+    ----------------------
+    @a and @b are connected.
+
+If we add a separate rule which can justify the same conclusion, then
+we can get transitive closure:
+
+    @a and @b are friends.
+    @b and @c are connected.
+    ------------------------
+    @a and @c are connected.
+
+From this and the above facts we can justify, for example,
+
+    Glenda Quesada and Juan Pablo Suracco are connected.
+
+This much is sufficient to implement basic SQL pointwise queries, but
+it doesn’t yet touch issues of quantification, aggregation, negation,
+and ordering.  You can get existential quantification simply enough:
+
+    @someone’s phone number is @number.
+    ----------------------------------
+    @someone has a phone.
+
+Note that this immediately gives you both AND and OR (intersection ∩
+and union ∪), though not negation or even abjunction.  You can get AND
+with two clauses:
+
+    @someone dances contact improv.
+    @someone lives at Hidalgo @address.
+    ----------------------------------
+    @someone is acrobatic.
+
+And you can get OR with two inference rules that can produce the same
+result:
+
+    @someone and Juan Pablo Suracco are friends.
+    -------------------------------------------
+    @someone is cool.
+
+    @someone dances contact improv.
+    ------------------------------
+    @someone is cool.
+
+Problems of infinite regress
+----------------------------
+
+In some sense, this string-based formulation is strictly more powerful
+than Datalog, in dangerous ways.  For example, given the rule:
+
+    @P.
+    ---
+    It is the case that @P.
+
+we can derive:
+
+    It is the case that Valeria Lemmi lives at Suipacha 825.
+    It is the case that It is the case that Valeria Lemmi lives at Suipacha 825.
+    It is the case that It is the case that It is the case that Valeria Lemmi lives at Suipacha 825.
+
+and so on.
+
+User interface affordances
+--------------------------
+
+An obvious problem with this kind of naïve text matching is that it’s
+very easy to miss records because of very slight textual mismatches.
+For example, consider the following pattern:
+
+    @who’s phone number is @phone.
+
+It won’t match the following fact:
+
+    Valeria Lemmi’s phone number is +54 11 2560 6898.
+
+That’s because it uses a different apostrophe, an ASCII one rather
+than the Unicode one used in the pattern.  It won’t match this one
+either:
+
+    Valeria Lemmi’s cellphone number is +54 11 2560 6898.
+
+Once you become aware of these, you can bridge them with inference
+rules:
+
+    @who’s cellphone number is @phone.
+    ----------------------------------
+    @who’s phone number is @phone.
+
+But in many cases it’s better to avoid them in the first place, which
+is best done with user interface affordances.
+
+If you have a set of inference rules like the examples in the earlier
+section, or even queries that you are likely to evaluate again, they
+can provide a certain amount of guidance to the system about what kind
+of data you might want to put into it.  A query result, without any
+further inference rules, is a table that you can type more values
+into, which immediately provides a quick data-entry user interface.
+But also, they provide some amount of hints as to the type structure
+of your data.
+
+    Lunch with @who on @when at @where.
+    @who’s phone number is @phone.
+
+Then, what can we tentatively infer, given the following ground fact?
+
+    Valeria Lemmi’s phone number is +54 11 2560 6898.
+
+We can infer that “Valeria Lemmi” is some kind of meaningful entity,
+and it might be worthwhile to make her name a link to a view of all
+facts that mention her; and we can also infer that a possible thing
+that the user might want to do in that context would be to add a
+ground fact of the form “Lunch with Valeria Lemmi on ... at ....” to
+the store.  There might even be places where you've planned lunch
+before that could be suggested for the location “field”.

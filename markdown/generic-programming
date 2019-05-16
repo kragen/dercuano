@@ -1,0 +1,101 @@
+Generic programming with proofs, specification, refinement, and specialization
+==============================================================================
+
+Here’s a specification for sorting:
+
+    A. sorted(x) is some permutation p of x such that ∀i∈[0, #p-1): ¬ pᵢ > pᵢ₊₁.
+
+Given a way of enumerating the permutations of a finite sequence and
+some relation `>`, this specification A is executable: you can
+enumerate all the permutations of x, and if you find one that
+satisfies `∀i∈[0, #p-1): ¬ pᵢ > pᵢ₊₁`, you return it.
+
+You can consider this algorithm, or an implementation of it for a
+given machine, a refinement of specification A, specialized for a
+given permutation-enumeration algorithm, data type, and ordering
+relation.  You can write a proof that this plan correctly implements
+specification A, which is to say, it’s a refinement of it.  It isn’t a
+very efficient plan, since it takes superexponential time in the worst
+case; you can also write a proof of that.
+
+There isn’t a clean separation between programs, algorithms, plans,
+and specifications; you can continue refining and specializing that
+specification toward something executable on a particular machine.
+Let’s call the brute-force sorting algorithm that you would thus
+derive specification B.
+
+(Some specifications may be uncomputable; for example, if you specify
+that a program should be fun to use, or compute Chaitin’s number omega
+for a flavor of Turing machine, you will not be able to execute those
+specifications, even inefficiently.  Even if the specification says to
+find a real number for which some potentially computable property
+holds, that may be uncomputable if the number itself is uncomputable.
+But if the specification says to find a computable real number for
+which the property holds, if one exists, then you can satisfy that
+specification by enumerating all possible programs.  Henceforth I will
+disregard such uncomputable specifications in this essay.)
+
+Given the premise that your relation `>` (or rather its negation
+`≤`) is at least a weak partial order, you can write a proof that such
+a sorted permutation exists.  Also, you can write a proof that the
+original specification implies that `¬∃i: p₀ > pᵢ`, and that all the
+subsequences of `p` are sorted versions of themselves, including in
+particular `p[1:]`, if it exists.
+
+Given these (plus a couple more things), you can also write a proof
+that the following specification is equivalent to, and thus a
+refinement of, specification A:
+
+    C. sorted(x) is some permutation p of x such that ¬∃i: p₀ > pᵢ
+       and, if x is nonempty, p[1:] = sorted(p[1:]).
+
+With a naïve backtracking search, this leads fairly quickly to
+selection sort, given a proof of the usual linear-time minimum-finding
+algorithm; this is already a much more efficient sort.  And you can
+write a proof of that.  Let’s call this algorithm specification D.
+
+(I’ve been writing `sorted(x)` as if it were a function, but of course
+it is a relation; it is a bit of an abuse of notation to say that
+`p[1:] = sorted(p[1:])`.)
+
+There are several characteristics of what we are doing here:
+
+1. Specifications are written in a form that is entirely independent
+   of the other relations and data they are defined in terms of.
+   Specification A does not say that `>` is a weak partial order, or
+   that `x` is a finite sequence, or what algorithm to use to
+   enumerate permutations.  Instead, somewhere else, we write a proof
+   that, IF `>` is a weak partial order, THEN specification A
+   describes a nonempty set of permutations, and also specification B
+   is equivalent to specification A.
+
+2. Some specifications are refinements of others, in the
+   sense that they logically imply the specifications they are
+   refinements of.  Some of these refinement relations are only valid
+   given certain premises, which amount to specializations of a
+   specification.  Some of these refinements are derived
+   automatically; others are written by hand and then proved to be
+   refinements.
+
+3. Some specifications are sufficiently specific that we can prove
+   efficiency properties about them, such as specifications B and D;
+   others are not, such as specifications A and C.
+
+We can take as an analogy the process a SQL database uses to evaluate
+queries.  First we write a specification in SQL of the query we want
+to run; then the database derives a plan that it proves is a
+refinement of our query — in this case, the plan will produce a
+specific sequence of tuples that is one of the sequences of tuples
+that would be a correct response to our query.  We can understand much
+of compilation in this fashion, as well.
+
+Moreover, we can do generic programming in this way.
+
+What I’m describing here is very different from the usual programming
+process.  Normally, we write a given subroutine only once, and we mix
+premises about what kind of data it’s operating on and which other
+operations it’s invoking in with the code.  The compiler might derive
+a refinement of it for a given machine, but we don’t derive them
+ourselves, and the compiler doesn’t provide us with a proof that the
+machine code is a sound refinement of our source code, nor does it
+prove efficiency properties of the machine code.

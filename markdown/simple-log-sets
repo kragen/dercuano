@@ -1,0 +1,91 @@
+An in-memory dictionary with O(lg² N) lookups, O(lg N) amortized
+insertions, O(lg lg N) key-ordered traversal, dramatically better
+memory usage and cache behavior than binary search trees, persistence
+in Okasaki’s sense, and very simple code.
+
+Search trees store sets or bags in logarithmic time.  The simplest
+search-tree algorithms are very simple indeed, although they use a lot
+of memory and a lot of random memory seeks; but they degrade to linear
+search in the worst case.  Advanced search trees like red-black trees
+and B*-trees fix these problems, but at the cost of great algorithmic
+complexity.
+
+A perfectly-balanced binary search tree can be represented without
+pointers, as an array; the usual binary heap algorithms work this way,
+taking the nodes at 2N and 2N+1 as the children of the node at N (or
+2N+1 and 2N+2, if you’re zero-based.)  Alternatively and equivalently,
+you can use binary search: a subtree of 2N+1 nodes is comprised of the
+concatenation of a left subtree of N nodes, a single root node, and a
+right subtree of N nodes.  These two representations are equivalent
+and interchangeable, and they share the problem that inserting into
+them is O(N) rather than O(lg N).  (The binary-heap approach seems
+like it should have better cache behavior for lookups, and worse for
+sequential traversal.)
+
+Lucene handles a similar problem by maintaining its index as a set of
+O(lg N) “index segments”, each of which is sorted.  Insertion takes
+the form of generating a new index segment, while a search requires
+doing an O(lg N) search in each of the O(lg N) segments.  Creating a
+new index segment may result in merging some existing index segments
+into larger index segments.
+
+(Lucene’s data structure, because it requires only sequential writes
+to new segments and never random writes, is also well-suited for
+concurrency and variable-sized data items.)
+
+The simplest version of this approach would make the index segments
+powers of two, with a maximum of one index segment of each possible
+size.  So if you had index segments of sizes 1, 2, 4, 16, and 64, then
+after inserting a new datum, you would have index segments of sizes 8,
+16, and 64, having merged the three smallest segments together.  (It
+might simplify the search of each individual index segment to use
+powers of two minus one: 1, 3, 7, 15, 31, and so on.  But then you’d
+need to allow up to two segments of any given size.)
+
+It’s straightforward to see that you’ll have between 1 and lg N
+segments, and that the average case will be ceil(lg N)/2.  An
+insertion will cause zero merges half the time, one merge a quarter of
+the time, two merges an eighth of the time, three merges a sixteenth
+of the time, and so on, for an amortized constant of two merges per
+insertion.  Those merges are mostly small and fast: four-item merges
+are half as common as two-item merges, eight-item merges half as
+common as four-item merges, sixteen-item merges half as common as
+eight-item merges, and so on.  However, this series still fails to
+converge, which makes sense since in its infinite form it represents
+the work of inserting into an already-infinite set.  If you terminate
+it after N terms, it represents the work of inserting into a set of
+2**N items, and it adds up to N.
+
+As with trees, this approach supports “persistent” data structures,
+where you can hang on to a previous version of the structure simply by
+holding onto a pointer to it, sharing state with current versions — as
+long as you store it as a linked list, going from the smallest to the
+largest index segments.  You lose the amortized time guarantee,
+though; if you save off a version with 1023 items in it and then make
+100 modified versions of it with one item added, you’ll do a 1024-item
+merge for each of those 100 modified versions, for 102400 total work.
+
+This data structure is asymptotically slower than a binary tree for
+lookup, since doing a lookup takes O(lg² N) probes — for example, in a
+42-item dictionary, you must search in the 2-item array (1½ probes),
+the 8-item array (3⅛ probes), and the 32-item array (about 5 probes),
+for a total of 9⅝ probes, while a perfectly balanced binary tree would
+take slightly over 5.  In a 2730-item dictionary, you must do that and
+also carry out 7 probes in the 128-item array, 9 probes in the
+512-item array, and 11 probes in the 2048-item dictionary, for a total
+of a bit over 36 probes, while a perfectly-balanced tree would take
+under 12 probes.  I’ve chosen the numbers 42 and 2730 because they’re
+uncharacteristically average.
+
+(Here I’m assuming that you must examine every candidate location,
+either because your lookup is unsuccessful or because you could
+theoretically have more than one value for a given key, but don’t.  In
+the case where keys are guaranteed unique, you may be able to stop
+earlier, but I think that doesn’t affect the asymptotic time; and if
+you actually do have multiple values per key, the worst case is that
+you have to return every value.)
+
+If we allow index segments with less than the maximum possible number
+of keys, it’s possible to run an O(N lg lg N) “optimization” pass on
+the data structure, sorting everything into a single array.
+Thereafter lookups will be O(lg N).

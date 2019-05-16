@@ -1,0 +1,125 @@
+One of the difficulties with the Lisp memory model used by most
+mainstream programming languages today is that memory usage is fairly
+unpredictable, and allocation is fairly ubiquitous.  This means that
+writing code that cannot fail is pretty difficult.
+
+The nested-objects memory model used by COBOL and used with some
+modification by C avoids this problem, but it’s much less flexible.
+Every object has a fixed size, so you’re always running off the ends
+of buffers, which is another way for your code to fail.
+
+The Z-machine memory model used by Zork is an interesting alternative.
+Z-machine objects are normally all allocated at compile time, but
+linked together into a linked-list nested container hierarchy
+reminiscent of the DOM at runtime, and each object has a sort of
+property list which you can mutate but not add to or remove from.  In
+games like Zork the container hierarchy is used for possession and
+location: your book might be contained in your bag, which is contained
+in you, who is contained in the entry hall, which is contained by the
+universe and which also contains a handkerchief and two exits.
+
+In the Z-machine, objects are never created or deleted, but merely
+move from one container to another.  Moreover, inserting the object
+into its new container is a constant-time operation involving the
+setting of three pointers.  Because none of those three pointers is
+“prev”, removing an object from its current container is a
+variable-time operation.  Here’s a graphviz diagram:
+
+    digraph zorkish {
+        node [shape=record, label="{\N|{<parent>parent|<child>child|<sibling>sibling}}"];
+        universe:child       -> hall        ; hall:parent                  -> universe;
+        hall:child           -> player      ; player:parent                -> hall    ;
+        player:child         -> bag         ; bag:parent                   -> player  ;
+        bag:child            -> book        ; book:parent                  -> bag     ;
+        player:sibling       -> handkerchief; handkerchief:parent          -> hall    ;
+        handkerchief:sibling -> exit1       ; exit1:parent                 -> hall    ;
+        exit1:sibling        -> exit2       ; exit2:parent                 -> hall    ;
+    }
+
+You could imagine generic functions that work over such a structure.
+For example, you could write a filter function that cleaned any
+contents out of a container that didn’t pass a given criterion, moving
+them into a given wastebasket, or a sort function.
+
+We could modify the structure somewhat.  We could use these nodes to
+represent relationships between entities rather than entities in
+themselves — originally we had only a “contains” relationship, but we
+could include relationships such as “has as title”, “has as acronym”,
+etc.  This gets us quite close to the Python or Lua or JS data model,
+but if we adopt that data model directly, we have the problem that it
+doesn’t allow duplicate properties in a dict.
+
+Consider this example JSON:
+
+    {
+      "glossary": {
+        "title": "example glossary",
+        "GlossDiv": {
+          "title": "S",
+          "GlossList": {
+            "GlossEntry": {
+              "ID": "SGML",
+              "SortAs": "SGML",
+              "GlossTerm": "Standard Generalized Markup Language",
+              "Acronym": "SGML",
+              "Abbrev": "ISO 8879:1986",
+              "GlossDef": {
+                "para": "A meta-markup language, used to create markup languages such as DocBook.",
+                "GlossSeeAlso": [
+                  "GML",
+                  "XML"
+                ]
+              },
+              "GlossSee": "markup"
+            }
+          }
+        }
+      }
+    }
+
+It contains a list, GlossSeeAlso.  Suppose we represent that with
+multiple values for the property GlossSeeAlso of the GlossDev entity,
+by which I mean the object that is the GlossDev property of the other
+entity:
+
+    { ...
+      "Acronym": "SGML",
+      "GlossDev": {
+        "para": "A meta-markup language, used to create markup languages such as DocBook.",
+        "GlossSeeAlso": "GML",
+        "GlossSeeAlso": "XML"
+      }
+    }
+
+This change to the data model eliminates the need for separate lists.
+In effect, all property values are implicitly lists.
+
+That fragment might look like this:
+
+    digraph arcs {
+        node [shape=Mbox; label="\"\N\""];
+        GML XML SGML paraval;
+        paraval [label="\"A meta-markup language, used to create markup languages such as DocBook.\""];
+        {
+            node [shape=record, label="{type \N|{<kid>kid|<sib>sib}}"];
+            "root":kid       -> Acronym;
+            Acronym:kid      -> SGML   ; Acronym:sib      -> GlossDev     ;
+            GlossDev:kid     -> para   ;
+            para:kid         -> paraval; para:sib         -> GlossSeeAlso ;
+            GlossSeeAlso:kid -> GML    ; GlossSeeAlso:sib -> GlossSeeAlso2;
+            GlossSeeAlso2 [label="{type GlossSeeAlso|{<kid>kid|<sib>sib}}"];
+            GlossSeeAlso2:kid -> XML;
+        }
+    }
+
+This change to the data model means that removing an arc from an
+entity (and not deleting it) or adding an existing arc to an entity
+can no longer fail.  Furthermore, fetching a property from an entity
+cannot fail either; it can only return an empty list.
+
+In a 16-bit world, these nodes probably take up 6 bytes each.  If we
+expand the “kid” pointer to be a hash table of 4 or 8 entries, we lose
+the sequencing among different properties, but we can still retain
+sequencing within a single property.  We use more memory, though still
+much less than Python, but property lookup becomes instantaneous on
+small objects.

@@ -1,0 +1,127 @@
+Suppose we want to transform a sequence like this:
+
+    .#....#.#..#....#.....##.#..#....#
+
+into another sequence as follows:
+
+    .#....#.#..#....#.....##.#..#....#
+    1012340101201234012345001012012340
+
+which is to say, for each position, we want to compute the number of
+places to the left that you have to go to find a #.  (This problem
+comes from a problem I'm thinking about with regard to coregistration
+of potentially translated sparse bitmaps with their pointwise
+products.)
+
+This is super easy in an imperative language:
+
+    for item in seq:
+        if item == '#':
+            count = 0
+        yield count
+        count += 1
+
+However, that approach is inherently serial.  What does it look like
+to reformulate this in a way that we can compute with a prefix sum, so
+that we can automatically parallelize it?
+
+Parallel prefix sum algorithms require the addition operation over
+which they're computing the sum to be associative, and no
+associativity is evident in the above at first glance.
+
+The fully general procedure for this transformation on such loops over
+input is to formulate each iterations of the loop as a function from
+previous state to next state, the function in question being
+determined by the input on that iteration of the loop, and then to
+apply the prefix-sum algorithm to these functions with the "addition"
+operator being functional composition.
+
+In this case, the loop state is merely `count`, and there are two
+possible functions:
+
+- on `#`, `count` is set to 1
+- on `.`, `count` is incremented
+
+Thinking of these as functions from a previous to a next state, they
+are λc.1 and λc.c+1.  These do not form a set that is closed under
+composition; under composition you have the set {n∈ℤ | λc.n, λc.c+n},
+more or less.  (λc.0 and λc.c+0 actually don't occur.)  The
+composition rules are then the following:
+
+- (λc.n) ∘ (λc.m) = λc.n
+- (λc.n) ∘ (λc.c+m) = λc.n
+- (λc.c+n) ∘ (λc.m) = λc.m+n
+- (λc.c+n) ∘ (λc.c+m) = λc.c+(m+n)
+
+(These are just the two functions + and K, of SKI-combinator fame.)
+
+You can write this in OCaml with an appropriate data type as follows:
+
+    let compose = function K a -> (fun _ -> K a)
+                         | Plus a -> function K b -> K (a + b) 
+                                            | Plus b -> Plus (a + b)
+
+I feel like this algebra is some kind of semigroup that I should
+recognize.  It isn't commutative, it has no inverses, and although
+λc.c+0 would be an identity element, that doesn't actually occur in my
+problem.  But it is associative, which is all prefix-sum needs.
+
+From the sequence of `count` values, you can reconstruct the desired
+original inputs: they're one less than the `count` values.
+
+Given a representation of this set of functions, say =n for λc.n and
++n for λc.c+n, you can compute the function in parallel in logarithmic
+time as follows:
+
+     . # . . . . # . # . . # . . . . # . . . . . # # . # . . # . . . . #
+    +1=1+1+1+1+1=1+1=1+1+1=1+1+1+1+1=1+1+1+1+1+1=1=1+1=1+1+1=1+1+1+1+1=1
+      =1  +2  +2  =2  =2  =1  +2  +2  =2  +2  +2  =1  =1  +2  =2  +2  =1
+          =3      =2      =1      +4      =4      =1      =3      =4  =1
+                  =2              =5              =1              =4  =1
+                                  =5                              =4  =1
+                                                                  =4  =1
+                                                                      =1
+                                                                  =4  =1
+                                  =5                              =4  =1
+                  =2              =5              =1              =4  =1
+          =3      =2      =1      =5      =4      =1      =3      =4  =1
+      =1  =3  =5  =2  =2  =1  =3  =5  =2  =4  =6  =1  =1  =3  =2  =4  =1
+    =2=1=2=3=4=5=1=2=1=2=3=1=2=3=4=5=1=2=3=4=5=6=1=1=2=1=2=3=1=2=3=4=5=1
+     1 0 1 2 3 4 0 1 0 1 2 0 1 2 3 4 0 1 2 3 4 5 0 0 1 0 1 2 0 1 2 3 4 0
+
+In theory, this only takes 14 computational steps on each of 34
+processors, rather than the 34 needed to calculate the same thing
+serially.  In practice, it is going to be difficult to find hardware
+that can realize a 2x speedup on that problem.  But for 4096 positions
+instead of 34, it should only take 26 steps rather than 4096, so you
+do eventually get a speedup if you have enough hardware, even if your
+chunk size is larger.
+
+This was only possible for this algorithm because the state kept from
+one loop iteration to the next was relatively compact.  If the state
+grows proportional to the number of iterations (or worse), you will
+never get a speedup.
+
+What kind of Sufficiently Smart Compiler would it take to analyze the
+serial program and parallelize it in this way?  Because here's the
+code you get to write in OCaml for the parallel version:
+
+    type counter = K of int | Plus of int
+    let compose = function K a -> (fun _ -> K a)
+                         | Plus a -> function K b -> K (a + b) 
+                                            | Plus b -> Plus (a + b)
+    and init = function '#' -> K 1 | _ -> Plus 1
+    and final = (-) 1
+    in prefixsum init compose final
+
+which I feel is not just longer but dramatically less clear than the
+serial version
+
+    for item in seq:
+        if item == '#':
+            count = 0
+        yield count
+        count += 1
+
+even though the latter is in some sense written at a lower level of
+abstraction.

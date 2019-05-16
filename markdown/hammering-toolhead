@@ -1,0 +1,91 @@
+Using a hammer-and-chisel approach should enable new kinds of
+lightweight, portable, but slow CNC machine tools, by way of
+eliminating toolhead side forces during positioning.
+
+One of the greatest challenges in precision machining is toolhead side
+forces.  A 3-D printer can get by with a low-rigidity frame, open-loop
+control with stepper motors, and triangular-thread (V-thread)
+leadscrews in large part because the forces at its toolhead are so
+small.  But cutting metal with edged tools or abrasives, even very
+sharp edged tools, produces substantial side forces, and these forces
+change rapidly and even unpredictably as contact is established or
+contact angles change.  Consequently, precision machining invariably
+uses closed-loop control and massive structural members to achieve the
+desired stiffness, and usually also uses ballscrews or acme-thread
+leadscrews.
+
+I’ve speculated previously that it with sufficiently rapid control
+systems, it will be possible to provide such stiffness “virtually”, by
+countering a detected displacement with a larger opposing displacement
+in some actuator, effectively multiplying the rigidity of the frame by
+the ratio of displacements.  But here I want to discuss a different
+approach, that of hammering.
+
+A hammer or karate chop is a kind of simple machine: you apply a small
+force to the hammer over a large distance, and the hammer applies a
+large force to the work over a proportionally small distance.  (Stevin
+and Galileo did not include the hammer in their list of simple
+machines, as they lacked, I think, the concept of kinetic energy.)
+Sufficiently rapid and precise feedback about the hammer’s path allows
+you to control the point of impact precisely with low energy, but an
+alternative mechanism is the hammer-and-chisel mechanism used by an
+automatic center punch; this allows you to position the chisel as
+slowly and precisely as you like, then transmitting a hammer strike
+anywhere on the chisel head precisely to the chisel tip.
+
+The hammer-and-chisel mechanism has been used for this purpose since
+the Paleolithic, when it enabled soft, squishy human hands to
+precisely shape rocks harder than steel.
+
+At one point I was pretty skeptical of hammering on things to
+precisely shape or fix them, since there’s inevitably a shock produced
+at the time of impact, and that shock can damage things as it
+propagates through the rest of the structure.  But eventually I
+learned that hammering is, in many cases, safer and more precise than
+applying a large force more slowly through an elastic frame; applying
+a force F through a mechanism with stiffness k requires building up an
+energy ½F²/k.  If the resistance diminishes once initial resistance is
+overcome, as in solid friction and many kinds of material fracture,
+this energy is released all at once in an uncontrolled fashion.  By
+contrast, a hammer blow can have an arbitrarily small energy, and the
+energy *at a given force* is limited only by the stiffness of the
+chisel and hammer head themselves, which can be made orders of
+magnitude smaller than the stiffness of an entire frame.
+
+This very feature is one of the reasons for the use of automatic
+center punches: their hammer energy is the same on every stroke, so
+every divot has fairly precisely the same depth.
+
+You could imagine a CNC machine that precisely repositioned a chisel
+several times a second under very low toolhead forces, striking the
+chisel with a hammer separately moved with higher, but still fairly
+low, forces, in order to cut or form a piece of material by applying a
+precisely controlled amount of energy with a very large force at a
+precisely controlled location.  Wood chisels have been
+used with this technique by carpenters to make precise cuts in wood
+since the paleolithic.
+
+As the hammer approaches the chisel, it must of course be held in some
+kind of mechanism to apply force to it, which means that it needs some
+non-negligible stiffness to the chisel and workpiece.  However, at the
+point that it actually strikes the chisel, it is not necessary for it
+to be held with any stiffness in the axis in which it strikes the
+chisel.  It could, for example, be sliding down a tube under its own
+momentum, or held with a negative-stiffness cancelation mechanism like
+that used to isolate the LIGO from vibration.  Such an expedient could
+prevent the shock of impact from being transmitted back into the
+struture holding the hammer, which would introduce a vibrational impulse
+into the machine frame.
+
+For metal cutting, it probably is not possible to reach the optimal
+cutting speed with this approach; recall, as cutting speeds go up, up
+to a point, tool life goes up too, because the machine is cutting hot
+metal which applies less force to the cutting edge, wearing it less.
+(I think it also is more efective at producing a built-up edge, which
+worsens cutting precision but decreases wear.)  So we should expect
+that cutting tools used in this way will not last as long as cutting
+tools used in the traditional cutting mode on a lathe with continuous
+movement.  Milling-machine cutting points (whether inserts or just
+flute edges) are typically used in a similar discontinuous-cutting
+mode, but the metal of the workpiece does not have time to cool
+completely between strokes.

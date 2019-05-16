@@ -1,0 +1,105 @@
+Reading the 1962 book about Stretch.  There are a lot of strange ideas
+and terminology in here.
+
+“Edit” seems to be used in a sense I don’t understand.
+
+IBM, especially at that time, had a habit of plagiarizing other
+people’s ideas, so it’s hard to tell what’s really new here; but
+Stretch was the first IBM computer, at least, to be pipelined, though
+this was called “virtual memory,” predating the use of that term to
+mean swapping to disk.
+
+The idea of a “program” solving a “problem” for a “sponsor” is pretty
+far from our current understanding.  So, too, the justification of
+“multiprogramming” (also “time-sharing”): “it becomes economically
+practical for a person seated at a console to observe his program
+during execution and interrupt it while considering the next step”,
+and also to “avoid delaying the calculator [!] for input-output”.
+
+The disk storage (intended for 250,000 words per second, though only
+half of that was achieved: 8 megabits per second, seek time 150 ms;
+the terms “DASD” and “fixed disk” do not appear) was considered to
+avoid the need for “very-high-speed magnetic tapes.”
+
+“On line” and “off line” also appear, in quotes, to describe different
+ways of entering input data: on directly connected devices, or using
+physically separate devices that produced magnetic tapes, “the fastest
+possible medium”.
+
+“To an increasing extent, bits in even a scientific computer represent
+things other than numerical quantities: elements of a program
+metalanguage, alphabetic material, representations of graphs...”
+
+A rather striking feature is that Stretch’s memory, in 1961, had a
+2.1-μs cycle time, which they considered rather slow (thus its 64-bit
+word size).  Nowadays the main memory of my laptop (whose CPU uses a
+64-bit word size) can produce bursts substantially faster than this,
+at close to 1 ns, but random accesses still cost it nearly 100 ns,
+which is only 21× faster.
+
+Stretch could address 2¹⁸ words, but the first 32 words were its
+registers; I imagine this wasn’t useful to user programs because of
+the memory-protection scheme explained below.  Register 0 was the zero
+register, “a bottomless pit.”
+
+Memory protection was provided as follows: “The interpretation and
+execution of instructions is monitored to make sure that the effective
+addresses are within boundaries defined by two [address-]boundary
+registers.”
+
+Only floating-point math was bit-parallel; logical operations and
+fixed-point arithmetic were done by “the serial section” of “the
+arithmetic unit”, which was not yet called the ALU (though
+“Instructions that combine bits by logical and, or, and exclusive or
+functions have been available in earlier computers.”).  This had the
+advantage that the operands didn’t have to be word-aligned, or even
+byte-aligned, but could instead be at arbitrary bit offsets.
+“Byte-aligned” wouldn’t have made any sense anyway — “The number of
+bits used to encode individual characters may be varied.  Thus a
+decimal digit may be compactly represented by a binary code of 4 bits,
+or it may be expanded to 6 or more bits when intermixed with
+alphabetic information.”
+
+It still had only a single accumulator (and 15 index registers) but
+the accumulator was two words, which I think means 128 bits!  This
+despite extensive handwringing about how hard they worked to wring the
+most out of their slow memory (this was the reason for the pipelining,
+which prefetched).
+
+The index registers were 64 bits wide even though memory addresses
+were only 24 bits (“A complete word-and-bit address forms a 24-bit
+number.”).  So they used the extra bits to count loop iterations and
+specify a “refill address” for reloading the register, and there’s a
+“progressive indexing” mode “in which the index quantities may be
+advanced each time they are used”.
+
+Its indirect addressing mode was wild: “The term *indirect address*
+refers to an address that gives the location of another address. An
+indirect address may select an immediate address, a direct address, or
+yet another indirect address. Indirect addresses are obtained in the
+7030 by the instruction LOAD VALUE EFFECTIVE, which places the
+effective address found at the specified memory location into an index
+register for indexing a subsequent instruction. Multiple-level
+indirect addressing is obtained when LOAD VALUE EFFECTIVE finds at the
+selected location another instruction LOAD VALUE EFFECTIVE which
+causes the indirect addressing process to be repeated.”
+
+The interrupt vector table was called “a table of fix-up
+instructions”.
+
+When talking about data formats for address arithmetic, the data
+formats shown are actually instruction word formats, suggesting that
+despite the ample index registers on the machine, self-modifying code
+was common.
+
+One of the strange uses of “edit”: “For example, a floating-point
+datum may be developed as a unit in a computation, its components then
+used in radix-conversion arithmetic, and the characters of the result
+finally used as units in editing for printing.”  I think maybe “edit”
+means “format” (although the Fortran statement is FORMAT, not EDIT.)
+
+Aha, there’s a definition: “A final class, _editing operations_,
+includes all operations in which data are transformed from one format
+to another, checked for consistency with a source format, or tested
+for controlling the course of the program.”  So “editing” includes
+comparisons for control flow!

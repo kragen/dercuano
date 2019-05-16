@@ -1,0 +1,138 @@
+I want to write a minimal self-sustaining programming environment to
+work from.
+
+What’s the absolute minimum you need for a self-sustaining programming
+environment?
+
+You need a user interface including some kind of text editor, stable
+storage, a compiler, and a bootloader.  The stable storage thing needs
+to support at least some minimum of version control, so you can store
+previous versions of the code, if nothing else.  And a textual user
+interface needs a font, which means you need some kind of drawing
+program.
+
+It’s probably also almost unavoidable at this point to support network
+access, hotplugging, power management, foreign filesystems,
+cryptography, and HTML; it would be very useful to also have type
+checking, JS, and a debugger.
+
+If it’s going to be self-sustaining down to the hardware design level,
+it also needs a CPU design, a RAM design, and some kind of circuit
+layout and simulation tools.  If the CPU design is written at some
+higher level than netlists, it needs to be able to synthesize RTL from
+whatever the CPU design is expressed in and to synthesize netlists
+from RTL.
+
+If it’s additionally going to be self-sustaining down to the hardware
+fabrication level, it needs servo control algorithms, a cyclic
+fabrication system, motion planning, finite element simulation and
+optimization, and some 3-D geometry handling (even if only voxels).
+
+User interface
+--------------
+
+For a visual UI, minimally you need at least one font, some kind of
+text layout system (to put text into lines, if nothing else), and
+enough rendering to get it onto the screen.  It’s also very desirable
+to have mouse support and windowing, especially for the drawing
+program.
+
+A text editor needs to efficiently support movement, insertion,
+deletion, text search, and cut-and-paste, at least on the sizes of
+files you’re likely to encounter.  You may also need some interface to
+load and save files in it, if you have files.
+
+There also needs to be some kind of way to invoke other programs that
+you’ve written; Emacs does this with ^J and M-x, as well as the shell.
+
+You also need drivers for keyboard (or touchscreen) and mouse, if
+present.
+
+Stable storage
+--------------
+
+You need some kind of filesystem.  It doesn’t need to necessarily be a
+traditional hierarchical filesystem, although that would ease
+compatibility with existing systems, but there needs to be some way to
+not have to retype everything from memory every time you power-cycle
+the machine.  Smalltalk and other image-based environments do okay
+here, but they imply you need some kind of hot code upgrade facility,
+and then you have to build in some other way of doing version control.
+
+Forth’s filesystem is probably the most minimal here: the “files” are
+sequentially numbered disk blocks.
+
+Compiler
+--------
+
+For a self-sustaining system, interpreters are optional, but compilers
+are mandatory.  The compiler can be very simple, down to simply
+concatenating prewritten snippets of code and fixing up pointers, but
+it needs to exist, or you can’t ever run your code.  Furthermore, you
+need two duplicates of it: an executable bootstrap compiler or
+interpreter that can run on some existing system, and a source-code
+compiler that can run under the bootstrap as well as compiling itself.
+
+My experience with Ur-Scheme makes me think that dynamic typing, a
+relatively simple grammar, ruthlessly polysemic data types, and making
+everything explicit will minimize the difficulty of writing the
+self-compiling compiler.  My experience with peg-bootstrap and Prolog
+makes me think that backtracking and similar logic-programming or
+constraint-solving tricks can simplify tokenization and parsing down
+to a very simple task.  My minimal experience with Forth makes me
+think that you probably do want syntax and typechecking.
+
+Bootloader
+----------
+
+The bootloader is almost entirely dependent on the environment you’re
+running in.  UEFI lets you load whatever you like from a certain
+version of the FAT filesystem, already in 32-bit mode.  BIOS is
+hairier, but you still only need a few dozen instructions.
+
+Network access
+--------------
+
+An OS without TCP/IP is not useful for most purposes nowadays.  Wi-Fi,
+maybe via a USB dongle, is perfectly adequate at the physical level,
+but you still need the whole stack on top of that.  Contiki’s lwip is
+the standard in tiny TCP/IPs, but it’s sixty thousand lines of C.  The
+VPRI tiny TCP/IP stack is much smaller, but I don’t know where to find
+it or how to get it running.
+
+Hotplugging
+-----------
+
+Lack of hotplugging is what doomed sysvinit in Linux, leading to its
+replacement with a poorly-designed monstrosity called systemd.  I’m
+not totally 100% sure about why plugging devices into a “hot” USB
+network requires rewriting the entire software stack while plugging
+devices into a “hot” Ethernet doesn’t, but there you have it.
+
+You need some kind of event bus to coordinate responses to either kind
+of event, so you can’t get by with the traditional Unix IPC mechanisms
+of pipes and a shared global mutable filesystem, unless you want to
+have to poll all the time.  But this broadcast/multicast IPC mechanism
+could totally run as a user process.  Then again, in Minix even memory
+management is a user process.
+
+Power management
+----------------
+
+Foreign filesystems
+-------------------
+
+Cryptography
+------------
+
+HTML
+----
+
+Type checking
+-------------
+
+JS
+--
+
+A debugger
+----------

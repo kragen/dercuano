@@ -1,0 +1,112 @@
+Particulate matter in air is generally bad for your lungs, and it can
+be a problem under some other circumstances, like in hospital
+operating rooms, biology labs, or semiconductor or hard disk clean
+rooms.
+
+One way to remove particulates from air is to filter it by passing the
+air through a thin sheet with a lot of small holes in it.
+Particulates that are bigger than the holes won’t pass at all; some
+fraction of smaller particulates will stick to the filter.  Ideally,
+all the holes would be the same size, because if there are a fair
+number of really big holes, most of the air will go through them.
+
+The particulates that are of most concern for health are in the
+categories PM10, which is 2.5–10 μm in diameter, and PM2.5, which is
+1–2.5 μm in diameter.  So it would be useful to have a sheet of
+material that was full of holes under 1 μm in diameter.
+
+Make the sieve from a thin sheet of metal with sparks
+-----------------------------------------------------
+
+A spark of a well-controlled energy applied to a thin sheet of metal,
+such as gold leaf or the metallization layer on a sheet of Mylar,
+should vaporize a well-controlled amount of metal in a pretty round
+hole, requiring about 14 kJ/g to vaporize aluminum `(((2470 - 20) K
+24.20 J/mol/K + 10.71 kJ/mol + 284 kJ/mol) * 27.0 g/mol)`.  A
+cylindrical hole of 1 μm radius through an 0.5 μm layer of aluminum
+metallization would amount to about 400 attoliters or about a picogram
+of aluminum, requiring about 15 nJ of spark energy.
+
+Gold leaf is probably more practical, since it can be free-standing at
+as little as 0.1 microns thick.  I’m going to assume that the energy
+needed to vaporize an area of gold leaf is close to the energy to
+vaporize the same area of aluminum metallization, because gold is
+thinner, but denser, and with higher specific heat and heat of fusion.
+
+Electrical circuit considerations
+---------------------------------
+
+Getting a spark that’s only 15 nJ in air may be actually kind of
+tricky, because Paschen’s Law has a minimal voltage of about 300 volts
+to start an arc in air.  It’s tough to get parasitic capacitances
+below about 10 pF, and at 300 V, that holds about 450 nanojoules.  So
+the hole you’re going to blow in the metal with just the parasitic
+capacitance, if you go around charging things up to 300 volts and then
+touching an electrode to the sheet, that hole will be about six
+microns across.
+
+As an alternative, you could maybe use an inductor and strike a spark
+like you were using a stick welder: first bring the electrode into
+contact with the workpiece, allowing current to flow through an
+inductive load, then move it away, striking an arc which continues
+until the inductor’s energy is dissipated.
+
+How much current can you have flowing without heating things up?  A
+34-gauge wire is 160 microns across (thus a cross-sectional area of
+20 000 square microns) and can handle 300 mA.  If your area of contact
+is, say, 100 square microns, then the same current density would be
+0.5% of that, or 1.5 mA.  Let’s say 1 mA to be sure it’ll work.  ½LI²
+= 15 nJ at I = 1 mA if L = 2·15 nJ/(1 mA)², which comes out to a very
+conveniently large 30 millihenries.  It’s easy to build a circuit with
+less than that amount of parasitic inductance.
+
+The most popular off-the-shelf inductor in this range at Digi-Key is
+the Murata 13R336C inductor: "33mH Unshielded Wirewound Inductor 60mA
+68 Ohm Max Radial".  It costs 59¢.  It’s ferrite-cored, and craps out
+at a couple hundred kilohertz; I’m not sure what would happen if you
+try to break the contact faster than ten microseconds, but I suspect
+that you lose most of the energy to core losses.  If that happens,
+that’s a problem.
+
+An air-core coil with 10 mm diameter and 20 mm length has 25 mH once
+it gets to 2500 turns, which is totally feasible to wind with magnet
+wire.  But I suspect you’ll have enough parasitic capacitance to
+prevent it from responding within less than a few microseconds.
+
+So you can build a power supply circuit that provides up to 1 mA at
+some low voltage (say 1–10 V), run it through a 30 mH air-core
+inductor, hook that up to your graphite electrode, and you’re in
+business.  Then you just have to move the electrode away from the
+metal sheet fast enough that the inductor’s energy is mostly
+dissipated in the arc and not in the resistances of the rest of the
+circuit.
+
+(Will 1–10 V be enough to drive a milliamp through such a small point
+contact?  I think so.)
+
+Hole concentration
+------------------
+
+By peppering a sheet of metal with sparks of well-controlled energy,
+you should be able to get the sheet up to 1% hole even without
+controlling the hole position without a significant number of “hole
+collisions” producing oversized holes.  Even up to about 10% hole,
+almost all the “hole collisions” will produce holes that are only
+oversized in one dimension.  If you can control the hole position
+closely, then with hexagonal close-packing you can get arbitrarily
+close to 3√3/2π ≈ 82.7% hole; if you reach that limit, the sheet falls
+apart into tiny triangles.
+
+Non-air-filter applications
+---------------------------
+
+You can use the same spark approach to blow holes up to nearly a
+millimeter in diameter in the metal sheet, with fairly precise control
+of hole size (under 1% error, say).  This provides a way to produce
+very fine-grained “mesh” sieves with precisely controlled hole sizes,
+which in theory could separate particles up to a particular size with
+very high precision, at least if they don’t stick to the filter.
+
+Separating particles into precisely graded size groups is the first
+step to being able to separate them by density and morphology with an
+air updraft.

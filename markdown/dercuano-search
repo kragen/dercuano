@@ -1,0 +1,37 @@
+I’d like to add full-text search to Dercuano; God knows I grep it
+often enough.  Right now I have 4.5 megs of Markdown in 341 notes,
+producing a 2.0-megabyte gzipped tar file with static HTML files (plus
+tables of contents), and I'm planning to expand these numbers by a
+factor of about 2.5 by the time I’m done: less than 1200 notes
+amounting to 5 megabytes compressed, 11 megabytes plaintext.  The
+index needed for full-text search with snippets is pretty much
+equivalent to the corpus of notes.
+
+Grepping the 4.5 megabytes with grep takes 0.6 seconds on my laptop,
+but only 28 ms of that is user time; a second grep takes 42 ms of
+which 32 ms is user time.  Generating a 200-megachar string in Firefox
+with `Array(100*1000*1000).join(',a')` takes a few seconds and
+provokes a warning about slow scripts, but then `.indexOf('a,b')` in
+it takes 1.7 seconds, and `.indexOf('a,a,b')` in it takes 2.2 seconds,
+and `a,a,a,a,b` takes 2.8, which, interpolated down to 11
+megacharacters, would be 150 ms; so even brute-force search, without
+even building an index, may be a reasonable implementation strategy.
+
+The difficulty is that modern browsers generally don’t allow file://
+HTML to access other file:// URLs via XMLHttpRequest, although old
+versions of MSIE and the ActiveX XMLHttpRequest control did.  So
+leaving the notes in static HTML makes full-text search impossible.
+
+A possible solution would be to put the actual note text into .js
+files and load them with `<script src>`, rather than putting it into
+HTML.  The various HTML documents could load their respective text
+from their respective .js files, while the search engine page could
+load all of them and maybe build an in-memory index.
+
+To keep the search-engine page reasonable to load, the number of .js
+files should be limited.  64 might be a reasonable limit; this would
+be 4–7 notes per 70-kilobyte .js file at present, increasing to 17–20
+notes and 170K each by the time it’s done.  This doesn’t seem like a
+grossly unreasonable number for a page load from the local filesystem,
+and indeed it might end up being comparable to the amount of common JS
+liabilities they load.
