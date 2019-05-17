@@ -1,6 +1,17 @@
 I was considering how to specify finite state machines, and some
 interesting ideas occurred to me.
 
+This is related to the notation for directed graphs in file
+`graph-construction` and the algebra of textures in file
+`texture-algebra`.  (File `circuit-notation` is more concerned with
+describing the topology of circuit netlists, as you might use for
+designing analog circuits, while this note is concerned with designing
+digital circuits, and in particular sequential digital circuits, in
+terms of finite functions on alphabets; when considering a circuit,
+this is a higher level of abstraction, though it may well be a lower
+one when considering some dynamical system you want to simulate with
+the circuit.)
+
 Introduction and outlook
 ------------------------
 
@@ -97,10 +108,10 @@ intersection, set subtraction, relational inverse, relations car and
 cdr for dissecting Cartesian products, and notations for constant
 functions and primitive relations consisting of pairs of elements.
 
-It’s not a particularly tiny algebra — it has ten primitives, of which
+It’s not a particularly tiny algebra — it has eleven primitives, of which
 two are primitive relations, one constructs a relation from an
 element, one constructs a relation from two elements, two more
-construct a relation from another relation, and the remaining four
+construct a relation from another relation, and the remaining five
 construct a relation from two relations.  And, implicitly, there’s the
 tuple-creation operator, which constructs an element of A × B from an
 element of A and an element of B.  But, at least for finite
@@ -113,16 +124,32 @@ Then I use the union and primitive pairs to build up boolean NOT, and
 then without mentioning elements again, build up bitwise identity, the
 universal relation on bits and from pairs of bits to bits,
 restrictions of car and cdr to relations from pairs of bits to bits
-(called L₂ and R₂), their bitwise inversions, and something that makes
-no sense called NI₂.  I’m pretty sure this is what I was thinking
-about in the “Example: XOR from NAND” section below: build up all the
-primitive gates from just a NAND relation (rather than from NOT and
-AND as I was trying on paper).
+(called L₂ and R₂), their bitwise inversions, and finally a relation
+called NI₂, which I think is (1, 1) → 1 ∪ (0, 0) → 0.  I’m pretty sure
+this is what I was thinking about in the “Example: XOR from NAND”
+section below: build up all the primitive gates from just a NAND
+relation (rather than from NOT and AND as I was trying on paper).
+
+I think I was trying to derive AND from just NOT and the primitive
+relations, so that I would have an algebraic derivation of a whole
+Boolean algebra from just a definition of NOT.  I think doing this
+isn’t possible, because NOT is symmetric under exchange of 0 and 1,
+while AND is not.  I think it also requires the use of some form of
+negation, which I hadn’t tried using yet, and although I had included
+set subtraction in my set of logical definitions of operations, I had
+omitted it from the list at the end!
 
 My comments about which relations are finite and which are infinite
 suggest that I was worried about infinite sets popping up and making
 algorithms fail to terminate, as does my use of set-subtraction \\
-rather than simple negation.
+rather than simple negation, and the aside (on the facing page, which
+I set aside for asides) about providing only A÷B instead of B⁻¹, which
+would keep infinite sets that occur in the range confined to the
+range, preventing them from escaping into the domain and making it
+infinite too.  This would have preserved the ability to finitely
+enumerate the domain of any relation except car and cdr (which I
+suggested demoting in the same aside) although if ranges were infinite
+anyway I'm not sure why that would be especially useful.
 
 I think the idea then was that you can consider a binary relation to
 be a specification of a combinational logic function, and you can
@@ -145,8 +172,8 @@ mind that you would construct primitive finite state machines using
 binary relations to specify their transition function, then use the
 other mechanisms to combine these primitive state machines in series,
 in parallel (note that tconcurrency was a heading not in the paper
-notebok), nondeterministically, and in trees of state (perhaps as in
-Harel statecharts, although I didn't know about those then).
+notebook), nondeterministically, and in trees of state (perhaps as in
+Harel statecharts, although I didn’t know about those then).
 
 ### Componer FSMs
 
@@ -182,7 +209,7 @@ Cabe destacar que, ya que Σ y Υ son (ilegible) así también Σ × Υ, así
 En los registros del circuito almacenamos Sᵢ, representando como un
 conjunto de bits, interpretamos el conjunto de entradas como Iᵢ, y
 representamos F como el RTL del circuito, que se puede realizar con
-LUTs, lógica combinacional de DAGs de compuertas (un "circuito" de
+LUTs, lógica combinacional de DAGs de compuertas (un “circuito” de
 teoría de computación), un EPROM, lo que sea.
 
 No es necesario especifcar los registros ni Σ — se pueden inferir de F
@@ -196,7 +223,7 @@ circuitos, nos conviene usar un lenguaje más poderoso para poder
 componer la función deseada de sub-funciones separadamente
 entendibles, verificables, y reutilizables.
 
-Cabe repetir que ésos no son las "funciones" de JS o C, es decir,
+Cabe repetir que ésos no son las “funciones” de JS o C, es decir,
 subrutinas, que pueden ejecutarse y así tomar tiempo.
 
 ### Relaciones
@@ -209,8 +236,8 @@ subrutinas, que pueden ejecutarse y así tomar tiempo.
 * (a, b) ∈ B ⇒ (a, b) ∈ A∪B
 * (a, b) ∈ A ∧ (a, b) ∈ B ⇒ (a, b) ∈ A∩B
 * (a, b) ∈ A ⇒ (b, a) ∈ A⁻¹
-* *tachado* (a, (b, c)) ∈ A ⇒ (a, b) ∈ ←A
-* *tachado* (a, (b, c)) ∈ A ⇒ (a, c) ∈ →A
+* <s>(a, (b, c)) ∈ A ⇒ (a, b) ∈ ←A</s>
+* <s>(a, (b, c)) ∈ A ⇒ (a, c) ∈ →A</s>
 * ((b, c), b) ∈ car
 * ((b, c), c) ∈ cdr
 * (a, b) ∈ A ∧ (a, b) ∉ B ⇒ (a, b) ∈ A\\B
@@ -221,7 +248,7 @@ Así con ↦, K, car, cdr, ⁻¹, ∩, ∪, ×, \*, y ∘, podemos
 combinar relaciones para formar otras relaciones, y podemos construir
 cualquier relación finita.
 
-> (ilegible) va al (incentar?) (ilegible) dominio inf(ilegible) es
+> (ilegible) va al (intentar?) (evitar?) dominio inf(inito?) es
 > brindar una operacion A ÷ B = A ∘ B⁻¹.  Pero no ayuda con car y cdr
 > (pero pueden ser sus propias operaciones.)
 
@@ -241,17 +268,326 @@ de NOT sin ↦.
 * (U₂ × U₂)⁻¹ = U₂₂
 * NOT ∘ L₂ = L̄₂
 * NOT ∘ R₂ = R̄₂
-* (L₂ ∘ R₂) = NI₂
+* (L₂ ∩ R₂) = NI₂
 
 Design goals
 ------------
 
 Concision, flexibility, tractability, simulability, synthesizability
 
-Relational algebra
-------------------
+A relational algebra
+--------------------
 
-Termination of transitive closure over finite domains
+Above, a sequential circuit was described according to its state
+transition function — its domain being the cartesian product of some
+finite alphabet of states Σ and some finite alphabet of inputs Υ and
+its range being Σ — and some assignment of Σ and Υ to concrete
+bitstrings.  To each item in the domain it associates precisely one
+item in the range.  We can generalize this to a state transition
+*relation*, in which each item in the domain is associated with any
+number of items in the range; this describes a potentially
+nondeterministic circuit, or a design specification with some liberty.
+A common way for this to occur in real life is for the circuit to have
+“don’t care” combinations which we expect not to arise in practice,
+but also we will see that it’s often convenient to construct a
+deterministic function out of nondeterministic relations.  We can also
+generalize to binary relations between any alphabets whatsoever.
+
+(Historically, “relation” has meant this kind of binary relation, but
+since the 1970s a rich theory of N-ary relations has grown up around
+databases.  Here we will completely ignore N-ary relations, being
+concerned only with binary relations.)
+
+Mostly we will be concerned with finite relations among finite sets,
+though sometimes they are exponentially large.  This means that most
+of the algorithms we’re interested in are trivial in the sense that at
+worst they need only enumerate some finite set of cases.
+
+### The algebra defined ###
+
+(Very little of this is original.)
+
+Here’s the definition of the algebra of relations we’ll be using,
+which is explained in more detail below.  Consider a relation as a set
+of (domain element, range element) pairs; this gives us standard
+definitions of ∪, ∩, and \\ operations, to which we add the following
+definitions of →, K, ∘, ⁻¹, car, cdr, ×, and \*; note in particular
+that × is *not* the Cartesian product of sets:
+
+<blockquote>
+<table id="algebra-definition">
+<tr><td><em>x</em> ∈ <em>a</em> → <em>b</em></td><td>⇔</td><td><em>x</em> = (<em>a</em>, <em>b</em>)</td></tr>
+<tr><td><em>x</em> ∈ K(<em>b</em>)</td><td>⇔</td><td>∃<em>a</em>: <em>x</em> = (<em>a</em>, <em>b</em>)</td></tr>
+<tr><td><em>x</em> ∈ A∘B</td><td>⇔</td><td>∃<em>a</em>: ∃<em>b</em>: ∃<em>c</em>: <em>x</em> = (<em>a</em>, <em>c</em>) ∧ (<em>b</em>, <em>c</em>) ∈ A ∧ (<em>a</em>, <em>b</em>) ∈ B</td></tr>
+<tr><td><em>x</em> ∈ A⁻¹</td><td>⇔</td><td>∃<em>a</em>: ∃<em>b</em>: <em>x</em> = (<em>a</em>, <em>b</em>) ∧ (<em>b</em>, <em>a</em>) ∈ A</td></tr>
+<tr><td><em>x</em> ∈ car</td><td>⇔</td><td>∃<em>a</em>: ∃<em>b</em>: <em>x</em> = ((<em>a</em>, <em>b</em>), <em>a</em>)</td></tr>
+<tr><td><em>x</em> ∈ cdr</td><td>⇔</td><td>∃<em>a</em>: ∃<em>b</em>: <em>x</em> = ((<em>a</em>, <em>b</em>), <em>b</em>)</td></tr>
+<tr><td><em>x</em> ∈ A×B</td><td>⇔</td><td>∃<em>a</em>: ∃<em>b</em>: ∃<em>c</em>: <em>x</em> = (<em>a</em>, (<em>b</em>, <em>c</em>)) ∧ (<em>a</em>, <em>b</em>) ∈ A ∧ (<em>a</em>, <em>c</em>) ∈ B</td></tr>
+<tr><td><em>x</em> ∈ A*</td><td>⇔</td><td>∃<em>i</em> ∈ ℕ: <em>x</em> ∈ A*<em>ᵢ</em>, where</td></tr>
+<tr><td></td><td></td><td>A*₀ = A</td></tr>
+<tr><td></td><td></td><td><em>i</em> > 0 ⇒ A*<em>ᵢ</em> = A*<em>ᵢ</em>₋₁ ∪ A∘A*<em>ᵢ</em>₋₁</td></tr>
+</table>
+</blockquote>
+
+(This is somewhat related to Binate and to the function notation in
+file `pattern-matching-and-finite-functions`.)
+
+Sometimes people consider the domain and range sets to be part of the
+content of a relation, aside from its pairs of elements, in the sense
+that two relations are not equal if they have the same sets of pairs
+of elements but different domains or ranges (which necessarily in this
+case include some elements that don’t occur in any of their pairs).
+Here, however, when we mention the “domain” or “range” of a relation,
+we mean the sets of elements that occur on the left or right side of
+its pairs.
+
+XXX typing this fucking Unicode is getting on my fucking nerves.
+Maybe I should switch to “.” (the other way around) for ∘, “;” for ∪,
+“:” for →, “~” or “'” or something for ⁻¹, "&" or something for ∩, and
+some other things?
+
+### Constructing relations from items: → and K ###
+
+The operator → produces a relation consisting of a single pair: *a* →
+*b* is the set {(*a*, *b*)}.  So, applied to *a*, this relation gives
+us {*b*}, and applied to anything else, it gives us the empty set.
+
+(Originally I was going to use ↦ rather than →, but I have → on my
+keyboard, and I gave in to expediency.)
+
+The operator K(*x*) gives us a constant function whose value is *x*
+everywhere.
+
+These are the only two operators of our eleven-operator algebra which
+take elements of relations, rather than relations, as operands.  We
+could consider the tuple-construction operation “(,)” that constructs
+(*u*, *v*) from *u* and *v* as an operation on elements, but it
+doesn’t belong to the algebra proper; we only use it in the
+meta-notation we’re using to *describe* the algebra.
+
+### Constructing relations with set operations: ∪, ∩, and \\ ###
+
+The ∪ set union operator allows us to construct a possibly larger
+relation from two relations.  With ∪ and → we can construct all finite
+relations simply by listing the cases: (ℵ, π) → P ∪ (P, π) → p ∪ (P,
+λ) → λ, and so on.  If we sort the clauses, we can consider this a
+canonical form, in the sense that two finite relations will have
+different canonical forms if and only if they map some domain element
+to different sets of range values.
+
+The ∩ set intersection operator allows us to construct a possibly
+smaller relation from two relations, as does the \\ set-subtraction
+operator.  So, for example, (α → a ∪ υ → y ∪ υ → u) ∩ (υ → y ∪ υ → v)
+is just υ → y, and (α → a ∪ υ → y ∪ υ → u) \\ (υ → y ∪ υ → v) is (α →
+a ∪ υ → u).
+
+We could define these in the same style as the above definitions, but
+it hardly seems necessary, since we’re just using them in the
+conventional way on sets that happen to be relations:
+
+> * *x* ∈ A∪B ⇔ *x* ∈ A ∨ *x* ∈ B
+> * *x* ∈ A∩B ⇔ *x* ∈ A ∧ *x* ∈ B
+> * *x* ∈ A\\B ⇔ *x* ∈ A ∧ *x* ∉ B
+
+Call a relation R **deterministic** if ¬∃*x*: ∃*y*: ∃*z*: (*x*, *y*) ∈ R
+∧ (*x*, *z*) ∈ R ∧ *y* ≠ *z*, which is to say that it’s a function,
+and **reversible** if correspondingly ¬∃*x*: ∃*y*: ∃*z*: (*y*, *x*) ∈ R
+∧ (*z*, *x*) ∈ R ∧ *y* ≠ *z*.  (I was going to use “injective” for
+“reversible”, but apparently sometimes “injective” is used to mean
+what I mean by “deterministic”.)  In particular, the empty relation ∅
+is trivially deterministic and reversible.
+
+All three of these operations preserve finiteness; they cannot
+construct an infinite relation from finite relations.  (This is the
+reason for using \\ rather than the more conventional set complement.)
+Only ∪ preserves infinity, in that the intersection or difference of
+infinite relations may be finite, but generally we don’t care about
+preserving infinity.
+
+∩ preserves determinism and reversibility — if either argument is
+deterministic, the result is deterministic, and similarly for
+reversibility.  Importantly, though, it does not preserve
+nondeterminism or irreversibility: the intersection of two
+nondeterministic, irreversible relations may be deterministic and/or
+reversible.  Indeed, it may be empty.
+
+\\ preserves determinism and reversibility in its left argument.
+
+∪ does not preserve determinism and reversibility, but it does
+preserve nondeterminism and irreversibility: if the result is
+deterministic, both of the operands were deterministic, and similarly
+for reversibility.
+
+The usual properties of set operations hold in the usual way, with the
+usual adaptation of DeMorgan’s laws and the distributive and
+associative laws to set subtraction:
+
+> * A∪A = A∩A = A
+> * A∪B = B∪A
+> * A∩B = B∩A
+> * A∪(B∪C) = (A∪B)∪C
+> * A∩(B∩C) = (A∩B)∩C
+> * A∩(B∪C) = (A∩B)∪(A∩C)
+> * (A\\B)∪(A\\C) = A\\(B∩C)
+> * (A\\B)∩(A\\C) = A\\(B∪C)
+> * (A∪B)\\C = (A\\C)∪(B\\C)
+> * (A∩B)\\C = A∩(B\\C) = (A\\C)∩B
+> * A∪∅ = A
+> * A∩∅ = A\\A = ∅
+
+We can also derive some laws for how they combine with the primitive
+relation constructors:
+
+> * *a* → *b* ∩ *c* → *d* = ∅ unless *a* = *c* ∧ *b* = *d*
+> * *a* → *b* ∩ K(*c*) = ∅ unless *b* = *c*, in which case it's *a* →
+>   *b*
+> * K(*a*) ∩ K(*b*) = ∅ unless *a* = *b*
+
+(All of these, like the other laws presented below, can be proved in
+terms of the [pointwise definition of the operators](#algebra-definition)
+above.)
+  
+### Composing relations with ∘ ###
+
+As a generalization of function composition, A∘B maps some element *a*
+to some element *c* precisely when B maps *a* to some (possibly
+different) element *b*, and A then maps that element *b* to *c*.  So,
+for example, (1 → 3) ∘ (0 → 1) is (0 → 3).  The reversals of direction
+are most unfortunate, XXX maybe I should switch to using | or . and
+the other direction of composition.
+
+∘ preserves finiteness in the sense that the composition of two finite
+relations is also finite.  The composition of a finite relation with
+an infinite one, or vice versa, or the composition of two infinite
+relations, may be either finite or infinite; but in particular A∘B has
+B’s domain, or some subset thereof, and A’s range, or some subset
+thereof, so if B’s domain and A’s range are both finite, then A∘B is
+finite, even if neither A nor B is finite.
+
+∘ preserves determinism and reversibility in that the composition of
+two deterministic relations is deterministic, and the composition of
+two reversible relations is reversible.  Nothing in particular can be
+said about the other combinations.
+
+∘ has a number of useful algebraic properties: XXX some of these are
+probably wrong
+
+> * K(*a*)∘(*b* → *c*) = *b* → *a*
+> * A∘(B∘C) = (A∘B)∘C
+> * A∘(B∪C) = (A∘B) ∪ (A∘C) ???
+> * A∘(B∩C) = (A∘B) ∩ (A∘C) ???
+> * A∘(B\\C) = (A∘B) \\ (A∘C) ??? this one seems really dubious
+
+### Inverting relations with ⁻¹ ###
+
+A⁻¹ is a relation that interchanges the domain and range of A, a
+generalization of taking the inverse of a function; so, for example,
+(*p* → *q* ∪ *p* → *r* ∪ *q* → *r*)⁻¹ = (*q* → *p* ∪ *r* → *p* ∪ *r* →
+*q*).  Unlike the case with functions, every relation has an inverse,
+which is also a relation, and A⁻¹⁻¹ is always precisely A.
+
+A⁻¹ is finite if A is finite, and it’s reversible if A is
+deterministic, and conversely deterministic if A is reversible.
+
+We can write down some laws for how ⁻¹ combines with other operators:
+
+> * A⁻¹⁻¹ = A, as mentioned above
+> * (*x* → *y*)⁻¹ = (*y* → *x*)
+> * A⁻¹ ∪ B⁻¹ = (A∪B)⁻¹
+> * A⁻¹ ∩ B⁻¹ = (A∩B)⁻¹
+> * A⁻¹ \\ B⁻¹ = (A\\B)⁻¹
+> * A⁻¹ ∘ B⁻¹ = (B∘A)⁻¹
+> * K(*a*) ∘ K(*b*)⁻¹ = *b* → *a*
+
+From these we can derive an unending farrago of worthless variants
+like B∘A⁻¹ = (A∘B⁻¹)⁻¹, (*a* → *b* ∪ *c* → *d*)⁻¹ = *b* → *a* ∪ *d* →
+*c*, A∩B∩C = (A⁻¹ ∩ B⁻¹ ∩ C⁻¹)⁻¹, and so on.
+
+### Constructing and deconstructing aggregates with car, cdr, and × ###
+
+The × “relational product” operator, if applied to two relations A and
+B over the same domain, produces a new relation A×B with the same
+domain, but whose range is the Cartesian product of the ranges of A
+and B — it consists of pairs constructed from an item from A’s range
+and an item from B’s range.  This allows you to take two relations
+from the same range and combine their results into a single relation.
+
+What × has joined together, the car and cdr relations put asunder;
+car∘(A×B) is some subset of A, all of A if B didn’t lack any of A’s
+domain values, and cdr∘(A×B) is analogously some subset of B, all of B
+if A didn’t lack any of B’s domain values.  car and cdr are
+unapologetically infinite and polymorphic, even Protean, but they have
+the property that composing them *on the left* (car∘R, cdr∘R) with a
+finite relation R produces another finite relation.
+
+You might complain that car, cdr, and × reintroduce the asymmetry
+between domain and range that we dispensed with when we moved from
+functions to more general relations.  This is merely a matter of
+convenience; you can use (A⁻¹×B⁻¹)⁻¹ or R∘car⁻¹ nearly as easily
+as you can use A×B or car∘R, so there is no need to provide them as
+separate operations.
+
+× preserves finiteness in the sense that the product of two finite
+relations is finite, but the product of two infinite relations, or a
+finite relatin with an infinite relation, may be either finite or
+infinite.  More precisely, if either A or B has a finite domain, A×B
+will have a finite domain, and if both A and B have finite ranges, A×B
+will have a finite range.  × does not preserve infinity in any of
+these cases, in the sense that A×B may be finite even if both A and B
+have infinite domains and infinite ranges.
+
+× preserves determinism in the sense that if A and B are *both*
+deterministic, then so is A×B.  In this case, A×B will also have no
+more pairs than either A or B — precisely the same number if and only
+if they are deterministic and their domains are equal.  It preserves
+reversibility in the stronger sense that if *either* A or B is
+reversible, then so is A×B.
+
+× has some interesting algebraic properties:
+
+> * (*a* → *b*) × (*c* → *d*) = ∅ unless *a* = *c*
+> * A × (B∪C) = (A×B) ∪ (A×C)
+> * A × (B∩C) = (A×B) ∩ (A×C)
+> * A × (B\\C) = (A×B) \\ (A×C)
+> * car∘(A×B) ∩ A = car∘(A×B)
+> * cdr∘(A×B) ∩ B = cdr∘(A×B)
+
+### Transitive closure: \* ###
+
+XXX maybe this should be +?  Because the \* suggests that maybe zero
+times through the relation is fine too, in which case the identity
+should be included, and it isn’t.  It would also help avoid the
+semantic collision with Kleene closure once we get to regular
+expressions.
+
+A\* is a superset of A; it’s the smallest relation such that A\*∘A =
+A\*.  If A tells you where you can get in one move, A\* tells you
+where you can get to in one or more moves.  A\* = A∪(A∘A)∪(A∘A∘A)∪....
+So, for example, (*p* → *q* ∪ *q* → *r*)\* = (*p* → *q* ∪ *p* → *r* ∪
+*q* → *r*).
+
+\*, surprisingly, preserves finiteness: a finite relation A
+necessarily has finite domain and finite range, and A\* has precisely
+the same domain and range as A.  This provides a convenient way of
+enumerating A\* in finite time for finite relations A, despite its
+recursive definition.
+
+If A’s domain and range are disjoint, A\* = A.
+
+\* does not preserve determinism or reversibility, as can be seen by
+the example above in which the transitive closure of a deterministic,
+reversible relation is neither deterministic nor reversible.  Indeed,
+I think A\* can only be deterministic or reversible if A\* = A.
+
+\* has relatively few useful algebraic properties:
+
+> * A\*\* = A\*
+> * A⁻¹\* = A\*⁻¹
+> * K(*a*)\* = K(*a*)
+> * A ∩ A\* = A
+> * A ∪ A\* = A\*
+> * (A∘A) ∪ A\* = A\*, *etc.*
+> * (*a* → *b*)\* = ∅ unless *a* = *b*, in which case it's (*a* → *b*)
 
 Regular expressions
 -------------------
