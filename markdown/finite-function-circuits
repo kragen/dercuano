@@ -288,8 +288,10 @@ item in the range.  We can generalize this to a state transition
 number of items in the range; this describes a potentially
 nondeterministic circuit, or a design specification with some liberty.
 A common way for this to occur in real life is for the circuit to have
-“don’t care” combinations which we expect not to arise in practice,
-but also we will see that it’s often convenient to construct a
+“don’t care” combinations which we expect not to arise in practice.
+For example, a specification for adding BCD numbers need not specify
+what happens when the inputs aren't BCD numbers, but some other bit pattern.
+Also, though, we will see that it’s often convenient to construct a
 deterministic function out of nondeterministic relations.  We can also
 generalize to binary relations between any alphabets whatsoever.
 
@@ -473,6 +475,7 @@ said about the other combinations.
 probably wrong
 
 > * K(*a*)∘(*b* → *c*) = *b* → *a*
+> * (*a* → *b*) ∘ K(*a*) = K(*b*)
 > * A∘(B∘C) = (A∘B)∘C
 > * A∘(B∪C) = (A∘B) ∪ (A∘C) ???
 > * A∘(B∩C) = (A∘B) ∩ (A∘C) ???
@@ -511,11 +514,15 @@ domain, but whose range is the Cartesian product of the ranges of A
 and B — it consists of pairs constructed from an item from A’s range
 and an item from B’s range.  This allows you to take two relations
 from the same range and combine their results into a single relation.
+So, for example, (*x* → *y*) × (*x* → *z*) is *x* → (*y*, *z*).
 
 What × has joined together, the car and cdr relations put asunder;
 car∘(A×B) is some subset of A, all of A if B didn’t lack any of A’s
 domain values, and cdr∘(A×B) is analogously some subset of B, all of B
-if A didn’t lack any of B’s domain values.  car and cdr are
+if A didn’t lack any of B’s domain values.  For example,
+(*y*, *z*) → *y* ∈ car, while (*y*, *z*) → *z* is in cdr.
+
+car and cdr are
 unapologetically infinite and polymorphic, even Protean, but they have
 the property that composing them *on the left* (car∘R, cdr∘R) with a
 finite relation R produces another finite relation.
@@ -551,6 +558,22 @@ reversible, then so is A×B.
 > * A × (B\\C) = (A×B) \\ (A×C)
 > * car∘(A×B) ∩ A = car∘(A×B)
 > * cdr∘(A×B) ∩ B = cdr∘(A×B)
+
+XXX this is simpler than the kind of relational product I eventually
+ended up using in Binate, but I imagine I’m going to end up with a
+bunch of opaque definitions saying things like “carry = car∘car∘cdr”
+in particular circuits.  The Binate approach avoids that, and also
+sort of avoided the problem of infinities associated with car and cdr.
+The idea there was that you would write {x: Xexpr, y: Yexpr, z:
+Zexpr}, and that would be a relation from the (intersected) domains of
+Xexpr, Yexpr, and Zexpr to records, one for each triple of range
+elements; then, new field-selection relations x, y, and z related
+those records to their individual fields.  This avoids the problems of
+infinities and polymorphism mentioned above, but it’s definitely
+conceptually more complicated, and I think the algebraic laws
+described above are a lot harder to state in the named-field case.  On
+the other hand, I’m not sure how useful such algebraic identities will
+really be.
 
 ### Transitive closure: \* ###
 
