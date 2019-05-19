@@ -1,0 +1,362 @@
+How to make Dercuano work on hand computers?
+============================================
+
+Foreseeably, most personal computers now are hand computers, commonly
+called “cell phones” or “mobile phones”, for archaic reasons (with a
+few exceptions called by names like “e-readers”).  Less foreseeably,
+they mostly run user interfaces that limit the user’s power over them
+considerably; in particular, although they generally have WWW browsers
+and most of them can download files and save them locally, they cannot
+extract a .tar.gz file full of HTML and browse it.
+
+This poses a problem for Dercuano, because right now I am publishing
+it as a .tar.gz file full of HTML.  But its objective is to remain
+readable even if my server or domain name fails, as they inevitably
+will someday.  It’s really important (to me, anyway) that people be
+able to continue reading Dercuano in that case.  There are a variety
+of possible alternative formats that could work well on hand
+computers.
+
+The problem: gratuitous handicaps and tiny screens
+--------------------------------------------------
+
+Hand computers have an additional problem, aside from being
+gratuitously crippled in a way that requires compatibility hacks:
+**their screens are tiny**.  For example, until I broke the screen, I
+was using a discount hand computer with a 45×63 mm screen; a more
+modern one I looked at last night has a 64×115 mm screen.  Also, the
+screens used to be low resolution: the PalmPilot was 160×160
+(monochrome!), and the original iPhone was 320×480.  (At 163 pixels
+per inch, that was 50×74 mm, bigger than the one I broke.)  Modern
+cellphones have much higher-resolution screens, and e-readers
+generally have much larger screens, though with fewer pixels.
+
+Making text readable at all on such small screen sizes requires
+serious compromises in typographic design.  For example, the
+typography I’m using at the moment (see file
+`dercuano-stylesheet-notes`) is “22px”, with max-width of 45em and
+line-height of 1.5 (em), and 1 em of padding around the body; on my
+158 dpi laptop screen, that’s a font size of 3.5 mm or 10 (PostScript)
+points, with 5.3 mm from one baseline to the next.  I use a ragged
+right margin extra vertical whitespace between paragraphs, as is
+normal on the WWW, and a somewhat smaller font size for `<pre>`
+blocks.
+
+At this font size, on my 45×63 mm screen in portrait mode (my
+observations on the subway and bus suggest that people strongly prefer
+using their hand computers in portrait mode, only switching to
+landscape mode to watch landscape-mode videos, play landscape-mode
+video games, or occasionally read PDF files whose lines are too long),
+the 7 mm of padding on the left and right would leave room for almost
+13 ems of text, about four or five words’ worth.  Using the greedy
+paragraph-filling algorithm web standards short-sightedly require (at
+least in the case where there are floats, according to pcwalton), and
+especially without hyphenation, this would frequently have lines with
+only one or two words on them.  Less than 12 of these tiny lines would
+fit on the screen, one of which will frequently be consumed by a
+paragraph break, so you might have 40 words of actual text on the
+screen.
+
+Worse, Chromium’s Blink HTML engine, like the WebKit and KHTML engines
+it derives from, doesn’t support hyphenation at all; Firefox’s Gecko
+engine is the only significant WWW browser engine that does, and on
+hand computers, almost nobody uses Firefox.
+
+Once you add any extra block indentation, like that in a blockquote or
+indented list, the situation quickly deteriorates to one or two words
+per line.
+
+Reducing the text size to a less-comfortable size is a necessary
+compromise to avoid such uncomfortably short line lengths.
+(Generally, when I read things on it, I also used portrait mode.)
+Also, though, using less padding around the text is very helpful (in
+this example, using 0.5em instead of 1em padding would increase the
+text column width from 13em to 14em).  The line length will still
+necessarily be shorter, which reduces the need for leading between
+lines to avoid disorientation when moving from one line to the next.
+
+It’s possible to do far worse than my default style on hand computers,
+though.  The worst reading experiences on hand computers are when you
+have very long lines in PDFs or ASCII text files with hard line
+breaks, such that even in landscape mode, you can’t fit an entire line
+on the screen at a readable font size.  This requires you to scroll
+left and right on every single line to read the text.
+
+Somewhat less annoying are academic papers which preserve the
+traditional book layout of two columns of text per page, rather than
+the single-column layout that has become popular recently, since about
+1850.  The columns are generally narrow enough to be readable on the
+tiny hand computer screen, which is a great blessing, but once you
+reach the end of one, you have to spend several seconds panning
+diagonally across the page to find the top of the next one — and, half
+the time, that’s the wrong thing to do, because the next column is on
+the next page.
+
+(I lied, though.  The worst reading experiences on hand computers are
+file formats you don’t have an app for.)
+
+Some kind of adaptation to widely varying screen sizes is necessary,
+since hand computers in common use range from the kind of tiny 45×63
+screen I mentioned up to Amazon Swindles with 600×800 screens at
+167 dpi grayscale, which works out to 91×122 mm, almost 4× as big, and
+51% bigger than the 64×115 mm “cellphone” I mentioned above.  (For
+comparison, a page of [a paperback
+book](dercuano-stylesheet-notes.html#ticktock) is 105×175 mm and about
+600 dpi, but without grayscale.)
+
+Possible formats
+----------------
+
+### DHTML with offline reading via cache-manifest or service workers ###
+
+The first thing that occurred to me was that I could just add a
+cache-manifest to the HTML generated for Dercuano so that when a
+browser loads one page, it loads them all into the appcache, and (at
+least if you bookmark the thing) the whole thing remains accessible
+even if you’re offline or the server goes down.
+
+This has the advantage that anything that works in the current HTML
+tarball incarnation of Dercuano would keep working the same way.  In
+fact, more things would work — the difficulties with full-text
+indexing I mentioned in file `dercuano-search` wouldn’t exist.
+
+This is the lowest-effort approach, but it wouldn’t work very well.
+Although the cache-manifest mechanism is widely supported, including
+on pretty much all hand computers, it’s considered obsolescent (the
+documentation for it has been removed from the current version of the
+WHATWG standard), to be replaced with the new and shiny
+service-workers mechanism.  Since Firefox 60 and Chrome 69, it’s also
+unavailable if you aren’t using HTTPS.  It enjoys invisible resource
+limits — the amount a browser is willing to cache is not exposed to
+the user, but typically it’s 5MB or 10MB, and if the download fails
+because not enough space is available, no error message is given; it
+just fails when you’re offline or the server is down.
+
+There’s a sort of polyfill to support the cache-manifest API on top of
+ServiceWorker, but ServiceWorker also requires HTTPS.
+
+The bigger problem, though, is that both service workers and the
+appcache are totally dependent on, and vulnerable to, the origin
+server.  This violates my intent with Dercuano in three ways:
+
+1. If my server is down, one person with a copy of Dercuano would not
+   be able to give it to another person, except by giving them their
+   entire browser state.  This means that once my server is gone,
+   copies of Dercuano would gradually diminish one by one until they
+   are all gone, rather than being shared with new people who want
+   them.
+
+2. If malicious actors gain access to my server or my domain, they
+   could use that access to delete all the copies of Dercuano, if it
+   were using service workers or appcache.  Malicious actors have
+   gained access to the vast majority of domains that were on the web
+   20 years ago, usually to put generic linkspam pages on formerly
+   high-PageRank domains, so it’s a good bet that this will happen
+   sooner or later to canonical.org.
+
+3. If a patent examiner reads some idea in their copy of Dercuano, and
+   Dercuano uses service workers or appcache, they can’t tell if that
+   idea was inserted into their copy of Dercuano the last time they
+   connected to the internet, or ten years earlier.  This means that
+   ideas in Dercuano would not be able to serve as prior art to
+   invalidate patent claims, as “rapid genetic evolution of regular
+   expressions” did.
+
+### MobiPocket .mobi format ###
+
+A more reasonable alternative approach, for which I am indebted to
+cajg, is to convert Dercuano into some kind of ebook format.  Ebook
+formats in general solve the three problems I mentioned above.
+
+The popular Amazon Swindle hand computer uses a variant of this
+format.  I don’t know much about it, but it’s not fully documented in
+public.  Its text is formatted with (X)HTML and CSS.  Mobipocket
+themselves did a bunch of work on hyphenation, but their work is no
+longer available (except on the Swindle), and other .mobi readers may
+not have such good hyphenation support.
+
+Support for .mobi files is not available on most e-readers (except the
+Swindle), and on cellphones it is available but not installed by
+default.  You can install, for example, Okular or FBReader to be able
+to read them.
+
+.mobi doesn’t seem to have very good graphics support — in particular,
+nothing like SVG or EPS, *but* it does support embedded JS which
+could, in theory, implement that kind of thing, maybe.  It supports
+embedded GIFs and JPEGs, but with a size limit of 63 KiB.
+
+I’m not sure if one part of a .mobi file can contain a hyperlink to
+another arbitrary part of it, although it does of course support
+tables of contents.  This is important for Dercuano.
+
+### .ePub format, the modern replacement for .mobi ###
+
+EPUB, as it’s sometimes written, continued to evolve after .mobi
+forked from it around 2005, and the current version *does* support SVG
+images.  It’s fully documented, not suffering from the
+reverse-engineering problem .mobi does.  Otherwise (in terms of
+supported features, preservability, file size, and so on) it seems to
+be pretty similar.
+
+### PDF ###
+
+That brings us to PDF, which is usually in last place in anyone’s list
+of candidate document formats, due to decades of painful experiences;
+PDF doesn’t support text reflow†, so using it for hand computers whose
+screens vary by a factor of about 4 would seem, at best, perverse.
+However, for better or worse, PDF is supported by almost all hand
+computers (Android, iOS, and Swindle all ship with PDF support out of
+the box), and it always looks the same, within the limits of the
+screen or printer, while maintaining a file size similar to that of
+gzipped HTML.  It supports hyperlinks, including hyperlinks within the
+document, and it supports vector graphics, including transparency
+(though not, as far as I know, SVG-like convolution filters).  PDF is
+designed for random access, so a few thousand pages in a document is
+not a problem on modern computers, including hand computers.
+
+PDF also has the advantage that there are a lot of people out there
+who take seriously the problems of archiving PDFs and making them
+searchable.  The ISO has a PDF standard and also a standard for a
+“PDF/A” subset designed for archival.  (Well, several
+non-backwards-compatible versions of the standard, actually, which
+likely defeats the purpose, but possibly they’ll pull their heads out
+of their asses at some point.)
+
+The worst problems with reading PDF on hand computers, as I said
+above, result from formatting with long lines.  Wide margins are a
+secondary offense, since in many readers they mean you have to zoom to
+a readable size every time you switch pages, and when panning on
+touchscreens, you’re always at risk of panning a little bit diagonally
+and losing the last few letters of the column you’re trying to read.
+
+Typically, though, PDF viewers only let you pan diagonally when you’re
+zoomed in in two dimensions.  If you have the entire page width
+visible, you can only pan vertically, and if you’re looking at the
+entire page, you can’t pan at all.
+
+† Recent versions of acroread do claim PDF reflow support, but I
+haven’t tried it.
+
+### .chm ###
+
+Microsoft distributes help files in CHM format, which, like ePub, is
+an archive (in “.cab” “cabinet” format, IIRC) full of HTML files.
+This used to be popular as a way to distribute technical books, and
+maybe it still is, but support on hand computers is limited.  Play
+Store app reviews suggest that nowadays it’s found a niche for
+distributing medical reference books to doctors.
+
+My proposed solution: PDF with pages of 24 ems × 60 ems with ½ em of margin all around
+--------------------------------------------------------------------------------------
+
+Maybe PDF’s vices can be turned into virtues.
+
+Consider a page that measures 24 ems by 60 ems, with 1.2-em line
+spacing and ½ em of margin, so eight to twelve words per line, much
+like a paperback book, but with much taller pages: 49 lines.  On my
+tiny 45×63 mm hand computer, these numbers give a barely bearable
+5.3-point font in portrait mode and a tolerable 7.4-point font in
+landscape mode, when the page is zoomed to fit the width of the
+display rather than its height.  On the larger 64×115 one I mentioned
+earlier, these numbers are a tolerable 7.6-point font in portrait mode
+and an eminently readable 13.6-point font in landscape mode.  Indeed,
+even fitting the height of the page to the display gives a bearable
+5.4-point font on that machine.
+
+These four possibilities — landscape zoom-to-width, landscape
+zoom-to-height, portrait zoom-to-width, and portrait
+zoom-to-height — provide four roughly evenly spaced magnification
+levels covering a linear zoom range of about three to four times, or
+an areal zoom of about 12 to 20 times.  None of them suffer the janky
+diagonal panning problems that plague PDF reading on hand computers,
+since none of them require zooming in so far that diagonal zooming is
+possible.  The number of words per line is suboptimal but readable.
+
+Some screen real estate to the left and right of the page is left
+unused.  On a 91×122 mm Swindle, zooming to fit the whole 60-em-tall
+page in portrait mode gives you a 5.8-point font, but only the middle
+49 mm of the display is used.  Many PDF readers (I don’t remember
+about the Swindle’s) offer an option to view pairs of facing pages
+next to each other, rather than single pages; doing this on a
+Swindle-sized screen would give you a 5.4-point font, which is still
+bearable, and two pages of text at a time.
+
+If we think of an em as nominally representing 12 PostScript points,
+the 24×60 em page size is 102 mm (4 inches in archaic units) by 254 mm
+(10 inches in archaic units).  So this column size actually closely
+approximates the size of a column in a traditional two-column folio
+page, or a two-column A4 or US letter-sized page.
+
+Given how precious hand-computer screen real estate is, we’d probably
+want to use indentation, rather than extra vertical space, to
+demarcate paragraphs, in the way that has been standard for several
+centuries.  The addition of PDF’s unavoidable page breaks with ragged
+right margins adds an additional rationale for this: if a sentence
+starts at the beginning of a line at the top of a page, how can we
+tell if it starts a new paragraph or not?  It will have extra
+whitespace above it simply because of the page break.
+
+A hypothetical PDF reader that supported zooming to fit the page
+height, with more than two pages next to each other, would allow
+reading any number of such columns with horizontal scrolling.
+
+To some extent, small font sizes can be compensated by holding the
+computer closer to your face, wearing reading glasses, and squinting,
+but a more absolute limit — without resorting to temporal
+antialiasing, anyway — is the actual number of pixels.  I’ve done a
+3½×6 pixel font that is marginally readable, and I think you can do
+better than that with antialiasing and especially subpixel rendering,
+but usually a minimum for reasonable letterforms is 5×8 pixels, and
+standard VGA fonts were 8×16.  But at these line widths, that’s not
+going to be a problem.  If we divide the original iPhone’s 320-pixel
+width by 24 ems, we get a line height of 13 pixels, so an average
+glyph of around 6×13 pixels.  And modern hand computers have
+considerably more pixels than that.
+
+Given that all these point sizes are a little on the small side, and
+the actual paperback book I was looking at has lines of only about 20
+ems wide and is eminently readable, you’d think I could get by with a
+font size about 10% or 20% larger than what’s implied above (and thus
+21% or 44% less areally dense).  45 mm / 21 em would be 2.1 mm per em,
+which is a 6-point font; in landscape mode, the same tiny screen would
+have 63 mm / 21 em = 8.5 points, which is easily readable.  But the
+other force pushing for smaller fonts and wider lines is the
+occasional `<pre>` block, which needs to be able to accommodate 80
+columns, nominally 40 ems.  That’s a text size of 0.6 em for the
+`<pre>`.  Using an even larger font size for the normal body text
+would cause an even larger disharmony between the two text sizes.
+
+### ZUI in PDF for navigating illustrations? ###
+
+Illustrations (see file `dercuano-drawings`) are a really hard problem
+in HTML-based formats for small screens: your lines are already too
+short to flow text around large pictures, and small pictures are
+unreadable unless they contain only a little bit of information, like
+sparklines.  But if we assume that the reader is using a hand computer
+with pinch-to-zoom, and our image format is vector, perhaps we can
+rely on zooming to provide more information about illustrations on
+demand, and even some degree of hierarchical navigation.
+
+Hyperlink navigation within the illustration is probably not
+supported, though, and the maximum zoom is probably quite limited; the
+popular AndroidPdfViewer open-source component defaults to 3× as its
+default maximum zoom.
+
+### Hyphenation and equations in PDF ###
+
+The major advantage of PDF over the HTML-based formats is that things
+will look exactly as I formatted them.  This means that I don’t have
+to rely on hyphenation support on the reader’s computer; I can use a
+decent hyphenation algorithm, and if necessary I can tweak the text to
+deal with rotten formatting (although, honestly, I’m trying to import
+a couple of million words of unfinished notes into this thing; I can’t
+stop to futz with per-paragraph formatting on more than a tiny part of
+it).
+
+Also, an enormous advantage accrues to math formatting (see file
+`dercuano-formula-display`).  In theory, EPUB supports some part of
+MathML, but MathML rendering is generally kind of shitty (where it’s
+not done through MathJax), and writing MathML is worse.  With PDF, I
+can render equations at build time using T<sub>E</sub>X, subsetting
+Computer Modern fonts as necessary to include just the glyphs I’m
+using, and get well-formatted formulas.
