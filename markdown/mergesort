@@ -1,0 +1,83 @@
+An almost-in-place mergesort
+============================
+
+(I’ll be surprised if this isn’t all in Knuth, but my Knuth is in the
+US.)
+
+Background
+----------
+
+The asymptotically most efficient comparison-based sorting algorithms
+take O(N log N) time.  Mergesort is one of the sort algorithms of this
+complexity class, along with Quicksort, Heapsort, and the recently
+discovered Library Sort.  It has the desirable property (like
+Heapsort) that it always takes the same amount of time, unlike
+Quicksort, which has an O(N²) worst case.  Indeed, you can implement
+it without conditional execution.  Unlike Heapsort and Quicksort, it’s
+also easy to make it a stable sort, which is often desirable
+(especially for library routines for sorting); and it accesses memory
+in purely sequential fashion, which is a huge plus as memory
+hierarchies get deeper, while Heapsort and Quicksort jump all over the
+place.  Mergesort is the only reasonable choice for a comparison-based
+sort of data on disk.
+
+(Radix sorting algorithms, which don’t rely on comparisons, can be
+O(N) time, and many are; but I won’t discuss them further here.)
+
+It has one huge disadvantage, though, which is that to sort a million
+things, you need memory space for a million and a half of them; you
+need temporary storage for N/2 elements, which is to say, you need
+O(N) space.  Meanwhile, Heapsort needs only constant space (O(1)), and
+Quicksort needs O(log N) space.
+
+Solution?
+---------
+
+I think there’s a solution, but I’m not sure how to make sure it
+terminates.
+
+One variant of mergesort uses stacks.  With three stacks, you can
+merge sorted runs on S1 and S2 into longer sorted runs on S3 until
+both S1 and S2 are empty, and then perfect-unshuffle those runs back
+onto S1 and S2 (one run onto S1, one run onto S2, repeat) before
+continuing again.  This is a little wasteful in that you move each
+item twice for each merge.  Or, with four stacks, you can merge S1 and
+S2 into runs that you perfect-shuffle between S3 and S4; then you can
+backwards-merge the S3 and S4 runs, perfect-shuffling them between S1
+and S2.
+
+(This originates in the tape-drive days, when your four-kilobyte
+machine would have to do payroll for your hundred thousand employees.
+I’m pretty sure I remember that much from Knuth.)
+
+An amusing note is that you don’t have to keep track of where the runs
+are.  You can simply refuse to move elements onto the output stack
+when they would be out of order (because they belong ot the next run),
+until all the candidates would be out of order, at which point you
+start a new run.
+
+But suppose you’re doing this in memory.  As S1 and S2 are shrinking,
+S3 and S4 are growing by the same amount; it’s just that the growth is
+distributed unequally.  You could maybe put S1 and S3 in the same
+memory space, but growing toward each other with some spare space in
+between, unless they collide.
+
+But most of the time, especially in the early stages part of the
+process, you’re fine.  At the very end, you need to split the final
+run between S3 and S4 (or S1 and S2) unless you want to reallocate the
+space.
+
+But this suggests a solution: what if, when your output stack would
+overflow, you switch to the other output stack in the middle of the
+run instead of reallocating?  You’ll make two small sorted runs
+instead of one big one, so you won’t be making progress on that run,
+but at least you’re not going backward.  But it probably won’t happen
+too often, and you’re guaranteed to have space on one stack or the
+other.  And if at some point you have to switch back to the first
+stack (because the other one is full) you won’t be creating a new run
+there; you'll just be extending the one you started earlier.  So the
+number of sorted runs never grows, but always shrinks.
+
+I’m too tired to code this up right now, but I have a suspicion that
+it will always terminate; but that if the gap size is too small, it
+might not terminate in a reasonable period of time.

@@ -1,0 +1,87 @@
+It would be super neat if I could blur a video stream in real time
+with a realistic camera-like bokeh, like a flat circle or hexagon or
+octagon or something, with a diameter in the neighborhood of like 32
+pixels or more.
+
+By “flat” I mean that, within the area of the bokeh, the transfer
+function is almost constant.  (And, outside, it’s zero.)  This is very
+different from the Gaussian blur that is such a popular effect on
+computers, which has the advantage that it’s isotropic (the PSF is
+circularly symmetric) and very fast to compute (as a cascade of box
+filters and/or separable X and Y Gaussian blurs).  It’s the *only*
+circularly symmetric separable convolution kernel.
+
+However, on my laptop, the time budget for fullscreen full-resolution
+60fps video is 8 ns per pixel.  So I think this is probably feasible
+on a GPU with enough work, but not on a CPU.
+
+A box filter is pretty fast, and it has the desirable camera-like
+flatness, but I’ve never seen a camera with a rectangular bokeh.  You
+could use a set of 32 one-dimensional box filters for the bokeh on 32
+scan lines, adding together the results, and that would work, but it
+might be pretty slow.  Maybe if you use another stage of box filter to
+blur the image to hide jaggies, maybe you could get by with 16 or 10
+of them.  Also, maybe you could use the vertical symmetry to only have
+to compute each scan-line box filter once.
+
+And of course you can affinely texture-map the image to rotate it,
+box-filter the rotated version, and then texture-map it back to
+unrotate it.  And that can get you a bokeh of a rotated rectangle or
+indeed an arbitrary parallelogram.
+
+But is there some efficient way to get even, say, a paraxial
+trapezoid?  With, like, less than a separate box filter for every 2–4
+scan lines?
+
+If you have successfully achieved two bokeh filters, one of which is
+entirely contained in the other, you can subtract one from the other
+to get a bokeh with a hole in it.
+
+You can get a spatially varying somewhat trapezoidal bokeh by a
+variation of the rotation method: do the texture mapping with
+perspective rather than just an affine transformation.  This is a
+useful approach to get a bokeh of spatially varying size in general:
+spatially transform the image, apply the bokeh, and transform it back.
+
+A possibly useful approach to round the corners of the bokeh without
+blurring its edges much: add a stage to the bokeh pipeline whose PSF
+is a small hollow circle, e.g.
+
+    0 0 0 0 1 1 1 0 0 0 0
+    0 0 1 1 0 0 0 1 1 0 0
+    0 1 0 0 0 0 0 0 0 1 0
+    0 1 0 0 0 0 0 0 0 1 0
+    1 0 0 0 0 0 0 0 0 0 1
+    1 0 0 0 0 0 0 0 0 0 1
+    1 0 0 0 0 0 0 0 0 0 1
+    0 1 0 0 0 0 0 0 0 1 0
+    0 1 0 0 0 0 0 0 0 1 0
+    0 0 1 1 0 0 0 1 1 0 0
+    0 0 0 0 1 1 1 0 0 0 0
+
+This can be achieved with the difference of two one-dimensional box
+filters per distinct scan line.  Note that in this case there are only
+four distinct scan lines, although there are 11 scan lines in total.
+
+This might be useful in combination with some of the jaggy approaches,
+and an alternative that might work well for that in the case of an
+octagonal bokeh might be a 45° rotated hollow square, achieved through
+a difference of rotated box filters.
+
+Finally, maybe doing the bokeh convolution in frequency space is the
+best available option.  However, on my laptop’s CPU, an FFT of a
+640×480 grayscale image followed by an inverse FFT takes 96 ms, which
+is 312 ns per pixel.  Much smaller FFTs should be significantly
+faster, but slightly larger FFTs (like a screenful) should be slightly
+slower (though for some reason 1024×1024 is actually often much slower
+on my laptop, possibly because of other CPU-intensive things I'm
+running).
+
+<http://ivizlab.sfu.ca/papers/cgf2012.pdf> uses min between rotated
+and skewed box filters to get fairly realistic hexagonal and octagonal
+bokeh, also varying it with the depth of field and using max to get
+star-shaped polygons.  This does produce detectable artifacts, but
+they are fairly minimal.
+<https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf> used
+low-rank linear approximations to get linear approximations of
+arbitrary bokeh shapes.

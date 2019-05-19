@@ -1,0 +1,75 @@
+Digital TV has a severe “cliff effect”: due to the excellent
+error-correction codes employed, you have no warning that the
+signal-to-noise ratio is worsening until suddenly you can’t decode the
+signal.  We can see this as an engineering deficiency — the channel
+capacity has not fallen to zero, but probably to just below the bit
+rate of the signal.  And in other situations, when the signal-to-noise
+ratio was better, there was excess channel capacity that the system is
+just wasting.
+
+Analog TV, though worse in many ways, was better at this.  When the
+signal levels were severely degraded, you’d see more noise on the
+screen, which effectively amounts to a lower resolution.
+
+Could you do something similar with digital TV?
+
+Since the failure of the MBONE, the standard approach with internet TV
+(CUSeeMe, YouTube, Skype, Netflix, etc.) is to downrez the stream
+until the receiver is able to receive all of it.  Could you do
+something similar without bidirectional transmission, e.g. for
+recording media or broadcast TV?
+
+Consider transmitting a 1920×1080 signal — first in 16-bit RGB without
+compression, to simplify the discussion.  You can mipmap a 1920×1080
+frame into a 240×135 frame, a 480×270 frame, a 960×540 frame, and a
+1920×1080 frame.  If you do it by summing the 4 pixels in each
+higher-resolution frame to get the corresponding pixel in the
+lower-resolution frame, then someone in possession of any 4 of those
+pixels can produce the fifth pixel.  This means that if you have
+successfully received the lower-resolution frame, you would be
+satisfied with ¾ of the pixels in the next-higher-resolution frame.
+
+Since the higher-resolution has ¼ of the pixels, that would seem to
+suggest that encoding the image in this way is “free”, in that it
+doesn’t cost any extra bits, but that’s wrong; the lower-resolution
+frames need more bits of precision to make this work.  But the cost is
+moderate: if you have 5 bits of precision per color component in the
+1920×1080 signal, you need 7 at 960×540, 9 at 480×270, and 11 at
+240×135.  This totals to 35 186 400 bits, 4 398 300 bytes, while the
+raw signal is 31 104 000 bits, so the cost is about 13%.  But the
+smallest frame size is only 1 069 200 bits, about 3% of the total.
+
+If you encode the smaller frame sizes with higher levels of
+redundancy, then a receiver who’s experiencing more noise might be
+able to receive the smaller frames even if the larger frames are lost.
+If you double the redundancy at each mipmapping level, then in effect
+you are using 5, 14, 36, and 88 bits per color component per pixel at
+the different mipmapping levels, which gives you 58 708 800 total bits
+per frame, almost twice the original bit rate.
+
+Perhaps you can decrease this overhead by doing similar subsampling
+along the time axis — update the smaller frames less frequently,
+without the ¾ reduction on the larger frames when they aren’t
+accompanied by a smaller frame — but the tradeoff is there.  Any bits
+you dedicate to redundancy for the sake of noisier receivers are in
+some sense not available for increasing the resolution for quieter
+receivers.
+
+This may not be a fatal flaw, though, because the usual system doesn’t
+serve those quieter receivers that well either — the wide SNR margin
+they enjoy is being completely wasted.  This system could provide them
+with an even higher-resolution and possibly higher-frame-rate signal
+encoded with even less redundancy, with the consequence that those
+receivers get better service, too.
+
+So it’s only a narrow range of SNRs, those just above the threshold of
+the usual system, where the usual system is superior.  From perhaps 0
+to 6 dB or 9 dB above completely failing to work, the usual system is
+an improvement.  But anywhere below that, this multirate system
+provides degraded service instead of no service, and anywhere above
+that, this multirate system provides enhanced service instead of
+baseline service.
+
+Apparently one scheme for degradable modulation like this is called
+“hierarchical modulation”, and “scalable video coding” is the name for
+the H.264 feature that implements another aspect of the above.

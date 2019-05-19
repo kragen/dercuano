@@ -1,0 +1,81 @@
+Looking at the [US$4.01 NXP MKW01Z128][0] that Bill Paul mentioned.
+This chip’s RF interface is really interesting because it can transmit
+license-free as low as 290 MHz (1.03 m) at up to 600 kbps.  It has
+128 KiB of Flash and 16 KiB of RAM and a 48 MHz Cortex-M0, sucking
+16 mA when actively receiving (and up to 95 mA when transmitting) at
+1.8 to 3.6 volts.  It's targeted at last-mile metering and wireless
+sensor networks.
+
+[0]: https://www.digikey.com/product-detail/en/freescale-semiconductor-nxp/MKW01Z128CHN/MKW01Z128CHN-ND/4746295
+
+Radio communications characteristics
+------------------------------------
+
+Its power output is -18 to 17 dBm (50 mW!) and its sensitivity is
+-120 dBm (a femtowatt!) and so it occurred to me that maybe we should
+measure solid angles in dB.  In this case, without further
+amplification, the receive antenna needs to capture signal over -137
+dB (or more) of the sphere around an isotropic transmit antenna.
+
+(The -120 dBm is dependent on lowering the communication rate to
+1200 bps.)
+
+A half-wave dipole antenna, the ideal, would be 516 mm long for 290
+MHz; it gives you 2.15 dBi of “antenna gain”, so you get down to a
+solid angle of -139 dB, and it captures signal over about 0.2 m², I
+think.  This subtends -139 dB of solid angle at about 1000 km.
+
+That’s pretty impressive — two such chips can communicate over 1000 km
+with nothing between them but half-wave dipoles, and furthermore
+without a license.
+
+On Spaceship Earth, though, it’s a little tricky to have nothing
+between them, and 1000 km is far too short for moonbounce.  If you
+were to use a 30 dBi dish antenna to transmit, that would get you to
+about 30 000 km, which isn’t even all the way around Spaceship Earth;
+if you use another one to receive, that gets you to 900 000 km, which
+is far enough for moonbounce — but then you only have about 3 dB of
+headroom, and the moon sucks most of that up; typical moonbounce path
+losses are around 240 dB.
+
+The 315 MHz UHF unlicensed (ultra-low-power/short-range device in US
+and Japan, not ITU) frequency band it uses (which extends down to 290
+mHz, at the top of the VHF band) is mostly used by garage door
+openers, keyless car openers, and whatnot.  It should have reasonable
+building penetration, better than cellphone signals.
+
+E-skip ionospheric propagation apparently doesn’t reach 290 MHz
+(250 MHz seems to be the limit), but it might be subject to
+tropospheric ducting from atmospheric temperature inversions, and to
+transequatorial propagation, and otherwise is limited to 3570 m √(h/m)
+line-of-sight radio horizon.  Reaching 1000 km with 3570 m √(h/m)
+would require a stratospheric balloon or drone at 79 km altitude.  A
+terrestrial structure like my office at about 60 m only has a line of
+sight of around 30 km.  (Probably all the people remotely unlocking
+their cars would provide too much interference, but maybe not.)
+Totally unsurprising structures like trees might be only 10 m tall,
+and thus have a line of sight up to about 10 km.
+
+Tropospheric ducting, if it’s possible, has the additional advantage
+that the strength of radio waves trapped in the atmospheric duct only
+drops off as the reciprocal of distance, rather than its square.
+
+If you were to try to do something cute and moonbouncelike, maybe you
+could use a mountain.  For example, a few kilometers from Las Cruces,
+Organ Needle reaches 2700 m above sea level, while Las Cruces itself
+is at only 1200 m.  A dish (or radome) pointed at Organ Needle would
+effectively transmit isotropically from 1500 m, giving it a
+line-of-sight range of over 100 km, as long as the reflected power was
+high enough.
+
+Power usage
+-----------
+
+16 mA × 3.6 V / 48 MHz works out to about a nanojoule per instruction.
+95 mA × 3.6 V / 600 kbps works out to 570 nJ per bit.
+
+17 mA at 1.8 volts is roughly the power supplied by the solar cell
+from a solar calculator, and just about at the right voltage already;
+two such cells in series with a capacitor ought to provide plenty of
+power for the device as long as it’s only transmitting with a
+relatively light duty cycle.

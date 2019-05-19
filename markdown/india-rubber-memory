@@ -1,0 +1,79 @@
+I watched Tony Hoare’s 2009 talk about how null pointers were a
+billion-dollar mistake today.  One of the things he mentioned was
+that, often, pointers are used because computer memory doesn’t
+stretch — you want to logically include some child object into a
+parent object, but the child object has a potentially variable size,
+so you’re stuck using a pointer to it (a Box, in Rust parlance).  If
+you had “India-rubber memory” that could expand without invalidating
+later pointers, you could just include the child object inside the
+parent, as we traditionally represent syntax trees in text using
+nested brackets.
+
+This is an appealing idea, and I wonder if you actually could make it
+work in practice, using some kind of flexible buffer scheme to hold
+all your data — like Emacs buffers with markers pointing into them,
+except that the buffers can contain not only characters but also
+references to markers.  To the extent that you can make your data
+immutable, you can avoid the need to update the positions of markers
+from inserting and deleting data in the middle of the buffer.  You
+need the markers in order to be able to rapidly jump over
+variable-length child objects and reach later children.
+
+For example, suppose you have these definitions (from the FlatBuffers
+tutorial):
+
+      struct Vec3 {
+        x:float;
+        y:float;
+        z:float;
+      }
+
+      table Monster {
+        pos:Vec3; // Struct.
+        mana:short = 150;
+        hp:short = 100;
+        name:string;
+        friendly:bool = false;
+        inventory:[ubyte];  // Vector of scalars.
+      }
+
+Now, if you know the starting byte position of a `Monster`, you can
+easily find the starting byte position of its `pos`, `mana`, `hp`, or
+`name`, since those are all at fixed offsets.  But `friendly` comes
+after `name`, and `name` is variable-length, so somewhere we must
+store a marker to find `friendly` with — a marker which will continue
+to point to `friendly` even if some characters are inserted or deleted
+in `name`.  From that marker we can find the byte position of
+`inventory`, since `friendly` itself is fixed-size.  We don’t need a
+second marker to find the end of the object, but since the
+variable-length `name` and `inventory` fields make `Monster` as a
+whole variable-length, we would need an array of markers to organize
+an array of `Monster`s, and if `Monster` were embedded in some other
+object, we’d need a marker to find the field following the `Monster`.
+
+At least, that’s one possible set of implementation decisions.  You
+could also imagine storing the markers at the end of the `Monster`,
+and using the end position rather than the start position to identify
+the `Monster`, which would have the advantage that you could write out
+the representation in a purely sequential fashion with no
+backpatching, which in turn would allow you to use variable-length
+representations for the markers, such as variable-length byte counts.
+In that case, you’d need a marker to find the beginning of `inventory`
+(and the end of `friendly`) and a marker to find the beginning of
+`name` (the end of `hp`).  In this case, this “trailers”
+representation requires more markers than a “headers” representation
+would, but that’s only because the last field is variable-length; more
+usually both would require the same number of markers.
+
+You could also imagine representing the markers in such a way that an
+update to them was needed under different circumstances.  For example,
+you could represent a marker as a sequence of indices into B-tree
+blocks walking down from some root, and only an insertion into a
+B-tree block before the marker would require an update to that marker;
+or you could represent it as something like a BASIC line number, in
+the sense that the marker destinations would be physically present in
+the buffer along with characters, in a lexicographically ordered
+fashion, and might occasionally need a “renum” operation to
+redistribute them over the index space, which could be carried out
+somewhat lazily.
+

@@ -1,0 +1,77 @@
+I was reading _TeX: The Program_, and in §§220 et seq. explaining *eqtb*
+and in particular §§268–284, I found the solution to implementing
+PostScript’s `gsave` operator efficiently in an interpreter, a solution
+that’s more efficient than either deep binding or the usual approach to
+shallow binding.
+
+`gsave` saves the drawing parameters on a stack of drawing parameters,
+including not just the current path, but also things like the current
+clipping path, the current line dashing pattern, the current line join,
+the current line width, the current color, and so on, which change
+relatively rarely.  Later, they can be restored with `grestore`.  This
+allows code inside the `gsave`/`grestore` pair to change these
+parameters with impunity.
+
+Now, the standard shallow binding approach to this problem is to allocate
+a new saved-graphics-context object on the saved-graphics-context stack,
+copy the entire current-graphics-context to it, and then continue.
+To restore, you copy the saved-graphics-context on top of the stack over
+the current-graphics-context.  This means that accessing the variables
+in the current graphics context is fast, because they’re always in
+the same location in memory in the current-graphics-context.  (A slight
+variation of this accesses those variables directly on the top item on the
+stack, thus making access to them indexed off the stack pointer, which
+was slower on old machines but is pretty much just as fast nowadays.)
+But, with this approach, `gsave` and `grestore` are fairly slow.
+
+The deep-binding alternative, as I understand it, is to maintain the
+graphics context as a stack of setting-value pairs.  To access a
+graphics-context variable, you search down the stack until you find it.
+This is slow, but `gsave` and `grestore` are much faster, since they
+don’t need to copy anything.  But it’s somewhat hairier than deep
+binding in its original Lisp context, where you’re pushing some new
+bindings onto the stack, because `gsave` doesn’t have a list of graphics
+parameters to override; it just arranges for later graphics parameter
+changes to be pushed onto the stack.
+
+How can you implement this?  Presumably you need to tag each name-value
+pair on the graphics parameter stack with the `gsave` level it belongs
+to.  `gsave` increments the level and saves the stack pointer, and
+operators like `moveto` or `setlinejoin` first search the stack to find
+an entry, then check to see if its tag matches the current level.  If it
+matches, they can just overwrite the value with the new value; if it
+doesn’t match, they need to push the new level on the parameter stack.
+`grestore` then restores the stack pointer and decrements the level.
+
+So variable access is slow, but `gsave` and `grestore` are fast, since
+they hardly do any work.  This is not a good tradeoff because you
+commonly do several graphics operations per `gsave`/`grestore` pair,
+often very many, and those operations typically access several graphics
+parameters each.
+
+But wait.  What if we don’t have to search the stack to find the current
+value?  This is the TeX approach.  The value of, say, glue between
+paragraphs (`par_skip`) is stored in `eqtb[glue_base+2]`, which turns
+out to be `eqtb[1+256+256+1+2100+10+257+1+2]`, which is `eqtb[2884]`, a
+constant memory address.  But the item stored at that address includes
+not just the value of the glue parameter, but also the save level it
+came from.  You can ignore that when you’re reading it, but when you’re
+setting it, it tells you whether you need to save the old value on the
+stack or not.  Then `grestore` (in TeX, “unsave”) iterates over the
+save-stack items, restoring their old values, until it hits a level
+boundary.
+
+This means that variable access is pretty fast, `gsave` is fast, and
+`grestore` only does a small amount of work proportional to the number
+of parameters that must be restored — comparable to the work done in
+overwriting them in the first place.
+
+Unfortunately I don’t know how to generalize this to a wider class of
+problems.  It’s perfect for dynamically-scoped variables and for
+propagating a potentially large class of top-down properties down a tree
+during a tree traversal.  It’s useful for graphics contexts, where it
+offers a much better alternative to copying a whole graphics context
+because you want to change a few things in it and a noticeably better
+alternative to changing a few things in it and then changing them back.
+But it isn’t useful for, for example, Emacs buffer-local variables or
+efficiently cloning a heap object from a prototype.

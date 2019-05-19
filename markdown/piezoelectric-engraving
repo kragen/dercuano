@@ -1,0 +1,71 @@
+You should be able to engrave permanent images on metal or glass using
+a ceramic or metal stylus on a flexing piezoelectric arm with no
+joints, somewhat similar to the needle of an STM or AFM.  Aluminum
+oxide (sapphire) is probably the easiest ceramic to use, although it
+provides no electrically-conductive feedback about contact; metal
+(hardened tool steel, say), or conductive ceramics like tungsten
+carbide, would remedy that shortcoming, allowing sensitive calibration
+of engraving depth.
+
+The total movement range of such a setup is likely very small, in the
+neighborhood of a millimeter, but it can potentially micro-forge the
+surface of the metal with sub-nanometer resolution, enabling the
+direct engraving of holograms.  I’m not sure what it will do on glass,
+but I think it’s possible to get it to make scratches rather than just
+break the glass.
+
+To take a random example, the [American Piezo catalog][0] lists a “PSt
+150/5x5/7” osi-type piezoelectric stack actuator of 5 mm × 5 mm, 9 mm
+long, with a maximum stroke of “13/9” μm (not sure what’s up with the
+two numbers), 800 nF capacitance, resonant frequency of 100 kHz,
+120 N/μm of stiffness, 1600 N of blocking force, with a maximum load
+of 2000 N, operating from -30 V to +150 V.  If you hook up three of
+these things in parallel to a chunk of metal with a grain of aluminum
+oxide on its tip, they could jam that grain 9 μm into a bit of
+aluminum, titanium, glass, or even steel, pull it back out, move it
+into a different position, jam it back in, and repeat, at 25 kHz (two
+octaves below resonant) without any difficulty.
+
+[0]: https://www.americanpiezo.com/images/stories/content_images/pdf/apc_multilayer_catalog.pdf
+
+If the chunk of metal has a 10:1 aspect ratio, for example if the
+piezo actuators are attached to it 20 mm apart and it’s 200 mm long,
+then you can wave that little grain of sapphire back and forth by
+90 μm, almost the width of a hair.  Some kind of flexure-lever
+arrangement to amplify this by another factor of 10 might be a good
+idea.
+
+You could presumably engrave data on a little spot at about 50 kbps in
+this way.  (They also offer flat chip actuators with a shorter stroke
+but much higher resonant frequency, like 500 kHz.)  But then you would
+probably need some kind of repeatable positioning apparatus to engrave
+over a wider area.
+
+The pressure generated is enormous.  Supposing that the tip is up to
+25 μm in diameter, 1600 N spread over 490 square microns is
+3.3 terapascals.  Different metals have yield stresses in the range of
+90 MPa (copper) to 2.5 GPa (piano wire), with around 500 MPa being
+normal; this is 6600 times lower.  (Actually annealed aluminum is down
+around 15–20 MPa.)  Sapphire’s ultimate tensile strength is only
+around 1.9 GPa, and diamond only 2.8.
+
+(Oops, actually the force and pressure from the actuator is
+potentially 3× that if you have three parallel actuators.)
+
+So you really could find a way to gear these actuators up by a
+factor of 1000 or so, it would give you a stroke of 9 mm with
+potentially nanometer precision, and still plenty of force to engrave
+the surface.  (I suppose this is why normal STMs use bending
+actuators.)  If you could still manage 50 kbps, although this seems
+more dubious, you could engrave a 9 mm square area at 500-nm
+resolution at 0.0125 mm² per second, filling the whole area in about
+two hours.  This is a good timescale.
+
+Unfortunately, at least the [Physikinstrumente devices][1] that gear
+up piezoelectric actuators in such a fashion have much lower resonant
+frequencies, like 150 Hz.
+
+[1]: https://www.physikinstrumente.com/en/products/piezoceramic-actuators/linear-actuators/p-602-piezomove-high-stiffness-linear-piezo-actuator-202700/
+
+As an alternative, maybe you could use electromagnetics, which can
+also reach up into the MHz range.

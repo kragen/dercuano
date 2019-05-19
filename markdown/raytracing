@@ -1,0 +1,75 @@
+From at least the 1970s until the present day, semiconductor RAM has
+been the dominant form of memory measured in number of memory
+accesses, and the number of bytes of memory on an interactive computer
+has roughly equaled the number of instructions per second it could
+execute, from about a hundred thousand around 1980, to about a million
+a few years later, to about ten million in the early 1990s, to about a
+hundred million in the late 1990s, to about a billion in the early
+2000s, to about ten billion today.
+
+But in theory time-space tradeoffs are possible, and indeed we have
+been achieving reasonable performance on these machines by storing a
+lot of precomputed results in their memory.
+
+But current microcontrollers have dramatically more computational
+power than they have onboard memory, and adding off-chip memory
+dramatically increases power usage.  It’s entirely typical to find a
+CPU capable of 50 or 100 million 32-bit integer instructions per
+second, but limited to 16 or 32 kilobytes of SRAM, a ratio of about
+2000 instructions per byte.
+
+The extreme on this axis, in a sense, is GreenArrays; each of the 144
+cores on a GreenArrays chip executes about a billion 18-bit integer
+instructions per second, but only has 64 18-bit words of memory, which
+would be 144 bytes.  That’s about 7 million instructions per byte.  I
+say “in a sense” because, with that little memory, it’s really kind of
+in between being an FPGA and being a regular computer.
+
+If nowadays CPU cycles are cheap compared to memory, how should we
+adapt our software to that?  Maybe we can do more stuff with
+convolutional and recurrent neural networks, but how about regular
+things like graphical user interfaces?
+
+You could imagine raytracing your GUI.  Raytracers use almost no
+memory for intermediate rendering results, although they do usually
+build up a scene graph.  I just ran a quick raytracer I’d written to
+benchmark, generating 1920×1080 pixels, and got these results:
+
+    ==22338== Cachegrind, a cache and branch-prediction profiler
+    ==22338== Copyright (C) 2002-2011, and GNU GPL’d, by Nicholas Nethercote et al.
+    ==22338== Using Valgrind-3.7.0 and LibVEX; rerun with -h for copyright info
+    ==22338== Command: ./raytracer 1920 1080
+    ==22338== 
+    --22338-- warning: L3 cache found, using its data for the LL simulation.
+    ==22338== 
+    ==22338== I   refs:      1,348,631,580
+    ==22338== I1  misses:            1,263
+    ==22338== LLi misses:            1,230
+    ==22338== I1  miss rate:          0.00%
+    ==22338== LLi miss rate:          0.00%
+    ==22338== 
+    ==22338== D   refs:        459,287,791  (331,081,906 rd   + 128,205,885 wr)
+    ==22338== D1  misses:           21,360  (     19,098 rd   +       2,262 wr)
+    ==22338== LLd misses:            2,292  (      1,719 rd   +         573 wr)
+    ==22338== D1  miss rate:           0.0% (        0.0%     +         0.0%  )
+    ==22338== LLd miss rate:           0.0% (        0.0%     +         0.0%  )
+    ==22338== 
+    ==22338== LL refs:              22,623  (     20,361 rd   +       2,262 wr)
+    ==22338== LL misses:             3,522  (      2,949 rd   +         573 wr)
+    ==22338== LL miss rate:            0.0% (        0.0%     +         0.0%  )
+
+So that took 1.348 billion instructions, about 650 instructions per
+output pixel.  It missed in its level-1 data cache (which is 128 KiB)
+21,360 times; its cache lines are 64 bytes, so that totals about 1.37
+megabytes of data I/O, about 10% of which was output.
+
+Suppose this 650 instructions per pixel is typical (although I was
+raytracing a very simple scene, you could imagine getting close to
+this performance on general scenes using all kinds of clever hacks).
+Then you could paint a 320×240 screen in 50 million instructions; with
+ten or twenty small processors you could raytrace a small-screen UI.
+
+However, 2560×1440 tablets are becoming common now!  These would
+require 2.4 billion instructions per frame at that rate.
+
+So, maybe not for a while yet.  The trends seem clear.

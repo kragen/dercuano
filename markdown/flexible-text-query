@@ -1,0 +1,117 @@
+Here’s an example of the problem I want to solve.  I have a crontab
+which records my battery capacity estimates from the OS once a minute;
+here’s a sanitized transcript:
+
+    $ crontab -l
+    # m h  dom mon dow   command
+    *   *   *   *   *   (date; date +date=\%s; cat /sys/class/power_supply/BAT0/uevent) >> .battery-samples
+    $ tail ~/.battery-samples 
+    POWER_SUPPLY_CAPACITY_LEVEL=Normal
+    POWER_SUPPLY_SERIAL_NUMBER= 
+    Sat Jul 14 16:40:01 -03 2018
+    date=1531597201
+    POWER_SUPPLY_NAME=BAT0
+    POWER_SUPPLY_STATUS=Discharging
+    POWER_SUPPLY_PRESENT=1
+    POWER_SUPPLY_TECHNOLOGY=Li-ion
+    POWER_SUPPLY_CYCLE_COUNT=0
+    POWER_SUPPLY_VOLTAGE_NOW=11400000
+    POWER_SUPPLY_POWER_NOW=20508000
+    POWER_SUPPLY_ENERGY_FULL=45828000
+    POWER_SUPPLY_ENERGY_NOW=24886000
+    POWER_SUPPLY_CAPACITY=54
+    POWER_SUPPLY_CAPACITY_LEVEL=Normal
+    POWER_SUPPLY_SERIAL_NUMBER= 
+    Sat Jul 14 16:41:01 -03 2018
+    date=1531597261
+    POWER_SUPPLY_NAME=BAT0
+    POWER_SUPPLY_STATUS=Discharging
+    POWER_SUPPLY_PRESENT=1
+    POWER_SUPPLY_TECHNOLOGY=Li-ion
+    POWER_SUPPLY_CYCLE_COUNT=0
+    POWER_SUPPLY_VOLTAGE_NOW=11400000
+    POWER_SUPPLY_POWER_NOW=20565000
+    POWER_SUPPLY_ENERGY_FULL=45828000
+    POWER_SUPPLY_ENERGY_NOW=25216000
+    POWER_SUPPLY_CAPACITY=55
+    POWER_SUPPLY_CAPACITY_LEVEL=Normal
+    POWER_SUPPLY_SERIAL_NUMBER=
+
+Now suppose I want to plot battery capacity over time.  Getting the
+capacity itself is easy enough:
+
+    $ grep -a _FULL= ~/.battery-samples
+    ...(29000 lines omitted)...
+    POWER_SUPPLY_ENERGY_FULL=45828000
+    POWER_SUPPLY_ENERGY_FULL=45828000
+    POWER_SUPPLY_ENERGY_FULL=45828000
+    $
+
+(The `-a` is necessary because there’s a block of 541 NULs that got in
+there last Wednesday, presumably due to some kind of filesystem
+corruption on power loss.)
+
+But this only gives me the Y-coordinate.  The X-coordinate of time is
+missing.
+
+Now, I could write it this way:
+
+    $ perl -lne '$date = $1 if /date=(.*)/;
+                 print "$date $1" if defined $date
+                                 and /_FULL=(.*)/' ~/.battery-samples
+
+And I can plot that with gnuplot, and it looks right:
+
+    $ perl -lne '$date = $1 if /date=(.*)/;
+                 print "$date $1" if defined $date
+                                 and /_FULL=(.*)/' ~/.battery-samples |
+      gnuplot -p -e "plot '-' with linespoints"
+
+And that works.  But it’s a relatively large amount of hacking for a
+fairly simple task.  If we want to include both
+`POWER_SUPPLY_ENERGY_NOW` and `POWER_SUPPLY_ENERGY_FULL`, it’s going
+to start to be complicated.
+
+What I really want here is an interaction like:
+
+1. Show me the lines that say `date=`.
+2. Okay, now infer `POWER_SUPPLY_ENERGY_FULL` from the next line that
+   says `POWER_SUPPLY_ENERGY_FULL=`
+3. Okay, now infer `POWER_SUPPLY_ENERGY_NOW` from the next line that
+   says `POWER_SUPPLY_ENERGY_NOW=`.
+4. Okay, now display just `date`, `POWER_SUPPLY_ENERGY_FULL`, and
+   `POWER_SUPPLY_ENERGY_NOW` as columns.
+
+At the command line, this could be something like:
+
+1. `q2 date=`
+2. `q2 date= +_FULL=`
+3. `q2 date= +_FULL= +_NOW=`
+4. `q2 'date=(.*)' '+_FULL=(.*)' '+_NOW=(.*)'`
+
+For logfile processing, it’s common to want to limit matches to a
+particular request ID and to exclude “noise” events based on some
+other kind of pattern.  So it’s useful to conceptualize this process
+as the repeated execution of some possibly nondeterministic program:
+
+1. First, find `date=`, and save what comes after it; discard upon
+   fail.
+2. Then, search forward for `_FULL=`, and save what comes after it,
+   discarding upon fail; then return to the position from step 1.
+3. Then, search forward for `_NOW=` and save what comes after it,
+   discarding upon fail; then return to the position from step 1.
+4. Then, display the three saved strings.
+
+You could imagine, for example, running one of these subordinate steps
+on the set of lines that contain “id=$1 “, where $1 is a previously
+captured id.  You don’t want to necessarily constrain the entire rest
+of the query to do that.  And you might want to be able to emit nested
+structures here, and exclude domains in a known spammer list, and
+whatnot.
+
+This is pretty similar to what I need for my mailreader qyap: I have a
+nested structure of mail message threads to extract from a possibly
+out-of-order mailbox (or more than one), and I might want to hide
+particular threads or subthreads.
+
+(I’ve done something like this previously with batchagenda.py.)

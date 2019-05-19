@@ -1,0 +1,88 @@
+The analog-to-digital converter on even the most basic models of STM32
+is capable of a million samples per second, about 70 times faster than
+the 15ksps advertised for the ADCs on the 8-bit AVR line, which
+Arduino was built on.  The “leakage” or bias current is specified as
+<200nA, which is adequate for many measurement tasks even without an
+external preamp.  Some new “Arduino” boards are built around an
+STM32F103C8T6, which has two 1Msps ADCs, and thus ought to be able to
+digitize signals at 2Msps with a bit of clever programming — enough
+for signals of up to 1MHz.  (ST application note AN3116 has details.)
+It has 20KB of zero-wait-state SRAM, which is enough to capture
+several thousand samples, which ought to be enough.
+
+There are many possible uses for such a capability.  One highly
+desirable use is to make an oscilloscope, a general-purpose instrument
+for visualizing a small number of quantities changing quickly, once
+the quantities are converted to voltages.  (By “small number” I mean
+“less than five” and by “quickly” I mean “over nanoseconds to
+milliseconds”).  Unfortunately, 1MHz is not enough — a low-quality
+off-brand analog oscilloscope is 10MHz, and a normal entry-level
+analog oscilloscope is 20MHz, which doesn’t mean it can’t detect
+faster signals, just that they suffer 6dB/octave attenuation and
+severe phase distortion.  So 2Msps is about 5% of an oscilloscope.
+
+Here’s an exploration of possible ways to get to something a bit more
+decent.
+
+Software flash conversion
+-------------------------
+
+The STM32 is capable of acquiring data at much higher speeds using its
+GPIO lines; it can read 16 of them at once, something like 36 million
+times per second.  Configured as digital inputs, these are
+Schmitt-trigger lines; some are 5V-tolerant, with LOW guaranteed up to
+0.475Vdd - 0.33 V, HIGH guaranteed from 0.5Vdd + 0.2 V, and ≈100mV
+hysteresis; and others are not, with LOW guaranteed up to 0.3Vdd +
+0.07 V, HIGH guaranteed from 0.445Vdd + 0.398V, and ≈200mV
+hysteresis.  This leaves a narrow voltage range of 500–800mV
+undefined.  All have input leakages of 1μA or less.
+
+It occurs to me that you could perhaps use this capability to acquire
+lower-precision data about higher frequencies, which might still be
+valuable.  You could experimentally characterize the analog behavior
+of the chips, and perhaps generate waveforms for field-calibration of
+the chip.  Then you could use a 16-bit digital input port and a
+17-resistor ladder fed from a buffer as a 4-bit flash converter, and
+maybe do some kind of half-flash trick largely in software to get to 8
+bits.
+
+4 or even 8 bits may sound extremely unimpressive, but often the
+high-frequency signal is small in amplitude compared to the
+lower-frequency components; certainly when the signal contains both,
+the high-frequency components alone will have smaller amplitude than
+the overall signal.  In particular, this means it’s safe to use an
+ac-coupled or inverting amplifier on the input.  And flash conversion
+is easily capable of digitizing according to a nonlinear scale, such
+as ISDN μ-law.  But the most interesting possibility is using a bit of
+external analog circuitry to dynamically adjust the range of the
+high-frequency digitization to approximate the range of the
+jury-rigged ADC.
+
+An external fucking ADC obviously
+---------------------------------
+
+Well duh.  The TI ADC08060 is a 3V 8-bit 20–60Msps parallel-output
+ADC, and you can just hook it up to 8 GPIO pins and bingo.  There are
+others out there.  They barely cost more than a STM32F103, although
+other STM32 chips are cheaper.
+
+Running the ADC at lower precision 
+-----------------------------------
+
+As explained in file `stm32`, it’s possible to configure the ADC for
+lower bit depth (10, 8, or 6 bits) to speed it up (to 928, 785, or 643
+ns, respectively), which suggests you could crudely digitize signals
+up to 780 kHz with one STM32 ADC, or up to 1.56 MHz with two.
+
+Ganging up STM32s
+-----------------
+
+At the 1Msps rate, each conversion takes 14 clock cycles of a 14MHz
+clock, of which only 1.5 cycles (107 ns) are spent sampling the
+signal.  This means that frequency components up to about 9MHz are
+basically unattenuated, though aliased, in the output, and the first
+actual zero of the frequency response is 9.3 MHz.  The STM32F103C8T6
+can run its two ADCs in lockstep so as to sample precisely every 7
+cycles, but you could easily imagine a scheme for syncing up 5–20
+STM32s to sample at slightly staggered times, thus capturing signals
+up to 9MHz in their full glory.

@@ -1,0 +1,74 @@
+High-precision control of low-stiffness sytems with bounded-Q resonances
+========================================================================
+
+By inverse-filtering the control signal applied to a plant by the
+estimated OTF of the control function, we can compensate for
+arbitrarily poor stiffness, up to limits imposed by the control-output
+bounds and the Q factor of series resonances in the system which
+impede our ability to impose rapid changes on it.  The estimated OTF
+can be updated moment by moment from incoming sensor data, which
+permits compensation for mild nonlinearities in the plant; for
+example, the resonant frequencies of a robot arm may change as it is
+being extended.  High-Q-factor series resonances impose notch filters
+on the spectrum of the OTF, making it poorly conditioned, thus
+requiring large components in the inverse filter.  These large
+components can easily cause the inverse-filtered signal to have a very
+poor signal-to-noise ratio or to exceed the limits of the control
+actuators, requiring for example very large forces, velocities, or
+displacements.  This problem can be ameliorated somewhat by using
+nonlinear optimization algorithms, rather than simply solving a linear
+system, in the control loop.  However, in many cases, it may be better
+to change the design of the plant to damp the high-Q resonances.  For
+example, in a mechanical system, these high-Q resonances can be damped
+and broadened by adding dashpots or other dissipative elements, thus
+trading off efficiency for precision control.  Counterintuitively, the
+common approach of increasing rigidity can worsen the controllability
+of the system when using such an adaptive control algorithm, as it
+increases the Q factor of the system’s vibrational modes, even as it
+moves them to higher frequencies.  As more data is gathered about the
+system, it becomes possible to empirically estimate the variation of
+the control-feedback OTF over the plant’s parameter space, thus
+enabling compensation for OTF nonlinearities in parts of the parameter
+space we expect to visit in the near future.  If the control system
+can learn an OTF that is locally nonlinear or stateful, then nonlinear
+optimization algorithms in the control loop could potentially
+compensate even for such phenomena as gear backlash.  Finally, using a
+self-validating analysis system such as reduced affine arithmetic, the
+control system can optimize not only to reduce the expected deviation
+between the plant’s state and the commanded result, but even for the
+uncertainty in the plant’s state.
+
+All of the above is, to me at least, still somewhat speculative.  I
+have a strong intuition that all of it is true, but a lot of work is
+needed to verify it in practice.  It’s about four times too long for a
+paper abstract!
+
+How to investigate?  Well, one thing to try is to simulate a simple
+physical system, like maybe a linear one-dimensional
+mass-spring-dashpot system connected to another mass-spring-dashpot
+system plus a little bit of measurement noise, and try to command it
+to make some movements with some different kinds of control systems:
+
+- Maybe a simple bang-bang control system;
+- Simple proportional control;
+- A tuned PID control system;
+- The inverse-filtering-based system I describe above, in its simplest
+  form;
+- maybe more advanced forms of it if that seems like it would be
+  better.
+
+That should provide some kind of evidence that this is a good idea,
+before I get into more complicated plants.
+
+The obvious way to do the simulation at this point is with SVG and JS
+in Chrome, using direct-mode solutions with maybe a second-degree
+approximation for the integrals, which will also make it easy to
+demonstrate to other people.  Maybe I can make it game-like, which
+should make it easy to draw a desired motion with the mouse or a
+touchscreen in order to see how different control systems respond.
+
+Maybe I can try some experiments first with Jupyter notebooks with
+Numpy to see what inverse-filtering a noisy signal looks like.  Maybe
+I need to review how to compute the OTF of a linear mass-spring-
+dashpot system, because I’m pretty sure that’s like a closed-form kind
+of thing.

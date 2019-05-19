@@ -1,0 +1,71 @@
+I’m interested in sparse filters, in the sense that you can realize
+them with only a small number of taps to reduce the number of
+multiplications, and multiplication-free or multiplication-light
+filters, in the sense that the nonzero tap coefficients are numbers
+like 1, 2, 3, 4, or maybe 6 or 8, but not things like 1.03594513,
+except perhaps in a very few cases.
+
+The Hogenauer cascaded integrator-comb filter is a well-known filter
+of this class, commonly used for sample-rate conversion.  But here are
+a few other related ideas.
+
+The context for this is that a lot of our filter design lore comes
+from the world of analog electronics, where multiplication is trivial
+and memory is hard.  This means it is not a good fit for digital
+computation, where memory is trivial and multiplication is hard,
+although immense hardware effort has been devoted to papering over
+this for the benefit of DSP designers.
+
+A CIC filter is low-pass but linear-phase, so you can invert
+it — subtracting the appropriately scaled low-pass signal from the
+input sample in the middle of the kernel — to get a high-pass filter.
+Or you can subtract the outputs of two such filters to get a bandpass
+filter.  This may be particularly useful in combination with
+undersampling — decimating the bandpass-filtered signal to alias the
+band of interest down to IF or baseband, thus allowing you to detect a
+high-frequency signal without doing anything high-frequency except for
+running some integrators.
+
+A unity-gain negative-feedback comb filter y(n) = x(n) - y(n-k) is an
+oscillator, and indeed it’s very close to the Karplus-Strong
+oscillator (which is, in its original form, y(n) = x(n) - ½y(n-k) -
+½y(n-k-1), to gradually attenuate higher frequencies).  If you compose
+it with a unity-gain feedforward comb filter in very much the same way
+you do in a CIC filter, its impulse response is a finite-length
+alternating impulse train, so it’s a bandpass filter, though it also
+detects harmonics of the target frequency.  A cascade of a few of
+these approximates a Gaussian window; if you add an actual CIC filter,
+which you can tune to have nulls at the harmonics of the target
+frequency, you can get a very inexpensive high-Q filter.  As one
+example, [I got a bandpass Q][0] of 17.8 and 38dB stopband attenuation
+to generate I and Q signals for oscillations with a period of 60
+samples using 2.64 additions and subtractions per sample: a two-stage
+CIC filter with lags of 36 and 40 samples on the front end, three
+30-sample feedback combs, and further feedforward combs of 300, 480,
+and 780 samples.  This gives a kernel with a temporal response of
+about 1000 samples (FWHM) which is a reasonably good approximation to
+a Gabor filter with Q≈17.
+
+[0]: http://canonical.org/~kragen/sw/dev3/sparse-bandpass-filters.ipynb
+
+(You’ll note that this is very similar to the previous technique, and
+the two may be alternatives; with the previous technique, for example,
+it may be useful to set up the low-pass filter you're inverting to
+have precise nulls at the harmonics of the signal you're trying to
+detect.)
+
+More generally, if you can construct a filter whose impulse response
+is half a wave or more of some waveform you want, you can cascade it
+with the unity-gain negative-feedback comb filter and get an
+oscillator for that waveform, or more or less equivalently, a filter
+that matches it.  And you can use the same trick described above to
+construct a filter whose impulse response is a specific number of
+oscillations of the waveform.
+
+Anything you can construct by convolving, adding, and subtracting box
+filters and comb filters can be computed as a sparse filter.  So, for
+example, you can get a difference of gaussians fairly easily.
+
+Once we get into nonlinear filter territory, things get more
+interesting still.  You can do a PLL as a pretty sparse filter, for
+example.

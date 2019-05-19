@@ -1,0 +1,82 @@
+There were a couple of papers published in the 2000s about “hybrid
+memory” systems with SRAM and phase-change memory (PRAM or PCM-RAM).
+
+Here's the deal.  The standard memory hierarchy for the last 35 years
+has been SRAM → DRAM → spinning rust, and now that’s diversifying a
+bit, with SRAM → DRAM → NAND Flash → spinning rust, sometimes missing
+the spinning-rust part.  Each item in this hierarchy is much more
+costly per bit than the next one, but also much faster.  On each of
+these, the time to write one byte at a random location, the retail
+cost of that location, and the amount of such storage on a typical
+small netbook or cellphone, might be, very approximately:
+
+- SRAM: 0.2 ns, 20 000 nanodollars, 1 MiB
+- DRAM: 100 ns, 3.5 nanodollars, 4 GiB
+- NAND Flash: 10 μs (10 000 ns), 0.26 nanodollars, 64 GiB
+- spinning rust: 8 ms (8 000 000 ns), 0.03 nanodollars, 1000 GB (or 0!)
+
+You’ll note that the cost of each of these levels of the memory
+hierarchy is on the order of US$20.
+
+From this you might think it was some kind of a natural law that
+faster memory costs more to make, but the truth is that there's plenty
+of memory that's both more costly to make and slower than something in
+that list.  It’s just that people stopped making it.  Bubble memory,
+core memory, TTL SRAM, acoustic delay lines, punched paper tape,
+Williams tubes, magneto-optical disks, even magnetic tape and most
+photo and movie film have fallen to this economic logic.
+
+I think this kind of thing is called the “efficient frontier” or
+“Pareto frontier”, and it’s a pretty general economic phenomenon:
+possible technologies are scattered around some cost/benefit plot
+space at random, but the ones that are economically viable are the
+ones that have more benefit than everything that’s less costly,
+dramatically reducing the diversity of technologies.  When there are
+more different benefits to trade off among, more diversity can
+survive.
+
+A weird thing about this is that the time to read a byte is the same
+in all cases except for NAND Flash, because the process of erasing a
+block of NAND is slow, but reading it is potentially quite fast.  In
+fact, reading it can be as fast as reading SRAM or DRAM, depending on
+how the Flash is designed.  (A friend of mine went off to found a CDN
+startup based on this observation a couple of years ago; it’s called
+Fastly and now powers a substantial fraction of the internet,
+disrupting the business of some internet giants.)
+
+This is not as visible as it could be, because Flash has been slotted
+into the existing computing ecosystem as a disk replacement, so to
+some extent it’s been limited by the I/O hardware and software built
+to support spinning-rust disks.  Also, I think NAND Flash typically
+doesn’t support byte reads, just reads of 256-byte blocks.  I have to
+investigate further.
+
+This suggests that below a certain ratio of writes to reads, Flash
+(and similar technologies like PRAM, FeRAM, CBRAM, and MRAM) can
+displace not only some spinning rust but also many applications of
+DRAM and SRAM.  This is especially interesting to me because of a
+different benefit of nonvolatile technologies like Flash: they use
+much, much less power than DRAM.
+
+This is especially important because refreshing DRAM is actually a
+major user of computer energy nowadays, especially in mobile devices
+where power is so crucial.  If it’s possible to replace a large amount
+of DRAM with a larger amount of nonvolatile RAM and a much smaller
+amount of SRAM, it would be a huge win.  This is what inspired all
+that “Hybrid RAM” research.
+
+Of these alternatives to Flash, PRAM was the first to hit the market,
+and so it's the one that inspired the papers on hybrid RAM; it was
+only made by Micron, but only from 2012 to 2014.  Intel is trying to
+commercialize crosspoint PRAM it developed with Micron under the name
+“3D XPoint”.  CBRAM, FeRAM, and MRAM are still available and
+mainstream.
+
+A typical PRAM part might have been the Micron NP8P128A13TSM60E, 128
+megabits (16 megabytes) of PRAM in a 56-pin package with 115-ns random
+reads (using a 25 MHz clock) and 50-ns random writes (using a 50 MHz
+clock), which is read performance slightly better than DRAM.  (This
+was through an SPI interface.)  It was rated for a million write
+cycles, and although its write speed was not as fast as DRAM, it
+didn't require a separate slow erase step.  It supported writing or
+“programming” (ANDing) at 64-bit granularity.

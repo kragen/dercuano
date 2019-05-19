@@ -1,0 +1,77 @@
+Could you power a computer from your voice via a microphone?
+
+Typical speakers are about 1% to 5% efficient.  Suppose a microphone
+is about the same.  Someone shouting at a distance of a meter is
+supposedly about 85dBa; 0 dBa (0 dB SIL) is defined as 10⁻¹² W/m², so
+this is about 3 mW/m².  The shout is maybe spread over an area of a
+square meter, so it’s probably about 3mW in total, and you could
+probably capture a significant fraction of that if you had the
+microphone actually in your mouth.  3mW is plenty of power to run
+certain microcontrollers.
+
+There’s another issue of impedance and voltage matching.  Piezo and
+electret microphones are essentially capacitive, making them very high
+impedance at audio frequencies, while dynamic microphones are
+essentially inductive, which seems more circuit-friendly.  But since
+we’re dealing with an audio-frequency AC waveform, you ought to be
+able to step it up or down with a steel-core transformer.
+
+Otherwise, though, I think you could probably just feed a
+low-capacitance capacitor with the rectified dynamic mic, run a
+high-efficiency boost or buck converter from it to step the voltage up
+or down, and feed a low-voltage, high-capacitance capacitor with that
+to run the microcontroller.
+
+For example, the LTC3388 is designed for this kind of application,
+accepting voltages of 2.7 to 20 V, with 720 nA quiescent current up to
+820 nA at 20 V; different configurations manage output voltages down
+to 1.2 V; the efficiency is about 90% with low input voltages,
+dropping to about 70% for 20 V input, unless the load is under 100 μA.
+100 μA at 1.8 V (typical for low-power microcontrollers) would be
+180 μW, which would allow a one-second 3-mW burst of sound to power
+the microcontroller for 16⅔ s.  Various low-power microcontrollers
+manage a bit under a nanojoule per instruction (like 300 picojoules to
+900 picojoules per instruction), so 180 μW is about 360 000
+instructions per second, comparable to a Commodore 64.
+
+I have the intuition that for this kind of thing, it’s important to be
+able to draw down the charge stored on the input side fast enough to
+follow the sound waveform on its way down, to ensure that the
+available energy there is successfully harvested.  The LTC3388 can
+source up to 50 mA, which would be 90 mW at 1.8 V, which would be
+4.5 mA at 20 V or 10 mA at 9 V.  If the sound wave had most of its
+energy in a 200 Hz component, it falls from 9 V to 0 in 0.74 ms;
+without getting into actually calculating derivatives precisely, that
+would require that the input capacitor be no larger than about 0.8 μF.
+
+(We shouldn’t really try to analyze it linearly into sinusoids,
+because both the rectifier charging the input capacitor and the buck
+converter draining it are nonlinear, but that should give us a
+ballpark.)
+
+I don’t know how much input capacitance we need, or if we need any,
+but it seems like the LTC3388 lets its inductor current ramp up to
+150 mA before shutting the gate, so we probably need enough energy
+stored to get a 22 μH inductor up to 150 mA.  LI²/2 is then about a
+quarter of a microjoule.  A capacitor that charges up to a quarter of
+a microjoule at, say, 7 volts would be .25 J / (7 V)² = 5000 pF.  So
+probably anything in the middle of the 5000 to 800 000 pF range would
+work.
+
+My intuition is that if the input capacitor is ever *above* the
+rectified signal, no current will flow, so no energy is harvested;
+while if it’s far *below* the rectified signal, then most of the
+voltage has to be dropped by the rectifier itself rather than the
+capacitor, and that dropped voltage also represents inefficiency.  So
+I think you want to ensure that the input capacitor stays just below
+the constantly changing supply voltage, at least until the output
+capacitor is fully charged.
+
+I don’t think the LTC3388 will do that, at all, and I don’t know what
+will.
+
+One thing that might help would be an inductor in series with the
+rectifier.  This would keep a significant voltage from ever being
+dropped across the rectifier, instead charging the inductor until the
+capacitor is ready to accept its energy.  But maybe that will make it
+hard to ramp up harvesting when there’s a rapid rise in voltage?

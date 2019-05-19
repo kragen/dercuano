@@ -1,0 +1,77 @@
+Suppose you’re waiting for the bus on a Sunday.  You know that the bus
+goes where you want to go, and it will get you there in five minutes.
+But you may not be sure when or how often the bus runs on Sundays.
+You can walk where you want to go, but it will take you 50 minutes.
+At some point, if the bus hasn’t come yet, you’ll give up and start
+walking.  You would like to arrive as soon as possible.  How long is
+it optimal to wait before you start walking?
+
+(To simplify the problem I’m ignoring many complexities of the
+real-world situation; for example, you might get lost walking, or fall
+off a bridge and die; or, if the bus comes while you’re walking, you
+might be able to run back to the bus stop, or to the next bus stop; or
+the bus might catch on fire while you’re on it, or take a detour that
+takes you further from your desired destination; you might be
+hallucinating the destination, or waiting at the wrong bus stop, or
+indeed be an Alzheimer’s patient in a nursing home whose belief in
+both the bus and the destination is a demented delusion; you may be
+dreaming, and thus able to cause the bus to arrive whenever you want;
+and so on.)
+
+This problem depends on two parameters: one is your prior probability
+distribution of bus arrival times, and the other is your utility
+function over destination arrival time distributions.  There are some
+simple cases that are easy to solve.  For example, if your probability
+distribution is just a Dirac delta at some time t₀, which is to say
+that you know for certain when the bus will arrive, then you should
+wait if t₀ < 45 minutes, walk immediately if t₀ > 45 minutes, and do
+as you like if t₀ = 45 minutes.  If you absolutely need to arrive
+within 51 minutes, perhaps for a court date to appeal your upcoming
+execution, you should walk if there is any possibility of the bus
+taking longer than 45 minutes to arrive.  (Of course, in reality,
+there is always some possibility of that.)
+
+One solution which is robust (that is to say, it’s not optimal, but
+the optimal solution can only beat it by some reasonably small margin)
+over wide ranges of these parameters is to wait 45 minutes.  This
+bounds your destination arrival time to 95 minutes, which is less than
+a factor of 2 worse than the best result you can guarantee (if you
+just start walking immediately), and it has a "regret property" that
+is also bounded to a factor of less than 2: if you arrive at 95
+minutes, the soonest you could have arrived if you’d waited longer
+would have been 50 minutes, which is better by less than a factor of
+2.  I want to make some kind of argument based on Lipschitz constants
+of utility functions here, but I’m not certain how to formulate it
+yet.
+
+This problem is closely analogous to a wide range of planning problems
+in domains with large variance.
+
+For example, suppose you want to write a video-codec subroutine for
+60-frame-per-second video, and you are trying to choose whether to
+write it in C or Python.  You know that you can write it in C, and if
+you write it in C, it will be plenty fast, but writing things in C
+takes longer — say, 500 minutes.  You know you can write it in Python
+in about 50 minutes, but you don’t know if it will be too slow to use.
+(If it ever takes more than 16.7 milliseconds to run, it will make the
+video playback skip frames.)  How long should you fiddle around with
+trying to optimize the Python version to be fast enough before you
+throw it away and write the C version?
+
+In an analogous way, if you only have 500 minutes to solve the
+problem, you should just “walk”, writing the C version to begin with.
+But if you can afford to take a bit longer — say, 600 minutes — you
+should try writing the Python version and see if you can get it to run
+fast enough.  Maybe you’ll finish the task in 50 or 100 or 150 minutes
+instead of 500 minutes.  But by trying that option, you’re taking the
+risk that the overall task might extend to 550 or 600 or 650 minutes,
+if the Python approach doesn’t work out.
+
+This simplified model highlights one reason that it is so costly to
+maximize the predictability of processes for, among other things,
+writing software.  The fastest and highest-quality process is only
+very rarely the most predictable one.
+
+Schedule estimation errors are widely observed to be lognormally
+distributed rather than normally distributed.  This is not the only
+reason, but it is a significant one.

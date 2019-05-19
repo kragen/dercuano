@@ -1,0 +1,92 @@
+You can take the Lisp 1.5 metacircular interpreter (from
+e.g. <http://www.righto.com/2008/07/maxwells-equations-of-software-examined.html>,
+originally from p.13 of The Lisp 1.5 Programmer’s Manual
+<http://www.softwarepreservation.org/projects/LISP/book/LISP%201.5%20Programmers%20Manual.pdf>,
+in M-expressions and directly write them as stack-machine code.
+
+    \ evalquote[fn;x] = apply[fn;x;NIL]
+    :EN$;
+    \ apply[fn;x;a] = [atom[fn] -> [eq[fn;CAR] -> caar[x];
+    \                               eq[fn;CDR] -> cdar[x];
+    :$r!x!f!f@a[f@1=[x@AA;]f@2=[x@AD;]
+    \                               eq[fn;CONS] -> cons[car[x];cadr[x]];
+    f@3=[x@Ax@DAk;]
+
+This amounts to 54 characters for these four lines.  Proceeding more
+or less in this way, the 21 lines of code from the Lisp manual should
+be about 280 characters, or about four lines.  The non-Lisp primitives
+used here are taken from StoneKnifeForth, largely from Forth, and the
+meanings of the characters include:
+
+- `:` defines a (one-byte) label as a function entry point;
+- `;` returns from the current function;
+- `!` stores NOS (next-to-top-of-stack) at the address in TOS
+  (top-of-stack), popping both;
+- `@` fetches the value at the address in TOS, replacing it as TOS;
+- `[` pops TOS and conditionally jumps to the matching `]` if it was
+  zero, thus enclosing a conditional;
+- `=` pops TOS and NOS and pushes a value that is zero unless they
+  were equal;
+- literal numbers push themselves on the stack;
+
+StoneKnifeForth defines 21 such primitives.
+
+The other characters used are:
+
+- `r`, `x`, and `f` are presumed to be elsewhere-defined addresses of
+  memory cells that we can use for convenient storage of parameters
+  `r`, `x`, and `fn` respectively — recursive calls, however, may need
+  to explicitly save and restore such things on a Forth stack;
+- `E` represents `evalquote`, and `$` represents `apply` (after its
+  meaning in Haskell, I suppose);
+- `A` is `car`, `D` is `cdr`, and `k` is `cons`.
+
+You can implement the A (CAR) and D (CDR) operations with something
+like the following, presuming labels `c` and `d` pointing to
+appropriately-sized arrays in which to store the car and cdr pointers
+themselves:
+
+    :Ac+@;
+    :Dd+@;
+
+My recollection from doing this in C in 2007
+<https://www.mail-archive.com/kragen-hacks@canonical.org/msg00164.html>
+is that there are a fair number of other things you need to implement
+that are sort of hidden under the covers here: input parsing, output
+printing, atom interning, memory management, call/return (“activation
+record management”, as I said), and error handling.  The C version was
+154 lines of code that worked, plus another nonworking 23 lines of
+code for garbage collection, for a total of probably about 177 lines.
+Of that, 40 lines of C was devoted to the 21 lines of code from the
+Lisp 1.5 metacircular interpreter which could maybe be compressed down
+to 4 lines (284 characters) of line-noise stack code.  If the same
+ratios held, the whole working Lisp would be 1254 characters of stack
+code, which is about 20 lines; 15–25 lines is probably a reasonable
+estimate, or maybe 45 lines if it’s formatted to be as readable as
+possible.
+
+It might be a somewhat better idea to do a simple Scheme, Lua, or
+Smalltalk instead, with proper lexical scoping, instead of the
+dynamic-scoping early-bound mistake that was 1960s Lisp.  There’s no
+reason to expect that they’ll be much more code, but if they are,
+1960s Lisp might be good enough.
+
+Something like this is probably a reasonable way to bring up a more or
+less high-level language in a fairly minimal amount of code.  This
+provides the following estimate for the part of the abstraction ladder
+to get to a high-level programming environment:
+
+- 158 lines of Verilog: a CPU like the J1a;
+- 132 lines of quasi-Forth: a quasi-Forth compiler to native code like
+  StoneKnifeForth;
+- 198 lines of Python or similar: a bootstrap interpreter to run it to
+  get the initial native code, as in StoneKnifeForth;
+- 45 lines of code like the above: a high-level programming language.
+
+Total: 533 lines of code.
+
+(Maybe 90 lines is a better estimate for the Lisp part.)
+
+Of course, this doesn’t include operating systems, filesystems, text
+editors, fonts, font rendering, networking, Verilog logic synthesis,
+and so on.  But it’s a start.

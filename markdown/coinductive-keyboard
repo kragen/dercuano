@@ -1,0 +1,71 @@
+The traditional way to scan a keyboard is with row and column lines
+which are connected through mechanical keyswitches.  This runs into
+some trouble with bouncing and contact oxidation, as well as number of
+moving parts; a solution is to use variable capacitors instead, where
+pressing a key brings two pieces of foil close together, but not into
+contact, maybe squishing some plastic foam in between them or
+something.  This prevents contact oxidation, since there is no contact
+to make sparks, and bouncing, since a small deviation in distance will
+produce only a small deviation in capacitance.
+
+It still requires about 2√N wires for N keys, though.  As an
+alternative, consider using selective inductive coupling instead of
+selective capacitive coupling: pushing a key pushes a ferromagnetic
+core through some coils of wire, greatly increasing the inductive
+coupling between those wires.
+
+You could imagine, for example, using five “exciter” wires, each of
+which runs through 25 air-core coils, arranged in a 5×5 matrix.  Each
+of these coils is physically near a coil on a "row" wire, which runs
+through the 5 coils on a row for this exciter wire and also the
+corresponding 5 coils on the corresponding row for each of the other 4
+exciter wires, and a “column” coil, which has a corresponding
+column-wise arrangement.  Normally, you have limited inductive
+coupling between the wires, but pressing a button inserts a ferrite
+core through all three coils, strongly coupling any AC signal on an
+exciter wire to a corresponding row and column wire.  The signal is
+only weakly coupled to the other row and column wires.  (A factor of
+20 difference between coupling with and without the core should be
+easily achievable.)
+
+In this cubic arrangement, 15 wires are adequate to scan a 125-key
+keyboard, while the traditional matrix arrangement would have needed
+23.
+
+But it’s possible to go further with more coils: instead of coupling
+just three coils, let the inserted core couple, for example, five
+coils.  An exciter current on one of three exciter wires can produce a
+current on four other wires, each chosen from a set of three; in this
+case, we have 15 wires scanning 243 keys.
+
+It’s also possible to go further with coil polarity: each coil can be
+wound in either of two different directions, resulting in an induced
+voltage with a phase difference from the exciter voltage.  You could
+maybe also use different numbers of turns on different keys, but that
+seems like it is going to start to be flaky when the core is
+incompletely inserted.  (That's the same reason to prefer using, say,
+five wires to scan five columns, rather than four.)
+
+There’s no reason, then, to leave some of the sense wires inactive on
+each keystroke.  You could run each sense wire through each key with a
+coil in one or the other direction; for example, you could have three
+exciter wires which each excite 32 keys, plus five sense wires which
+run through all 96 keys, with a coil in one or the other direction,
+producing a unique 5-bit binary code for each of the 32 keys for a
+given exciter wire.  This gives you 96 keys with only 8 wires.  Since
+the codes are balanced, the stray inductive couplings through keys
+that are not being pressed should mostly cancel out.
+
+That logic brings us inexorably to preferring only a single exciter
+wire, which brings us finally to 128 keys using a single exciter wire
+and 7 sense wires: 8 wires for 128 keys, a great improvement over 23.
+
+If the sliding core slides through a hole in a high-permeability
+member that curves around to behind the coils, then it can close a
+magnetic circuit, reducing the total circuit reluctance by orders of
+magnitude, thus increasing the inductive coupling dramatically.
+
+This keyboard design has the great advantage for klutzes like me that
+it contains no uninsulated electrical conductors and no tight
+clearances, so it should work perfectly well even if it’s, for
+example, immersed in salt water or filled with Coca-Cola.

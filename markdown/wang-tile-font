@@ -1,0 +1,76 @@
+Old computer display systems used a “character generator” to drive the
+raster display (see file `gradient-pixels` for more detail), giving
+rise to the traditional “terminal screen” look and feel, with its
+single shitty typewriter font, blaring primary colors, block cursors,
+and readability-slaughtering background-color transitions on
+character-cell boundaries.  The major advantage of this system is that
+it saves a lot of memory; in `gradient-pixels`, I gave the example of
+a color 80×25 terminal with 8×16 pixels per character, which requires
+somewhere between 2000 bytes and 8096 bytes for a 1-bit-deep font, and
+perhaps 20 kilobytes or so for a font with antialiasing or color.  But
+a framebuffer for the 256000 pixels would require probably 128–768
+kilobytes.
+
+An interesting alternative that occurred to me today is to drive the
+pixel generator from a complete set of Wang tiles.  The pixel
+generator still uses a rectangular array of data directly
+corresponding to physical screen positions, but the “font” is
+potentially larger, because the pixels on the screen are a function
+not only of the glyph index at the underlying location, but also of
+some pixel generator state.  Specifically, you have, say, two bits of
+“bottom-edge-color state” from the corresponding cell in the previous
+line (that is, the cell above this one), and, say, two bits of
+“left-edge-color state” from the corresponding cell in the previous
+column (that is, the cell to the left).  And the font entry indexed by
+these four bits and the bits of the glyph index contains not only
+pixels but also the new bottom-edge-color state and left-edge-color
+state.
+
+In the simplest case, where the rectangular array has no bits per
+character position, the screen contents are entirely determined by the
+font; at each position, the four bits of edge state uniquely determine
+the pixels to display at that position, from the 16 available glyphs
+in the font, and also determine the new edge state.  With a single bit
+of color per edge, and thus only 4 glyphs, this is sufficient in
+itself to generate some simple fractals and count in binary, but
+nothing more interesting, but with two bits of edge state, all kinds
+of interesting programs are possible.  (There are 16¹⁶ = 2⁶⁴ possible
+programs that can be encoded in the font edge state bits.)
+
+When the rectangular array actually has some data in it, we can think
+of the bits in it as specifying which of the valid alternative tiles,
+as constrained by the environment, is to occupy the space; this, in
+turn, affects the environment of the cells below and to the right.
+
+To take a slightly more interesting case, you might use 5 bits per
+character position to encode which letter is to appear there, with
+four variants of the space character — one to set the right-edge state
+to any of four alternatives, which we could gloss as FIGURES,
+TITLECASE, UPPERCASE, and LOWERCASE.  The TITLECASE glyphs might be
+identical to the UPPERCASE glyphs in appearance, but the right edge of
+a TITLECASE glyph leaves the left-edge state set to LOWERCASE, while
+the right edge of an UPPERCASE glyph remains in UPPERCASE.  This is a
+somewhat suboptimal way to handle case-shifting, since it means that
+each case-shift leaves a blank space on the screen — undesirable if
+you’re talking about Mohamed ElBaradei, or example — but it shows that
+there are some interesting possibilities.
+
+Accommodating descenders from previous lines, or using special
+word-initial forms of letters, are other possible uses at the
+character-cell level.
+
+But what if instead we use Wang tiles at a slightly finer granularity
+than per character cell?  After all, if we try to have 256 possible
+tiles for any given environment, we need 4096 tiles if we have two
+bits of color on each edge, which implies an uncomfortably large “font
+ROM”.  What if each tile only covers *part* of a letter?  Maybe “ɑ”,
+“d”, and “q” could share a common code for the common part of the
+letter, while “d” and perhaps “l” could share a common ascender glyph.
+Perhaps we could even have a smaller font ROM rather than a larger
+one.
+
+For circuit schematics, we could use edge colors to note whether a
+wire is or is not present at each edge of a tile, eliminating some
+duplication.  However, without backtracking, the potential promise for
+this to propagate changes across your whole schematic without further
+work is limited — they can only propagate down and to the right.

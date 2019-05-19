@@ -1,0 +1,98 @@
+So, tonight, prompted by last night’s frustration with μSQL parsing of
+input, I hacked together a PEG parser with syntactic sugar in Python.
+It lets you write PEGs that look like this:
+
+    class Arithmetic(Grammar):
+        sp = Lit(' ') | '\n' | '\t'
+        _ = sp + _ | ''
+        digit = Lit('0') | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+        digits = digit + digits | digit
+        number = (digits + '.' + digits | digits + '.' | Lit('.') + digits | digits) + _
+        exponentiation = number + '**' + _ + number | number
+        multiplicative = (exponentiation + '/' + _ + multiplicative
+                          | exponentiation + '*' + _ + multiplicative
+                          | exponentiation)
+        additive = (multiplicative + '+' + _ + additive
+                    | multiplicative + '-' + _ + additive
+                    | multiplicative)
+
+Then you can invoke e.g. `Arithmetic.additive.parse` on a string.
+Like μSQL, it has some major problems, but it more or less works — to
+a much greater extent than μSQL, in fact.
+
+The implementation of this is about two pages of code, but I trimmed a
+version of it with slightly less magic down to under half a page:
+
+    from collections import namedtuple
+    class PE:
+        __add__ = lambda s, o: Seq(s, o if isinstance(o, PE) else Lit(o))
+        __or__  = lambda s, o: Alt(s, o if isinstance(o, PE) else Lit(o))
+        __invert__ = lambda self: Neg(self)
+    class Lit(PE, namedtuple('Lit', ['text'])):
+        def parse(self, text, position):
+            if self.text == text[position:position + len(self.text)]:
+                return self.text, position + len(self.text)
+    class Seq(PE, namedtuple('Seq', ['a', 'b'])):
+        def parse(self, text, position):
+            a = self.a.parse(text, position)
+            if a:
+                b = self.b.parse(text, a[1])
+                return ([a[0], b[0]], b[1]) if b else None
+    class Alt(PE, namedtuple('Alt', ['a', 'b'])):
+        def parse(self, text, position):
+            return self.a.parse(text, position) or self.b.parse(text, position)
+    class Neg(PE, namedtuple('Neg', ['negated'])):
+        def parse(self, text, position):
+            return None if self.negated.parse(text, position) else (None, position)
+    class Nonterminal(PE):
+        def __init__(self, name):
+            self.name = name
+        def parse(self, text, position=0):
+            r = self.rule.parse(text, position)
+            return ((self.name, r[0]), r[1]) if r else None
+
+This half-page of code leads me to thinking about StoneKnifeForth and
+its kin, which was of course why I started playing with PEG parsers in
+the first place ten years ago.  Such a parsing engine on top of a more
+primitive programming language would necessarily be more
+complicated — the code above implicitly depends on garbage collection,
+dynamic dispatch, recursive subroutines, Python’s lax encapsulation,
+and even operator overriding for its brevity.
+
+But I don’t think the penalty would be that bad.  It does need
+recursive subroutines, and Alt and Neg in particular need to save a
+previous text position on the stack.  Seq doesn’t need to save a
+previous text position, but it does save the result from its left-hand
+side to include in its own result.  Nonterminal only needs to remember
+its own name.
+
+If you’re building up some kind of parse tree, which is probably a
+good idea if only to fix the associativity problem introduced by PEGs’
+lack of left recursion, you need to allocate it somewhere — but
+typically a very simple allocation strategy is adequate for that.
+
+And the dynamic dispatch here could be taken care of rather simply
+with a switch over the different types of node in the tree
+representing the grammar.  Something like
+
+    switch(node->type) {
+    case LIT:
+       return memcmp(tp, node->v1, node->v2) ? fail : advance(node->v2);
+    case SEQ:
+       if (fail == parse(node->v1)) return fail;
+       char *v1 = result;
+       return (fail == parse(node->v2)) ? fail : succeed(sequence(v1, result));
+    case ALT:
+       char *saved = tp;
+       if (fail != parse(node->v1)) return succeed(result);
+       restore(saved);
+       return parse(node->v2);
+    case NEG:
+       char *saved = tp;
+       if (fail != parse(node->v1)) return fail;
+       restore(saved);
+       return succeed(NULL);
+    }
+       
+although I’m probably glossing over any number of important things
+there.

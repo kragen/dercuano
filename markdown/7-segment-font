@@ -1,0 +1,101 @@
+Seven-segment displays are easily salvaged from lots of electronics.
+They are somewhat limited in what they can display, but there are 128
+possible glyphs, not counting the decimal point which usually
+accompanies them.  Many of them are recognizable letters or
+punctuation.
+
+The most popular 7-segment LED display on Digi-Key right now is
+<http://www.digikey.com/product-detail/en/kingbright/ACSC56-41CGKWA-F01/754-1047-1-ND/1747764>,
+a Kingbright 2.1V 20mA (pulsed to 150mA in 100μs pulses)
+common-cathode slightly slanted green LED display with a decimal
+point, with the totally ridiculously high price of US$2.70.  Its
+datasheet “numbers” the segments as follows:
+
+       a
+      --
+    f|g |b
+      --
+    e|  |c
+      --
+      d   DP
+
+with the totally absurd pinout 7, 6, 4, 2, 1, 9, 10, 5, with the last
+being DP.
+
+If we make a the MSB of a 7-bit word, then the standard glyph for 0 is
+0x7e, with 0x7f being 8.  The numeric weights in hexadecimal are as
+follows:
+
+      40
+      --
+    2|1 |20
+      --
+    4|  |10
+      --
+      8
+
+A more complete font looks like this:
+
+    ' ' 0x00                            '⸣' 0x60
+    '-' 0x01                            '⊃' 0x61
+    ''' 0x02    '"' 0x22    '⸣' 0x42    'ⁿ' 0x62
+    ',' 0x04                '⊂' 0x43    '°' 0x63
+    'r' 0x05
+                                        '?' 0x65
+    '|' 0x06                'Γ' 0x46
+    '⊢' 0x07    'μ' 0x27    'F' 0x47    'P' 0x67
+    '_' 0x08
+    '=' 0x09                '≡' 0x49    '⊇' 0x69
+
+                            '⊆' 0x4b    'º' 0x6b
+    '⸤' 0x0c
+    'c' 0x0d    '¿' 0x2d                '2' 0x6d
+    'L' 0x0e                '[' 0x4e
+    't' 0x0f                'E' 0x4f    'e' 0x6f
+    'i' 0x10    '1' 0x30                '7' 0x70
+    '¬' 0x11    '⊣' 0x31
+
+                '4' 0x33    'ς' 0x53    'q' 0x73
+
+    'n' 0x15                'ñ' 0x55
+                                        '∩' 0x76
+    'h' 0x17    'H' 0x37                'A' 0x77
+    '⸥' 0x18                            ']' 0x78
+                                        '3' 0x79
+
+                'y' 0x3b    '5' 0x5b    '9' 0x7b
+    'u' 0x1c    'J' 0x3c    'ū' 0x5c
+    'o' 0x1d    'd' 0x3d    'ō' 0x5d    'a' 0x7d
+                'U' 0x3e    'G' 0x5e    '0' 0x7e
+    'b' 0x1f    '∀' 0x3f    '6' 0x5f    '8' 0x7f
+
+I’ve tried to omit duplicates here.  These 68 glyphs don’t include all
+the letters in even the English alphabet (missing are ‘k’, ‘m’, ‘v’,
+‘w’, ‘x’, ‘z’, and very sadly ‘s’), but they include a fairly complete
+repertoire of logical operators (at least if we interpret set
+arithmetic as logic) except for ∃.  They include a perhaps
+unreasonable number of bracketing characters.
+
+The absence of ‘s’ and ‘w’ eliminates many of the most common English
+words: ‘is’, ‘was’, ‘with’, ‘have’, ‘this’, ‘his’, as well as most
+plurals.  ‘m’ also eliminates ‘from’.  So you can’t use this font to
+write in English, unless maybe you use ‘ς’ for ‘s’.  You can't even
+write “sin” and “cos”.
+
+Many old typewriters didn't have separate characters for “l” and “1”,
+or “0” and “O”; the number row started at “2” and ended at “9”.  Due
+to typewriter legacy, even today, we often use the same character “'”
+for “‘” and “’”, and the same character ‘"’ for ‘“’ and ‘”’, and the
+same character “-” as a hyphen, minus sign, em dash, and en dash.  If
+you use the same approach here, allowing the “5” and “2” glyphs to
+double as “s” and “z”, then you get back trig operations and most
+common English words.  The most common ones missing are “was with have
+from which we were would will what who more them some him two time my
+like me now”.
+
+These glyphs do not include any arithmetic operators other than ‘-’.
+Some calculators use 0x05, 0x21, or 0x25 for “/” for a fraction bar.
+
+For the more limited purpose of rendering decimal or hexadecimal
+digits, you want the list {0x7e, 0x30, 0x6d, 0x79, 0x33, 0x5b, 0x5f,
+0x70, 0x7f, 0x7b, 0x7d, 0x1f, 0x0d, 0x3d, 0x6f, 0x47}.
