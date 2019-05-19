@@ -1,0 +1,100 @@
+I want a Wiki thing that provides some kind of knowledge ratchet for
+the things I work on in my spare time.  In particular, I want to be
+able to write things on my cellphone (including calculations) and not
+lose them or have them inaccessible from another cellphone or
+computer.
+
+The absolute minimal mechanism for this is some kind of text formatter
+that supports wiki links and some kind of sync protocol.  The simplest
+feasible sync protocol is probably something like this, with each
+speaker uttering an append-only numbered sequence of lines:
+
+“Give me any lines from Bob in the range 206–215.”  
+“Bob line 206 is wejgoiewjgojagoijg.”  
+“Bob line 207 is 302t020ujgs.”  
+“Give me any lines from Alice in the range 201–211.”  
+“Alice line 201 is jw0t23it20s.”
+
+This requires some kind of out-of-band mechanism for noticing that the
+connection has been established, or deciding when to make the request,
+and it doesn’t have any “now you are up to date” indicator or any way
+to indicate failure.  However, it doesn’t leave the door open for
+unbounded quantities of future messages, all the messages are
+idempotent, it’s convergent when messages are lost or when individual
+nodes fail or are restarted, and it doesn’t require any session state.
+And it works as publish-subscribe as well as fetch-store.  (You could
+even add sender-side message filters.)
+
+It doesn’t accommodate new speakers at this level of the protocol.
+Much.  I mean normally you would only ever send a requested line but I
+guess you could make an exception.
+
+Making this work offline on a cellphone is easiest in a browser app in
+JS.  This suggests that maybe the server should be JS too, probably
+using Node.  If I want to run it on adjuvant, though, which is
+probably a decent idea for prototyping, a CGI program is probably
+better.  (Adjuvant doesn’t have working TLS at the moment, though.  I
+could probably fix that.)
+
+You could require that the channel names (“Alice”, “Bob”) be public
+key hashes and that the lines each be signed.  This probably isn’t
+necessary for an initial prototype.
+
+A browser app can itself be cached with a cache manifest, but it needs
+some way to store the data being synchronized.  LocalStorage is the
+easiest and gives 5 megacharacters; WebSQL on Mobile Safari gives
+another 5 megabytes, and IndexedDB also works on Mobile Safari and
+supposedly gives 50 megabytes.  On my browser, using the Browser
+Storage Abuser, it claims to have gotten 910 MB, but half the time it
+doesn’t load at all.  And it seems to be persistent after a month and
+a half, which is probably long enough to reconnect to the internet at
+least once.
+
+Text formatting with wiki links could be something along the lines of
+
+    input.replace(/&/g, '&amp;')
+         .replace(/</g, '&lt;')
+         .replace(/"/g, '&quot;')
+         .replace(/\n\n/g, '\n<p>')
+         .replace(/\[(.*?)\]/g, '<a href="$1">$1</a>')
+
+although obviously you could go quite a bit further with real Markdown
+or something.  Markdown is not ideally suited for Wiki markup but it
+can work.
+
+You need some kind of interface for handling update conflicts.
+
+IndexedDB is the tricky bit here.  With IndexedDB, I can quite
+reasonably store 50MB of text — perhaps compressed, so more like
+150MB.  But IndexedDB is not a very stable interface, and it’s kind of
+complicated.  Firefox by default treats it as a cache; specifying
+`{storage: "persistent"}` requires using an interface that is
+incompatible with Chrome and probably Safari.  Worse, when Firefox
+evicts, it evicts the entire origin; there’s no way to ask that it
+please save a little bit of data.  (Although maybe a cookie or
+something would work.)  And the callback approach recommended in MDN
+doesn’t work in Chromium.  (Oh, wait, it does.  You just have to add
+the callbacks early enough, and subsequent opens are blocked until the
+earlier ones are closed.)
+
+The IndexedDB interface is, like, you open a database, and it gives
+you a database-opening callback during which you can create and delete
+tables (“object stores”).  Then once it’s open, you can open a
+transaction on it, and in the transaction you can execute get, put,
+and delete on the tables.  All of this is hidden behind an
+event-driven interface.  In some browsers you can do this:
+
+    try {
+      let db = await indexedDB.openDatabase('db')
+        , tx = db.transaction('store')
+        , store = tx.objectStore('store')
+      ;
+      await store.put('value', 'key');
+      console.log('Put is totally done');
+      await tx;
+      console.log('Committed');
+    } catch (ex) {
+      console.log(ex.message);
+    }
+
+But I’m not sure the iPhone browser I want to use is among them.

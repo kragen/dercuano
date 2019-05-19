@@ -1,0 +1,92 @@
+Tile graphics hardware with sprites, like that on the NES, was
+designed to make scrolling color video-game graphics achievable in
+1983 at a reasonable cost.  But it also makes certain kinds of visual
+effects fairly easy to achieve, like wallpapering an area with a
+repeating pattern or scrolling or globally changing the appearance of
+a certain kind of tile.  Other effects, like changing the on-screen
+size of anything, are harder.
+
+Sprites themselves are an affordance for making moving objects on a
+static background; without hardware sprites, given mutable tiles, you
+could always just use four tile types per sprite, compositing the
+sprite in the appropriate place in each tile type each frame.  I saw
+MS-DOS text-mode programs that did this for the mouse pointer.
+
+Given enough tile definitions to have a separate definition for each
+tile on the screen, and enough colors that you can 
+
+Nowadays our affordances run more to gradients and alpha-blending,
+although to some extent that’s only because our program output doesn’t
+go through a video codec, which has different affordances.
+
+Polynomials
+-----------
+
+There’s a variety of ways you can express the space of polynomial
+functions.
+
+You can express a degree-N polynomial as N+1 coefficients, which is
+convenient for many calculations but doesn’t make it particularly easy
+to achieve any given effect.
+
+Given some k, you can express it as N+1 coefficients of a polynomial
+in (x-k).  If k happens to be one of the zeroes of the polynomial, you
+only need N coefficients, since the constant term is zero.
+
+Extending this idea to its limit, you can express it as a scale factor
+and a set of zeroes: 3(x-1)(x+2)(x+5) has a scale factor of 3 and
+zeroes at 1, -2, and -5; its representation as zeroes is thus [3, 1,
+-2, -5].  It works out to 3x³ + 18x² + 9x - 30, so its representation
+as coefficients is [3, 18, 9, -30], although sometimes people prefer
+to write that in the other order.  (Transforming from zeroes to
+coefficients is easy; going the other way can be hairy.)
+
+You can express it with its values at some given abscissas and then
+use Lagrange interpolation.  For a given set of abscissas, such as the
+nonnegative integers, you have a constant set of Lagrange basis
+polynomials; the polynomial is a weighted sum of its values at these
+points, which is to say that the transformations between this Lagrange
+form and the form as coefficients are linear.  But the Lagrange form
+allows you to express the polynomial function in terms of its value at
+some given points, which is often more convenient.
+
+That of course leaves open the question of the set of abscissas to
+choose.  Sometimes it’s more expressive to be able to choose which
+abscissas to use, but this is somewhat dangerous with Lagrange
+interpolation, just as with splines of orders greater than 3; a bad
+choice of nodes can easily lead to unwanted oscillations (the Runge
+phenomenon).  If you’re approximating some existing smooth curve,
+using the Chebyshev nodes minimizes this.
+
+The Chebyshev polynomials form another orthogonal basis into which you
+can linearly transform a polynomial.
+
+For a given step size and starting point, you can express the
+polynomial in terms of the initial state of the method of divided
+differences for tabulating values of the polynomial.  These values are
+a linear transform of the coefficients and thus also of the Lagrange
+form; you can easily derive them by calculating some values of the
+polynomial and writing a difference table.  They are called the
+“Newton form” of the polynomial.  The Newton form is in some sense not
+very expressive, in that the numbers in it don’t correspond very
+directly to any interesting feature of the polynomial itself.
+However, it’s very convenient for calculation.
+
+Order-n polynomials on the real numbers (or even the rationals, or any
+dense set) are entirely determined by their value and first n
+derivatives at any arbitrary point; this is the basis of the
+Taylor-series approximation of a function, which is the analytic
+equivalent of the Newton form.  A polynomial function is equal to its
+Taylor series as soon as the Taylor series’ order equals or exceeds
+that of the original polynomial.  So the derivatives at some given
+point are yet another representation of the polynomial, another one
+which is linearly related to the coefficients.
+
+It isn’t necessary for all the derivatives to be at the same point;
+it’s adequate to specify N+1 values or derivatives as long as no two
+of them are the same.
+
+State machines
+--------------
+
+You can specify state machines as regular expressions...

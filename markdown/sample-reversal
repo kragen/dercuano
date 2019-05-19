@@ -1,0 +1,81 @@
+One problem that can happen with sampled sounds is a discontinuity at
+the end of the sample.  If the sample is long enough, this sounds like
+a click, but a short sample (e.g. a single oscillation of a waveform)
+can turn it into a sawtooth buzz, one that can overwhelm the rest of
+the signal.
+
+One tool available in old MOD trackers was time-reversal of the
+sample, so instead of playing the wavetable from beginning to end
+repeatedly, it would play boustrophedonically, first from beginning to
+end, then backwards from end to beginning, and then repeat.  This
+approach eliminates the discontinuity.  It also cuts the size of your
+wavetable in half.
+
+Audacity has a “zero-crossing finding” tool on the Z key which adjusts
+your selection boundaries to the nearest positive-going zero crossing.
+This also helps with the same problem.
+
+The boustrophedon approach has an interesting effect on the signal,
+though.  Since the resulting waveform is reflection-symmetric, it can
+only contain cosine waves; the phase of all the signal components is
+forced to zero, or rather all imaginary components are canceled,
+because the time-reversed part of the signal has conjugated phase.
+(All harmonics of the period of the doubled-length wavetable are
+possible, though.)  So the extent to which a partial makes it through
+this procedure is dependent on its phase — if it happens to have
+perfectly real phase, it’s untouched, but if it happens to have
+perfectly imaginary phase, it’s entirely canceled.  This means that
+filtering a signal with an allpass filter before this procedure can
+radically change the frequency content on the output, even though the
+signal going in may sound identical.
+
+I propose a probably known extension to the procedure: rather than
+repeat(wavetable[1:] || reverse(wavetable)[1:]), use
+repeat(wavetable[1:] || reverse(wavetable)[1:] || 2·wavetable[0] -
+(wavetable[1:] || reverse(wavetable)[1:])), reversing the sample both
+in time and in sign, eliminating the discontinuity in the derivative
+at the beginning of the wavetable (though not its end) and extending
+the generated waveform to four times the length of the wavetable.
+This allows the generated waveform to contain all of its period’s
+harmonics with any phase, rather than just real phases, and it cuts in
+half again the number of samples needed to represent a waveform of a
+given fundamental frequency.
+
+For example, a 440-Hz A note at a sampling rate of 16kHz (a common
+rate in MODs) would require a wavetable of 36.3636 samples for a full
+oscillation; a 36-sample version of this wave would be out of tune by
+1%, which sounds inconsequential but is 17 cents, easily audible.  So
+you’d probably use three oscillations, 109 samples, which gives you
+440.37 Hz, only off by 1.4 cents.  If you try to use this approach
+with ¾ of an oscillation, it will work, but you’re constrained to 27
+or 28 samples, corresponding to 108 or 112 samples in the full
+three-period time, which would be 36 or 37⅓ samples per oscillation.
+
+I was thinking that you could choose to duplicate the initial/final
+sample of a segment, or not, to correct this detuning, but I think
+that probably a better way to inexpensively tune up or down by
+fractions of a semitone is to occasionally duplicate or omit samples
+at points where the sample value and, especially, derivative are zero
+or nearly so.  I don’t know how this will sound, but maybe if it works
+well enough, you could represent an arbitrary 440Hz harmonic sound
+with a 12-sample 16ksps wavetable.  This is very appealing not just
+because it takes 24 bytes but because optimizing over a 12-dimensional
+space, whether in the frequency domain or the time domain, whether by
+hand or using an algorithm, seems much more tractable than optimizing
+over a 109-dimensional space.
+
+For images, you can use this kind of approach to make a smoothly
+tiling texture out of any image by reflecting it at the border.  A
+kaleidoscope works this way; the tiling need not be square but it does
+need to have only vertices of even degree, which probably limits you
+to variants of square and triangular tilings.
+
+You can also use this approach to make smoothly stretching display
+window frames from a single example: by inserting reflected sections
+into the middle of stretched dimensions as necessary, you can make the
+window whatever size you want, down to the minimum of the original
+drawing.  You won't introduce discontinuities in colors, but you may
+introduce discontinuities in line angles; if you can choose preferred
+direction-reversal points where the lines are all either perpendicular
+or parallel to the edge, you can keep that to a minimum, but you may
+not be able to eliminate it entirely.

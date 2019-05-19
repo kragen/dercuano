@@ -1,0 +1,122 @@
+The linear interpolation operation, lerp, is fundamental to a number
+of algorithms; you can derive Bézier curves and B-splines from it, it
+provides a differentiable version of the conditional operation, and of
+course it is directly applied in computer graphics and numerical
+computation of all kinds.
+
+There are some interesting questions related to its type.
+
+Definition
+----------
+
+It’s sometimes defined as a function of five parameters:
+
+    lerp5(x₀, x₁, y₀, y₁, x) = y₀ + (x - x₀)·(y₁ - y₀)/(x₁ - x₀)
+
+This gives you the interpolated value of y at x, given that it should
+be y₀ at x₀ and y₁ at x₁.
+
+However, this can be productively decomposed into two functions of
+three arguments:
+
+    howfar(x₀, x₁, x) = (x - x₀)/(x₁ - x₀)
+    lerp(y₀, y₁, t) = y₀ + t·(y₁ - y₀)
+    lerp5(x₀, x₁, y₀, y₁, x) = lerp(y₀, y₁, howfar(x₀, x₁, x))
+
+
+And it is the lerp function defined in the middle there that we are
+concerned with.
+
+Given the usual algebraic identities, we can transform its formula
+into a different form that is sometimes easier to use.  Writing out
+the algebraic transformation in great detail, we have
+
+    y₀ + t·(y₁ - y₀) =
+    {distributivity}
+    y₀ + t·y₁ - t·y₀ =
+    {unity}
+    1y₀ + t·y₁ - t·y₀ =
+    {definition of subtraction in terms of adding negative}
+    1y₀ + t·y₁ + -t·y₀ =
+    {commutativity}
+    1y₀ + -t·y₀ + t·y₁ =
+    {distributivity}
+    (1 + -t)·y₀ + t·y₁
+    {definition of subtraction in terms of adding negative}
+    (1 - t)·y₀ + t·y₁.
+
+I’m going to consider lerping in domains where some of these
+identities don’t apply, and (I assert) it will be interesting to
+consider which ones.
+
+This leads to the definition
+
+    lerp2(y₀, y₁, t) = (1 - t)·y₀ + t·y₁
+
+I believe this was the computation Turing originally proposed to
+compute the definition of a conditional branch instruction in his
+proposal to build a computer.
+
+Type signature of lerp
+----------------------
+
+What are the types of the parameters and result of the lerp function
+given above?  They need not all be the same; in the fully general
+case, there are six of them:
+
+    lerp(y₀: T₀, y₁: T₁, t: T₂) = y₀ + (t · ((y₁ - y₀): T₃): T₄): T₅
+
+which gives us the type signatures for the component operations:
+
+    (x: T₁) - (y: T₀): T₃
+    (x: T₂) · (y: T₃): T₄
+    (x: T₀) + (y: T₄): T₅
+
+So far, this is sort of vacuous.  But we only have to add a couple
+more constraints and it gets interesting!  The usual case in lerping
+is that you want the result to be y₀ sometimes, y₁ other times, and
+somewhere in between at still other times.  For that to be a coherent
+wish, those three values need to have the same type:
+
+    T₀ = T₁ = T₅
+
+This reduces our component operation signatures to the following:
+
+    (x: T₀) - (y: T₀): T₃
+    (x: T₂) · (y: T₃): T₄
+    (x: T₀) + (y: T₄): T₀
+
+If we arbitrarily add the additional constraint that T₃ = T₄, we have
+a simple algebraic structure that looks like an affine space:
+
+    (x: T₀) - (y: T₀): T₃
+    (x: T₂) · (y: T₃): T₃
+    (x: T₀) + (y: T₃): T₀
+
+Here T₀ is the affine space, T₃ is its associated vector space, and T₂
+is the underlying scalar field of the vector space.  Computing lerp
+doesn’t depend on the validity of any of the eight vector axioms or
+the axioms of the affine space, but to the extent that those axioms
+hold, more interesting properties will hold of lerp’s results.  For
+example, when t=1, normally you want the result to be y₁, but in many
+practical cases with floating-point numbers, it won’t be!
+
+To take a concrete example where the three types are different, T₀
+might be (the type of) a mapping from a set of (lat, long) pairs to a
+temperature reading represented as a floating-point number interpreted
+in degrees Celsius; T₃ might be a mapping from a set of (lat, long)
+pairs to a temperature difference represented as a floating-point
+number interpreted in kelvins; T₂ might be simply a single unitless
+floating-point number; and the three arithmetic operations might
+operate pointwise on their values.
+
+This is practically useful in finding errors in programs because it is
+physically meaningless to multiply a number interpreted in degrees
+Celsius by some number.  It is 22°C here right now; if I multiply 22
+by 2, getting 44, and then interpret that 44 as 44°C, I have computed
+a temperature with no meaningful relationship to the original
+temperature.  In Fahrenheit, these temperatures are 71.6°F and
+111.2°F.  If a program is doing such a computation, it is very likely
+erroneous, although not in every case.
+
+This definition of lerp does not do such a computation.

@@ -1,0 +1,92 @@
+I want to build an oscilloscope out of recycled e-waste.  This is
+problematic because parts like analog oscilloscope CRTs and 60Msps
+ADCs are not common in e-waste, and parts like TV CRTs and 2Msps ADCs
+are not adequate substitutes.  A 100kHz “oscilloscope” is a joke.
+20MHz is the minimum standard, and for an analog scope, that’s just
+the 3dB cutoff frequency; it can still detect signals of higher
+frequencies, just attenuated and maybe phase-shifted.
+
+Once I have a digitized signal, basically the hard part is over.
+Everything after that is a simple matter of programming.  Digitizing
+the signal fast enough is the hard part.
+
+To be concrete, I want to be able to sample a signal to the following
+specifications:
+
+- at a rate of at least 60 million samples per second;
+- at a resolution of at least 8 bits per sample;
+- for at least 2048 data points;
+- for at least two data channels.
+
+(Ideally I could do this many times per second, but I don’t think
+that’s going to be a meaningful constraint.)
+
+So I’ve been exploring a variety of different possibilities, and I
+think I might finally have a design approach that will work.
+
+To digitize a channel, you first use it to control eight separate
+nonlinear VCOs with one-octave ranges and center frequencies
+distributed around 350MHz.  At their lowest frequencies, they will be
+around 250MHz; at their highest, around 500MHz.  The linearity of
+their voltage- frequency response matters almost not at all for this
+application; deviations from linearity of a factor of 2 or more can be
+tolerated.  This should make it possible to use very simple, primitive
+designs for the VCOs; something like the 5¢ MMBT6428 npn RF
+transistor, with its 700MHz transition frequency, ought to be adequate
+for each VCO.
+
+The spread in frequencies among the VCOs prevents them from locking to
+one another through unintentional cross-coupling.  This probably means
+they’ll need to be spread apart by more than 15MHz (thus 120MHz
+between the highest and the lowest), which I will disregard in what
+follows, hoping it’s unimportant.
+
+So now you have eight channels carrying waveforms, each of which is in
+the 250MHz to 500MHz range, and which collectively have between 4 and
+8 billion transitions per second.  This means that during a
+17-nanosecond sample period (at 60Msps), they have between 65 and 133
+transitions, depending on the input voltage and on how the phase of
+each oscillator happens to line up with the sample period.  I think
+you should expect rms noise of .82 counts per sample period from the
+random phase thing,
+compared to rms noise of .29 counts
+for just quantizing at all (a factor of √8 smaller),
+which means ENOB is lg(66*.29/.82) ≈ 4.5, which is inadequate, even before
+some of those bits are spent on
+tolerating nonlinearity.
+
+(I think the above calculation is still wrong.  See
+<https://en.wikipedia.org/wiki/Effective_number_of_bits>.)
+
+Then you need to count these pulses.  If each channel is connected
+through a MOSFET to a capacitor and a 500MHz ripple counter, we can
+freeze the count by turning off the MOSFET and letting the ripple
+finish, and then we can latch it by reading out the ripple count data
+in parallel.  You just need the capacitor’s RC time constant with the
+MOSFET to be well under 1ns, and its discharge time while driving the
+ripple counter to be long enough to give us time to read the count
+(say, 1μs).
+
+A 500MHz ripple counter has a first bit that transitions at 500MHz, a
+second bit that transitions at 250MHz, a third bit at 125MHz, a fourth
+bit at 62½MHz, and then we’re down to ranges where any old ripple
+counter will do.  But the first four bits of the counter might need to
+be built with special care.
+
+This requires us to transfer eight 8-bit transition counts (64 bits)
+from the ripple counters to FIFOs every 17-nanosecond sample period,
+probably not over a shared 8-bit bus, in order to keep the bus clocks
+down at 60MHz instead of 480MHz. The FIFOs need to hold 2048 data
+points (128 kibibits in total, 16 kibibytes), but don’t need to be
+dual-ported.  Then we can read them at our leisure when we’re not
+acquiring data.  For example, if we trigger a data collection 60 times
+a second, we have 17 milliseconds to read the data out of the FIFOs,
+about a microsecond per data transaction or 125 nanoseconds per data
+transaction on a given FIFO.
+
+It’s probably necessary to measure the temperatures of the VCOs in
+order to compensate for thermal effects on their voltage-frequency
+relationship.
+
+Using larger ripple counters is probably a good idea because it means
+you can get higher precision at lower sampling rates.
