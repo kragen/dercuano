@@ -165,7 +165,7 @@ class Bundle:
         subprocess.check_call(['cp', '-a', liabilities, self.output_dir])
 
     def generate_archive(self):
-        subprocess.check_call('cd %s; tar czvf dercuano-%s.tar.gz %s' % (
+        subprocess.check_call('cd %s; tar czf dercuano-%s.tar.gz %s' % (
             self.dirname, self.get_version(), self.output_dir),
                               shell=True)
 
@@ -247,7 +247,7 @@ class Note:
 
     def render_if_outdated(self, print=lambda *args: None):
         if self.is_outdated():
-            print("rerendering", self.notename)
+            print("rendering", self.output_filename())
             vomit_html(self.output_filename(), self.render().encode('utf-8'))
 
     def output_filename(self):
