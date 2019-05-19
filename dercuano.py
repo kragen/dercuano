@@ -365,13 +365,28 @@ def note_date(note):
 def index_html(bundle):
     categories = sorted(bundle.categories())
     bundle_title = bundle.get_title()
+    notes = sorted(bundle.notes(), key=note_date)
+    note_years = []
+    last_year = None
+    for note in notes:
+        year = re.compile('[- ]').split(note.date_string())[0]
+        if year != last_year:
+            if last_year != None:
+                note_years.append(ol(current_ol))
+            note_years.append(h3(year))
+            current_ol = []
+            last_year = year
+        current_ol.append(li(note.link_ley(level=0), note.extra_ley(), "\n"))
+
+    if last_year != None:
+        note_years.append(ol(current_ol))
+
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(level=0),
                     h1(bundle_title),
                     bundle.get_intro(),
                     h2('Notes'),
-                    ul([li(note.link_ley(level=0), note.extra_ley(), "\n")
-                        for note in sorted(bundle.notes(), key=note_date)]),
+                    note_years,
                     div(h2('Topics'),
                         ul([li(bundle.category_link(category, level=0),
                                " (%d notes)" % bundle.category_size(category),
@@ -429,8 +444,8 @@ def tags(*tagnames):
     for tagname in tagnames:
         yield tag(tagname)
 
-html, title, script, h1, h2 = tags('html', 'title', 'script', 'h1', 'h2')
-div, ul, li, a = tags('div', 'ul', 'li', 'a')
+html, title, script, h1, h2, h3 = tags('html', 'title', 'script', 'h1', 'h2', 'h3')
+div, ul, ol, li, a = tags('div', 'ul', 'ol', 'li', 'a')
 
 class RawHTML:
     def __init__(self, html):
