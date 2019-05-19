@@ -1,0 +1,142 @@
+To make an automaton like the Jaquet-Droz artist, you need to program
+a relatively extensive series of paths.
+
+One mechanically very simple way to do this is with a differential
+spiral cam gantry, like a couple of Chinese windlasses driving a
+vertical plotter.
+
+The first step is to wind a couple of threads — one for X, one for
+Y — around eccentric spools mounted rigidly to a common shaft.  The
+rates at which the threads are taken up by the spools will vary
+depending on the rotational position of the spools, which can be out
+of phase.  If you hook up the threads to a pen in X and Y, as you
+wind, the pen will trace a wavy line across the paper as the phases
+vary.
+
+This is kind of lame, though, because not only does the motion repeat
+on every turn, but also, in a given direction of windings, the pen is
+limited to a fairly small range of directions: up, left, or somewhere
+in between.  Moving it right or down is impossible.
+
+The solution to the direction limitation is to make the motion
+differential: instead of directly driving the pen with the thread, run
+the thread around a pulley on a long loop between a supply spool and a
+takeup spool mounted rigidly to the same shaft.  Each of the spools
+can be eccentric or oddly shaped.  The difference between their radii
+at the tangent points of the thread at a particular rotational
+position results in a net lengthening or shortening of the loop, and
+thus extension or retraction of the pulley.  If they have different
+overall circumferences, the loop will have a net extension or
+retraction for each revolution.
+
+Now we have four spools mounted on the same axis and two pulleys
+connected to the pen; each revolution of the spools moves the pen
+through a fixed pattern, which may not end where it began, and so
+repeating the rotation will draw the pattern repeatedly at slightly
+different positions.
+
+Suppose that we don’t want to simply repeat the pattern, though.  Then
+instead of simple drum-shaped spools, we can use spools with helical
+grooves to entrain the thread; perhaps a 140-μm thread (Dyneema
+10-pound fishing line, say) could run in the bottom of a 2mm-deep
+wide.  Now, each rotation of the spool can vary its radius
+independently of previous and subsequent rotations, as long as you can
+confidently shape the 2mm-wide groove “above” or “below” the previous
+and following windings of the groove.  You’re still limited in how
+quickly you can increase or decrease the radius — you need a quarter
+turn to ramp all the way up from or down to zero — but hopefully the
+differential principle keeps that from being a huge problem.
+
+Now let’s suppose we have a reasonable-sized RepRap-printed version of
+such a doohickey.  Let’s say, four spools with 2mm grooves, max 100mm
+radius, and 200mm allocated among the four, 50mm each, printed at
+100-μm precision.  50mm of a 2mm-pitch spiral gives you 25 turns, a
+total of 7.9 meters at the maximal 100mm radius.  It probably makes
+sense to think of the actual motion as being half of that: about 4
+meters.  I’m not quite sure how quickly we can change speed, but if we
+figure that we can control more or less each 100μm unit separately,
+then we have about 40 000 line segments here to draw with, which is
+plenty for encoding a Jaquet-Droz-Artist-like picture.
+
+Some final details and variations:
+
+1. It might make sense to “gear up” the output so that the detail is
+   rougher than 100μm, but the total line length is more than the 6 or
+   8 meters you get with this design.  For example, you might use an
+   extra pulley or two so that the pen moves 2mm or 4mm every time the
+   thread difference changes by 1mm.
+
+2. Rather than a gantry system (like what you see in a construction
+   crane), you could use the standard vertical-plotter configuration,
+   where the two dimensions are the distances from two reference
+   points.
+
+3. By using three pairs of spools instead of two, you could
+   overconstrain the pen, keeping it under tighter control; and you
+   could selectively relax that constraint for when, for example,
+   you’d like to lift the pen from the paper.  Indeed, this gives you
+   a deltabot, with its attendant three degrees of freedom.
+
+4. You could print each spool as two separate prints, instead of all
+   as one piece, so that you have four times the length.  And you
+   could probably space the grooves closer than 2mm, though 1mm might
+   be pushing it.
+
+5. Instead of using the threads under tension as linear actuators, you
+   could use them to rotate things.  I kind of feel like cords under
+   tension eliminate most of the usual problems with linear motion,
+   though, except for lack of precision.
+
+6. You could use it to position things other than pens.  Markus Kayser
+   used a vaguely similar system in his SunCutter to control the
+   MDF-burning effect of a magnifying glass, although he was using
+   timing-belt-linked big acrylic cams pushing on cam followers on a
+   linear slide gantry moving a table around.  You could position
+   machine tools, position squirting nozzles of various materials,
+   trace lines in wet sand, trace lines in wet frosting or other
+   plastic material, move an electro-etching or electrodeposition head
+   around to selectively etch or deposit metal, cut foam with hot
+   wires, cut things with lasers or cutting torches or sparks, etc.
+
+7. You could use thicker thread.  140-micron Dyneema fishing line is
+   capable of supporting loads of a few kg; if you were to go up to
+   1500-micron Dyneema braid, that would hold loads of up to 400 kg or
+   more, 800 kg in each dimension considering it’s going around the
+   differential pulley twice.  This would also provide greater
+   rigidity, but probably much greater than is necessary; if we want
+   1mm positioning precision over a 1-meter distance, and our pen or
+   whatever weighs 500g and accelerates at 1 gee, we need to have less
+   than 1 millistrain of deformation at 4.9 N.  Doubled-up 140-micron
+   Dyneema with a Young’s modulus of 100 GPa would hit a millistrain
+   at about 3 N, so it’s already close.  Doubled-up 1500-micron
+   Dyneema doesn’t stretch a whole millistrain until 350 N; at 5
+   newtons over a meter, it stretches 28 microns.
+
+8. The Grail, of course, is to make the device programmable at
+   run-time, instead of requiring a new set of spools for every new
+   picture.  This can be accomplished by making the spools cylindrical
+   and not eccentric, with a constant radius, but no longer rigidly
+   fixed to the same axis; instead, their axes should be linked with
+   some kind of continuously variable transmission, probably one of
+   the positive-displacement ratchet-controlled types rather than one
+   of the friction-controlled types.  The setting of the CVT then
+   determines whether the thread is being extended or retracted.
+
+   You could imagine using a lightly angled cone spool instead of a
+   cylinder, then controlling where along the cone the thread winds
+   onto it.  This might work, but I fear that the thread might slip
+   too easily along the cone after being wound; maybe a sufficiently
+   bumpy cone surface would prevent that problem, at the cost of less
+   precise positioning.
+
+   Eventually, with any of these variations, you run out of thread in
+   one direction and have to change directions.  If you’re driving the
+   spools with a powerful motor, this may require slowing down and
+   stopping before you hit the end and break the thread.  In fact,
+   this is likely to be a showstopper unless you have several hundred
+   meters of thread.
+
+9. By threading the thread through various kinds of paths, we can
+   actuate things other than just a pen floating around in space.  For
+   example, three threads running through a universal joint are
+   sufficient to pull the joint into any position.

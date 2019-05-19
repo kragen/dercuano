@@ -1,0 +1,125 @@
+I want a new computing environment for reading writing, including
+reading, writing, and remixing computational models, that cleanly
+virtualizes the computer.
+
+The ideal is something like this.
+
+I sit down at a random untrusted computer and load up the virtual
+machine, as a web page or whatever, and type in an unspoofable
+identifier of the mutable information space I want to look at, maybe
+something like “lotus-marc-fix-kev-homes-vii-taps-car” or
+“dnbwalalhcsmgsnsspdyq”.  Immediately I see a display of that
+information space, loaded from a decentralized network of servers, and
+an unspoofable identifier for my session, which I write down on paper.
+I can start writing down my thoughts, using the keyboard or whatever,
+with an instantly accessible and reliably responsive user interface,
+taking advantage of the keyboard, mouse, tablet, webcam, or other
+peripherals available on the untrusted computer.  As I assemble
+computational models, they are executed immediately on this local
+machine, but everything I create is snapshotted periodically and
+propagated out to the network within less than a minute, retrievable
+later by the session identifier.  All of the information I see, too,
+is permanently snapshotted by the network, so that I can come back and
+refer to it later.  At the end of my session, I generate an
+unspoofable identifier for the state at the end of the session, and I
+write it, too, down on paper.
+
+Later, using a trusted but much less capable computer, such as my
+cellphone, I retrieve the data for the session identifier; I can see
+everything I created during the session, and it is certain to work
+compatibly there.  I can look at the things I created, and if they are
+good, I can update my published information space with them.
+
+Compatibility into the far future and past is guaranteed by the design
+of the system: if the needed data is preserved, a simple virtual
+machine suffices to bring it back to life.  In addition to recording
+decoders in a format that can be run efficiently on a simple virtual
+machine, the original data itself is recorded in simple, general
+formats like ASCII text, STL files, CSV files, and uncompressed
+bitmaps, simplifying putting it to new uses in the future.  Code and
+other original data have their integrity checked using a Merkle DAG;
+the hash of mutable data is authenticated by using a public-key
+signature.
+
+Code is deterministic, so that executing the same code with the same
+data as input will always produce the same output data.  Non-original
+data produced by executing code with data as input is thus cacheable
+in the same content-addressable store decentralized network; cache
+services store (code hash, input data hash, output data hash) tuples,
+so that if you trust everyone with write access to a cache, you can
+omit redundant computation.  Trees of such tuples are published in the
+same network, its hash being authenticated by the public-key signature
+of the caching service itself.
+
+Decoders and editors for crucial formats are accompanied by formal
+proofs of correctness, of worst-case execution time, and of worst-case
+execution space.  This is achieved by writing them originally in a
+formally tractable source language, making the proofs tractable at the
+source-code level, and then mechanically translating the proofs into
+proofs at the level of the virtual-machine code, which can be
+machine-checked without reference to the correctness of the compiler.
+
+In addition to the content-hash-addressable immutable blob data store
+and the public-key-hash-addressable mutable data store, the system
+contains two additional communication services: one for reliably
+passing streams of authenticated messages between mutually consenting
+communicating correspondents identified by per-connection public keys,
+and an unauthenticated and unreliable publish-subscribe system for
+initially establishing contact between parties that don’t have a
+pre-existing relationship.
+
+Interactive user interfaces are specified by a state transition
+function, which takes as input the current user interface state and an
+event (which may be a keystroke, a multitouch notification, a webcam
+frame, a mouse motion, a network message, a timeout, a random number,
+or a few other things) and produces as output the new user interface
+state and a possibly empty set of actions to take, which may include
+updating a screen, playing a sound, scheduling a timeout, publishing a
+blob, publishing an update to mutable data, sending a message to a
+correspondent, publishing a message, subscribing to a topic, and
+requesting a random number.  They are, it should be clear, composable
+from simpler user interfaces using the same interface or a simpler
+interface.  For example, many games can perform adequately if given
+the controller state 30 or 60 times a second and producing a frame of
+output. XXX does the deterministic computation thing interfere with
+responsiveness?  It would seem to make it impossible to update the
+rest of the screen while you’re trying to deliver updates to a slow
+program.
+
+Farming out computation to a cluster, if you trust it, is easily
+accomplished by sending the (code hash, input data hash) commands you
+want to execute to it, and arranging for the cluster coordinator to
+send you the final cacheable tuple when it finishes.  For many uses,
+this also requires sharing a cache with the coordinator that you can
+trust not to leak secret data.
+
+The virtual machine on which the code runs has this command-sending as
+a fundamental operation: any program running on it can submit (code,
+input) commands for execution, which may be transparently satisfied
+from cache, by local execution, or by farming out to a cluster.  XXX
+Perhaps this shouldn’t be a fundamental operation, both because you
+might want to change it and because it could make proofs of efficiency
+very difficult; but that just means that the computation producing an
+output needs to be able to delegate that responsibility to a future
+computation composed from commands it spawns, which might come to the
+same thing in the end.
+
+Programs manipulate the hashes through handles that are opaque to
+them; rather than being contained in the code itself, they are listed
+in a manifest associated with the code.  Similarly, plain data
+containing a reference to other plain data lists its hash in an
+associated manifest.  The hashes in the manifest have associated types
+which restrict what kinds of references can be made to them: an image
+transcluded in a hypermedia document has the type “dependency”
+associated with its hash in the manifest, while a hypertext link has
+the type “reference” associated with it.
+
+These link types allow archive-auditing systems to verify that all of
+the dependencies of a document are included on an archival medium or
+stored in the network with an acceptable degree of redundancy, without
+having to understand not-yet-invented hypermedia data formats.
+
+Computation-cache services can also publish the estimated cost to
+recompute derived data, based on how long it took last time.  This
+aids cooperating data-cache services in choosing which data to throw
+away.

@@ -1,0 +1,189 @@
+Thinking about my “[object-oriented equational rewrite rules][0]” and IRC
+bots.
+[0]: http://lists.canonical.org/pipermail/kragen-tol/2007-March/000855.html
+
+Suppose we think of definitions like
+
+        c = (f - 32) * 5 / 9
+
+as defining properties that exist on every object that meets their
+qualifications (and isn’t shadowed by some previously-existing c).
+Then we could think of something like this:
+
+        todayweather = { f: 95, windspeed: 37 }
+
+as defining a property ‘todayweather’ that exists on every object.
+And then you could plausibly ask, on an object that has only the
+properties that all objects have (the Ur-Object), what are the
+properties that have a c property?
+
+        c?
+                { todayweather: 36.1, normalweather: 25 }
+
+Namespaces
+----------
+
+If you’re doing this on an IRC bot on a casual channel, you could have
+a namespace per nick, and only enumerate properties in your own
+namespace.  So there might be [kragen]c and [Isomer]c; but I could
+refer to properties from other namespaces explicitly if I wanted to;
+simply importing:
+
+        f = [isomer]f
+
+or using without importing:
+
+        c = ([isomer]f - 32) * 5 / 9
+
+Actual Programs
+---------------
+
+Let’s hold off for now on any way to make these properties (as
+opposed to their value on a particular object) first-class in the
+language.  But let’s have self-quoting keywords, like in Prolog or
+Erlang (lower-case), or Common Lisp or Ruby (with colons).  I’m pretty
+sure that if I use lower-case for auto-quoting, I’ll end up with Very
+Important-Looking Programs, so I’m thinking I’ll use backquote (`)
+instead.
+
+Let’s start with a little syntactic sugar for lists.  Let’s say that
+if we have some semicolon-terminated expressions inside parentheses,
+with the last semicolon optional, it is syntactic sugar for a list
+made of conses:
+
+        ( a; ) => { x: a, y: `nil }
+        ( a; b; c ) => { x: a, y: { x: b, y: {x: c, y: `nil } } }
+        () => `nil
+
+Even without first-class properties, we can still write:
+
+        (`nplusone; n).apply = n + 1
+
+such that we can write
+
+        (`nplusone; 3).apply
+
+and get 4.
+
+Given that, we can write map:
+
+        (fn; ()).map = ()
+        (fn; {x, y}).map = {x: (fn; x).apply, y: (fn; y).map}
+
+And filter:
+
+        (fn; ()).filter = ()
+        (fn; {x, y}).filter = (fn; x; (fn; x).apply; y).filter2
+        (fn; x; `t; y).filter2 = { x: x, y: (fn; y).filter }
+        (fn; x; `f; y).filter2 = (fn; y).filter
+
+It’s pretty brutally obvious that we need some special syntax for cons
+here.  Let’s try infix @.
+
+        (fn; ()).map = ()
+        (fn; x @ y).map = (fn; x).apply @ (fn; y).map
+        (fn; ()).filter = ()
+        (fn; x @ y).filter = (fn; x; (fn; x).apply; (fn; y).filter).filter2
+        (fn; x; `t; y).filter2 = x @ y
+        (fn; x; `f; y).filter2 = y
+        ().length = 0
+        length = 1 + y.length
+        x.reverse = ((); x).reverse2
+        (a; ()).reverse2 = a
+        (a; x @ y).reverse2 = (x @ a; y).reverse2
+
+That works OK, and I could imagine people typing it in IRC.  It would
+probably be good to eliminate the argument-order dependencies as much
+as possible, and reduce the number of properties defined on all lists
+of length two or three.  In the below, {foo, bar} is short for {foo:
+foo, bar: bar}, and any free variables are required properties of the
+object the property is defined on.
+
+        {list: ()}.map = ()
+        map = (fn; list.x).apply @ {fn, list: list.y}.map
+        {list: ()}.filter = ()
+        {list: x @ y}.filter = {fn, x, include: (fn; x).apply, 
+                                y: {fn, list: y}.filter}.filter2
+        {include: `t}.filter2 = x @ y
+        {include: `f}.filter2 = y
+        ().length = 0
+        length = 1 + y.length
+        x.reverse = { reversed: (), left: x }.reverse2
+        {left: ()}.reverse2 = reversed
+        {left: x @ y}.reverse2 = { reversed: x @ reversed, left: y }.reverse2
+
+Those aren’t quite so brief, but they’re still within the length where
+people could plausibly type them in a conversation.
+
+So how about strings?  Let’s suppose that strings support the
+interface of lists of one-character strings, work properly in
+pattern-matching, and that one-character strings additionally have a
+.ord property that tells you their ASCII code.  Can we split words on
+spaces?
+
+        " ".space? = `t
+        {ord}.space? = `f
+        ({space?: `t} @ y).words = y.words
+        ({space?: `f, x} @ y).words = {wletters: (x;), left: y}.word
+        {left: {space?: `t} @ rest}.word = wletters.reverse @ rest.words
+        {left: x @ rest}.word = {wletters: x @ wletters, left: rest}.word
+        {left: ()}.word = (wletters.reverse;)
+
+That’s not too bad.  It compares favorably to Scheme in total code
+volume:
+
+        (define (words string) (words-of-list (string->list string)))
+        (define (words-of-list clst) (map list->string (words-list clst)))
+        (define (words-list clst)
+          (let ((x (car clst)) (y (cdr clst)))
+            (if (char-whitespace? x) (words-list y) (word (list x) y))))
+        (define (word wletters left)
+          (cond ((null? left) (list (reverse wletters)))
+                ((char-whitespace? (car left))
+                 (cons (reverse wletters) (words-list (cdr left))))
+                (else (word (cons (car left) wletters) (cdr left)))))
+
+The Scheme is 10 lines, 59 words, 498 characters, in place of 7 lines,
+47 words, 299 characters.
+
+So from there I think you could quite reasonably, e.g. implement
+ternary trees and compute a time-efficient inverted index of a big bag
+of strings.  Say, old chat lines, or a small number of HTML documents.
+
+Precedence
+----------
+
+When you have more than one rule that’s applicable to finding a
+property value, you have to decide what to do.  Should you use the
+first rule, use the second rule, or combine them somehow?
+
+Aardappel used specificity ordering.  I think you should do the same
+here, given that the “source code” is a bunch of people chatting.  But
+it would probably be helpful if the specificity ordering were partial,
+so that the users would have to resolve potential conflicts manually.
+
+Syntax
+------
+
+The question of syntax is a little ugly but probably soluble.  The
+normal namespace syntaxes are as follows:
+
+        Syntax          Precedents              Why Not
+        isomer/f        Unix                    used for division
+        isomer\f        MS-DOS                  painful memories
+        isomer.f        C++, Java, Python       used for property access
+        isomer:f        MacOS, XML              used for property definition
+        isomer::f       C++, Perl               too verbose
+        isomer f        Smalltalk               not verbose enough
+        [ISOMER]F       VMS                     forgotten
+        isomer'f        Ada, Perl4              painful memories, unbalanced '
+        isomer$f        R, DCL                  painful memories, ugly
+
+There are some other alternatives, especially if we involve Latin-1:
+
+        isomer|f isomer»f isomer«f isomer§f isomerºf isomer->f
+        isomer>f isomer¦f isomer×f isomer÷f isomer¬f isomer®f isomer©f
+        isomer±f isomer£f isomer·f isomer=>f isomer=-f isomer:-f
+        isomer--f isomer-)f isomer-»f isomer°f isomer*f isomer~f
+        isomer!f isomer[]f isomer()f <isomer f> <isomer>f isomer<f>
+        isomer_f @isomer.f

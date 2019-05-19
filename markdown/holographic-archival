@@ -1,0 +1,157 @@
+I thought I'd written about this before, but I can't seem to find it
+in the archives.
+
+The Rosetta Project wants to make an etched nickel-alloy disc with
+reduced-size images of some ten or twenty thousand pages, readable
+under a 650× optical microscope.  They're using a process developed at
+Sandia based on microchip etching techniques — that is to say,
+microphotolithography.
+
+This approach has a few significant drawbacks:
+
+1. It's extremely expensive.  We're used to microchips being cheap,
+    but in fact they cost several dollars each, and each of the
+    Rosetta discs is like an entire wafer, not a single microchip.  So
+    we can expect the price per disc to stay in the hundreds to
+    thousands of US dollars.
+
+2. You need a microscope to read it.  It would be better if you could
+    read it with no special equipment, or only very simple special
+    equipment, such as could be easily improvised from rocks.
+
+3. The information capacity is limited by the wavelength of light.
+    Pixels in the original image can't be more than about half a
+    wavelength across for an optical microscope to resolve them:
+    figure 250nm.  That gives you a density of, at best, 16 terabits
+    per square meter.  With the 7.6-centimeter Rosetta disk, you only
+    have 72 gigabits, not even enough for English Wikipedia in a
+    readable font.
+
+Suppose we could instead usefully encode archival information at a
+density substantially higher than a light wavelength, reproduce it
+cheaply, and read it without special equipment.  That might produce a
+much more useful Rosetta disc.
+
+I think that rainbow holography may provide this medium.  Rainbow
+holograms have been inexpensively mass-produced since 1984; they can
+be viewed in sunlight; and their ability to encode many images in the
+same film is limited by the film resolution and the directionality of
+the light source.
+
+Rainbow holograms can present a different image for each angle within
+an 180° viewing arc.  The resolution of this image is degraded as more
+images from more angles are recorded, and the angle of the
+illumination and viewer are limiting factors in the number of angles.
+The degradation of the image is vaguely related in a way I don't
+understand to the square root of the number of images.
+
+The illumination angle from the sun is the first problem: the sun
+subtends some 32 arcminutes, and without further work, this limits you
+to about 330 distinct images.  This is about 1½ to 2 orders of
+magnitude worse than our objective.  Fortunately, direct sunlight is
+excessive; it amounts to about 100klx, while people can read
+comfortably at 100lx, three orders of magnitude dimmer.  If you go
+into a camera obscura with the holographic archival disc, illuminated
+by the sun shining through a vertical slit, you can obtain
+illumination that is much more directional and therefore allows you
+much more precision in imaging.  You simply set the disc in the beam
+of light stretching across the floor from the slit in the wall.
+
+The slit should, ideally, reduce the illumination by about three
+orders of magnitude from direct sunlight; but the illumination will
+vary across the beam, since the sides of the beam can only see the
+edges of the sun's disc, and will therefore be dimmer.  If we try for
+a factor of 2 between the brightest and dimmest parts of the disc,
+then we want the points on the edge of the sun's disc at 30° above and
+below the horizontal, since sin 30° = ½.  cos 30° ≈ 0.87, so we only
+lose about 13% of the sun's width this way, leaving us with a usable
+sun-disk width of about 28 arcminutes horizontally.
+
+For a beam spreading out from a thin slit with a divergence of 28
+arcminutes to illuminate a whole 7.6-centimeter-wide disc, the disc
+needs to be some 9.4 meters away from the slit, which makes for a
+pretty big camera obscura.  Now, how wide is the slit?  We want to see
+about a thousandth of the roughly 28-arcminute-wide sun through it.
+To see the entire 28-arcminute-wide chunk of the sun through it, it
+would be about 7.6 centimeters across; instead, it needs to be about a
+thousandth of that, or about 76 microns.  That is, it would need to be
+about the width of a human hair, and at least some 10 centimeters
+tall, although ideally many meters tall.  It doesn't need to be
+perfectly straight, but it can't deviate from the vertical by more
+than its width within the 10-centimeter-tall chunk illuminating the
+disk at any moment.
+
+So that's probably a bit too stringent; it might allow us to put
+330 000 naked-eye-viewable images on the disk, but only at the cost of
+the solar illumination mechanism being unreasonably finicky.
+
+Suppose instead that we allow the slit to be a millimeter wide, which
+will also boost our light level from 100 lux to 1300 lux, which is
+quite comfortable.  Now, at 9.4 meters, it subtends a 9400th of a
+radian, which means that the light can illuminate the disc from about
+30 000 distinct angles.  By rotating the edge of the disc 4 microns to
+the left or right, we can switch to the "next" or "previous" "page".
+
+How about our eyes?  If our pupils are too big, we may need to wear
+pinhole goggles, or peek through a finger pinhole, to see a single
+page instead of a mixture of several.  If we're trying to read at a
+distance of one meter, so that we can reach the disc with our hands,
+then a 9400th of a radian is about 0.1 millimeters.  Pupils only
+shrink down to about 3 to 5 millimeters, so such dense encoding would
+indeed require something like pinhole goggles; but rather than pure
+pinhole goggles, they can be vertical-slit goggles, which can probably
+be improvised adequately from rocks, sticks, etc.
+
+Can we really interfere 30 000 distinct wavefronts and get an image of
+reasonable resolution and contrast?  Supposing the "grain size" of the
+"film" is 50 nanometers and we're shooting for 100 dpi resolution,
+each of our 0.01" pixels contains about 5000×5000 grains.  I'm vague
+on exactly how holography scales, but I'm pretty sure it can manage to
+encode a pixel each of 30 000 different images in 2.5 million grains.
+
+So suppose we can get 30 000 frames at 100dpi on a disc in the form of
+rainbow holograms.  How many pixels is that in total?
+30000×π×(½7.6cm)² is an effective area of 136m², or 2 gigapixels.
+That works out to 465 gigabits per square meter.  This is not nearly
+as good as the current Rosetta disc's microscopy approach, although it
+would still make the disc quite a bit denser than a book.
+
+(Is there a limit in angular resolution resulting from the light
+itself?  There must be: the light path length from the source to the
+hologram to the eye needs to differ by at least half a wavelength for
+a pixel to go from light to dark, right?  At (half of) 500nm over a
+hundredth of an inch, we have an angle of about 1 milliradian, which
+is actually a much more stringent limit than the slit width thing: it
+would limit you to about 3100 frames.)
+
+Non-rainbow holograms could get some three orders of magnitude higher
+storage density by using both dimensions, but as far as I know, can
+only be read under laser illumination.  Perhaps you could get 500
+terabits per square meter that way.
+
+As for manufacturing, the common approach to manufacturing rainbow
+holograms is embossing: you nickel-plate the master hologram, then
+squish molten plastic against it, then take the now-shaped plastic off
+and plate it with something — typically aluminum, but nickel would
+work too, and probably last longer.  (Remember, we're talking about
+millennia here.)  Ideally you'd use entirely amorphous materials
+(glasses) to avoid noise due to crystal grain boundaries, entirely
+covalently bonded materials like SiO₂ for chemical stability and
+hardness, and thoroughly oxidized materials like SiO₂ for chemical
+stability and resistance to combustion.  But producing a sufficiently
+shiny surface on glass (whether pure fused silica, borosilicate,
+soda-lime glass, or something else) might prove too difficult.
+
+If your manufacturing cost is low enough and your material flexible
+and robust enough, then instead of a single disc, you could produce a
+codex.  If you're storing some 500 gigabits per square meter, a
+hardback book consisting of 400 A5-sized pages could store 6 terabits
+in human-readable form.
+
+For the case of holographic archival discs, you probably want to
+compute the original image, if possible, rather than attempting to
+produce it with thousands of interfering optical wavefronts.  Bill
+Beaty's scratch holograms provide a practical way of doing this that
+wouldn't require computing trillions of grains in order to store
+billions of pixels.  They also, like rainbow holograms, limit you to
+one direction of parallax motion.

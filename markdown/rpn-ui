@@ -1,0 +1,151 @@
+I was reading about the Olivetti Programma 101 desktop computer today.
+It cost US$3200 when it came out in 1964; they sold forty thousand of
+them.  It could be used as a printing calculator (LED displays were
+still in the future) and you could load a 120-instruction program from
+a magnetic card.  Its magnetostrictive delay-line memory was somewhat
+anemic at some 240 bytes, circulating with a bit over 2 milliseconds
+of cycle time.  It’s one of the reasonable contenders for the title of
+“first personal computer”.
+
+The thing that struck me as interesting about this machine was that
+four of the buttons (labeled V, W, X, and Z) were “start program”
+buttons: they jumped to four of the thirty-two available labels.  So
+you could write an interactive program that enhanced the calculator’s
+capabilities with four new functions invoked with these keys.  When
+the calculator finished feeding the magnetic card through the reader,
+it would come to rest atop these keys, so it could bear human-readable
+labels for them, explaining what the newly-loaded program had
+programmed them to do.
+
+RPN calculators, of which I assume the Programma was one, enjoy a
+pleasantly simple way of programming them: the sequence of
+computational steps to execute is the same as the sequence of
+keystrokes to do the same computation interactively, and parameter
+passing and result return is implicit.  The difference is just that in
+“program” mode, the program steps are added to a program instead of
+being executed.  (The user experience might arguably be better if you
+did that *as well as* executing them, rather than *instead of*
+executing them, but for it to be an actual improvement over the
+traditional HP experience, that probably requires enough screen real
+estate to simultaneously display the program steps being recorded and
+the example values.)
+
+This means, in effect, that your CPU instruction set is simultaneously
+your user interface, which suggests that you might have instructions
+for such odd keystrokes as “multiply the current top of stack by 10
+and add 5”.  These are obviously far easier to implement as code than
+as transistors, and as a result machines like the HP 9100A were
+heavily microcoded, to the point that they had to invent a new kind of
+ROM to store the calculator’s microcode.
+
+The VWXZ approach, however, suggests an alternative to microcoding:
+implement most or all keys as procedure calls rather than a CPU
+instruction.  Better yet, implement them as CPU instructions that call
+particular subroutines.  Then, you can avoid microcode and the need to
+have two levels of programmability in your computer.  If you can spare
+the RAM space for a sort of “interrupt vector” for these keys, then
+you can make those keys and those instructions reprogrammable.
+
+(If you can do this and also write some kind of idle-time handler that
+runs when the computer is waiting for an instruction from the keyboard
+and doesn’t get one, you can incrementally extend the computer’s
+instruction set into an arbitrary application.)
+
+We probably can’t make do with 32 instructions and keys on the
+keyboard.  A modern “four-function” calculator has the digits, “.”,
+“=”, +, -, ×, ÷, MR/C, M+, M-, ON/C, CE, +/-, √, and %, a total of 24
+keys; you probably need at least those instructions or their stack
+equivalents for a usable calculator, plus more than 8 instructions
+that aren’t one of those keys.  So you probably need at least 64
+keys and instructions, which is what the HP 9100A had.
+
+How much space do you need for a program address?  The HP 9100A needed
+a 32-kibibit ROM for its microcode, which is also how much RAM the
+late-1970s personal computers needed for a BASIC interpreter; the
+9100A also could hold 14 6-bit instructions per register, of which it
+had 23 implemented as core memory, for a total of 23·14·6 = 1932 more
+bits.  This was sufficiently limiting that they started shipping an HP
+9100B within the year with double the RAM, 3864 bits
+<http://www.hp9825.com/html/the_9100_part_2.html>.  The earlier
+Olivetti had 240 bytes of delay-line memory, which I suspect were
+6-bit bytes; this gives a similar number of 1440 bits.
+
+Let’s figure that stack-machine code will probably be a bit more
+compact than the 9100A’s microcode, especially with magic
+procedure-call instructions, but not all that much, maybe a factor of
+2 or 3.  Then you need something like ten kibibits of program memory,
+a bit over 1700 instructions.  You could impose, say, a four-
+instruction alignment requirement on the vectors for the keys, which
+would cut the vector size down to 9 bits.  So vectors for all 64
+possible instructions would require only 576 bits, 6% of total memory.
+Of course you need hard-wired functions for some instructions.
+
+You can probably make do with half of the program memory space being
+ROM.
+
+So how is this shaping up?  We have an interactively usable, fully
+programmable computer whose memory space consists of 512 24-bit words,
+of which half are ROM and half are RAM, for a total of 6144 bits of
+RAM, 59% more than the HP 9100B.  16 of the 256 words of RAM contain
+32 instruction addresses (plus six leftover bits) that define the
+meanings of 32 of the 64 possible six-bit instructions (and keys); the
+other 32 instructions are hard-wired, perhaps taken from the F18a
+core.  Those 240 words of RAM can contain 960 instructions, which can
+invoke routines in the other 1024 instructions stored in ROM.  These
+are stack-machine instructions, so this is roughly comparable to 1000
+machine instructions for the 386 or SPARC: barely enough for a simple
+compiler or assembler, plenty for a video game, and probably not
+enough for a working TCP/IP stack.
+
+(It’s a great deal more than the 1024 bits of RAM in the Atari 2600 or
+the 1152 bits of RAM in an F18a core, but less than the 8192 bits of
+RAM in an ATMega328 Arduino, and dramatically less than its 262144
+bits of Flash.)
+
+But these 6144 bits of RAM, if implemented as electronic static RAM,
+will need 12288 transistors — very likely more than the entire
+processor, maybe even if it’s bit-parallel and includes a multiplier.
+If you could get that memory complexity down a bit, you would have a
+computer that could scale to much more complex tasks.  But this is
+probably enough to bootstrap with.
+
+If you’re building the CPU out of mechanical logic, six 16-position
+sliders give you a 24-bit word of RAM.  All 256 words, then, can be
+stored in 1536 such sliders.  This is more complicated than a Curta
+calculator or a pocket watch, but not in the same world of difficulty
+as many mechanical machines that already physically exist.  In fact,
+it’s probably a lot less demanding than the Jaquet-Droz automata.
+
+The F18A has a ten-item parameter stack and IIRC a nine-item control
+stack; more deeply nested code will not be able to return.  In its
+case, since they’re 18 bits wide, they amount to 342 bits.  On this
+hypothetical machine, your parameter stack would be 24 bits, but the
+return stack could be narrower, as little as 11 bits if you didn’t
+want to use it for loop counters; so you could still fit ten
+parameters and nine return addresses into 350 bits, which is 5.7% of
+the size of the RAM and therefore probably a good investment.
+
+(The F18A also has some named memory pointer registers, one of which
+is also used for multiplication, and a few other miscellaneous
+features.)
+
+My experience with integer math in computer programs is that I have to
+think about overflow incessantly with 8-bit variables, frequently with
+16-bit variables, and almost never with 32-bit variables.  I have no
+experience programming with 24-bit variables, but it seems like they
+would probably be pretty easy.  Maybe I should be thinking about
+floating point.
+
+So the experience of bootstrapping this machine is probably that the
+bare CPU gives you a 24-bit integer hexadecimal or octal arithmetic
+calculator with addition, subtraction, and maybe multiplication, and
+then you can write programs for division, square roots, logarithms,
+transcendental functions, and whatnot.  Or you can instead write
+programs that don’t care about transcendental functions and instead do
+other things, like assemblers and BASIC interpreters, so you can
+bootstrap to higher levels of abstraction.
+
+You could maybe eliminate the distinction between compiling and
+interpreting modes by always recording the user’s keystrokes into some
+memory buffer or other, thus always preserving the option of executing
+them later.

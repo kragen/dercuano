@@ -1,0 +1,165 @@
+So I was thinking about one of my usual hobbyhorses: how to design an
+entire usably efficient interactive computing system as a pure
+function of some mutable, but in some way orderly, state.
+
+History
+-------
+
+The basic idea goes back to McCarthy’s “Elephant 2000” proposal, where
+you define a data processing system in terms of keeping commitments
+based on its past history, and then the compiler figures out what
+information the data processing system needs to store about that past
+history to comply with its commitments.  That is, the entire data
+structure of the system is purely the result of compiler optimization.
+You just make assertions about the relationships between past events
+and the system’s outputs, and the compiler produces a running system
+that satisfies those requirements.
+
+I explored it a bit in “rumor-oriented programming”, where the idea
+was that you accumulate an ever-growing history of “rumors” that get
+automatically synchronized between your devices (because you only ever
+add new ones, synchronization is trivial and guaranteed to be
+convergent, though potentially expensive) and the actual screen you
+see is the output of a query over that rumor history, using a query
+language that doesn’t expose the order in which the rumors arrived on
+the current device; then you have buttons and shit that add new rumors
+and possibly cause like a recomputation of the query result you see on
+the screen.
+
+I also explored it a bit in “dependency-driven composition, or make
+for websites”, where the idea is that you use a `make`-like build
+process over a dependency graph of resources.  Some resources are
+human-produced and editable, while others are produced on demand from
+other resources, and then cached.
+
+This is all closely related to functional reactive programming, which
+is perhaps unsurprisingly (at long last!) getting a lot of attention
+in the last couple of years in the JavaScript world, with React,
+Angular, and Meteor all becoming suddenly popular.
+
+Automatic dependency detection
+------------------------------
+
+A simpler model than `make` for dependency-driven recomputation in the
+world of building software projects is `redo`, which was designed by
+Daniel Bernstein and later implemented by Avery Pennarun.  The idea of
+`redo`, as I understand it, is that the script to build a file `foo`
+is contained in the file `foo.do`, which is a shell script which
+recursively invokes `redo` to ensure that each of the things `foo`
+depends on is up to date, and then does whatever it needs to do to
+build `foo`.  Because `redo` knows that it was trying to build `foo`,
+it can tell that each of those recursive calls represents an edge in
+the dependency graph.
+
+This is closely reminiscent of how optimistic STMs (software
+transactional memories) detect transaction conflicts and automatically
+retry the transactions.  Within a transaction, you read some set of
+STM variables and write some other set of them, and the STM records
+each of those sets; when the transaction goes to commit, it atomically
+publishes your set of writes, but only if no transaction has written
+to some variable that you read since the time that you read it.  If
+so, your results are discarded and automatically retried.  (This is
+also, I think, closely related to how speculative instruction
+execution works in CPUs, although I don’t know the details.)
+
+In a sense, the STM has concluded that since it’s possible all of the
+writes could have a dependency on any of the reads, so it needs to
+discard them and rerun the transaction if any of those variables that
+have been read has changed.
+
+This is very similar to how Meteor detects dependencies in its
+dependency graph: if a Meteor-controlled reactive computation reads
+from a reactive variable, that variable records a dependency, which it
+can then choose to invalidate later.  Unlike `redo`, and similar to
+optimistic STMs, this causes that reactive computation to be eagerly
+rerun, a policy choice which I suspect can lead to exponential-time
+execution from diamonds in the dataflow graph.
+
+The delightful thing about this kind of tracking, taken advantage of
+by all of Meteor, optimistic STMs, and `redo`, is that it doesn’t
+depend at all on the internal functioning of the computation that it’s
+re-executing; it only has to be able to re-execute it on demand and
+intercept its I/O, and trust that it is deterministic.  You could even
+imagine an “STM server” which provides these services over the
+network, although it has to trust its clients to retry when they get a
+commit rejected.
+
+(I confess I haven’t actually used Meteor or `redo`, so I could be
+totally confused about them.)
+
+The other interesting thing about it is that, usually at least, you
+can do a simple version of it with very little actual dependency
+tracking.  You can just re-execute stuff blindly.  This is how
+Pennarun bootstraps `redo`.
+
+Dependency-driven and immediate-mode GUIs
+-----------------------------------------
+
+So, what if we try to take this kind of thing all the way to pixels on
+the screen?  Like, it would be super cool if I could write some kind
+of straightforward computation over, I don’t know, an editor buffer of
+text in some form, some kind of specification of where I’m scrolled to
+in that text, and a font, that results in setting some pixels on the
+screen, and results in smallish recomputations.  It would be even
+better if I could, like, write a thing that parses HTML and CSS and
+lays out boxes on the screen and draws glyphs into them, and have that
+be able to automatically detect changes in the CSS and figure out
+which parts of the screen they affected.
+
+A crucial part of this is that if you want the dependency-tracking
+overhead to be small, the dataflow graph probably has to be relatively
+small, which means the nodes in it have to be fairly large; and if you
+want a recomputation to be small, the nodes in it have to be
+relatively small.  To be concrete, in the editor example, if there’s a
+change to a part of the text that isn’t displayed on the screen, you’d
+probably prefer to not have to recompute the entire screen contents
+from scratch; and maybe if there’s a change on one line of the screen,
+it would be nice to redisplay just that line.
+
+There’s a somewhat relevant field of work called “immediate-mode
+GUIs”, popular in videogames, where you don’t try to avoid redrawing
+the screen, part of the reason being that in a videogame you typically
+redraw the screen 60 or 120 times a second anyway.  Immediate-mode
+GUIs don’t have data objects that stick around in memory in some kind
+of nested window tree structure, the way regular (“retained-mode”)
+GUIs do; instead you do things like this:
+
+    set_drawing_background(start_button_background);
+    if (button(120, 200, 600, start_button_height, "Start!")) start_game();
+
+which redraws the button in the specified position, with its possibly
+updated height, and then checks to see if the user has just clicked
+their mouse in it.  The button has no persistent existence in memory,
+other than as pixels in the framebuffer that have changed color, but
+while control flow is down inside of it, it exists on the stack and
+can react to the mouse click.
+
+I feel that immediate-mode GUIs are a lot easier to program — for
+example, the above example doesn’t have to add an event listener to
+redraw when `start_button_background` or `start_button_height` change,
+nor does it have to worry about when to destroy the button object — 
+and they use less RAM.
+
+The analogy here is between immediate-mode and retained-mode graphics
+systems.  `<canvas>` is immediate-mode; SVG is retained-mode.  Both
+have their performance advantages.  One of the potential disadvantages
+of immediate-mode drawing is that you have to draw all the pixels on
+the screen every frame, even when they haven’t changed.
+
+So, suppose you execute some series of transactions to draw your
+immediate-mode GUI on the screen.  Each transaction updates some
+region of pixels on the screen, having read some set of reactive
+variables (the window size, the text buffer contents, the clock, etc.)
+and executed some deterministic computation driven by them.
+
+Can we use this to improve the efficiency of immediate-mode GUIs in
+the case where the entire screen is not actually changing?  It’s not
+super straightforward, but I think so.  If your `start_button_height`
+is tracked by something like Meteor, you can automatically rerun the
+draw-button transaction; and if it fails to overwrite pixels that it
+was previously overwriting, you can rerun the transactions that
+generated those pixels in order to get them back.  (Or maybe you could
+retain the pixels in a backing store.)
+
+If you’re doing alpha compositing, of course, you may have to redraw
+the background pixels you’re blending the button with first.

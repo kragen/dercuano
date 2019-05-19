@@ -1,0 +1,165 @@
+The US lunar lander has a plaque that says "WE CAME IN PEACE FOR ALL
+MANKIND", in a successful effort to avoid sparking a global
+thermonuclear war.  It’s 384 megameters away on average, although
+sometimes it gets as close as 356.4 megameters.  Can you read it from
+Earth?
+
+An interferometer, which is kind of a generalization of a telescope,
+distinguishes things by the phase of light reflected from them.  A
+lens or telescope mirror is a device to adjust the phase such that
+light waves emanating from the same point will be focused onto the
+same point, and more importantly for the question here, light waves
+emanating from different points will be focused onto different points.
+It uses the difference in phase across the width (“baseline”) of the
+interferometer to identify each point.
+
+To be clearly distinguishable by interferometer, the phase difference
+of two points ought to differ by a significant fraction of a
+wavelength.  We can take half a wavelength as a convenient number.
+And let’s figure we can’t conveniently use radiation any harder than,
+say, 300 nm wavelength, for example because it’s hard to focus or
+because the Sun doesn’t emit it or it doesn’t penetrate our
+atmosphere.
+
+I don’t know how big the letters on the plaque are, but let’s suppose
+that centimeter resolution is good enough.
+
+So how big of an interferometer do you need?  Does it fit on Earth?
+
+The Euclidean sum of 384 megameters and 1 centimeter is a bit tricky
+to calculate.  But you can easily calculate that 1 centimeter over 384
+megameters is about 30 picoradians, and 150 nm is 30 picoradians at a
+radius (or baseline!) of 5 km.  So even if the letters are a bit
+smaller than I imagine, you can read them from Earth with optical
+interferometry.
+
+Laser-printing on the moon
+--------------------------
+
+You can do better, though!  You can laser-print a new plaque by
+selectively melting the lunar soil from Earth with phased-array
+lasers, thus changing its color!  If you require a 50km baseline, you
+can get down to one-millimeter resolution.  You need high enough power
+to melt it, not just slightly warm it; but exactly how much power you
+need goes down as the resolution improves, but it depends on the
+thermal conductivity of the soil, its density, its heat of fusion, its
+melting point, the depth of penetration of light into it, and its
+specific heat.  Also, to estimate how fast this happens, you need to
+know its albedo and the spectral selectivity of its emission spectrum.
+
+### You need a few hundred milliwatts to laser-print on the moon ###
+
+I found [some information about lunar soil physical properties][0]
+online.  Lunar soil particles are very fluffy, with half a square
+meter of surface area per gram.  Specific gravity of the solid mass of
+regolith particles is about 3.1 g/cc; porosity is typically 50%;
+consequently lunar soil is about 1.6 g/cc, although varying from 0.8
+to 2.3, and perhaps even lower in the top surface layer.  Thermal
+conductivity in the top centimeters of lunar soil was measured at
+1.5 × 10⁻⁵ W/cm/° in the Apollo 15 and 17 missions.  Its albedo is
+about 0.07.
+
+[0]: http://www.lpi.usra.edu/science/kring/lunar_exploration/briefings/lunar_soil_physical_properties.pdf
+
+I don’t know the spectral selectivity, heat capacity, heat of fusion,
+or light penetration depth of the lunar soil, but let’s estimate.  The
+soil includes some components that would melt at lower temperatures,
+including many glasses that won’t have a heat of fusion at all, and it
+might be adequate to melt just those.  But I'm going to use a somewhat
+more pessimistic analysis to make sure my conclusions are ironclad.
+Let’s suppose it has no particular spectral selectivity, melts at
+about 1000°; has a heat capacity similar to quartz’s — 65 J/mol/° /
+(28 + 2·16 = 60) g/mol ≈ 1 J/g/°; and has a heat of fusion similar to
+quartz’s — 9 kJ/mol ≈ 150 J/g.
+
+The lunar surface can get as hot as 220 K during the day even before
+we start shooting lasers at it.
+
+So we need, hypothetically, to heat the surface of the regolith to
+1000°, sucking up about 780 J/g, and then melt it with 150 more J per
+gram.  [At 1000° a black body soil would be emitting 57kW/m²][4], so
+that’s probably about what we need to illuminate it with in order to
+keep heating it up once it’s already at that temperature.  But how
+much actual power is that?
+
+[4]: http://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law
+
+It depends on the area you can illuminate, of course — the tighter you
+can focus the beam, the easier it gets.  Above we posited a
+square-millimeter focus, which is 10⁻⁶m², at which point you’d need
+57mW — an eminently feasible number!  As long as you can focus 57mW
+onto a one-millimeter square in a vacuum, it will eventually heat up
+to 1000°.  How fast?
+
+1.5 × 10⁻⁵ W/cm/° at this temperature is about 1.5 × 10⁻² W/cm,
+which is to say, 1.5 mW mm/mm² — we can expect on the order of a
+milliwatt to escape to a depth of on the order of a millimeter through
+an area on the order of a square millimeter.  None of this is very
+precise because of course the planar focus spot gradually morphs into
+hemispherical shells of heat spreading into the regolith, so really at
+the depth of a millimeter you need to be considering about two square
+millimeters of almost-hemispherical shell, but it’s close enough to
+show that the vast majority of heat will be lost radiatively rather
+than conductively.  You might need 58mW or 59mW or 60mW to reach
+equilibrium, but really you want to be far from equilibrium, like at
+least 2× and ideally over 10×.
+
+So supposing we’re focusing 600mW and up on this square millimeter on
+the lunar surface, losing 7% of it to reflection, two or three
+milliwatts to conduction, and 60mW to thermal reradiation, leaving
+500mW, focused on a millimeter-sized spot that’s about a millimeter
+deep, with a density of about 1.6 g/cc (thus about 1.6 milligrams) and
+a heat capacity of 1 J/g/°.  This gives us a temperature rise of about
+300°/s, so it takes three or four seconds to melt the spot, so we can
+write on the moon at about 0.3 mm²/s with 600 milliwatts.
+
+This should scale linearly with applied power.  We should be able to
+do 3 mm²/s at 6 watts, or 30 mm²/s at 60 watts.  Even 6 kW should be
+doable without any extra difficulty (remember, we're talking about a
+phase-locked phased-array ultraviolet laser system spread over a
+thousand square kilometers or so) and should allow you to print on the
+moon at 3000 mm²/s.
+
+Lunar soil is accumulating at about 1½mm per million years, so
+whatever you write there might be readable for tens of millennia if
+daily dust redistribution doesn’t cover it up.
+
+The total information capacity of the moon’s surface would be close to
+1 bit per mm² if encoded in this way.  The moon's radius is 1738 km,
+so the part facing us has space for on the order of 5 × 10¹⁸ bits
+encoded in this way, which is several hundred petabytes.
+
+Calculating the bandwidth of this data storage channel is trickier.
+
+Related proposals
+-----------------
+
+Relevant to this is [NASA N78-13420][1], “Analysis and Design of a
+High Power Laser Adaptive Phased Array Transmitter”, from 1978.  They
+propose to use photovoltaic-powered terrestrial lasers, phase-locked
+to produce a phased array, to deliver 5 megawatts of infrared laser
+power to satellites, from a 6-meter transmitter to a 2-meter
+collecting aperture, for example to power orbital transfer maneuvers.
+They predicted overall power transfer efficiency of 53%, which seems
+inconceivably large to me given the generally low efficiencies of
+lasers, especially in the 1970s — and indeed, it turns out they’re
+talking about 53% of the light coming out of the laser making it to
+the satellite, and they suggest using an isotopically pure laser that
+wasn’t yet developed (and maybe still hasn’t been), plus six other
+areas of “advanced technology development required”, which I think all
+do exist now.
+
+[1]: https://ia700503.us.archive.org/2/items/nasa_techdoc_19780005477/19780005477.pdf
+
+In the high-spatial-resolution phased-array field, there's a 1993
+proposal for an [OVLA (NASA N93-13583)][2], or “optical very large
+array”, like the radio-telescopy Very Large Array, using optical
+heterodyning to get the equivalent of a very large aperture.
+
+[2]: http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19930004395.pdf
+
+The recent [DE-STAR proposal][3] from Cal-Poly is the closest in
+spirit: it proposes a high-power phased-array laser to divert or
+evaporate asteroids and comets in danger of hitting Earth.
+
+[3]: http://digitalcommons.calpoly.edu/cgi/viewcontent.cgi?article=1034&context=stat_fac

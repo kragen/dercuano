@@ -1,0 +1,134 @@
+I was reading [Doron Zeilberger's Opinion
+65](http://www.math.rutgers.edu/~zeilberg/Opinion65.html) about the
+Gelfand Principle, which he ascribes to Israel Gelfand.  I'll restate
+what he says here.
+
+He says it is better to begin by explaining that 1+2 = 2+1, and then
+go on to explain that this is true for all pairs a+b = b+a and that
+this is called the commutative property of addition, than to begin by
+giving the name, explaining that it means that always a+b = b+a, and
+then by giving an example.  And he points out that 1+2 = 2+1 is the
+best example to use, because there's nothing particularly special
+about it.  0+1 = 1+0 is true, but in general 0+x = x+0 = x, and so
+someone might think that this commutative property is a special
+feature of 0.  (In linear algebra, the identity matrix works this way:
+for all conformable M and identity matrices I, IM = MI, even though
+matrix multiplication is not commutative in general.)  And 1+1 = 1+1,
+but that's because of the reflexive property of equality, not the
+commutative property of addition.  So 1+2 = 2+1 is the simplest
+nontrivial example.  It's a better example than, say, 
+424 + 501 = 501 + 424, because it's easier to prove: 1+2 is 1+(1+1),
+and 2+1 is (1+1)+1, and addition is associative, so those are the same.
+
+In general, he argues, "Whenever you state a new concept, definition,
+or theorem, (and better still, right before you do) [you should] give
+the *simplest* possible non-trivial example."  He also says:
+
+> The Gelfand Principle should also be used in research articles. It
+> is much easier to follow a new definition or theorem after a simple
+> example is first given. Even proofs would be easier to follow if
+> they are first spelled out concretely for a special case.
+
+I agree.  In fact, I've often groused to myself about mathematical
+papers being written in the opposite style.  (I've spent some time
+lately reading John Backus's "Can Programming Be Liberated from the
+von Neumann Style?", which is not technically a math paper but
+contains theorems anyway, and it would be considerably improved by an
+application of this principle.)  I've wondered whether other people
+--- certain mathematicians maybe --- actually find it easier to
+understand things in what seems to me like a backwards order: theorem
+first, then example.
+
+(Amusingly, Zeilberger states the principle before he gives the above
+example of it, thus violating the principle he is trying to promote;
+however, he follows it in part, in that the commutative principle is
+probably the simplest possible nontrivial example of stating a
+theorem.)
+
+Apparently, however, other people also feel that the Gelfand approach
+is the correct one.  In response to Zeilberger's article, Tim Gowers
+wrote:
+
+> I've just looked at your opinions page for the first time for a
+> while, and read your article on two pedagogical principles. I was
+> particularly interested in the first [the Gelfand Principle],
+> because as a result of editing the Princeton Companion I have become
+> incredibly conscious of it myself -- I'm tempted to say that I
+> discovered it independently. Of course, it doesn't bother me that
+> Gelfand got there first -- it is SO clearly correct that it would be
+> a miracle if I had not been anticipated. Instead, we have the
+> depressing miracle that something so obvious should be practised by
+> such a small percentage of mathematicians. I feel quite evangelistic
+> about this, and have already started a one-man (except that now I
+> see that you are an ally) campaign to publicize the principle.  For
+> example, a few weeks ago I was asked to give a talk about the
+> Princeton Companion, and EXAMPLES FIRST was one of the main themes
+> (which I illustrated by an example first: I gave a ridiculous and
+> unmemorable definition of a "C-space" which was in fact a
+> mathematical model of a car, and as soon as the word "car" was
+> uttered, the definition was magically easier to remember).
+> 
+> I had always been aware, of course, of the value of giving the
+> simplest non-trivial example. The thing that has really struck me is
+> the value of giving it FIRST. I think it is very important to stress
+> that this is an independently important part of the Gelfand
+> principle (or else, if you were not including it, a separate and
+> equally important principle).
+> 
+> Here is my "proof" that it is better to start with concrete examples
+> and proceed to abstract definitions than it is to begin with the
+> abstract definitions. If you give the example first, then it is easy
+> for the reader to understand, so not much effort is needed to
+> remember anything. Then, when you are presented with the abstract
+> definition, you have a mental picture of an example, so the various
+> components of the abstract definition become labels that you attach
+> to this picture. If, on the other hand, you give the abstract
+> definition first, then the components are meaningless, so you have
+> no choice but to memorize them as if you were learning Chinese
+> vocabulary or something.  Then when you see the example, you have to
+> go back and see how this meaningless stuff does in fact mean
+> something. But that effort of memorization should have been
+> unnecessary!
+
+Dijkstra, unsurprisingly, disagrees (in EWD757-3):
+
+> There exists a school (I wouldn't call it a "school of thought")
+> that believes in "teaching by example" and in "discovery by
+> example".  I don't.  I concluded EWD376, which describes in detail
+> the actual steps in which I had solved a problem from graph theory,
+> with:
+> 
+> > "Finally we draw attention to the fact that we did not draw a
+> > single example to explain what we were talking about or (even
+> > worse!) to discover what the program should do.  And this, of
+> > course, is as it should be."
+
+So what's the analogue in computer programming?  You could argue that
+it's test-first programming, where you write the unit test before you
+write the code, and hopefully people will read it in the same
+sequence.  The unit test is usually a better unit test if it's exactly
+this simplest non-trivial case.  (Maybe it's better if there's an
+additional test that doesn't try to be simple, just in case you were
+mistaken about how trivial the case was.)
+
+But in the mathematical case, you don't just write down the premises
+of the example, write down the conclusion, baldly assert that some
+theorem exists to connect the two, and then proceed to explaining what
+that theorem is and proving it in the general case.  Instead, you
+demonstrate that the conclusion is true of that particular example,
+and then state the theorem and proof for the general case.  This is
+much more similar to walking through the program as it executes the
+test case in a debugger and looking at all the intermediate values.
+ 
+There was a thread on LtU about "[Ivory Towers and Gelfand's
+Principle](http://lambda-the-ultimate.org/node/924)", on motivating
+language features with examples:
+
+> If an example has a solution that is nearly as good without a given
+> language feature, then that example is not a good motivation for
+> that feature. Perhaps not following this principle is partly what
+> earned FP it's ivory tower reputation.
+
+There was also [a thread about this on
+LiveJournal](http://jcreed.livejournal.com/899682.html?view=2631778#t2631778).
+

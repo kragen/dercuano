@@ -1,0 +1,178 @@
+I’m fed up with the terribly slow performance of OsmAnd~ on my phone.
+But how can I get access to OSM data to reformat in different formats?
+
+Formats and getting geodata
+---------------------------
+
+OsmAnd~ uses its own .obf format, and decoding that data seems to
+involve using their precompiled jar files, since I can’t figure out
+how to get their code to compile.
+
+OSM has two principal formats, an XML format called .osm, and a
+ProtoBuf format called .pbf, which is a few times smaller, which is
+documented at
+<http://wiki.openstreetmap.org/wiki/PBF_Format#File_format> and
+implemented in, among other things, Osmosis
+<http://wiki.openstreetmap.org/wiki/Osmosis>, which is in Debian.
+<http://wiki.openstreetmap.org/wiki/Osmosis/Detailed_Usage_0.44#--read-pbf_.28--rb.29>
+sort of explains how to use it.  `osmosis --read-pbf foo.pbf
+--write-xml` creates a `dump.osm` file full of XML; adding a `-`
+argument to the end spews the XML out on stdout as Ghod intended.  The
+XML format is documented in
+<http://wiki.openstreetmap.org/wiki/OSM_XML>.
+
+For better or worse, the XML format has all the nodes first, followed
+by all the ways, then all the relations.
+
+GDAL/OGR has support for these formats
+<http://www.gdal.org/drv_osm.html> but only from 1.10 on.  GDAL in the
+Debian I’m running is 1.9.
+
+A current PBF of Argentina is only 103MB:
+<http://download.geofabrik.de/south-america/>.  Planet.osm is 29.3GB
+<http://wiki.openstreetmap.org/wiki/Planet.osm> so maybe the 300×
+smaller Argentina file is better.  <http://openstreetmapdata.com/> has
+“generalized” OSM data (sadly, in shapefiles) including coarse
+coastlines, land polygons, and water polygons (30 MB each).
+
+<https://github.com/scrosby/OSM-binary> is a PBF library for C.
+
+Arranging data for rapid access
+-------------------------------
+
+The PBF data is apparently not arranged for rapid access, even though
+it's divided into independently decompressable PrimitiveBlocks.
+
+My basic thought is that you can fit maybe 20 × 40 roads on my phone
+display before it becomes too crowded to read, so we ought to be able
+to produce level-of-detail summaries of the data that allow us to read
+some constant factor more than those 800 paths when we’re drawing a
+display.
+
+Like, if the display is only 2km tall and 4km wide, or less, we should
+be able to draw *all* the data in that region, but only access data
+that is actually in or near that region.  If you break the
+full-resolution data up into 1km×1km tiles, each of which is stored
+contiguously, then you might need to access 8 to 15 of these tiles,
+which is probably okay even on spinning rust, especially if you use
+Z-ordering or Hilbert curve ordering for those tiles.
+
+Each such tile might have 200 line segments in it, mostly sharing
+endpoints with other line segments, with 7 decimal places of accuracy
+in each of lat and lon, and maybe a bit more metadata, like street
+names.  That’s probably about one endpoint per segment, and probably
+about 56 bits (7 bytes) of coordinates, although maybe delta-encoding
+can shorten that to about 32.  7 × 200 = 1400, so each such tile might
+be 2 to 4 kilobytes.  Most will be smaller, a few might be bigger.
+
+If you zoom out to almost 4km tall and 8km wide, then you may have as
+many as 5 × 9 = 45 such tiles in view, and need to access as much as
+180 kilobytes of data.  This is still doable in a small fraction of a
+second, even on my cellphone, but for zooms this large and larger, we
+can do better by making “summary tiles” that include the
+large-scale-visible features from 16 smaller tiles, but only about 200
+line segments in the summary tile; so the summary tiles will also be
+only 2 to 4 kilobytes each.
+
+The summary tiles should only include the most important ways; the
+importance ranking for “highway” ways goes something like motorway,
+trunk, primary, secondary, tertiary, unclassified, residential,
+service, living_street, pedestrian, track, footway, bridleway,
+raceway.  Perhaps "road" should be near "residential", as should the
+various "_link" types.
+
+In most areas, data will be so sparse that these 4×4 summary tiles
+will be able to include all the data.
+
+The summary-tile process should be recursive, so you have metasummary
+tiles that cover 4×4 summary tiles, and third-level summary tiles that
+cover 4×4 metasummary tiles, and so on.  There will be some
+duplication of data, but the summary tiles will never add more than a
+sixteenth (6¼%) to the size of the base tiles, and even an infinite
+pyramid of such things would only add a fifteenth (6⅔%).  But
+Argentina is only 2.7 million km², so you only need six levels of
+summary tiles.
+
+In this way, no view will *ever* need to access more than 180
+kilobytes of data, plus the bounds as it walks down the tree to find
+the tiles it needs.
+
+Build process
+-------------
+
+I feel like even on my netbook the 103 megabytes of Argentina data
+should fit in my 2 gibibytes of RAM, especially since I don’t care
+about the users, versions, timestamps, or changesets of nodes, just
+their lat, lon, id, and tags.  Generating the XML file on disk, at
+150+ bytes per node, is probably not an ultra great idea; it would be
+about a gig.
+
+For estimating sizes from the XML:
+
+    perl -lne '$tag{$1}++ while /<(\w+) /g; END { for my $tag (keys %tag) { print "$tag $tag{$tag}" }}'
+
+      <relation id="56688" user="kmvar" uid="56190" visible="true" version="28" chan
+       <member type="node" ref="294942404" role=""/>                                
+       ...                                                                          
+       <member type="node" ref="364933006" role=""/>                                
+       <member type="way" ref="4579143" role=""/>                                   
+       ...                                                                          
+       <member type="node" ref="249673494" role=""/>                                
+       <tag k="name" v="Küstenbus Linie 123"/>                                      
+       <tag k="network" v="VVW
+
+Results:
+
+    |----------+------------+-----------------+-------------------|
+    | entity   | 2014 count | est. 2015 count | actual 2015 count |
+    |----------+------------+-----------------+-------------------|
+    | byte     | 65M        |                 | 103M              |
+    | relation | 10,913     | 17,292          | 24,878            |
+    | member   | 228,594    | 362,233         | 482,756           |
+    | way      | 621,045    | 984,117         | 1,169,064         |
+    | tag      | 1,666,072  | 2,640,083       | 4,468,399         |
+    | node     | 6,597,342  | 10,454,249      | 10,697,272        |
+    | nd       | 8,139,986  | 12,898,747      | 12,791,230        |
+    |----------+------------+-----------------+-------------------|
+
+So this suggests that the average node participates in (“nd”) about
+1.2 different ways and thus about 2.2 different line segments; it’s
+almost cheaper to store the nodes redundantly, using an extra 10% (6
+bits), rather than indirect node access through some kind of ID, which
+is necessarily bigger than 24 bits each.  The high tag count is a
+surprise to me, and I assume that it’s because ways have a lot of
+tags, but I should look.
+
+The 65-megabyte 2014 Argentina PBF I downloaded by mistake has only
+8.1 million “nd“s in it and takes Osmosis about 5 to 7 minutes to
+decode into XML.  This would put my estimated-8-bytes-per-node
+optimized binary format at 65 megabytes, or about 103 megabytes for
+the current dataset, consisting of about 32k to 128k tiles.
+
+The 2015 dataset took Osmosis 11 minutes to decode.
+
+I should be able to do at least the initial build process in Python
+rather than C, despite it being in-RAM on this netbook, because a dict
+entry in Python only weighs about 128 bytes; so 10 million nodes will
+only weigh about 1.3 gigs.  I should probably test on some smaller
+data first.  If that doesn’t work out, I can probably hack together
+something in C, or I guess I could put the node data into files and
+use an external sort, or maybe use SQLite or Postgres.
+
+Reducing the ways to sequences of (lat,lon) tuples, plus a bit of
+metadata, as a sort-merge job, would involve these steps:
+
+1. Reduce the ways to 13 million (nodeid, wayid, seqno) tuples in 325
+   megabytes.  Sort.
+2. Reduce the nodes to 10 million (nodeid, lat, lon) tuples in 400
+   megabytes.  Sort.
+3. Merge the two into 13 million (wayid, seqno, lat, lon) tuples in
+   600 megabytes.  Sort.
+4. Coalesce runs with the same wayid into (wayid, [(lat, lon) ...])
+   structures.
+
+An alternative multipass strategy would involve decoding the PBF file
+several times, each time computing the tiles in a particular
+geographical area and ignoring the other data.  This is a more or less
+linear time-space tradeoff: I can use 10% of the memory in exchange
+for running the job in 2 hours instead of 12 minutes.

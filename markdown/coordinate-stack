@@ -1,0 +1,206 @@
+I thought I had a novel way of thinking about automatic APL-style
+lifting of pointwise operators, and it yielded some interesting
+suggestions, but I think it turns out it kind of sucks as a generic
+way of thinking about APL operators.  Here I document my blind alley
+in case other people find it interesting.
+
+The Problem
+-----------
+
+In APL, you can write 4 + 5 and get 9, or 4 + 3 4 5 6 and get 7 8 9
+10, or 4 5 6 + 2 3 8 and get 6 8 14.  And you can similarly add a
+vector to a matrix, and each element of the vector will be added to an
+entire row (or column, depending on your point of view) of the matrix.
+And so on.
+
+The Basic Approach
+------------------
+
+So here's a way to think about that.
+
+Suppose we have a (possibly finite) stack of coordinate contexts, each
+of which contains one coordinate, and each of our values is a function
+of this stack.  Scalars don't look at the stack at all.  Vectors look
+at the top item on the stack to figure out which scalar to return.
+Matrices look at the top two.  Now we consider our language's
+e.g. multiplication to be pointwise multiplication over these
+functions.
+
+Suppose we use + to denote mathematical addition and +. to denote the
+addition operator of our language.  Then we can say
+
+    x + y = \ C . x(C) +. y(C)  where C is a coordinate stack.
+
+So if x and y are both scalars, then so is the result; if one is a
+vector and the other is a scalar, then the result will be a vector, in
+that it will depend on the top item of the coordinate stack for one side
+of the addition; and so on.  This automatically provides the desired
+behavior for binary operators on vectors of different ranks.
+
+Unintuitively, the indices that we normally think of as changing
+fastest are further down the stack.
+
+Can we define other APL functions this way?
+
+Transpose and Compose
+---------------------
+
+If we want to define the transposition operator that transposes the
+first two indices, we can define it in terms of cons, car, and cdr
+functions on coordinate stacks.  car returns the top index off the
+stack; cdr returns a coordinate stack missing that top index; and cons
+returns a coordinate stack with a new car pushed on top of what was
+previously there.
+
+    transpose x = \ C . x(cons (car (cdr C)) (cons (car C) (cdr (cdr C))))
+
+That's just the Forth SWAP or the PostScript exch operator.  It's
+probably clearer if I write it with Haskell's right-associative infix
+cons operator ':' and pattern-matching:
+
+    transpose x = \a:b:z . x (b:a:z)
+
+If we define transpose this way, then we can apply it to a scalar ---
+but the resulting value will require at least two stack levels that it
+actually ignores, i.e. will be an infinite matrix.  I could add
+error-checking cases to transpose to handle this.
+
+(XXX this is wrong.  What you want is something that transposes the
+two leftmost indices, the ones that change slowest, not the ones that
+chnage fastest.)
+
+There's a useful operator that Numeric calls "take", and which APL
+implements by indexing one array with another (e.g. 4 5 6[1 2 1]
+yields 4 5 4, and 4 5 6[2 3 rho 1 2 2 1 3 1] yields 2 3 rho 4 5 5 4 6 4).
+
+In its most basic form it only applies to a one-dimensional array as
+its first argument.  I'll call it "compose".  Can we define this
+"compose" operator?
+
+    compose(lookuptable, indices) = \C.lookuptable(cons(indices(C), nil))
+
+That is, we create a new coordinate stack to use to index the
+lookuptable, consisting only of the values from indices.  That's OK
+for one-dimensional lookuptables, but maybe we can generalize it so
+that it does the right thing if the elements of the lookuptable are
+vectors or more complicated things.
+
+To do that, we need to provide the leftover elements of the coordinate
+stack --- the ones not needed to index into indices --- to lookuptable
+in place of the nil.
+
+Taking Rank Into Account
+------------------------
+
+So now we need to consider each array as more than just a function
+from coordinate stacks to scalars; now we also care about its rank
+(although that was obvious from the start, since without knowing its
+rank and also its size in each dimension, we can't do simple things
+like display it on the screen).
+
+So now I am losing interest, because I think this way of thinking
+about it doesn't actually simplify things any over the traditional
+view (where an array consists of a vector of dimensions and a vector
+of contents).  But I'll pursue it just a little bit longer.  Let's
+call the contents function of x "x.f", and its rank function, which
+tells how many items it cares about on the coordinate stack, "x.r",
+and write { f = x.f, r = x.r } to express a new one identical to x.
+So we have
+
+    x + y = { f = \ C . x.f(C) +. y.f(C), r = max(x.r, y.r) }
+    transpose x = { f = \a:b:z . x.f(b:a:z), r = x.r }
+    compose(lookuptable, indices) = {
+        f = \ C . lookuptable.f(cons(indices.f(C), dropn(C, indices.r))),
+        r = indices.r + lookuptable.r - 1
+    } where dropn(X, 0) = X and dropn(X, N>0) = cdr dropn(X, N-1)
+
+The more general form of the "+" case for scalar binary operations is
+
+    scalarop(op, x, y) = { f = \C . op(x.f(C), y.f(C)), r = max(x.r, y.r) }
+
+You could treat arbitrary unary scalar operations as if they were
+vectors, then apply them with compose:
+
+    opvalue(op) = { f = \C . op(car C), r = 1 }
+
+Or you could have a scalarunop:
+
+    scalarunop(op, x) = { f = \C . op(x C), r = x.r }
+
+(It seems like you ought to be able to derive the "r"s mechanically
+from the expressions for the stacks to which you're applying the "f"s.
+In the transpose case, the stack is still the same height, so the rank
+is the same; in the compose case, we drop indices.r items from the
+stack and then add one, so we need an extra indices.r - 1 items.  But
+I'm not quite sure how to do that yet.)
+
+The other basic Forth stack manipulation operators also have
+interesting functions.  DUP, diminishing the rank by 1, takes the
+diagonal of a matrix; DROP, increasing the rank by 1, turns a vector
+into a matrix so that it can be applied column-wise.  For now I'm not
+going to think about OVER (diagonal between first and third
+dimensions?), ROT (rearranging the order of the top three
+coordinates?), NIP, TUCK, 2DUP, and 2DROP.
+
+Iota
+----
+
+One-dimensional monadic iota is fairly straightforward; its content
+function doesn't depend at all on its argument.  (Only its size does,
+and we haven't talked about size yet.)
+
+    iota = { f = car, r = 1 }
+
+APL's N-dimensional monadic iota is kind of stupid; it takes the
+values produced by the one-dimensional iota --- as many as needed ---
+and then reshapes them into the requested shape.
+
+Numerical Python has a somewhat more general operation called
+"indices".  Applied to a vector describing an N-dimensional shape, it
+returns N sets of indices, each of which has the shape requested, and
+contains the Nth index.  For example:
+
+    >>> Numeric.indices((2, 3))
+    array([[[0, 0, 0],
+            [1, 1, 1]],
+           [[0, 1, 2],
+            [0, 1, 2]]])
+
+So the first top-level item has the first coordinate of each location,
+the second item has the second coordinate, etc.  That is,
+Numeric.indices((a,b))[0][x][y] == x, and
+Numeric.indices((a,b))[1][x][y] == y.  This sounds stupid but is very
+useful if you want to tabulate values of N-dimensional functions.
+
+Unfortunately it's a little clumsy to work with in the one-dimensional
+case, because iota (which it calls "arange") is wrapped in another
+layer of nesting.  It's a little clumsy to define in this system;
+although its pointwise value is, like iota, just one of the
+coordinates, the number that specifies which coordinate is hidden deep
+in the stack, and counts backward from there.
+
+    indices(dims) = {
+        f(C) = C[length(dims) - C[length(dims)] - 1],
+        r = length(dims) + 1 
+    }
+
+The "- 1" is there to make the coordinates zero-based.
+
+Reshape
+-------
+
+Reshape (dyadic rho) is extremely simple in the standard
+representation, and rather a dog's breakfast in this one.
+
+Reduce
+------
+
+Reduce ought to work by default along the axis that changes slowest,
+and that's kind of ugly here.
+
+Conclusions
+-----------
+
+It was a cute idea --- especially the Forth stack manipulations
+turning into operations --- but I think it makes things more
+complicated, not less.
