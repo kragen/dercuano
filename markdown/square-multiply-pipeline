@@ -1,0 +1,67 @@
+If you can build a high-speed routing network in a small amount of
+silicon, you can build an extremely high-throughput multiplier for
+high-latency multiplies by using square tables.
+
+xy = ¼((x+y)² - (x-y)²); for example, 579×414 is ¼((579+414)² -
+(579-414)²) = ¼(993² - 165²) = ¼(986049 - 27225) = ¼ 958824 = 239706.
+This seems potentially interesting in the context of modern
+high-throughput computing, in which multipliers occupy a significant
+amount of silicon area and power consumption.  Squaring a number can
+be done with a table lookup, which is relatively light on power
+consumption.  The remaining addition and two subtractions can be done
+quite a bit more easily.
+
+The difficulty, of course, is that a large table occupies a very great
+deal of silicon area.  But perhaps all is not lost — we can share this
+large table among many concurrent multiplications, if they are
+latency-tolerant.
+
+Consider, for example, a 32-stream 10-bit×10-bit multiplier built using this
+scheme.  Each pair of 10-bit numbers entering the multiplier at one of
+32 multiplier ports gets its sum and difference taken; these are sent
+into a mesh routing network to be squared, each tagged with an output
+port.  The 1024-entry lookup table is split into 64 independently
+operating lookup tables of 16 entries each; on every cycle, each such
+lookup table receives a 10-bit input from the network along with the
+routing tag (or, occasionally, an idle notification), and in a single
+cycle places the 20-bit or 18-bit result and the routing tag onto a
+second mesh routing network.  So, every cycle, we’re doing 64 10-bit
+squarings.  These squares make their way through the second routing
+network to output buffers, where they are paired up with their partner
+from the input and subtracted.
+
+The queuing-theory bit is somewhat tricky in that it’s totally
+plausible to do a bunch of multiplications by the same number or by
+similar numbers.  Similar numbers can be broken up a bit by some kind
+of simple hash (x ^ x >> 5, for example) so they don’t all hit the
+same lookup-table shard, but some amount of replication is probably
+unavoidable to handle many multiplications by the same number.
+Alternatively, perhaps the original numbers themselves could serve as
+the routing tags, thus permitting the coalescence of multiple
+concurrent requests for the same number; this would require somehow
+duplicating the results on their way
+to the subtractors.  Regardless, some amount of
+nondeterminism in performance is unavoidable with this scheme.
+
+The routing network from the inputs to the multiplication table can
+probably consist of three layers of 16 4×4 17-bit crossbar switches
+with output buffers to wait on contention; similarly the routing
+network from the table to the output can probably consist of three
+layers of 16 27-bit crossbar switches.
+
+Such a device could carry out 32 10×10-bit multiplication results
+every cycle, with a typical latency of 8 to 11 clock cycles.  The bulk
+of the silicon area is the 1024-entry 20-bit (or 18-bit) square table;
+the crossbars, adders, and subtractors should be relatively small by
+comparison.  (Actually, is that bullshit?  Is it possible that those
+crossbars are fucking huge, even though they don’t contain many
+transistors, just because of the wires?)  Scaling it up to, say,
+16-bit × 16-bit multiplications would involve scaling the table up to a
+65536-entry 32-bit table, which is 100 times larger; but, if split
+among a correspondingly larger number of independent table lookup
+units, this would perform 4096 16×16-bit multiplications every cycle,
+with a variable latency of 15 to 20 clock cycles.  At 400MHz, it would
+provide 1.6 trillion low-precision multiplies per second.
+
+If an electronic crossbar switch turns out to be infeasible, another
+possibility is optical free-space routing.

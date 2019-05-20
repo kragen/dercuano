@@ -1,0 +1,72 @@
+Could you do DDS of comprehensible radio signals with an Arduino?
+Maybe with some filtering.
+
+You can spit out data words with bitstreams at the full clock rate
+with the SPI controller (and some trickery), which is a square wave of
+up to 8MHz.  You can get 10MHz (20mbps) if you use a 20MHz crystal.
+
+AM radio is 525 kHz to 1705 kHz with like a 10kHz bandwidth.  FM radio
+is 88 to 108 MHz with like a 200kHz bandwidth and ±75 kHz deviation.
+
+The mechanisms for these two bands would be quite different.
+
+For AM, we would be synthesizing more or less the frequency we
+actually want, but with different amplitudes (and unwanted harmonics).
+A 530kHz cycle is 1.89 μs, about 30 bit times.  That should give us
+something like 10 or 15 distinct amplitudes, maybe 4 bits.  Not as
+good as magnetic tape, but probably enough for comprehensibility.
+
+For FM, we can’t hope to get close to the actual carrier frequency;
+instead, we can hope that our square waves are square enough and
+well-timed enough to have harmonics up there.  We may be able to
+improve the situation by reshaping them (say, with a Schmitt trigger)
+to sharpen the edges.  At 8MHz, though, you can’t get very narrow
+variation of frequencies.  At 4MHz, your 23rd and 25th harmonics would
+be within the FM band.  But I’m not convinced you can do an adequate
+job unless you’re actually bending the Arduino’s own clock.
+
+Bending the clock might not be that hard, though, especially if we’re
+running on the internal 8MHz RC oscillator for a change.  Keep in mind
+we’re looking for a deviation of less than 75kHz out of about 100MHz:
+0.075%.  And it doesn’t even have to be very linear.  It just has to
+be roughly controllable.
+
+(The numbers hereafter are from the ATtiny2313 datasheet.)
+
+The OSCCAL register on the ATtinies can adjust the internal oscillator
+speed, but only by increments of about 1% (about 2% at the high end of
+the frequency range) which would take you to an entirely different
+radio station.  However, the oscillator frequency also varies with Vcc
+in a much more subtle fashion.  So maybe by putting a resistor on the
+Vcc lead we could vary the Vcc between, say, 1.8V and 5V, by varying
+the current drawn by the chip and therefore the voltage across the
+resistance.  The voltage coefficient of frequency varies on both sides
+of zero over the voltage range, but it seems to be usably large in
+many places.  For example, going from 2V to 2.5V, eyeballing the
+chart, it looks like the frequency at 25° declines from about 8.02MHz
+to about 7.99MHz, a 30kHz variation (0.375%), about 60Hz/mV
+(0.00075%/mV).  This means that by varying the voltage by 100mV we can
+vary the frequency over the appropriate range.
+
+Active supply current Icc increases with Vcc; over that range, it
+varies from 1.3 mA at 2V to 1.8 mA at 2.5V, supposedly.  Idle supply
+current is about 0.3 mA to 0.5 mA over that range, so you can generate
+a proportionately large variation in current just by executing
+instructions.  If we want 1mA to vary our current by 100mV, then we
+want about 100Ω of resistance.
+
+We can’t be sourcing 20mA of FM signal, because the resulting current
+and thus voltage and thus frequency variation would overwhelm the
+signal we are trying to generate.  We might be able to sink it,
+though, with the output load being connected between an output pin and
+Vcc.
+
+[Scott Harden reports][0] that he is able to get good results
+transmitting 1MHz square waves with a class-C amplifier consisting of
+a 2N7000, a resistor to Vcc, a couple of coupling capacitors, and
+modulating the signal into the transistor’s drain below the resistor
+with an audio signal.  But he was just generating square waves.  If I
+understand it right, this seems like it might be a useful alternative
+to direct digital synthesis, maybe using a filtered PWM output.
+
+[0]: http://www.swharden.com/wp/2011-08-06-ridiculously-simple-avr-mcu-am-radio-transmitter/

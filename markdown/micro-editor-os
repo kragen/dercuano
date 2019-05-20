@@ -1,0 +1,65 @@
+I was thinking about the minimum hardware and software needed to get a
+flexible notetaking device working on an AVR microcontroller or
+something similar.  There are a variety of old Nokia cellphone
+displays out there that can be accessed via SPI, such as
+<http://articulo.mercadolibre.com.ar/MLA-647101617-lcd-nokia-5110-_JM>
+(84×48 pixels, monochrome, SPI, AR$99).  PS/2 keyboards
+(<http://articulo.mercadolibre.com.ar/MLA-624534188-teclado-evertec-kb-12u-bk-ps2-teclas-resistentes-compacto-_JM>
+AR$59, a few blocks from my house) are easy to interface.  Supposedly
+4GB MicroSD cards are easy to interface via SPI
+(<http://articulo.mercadolibre.com.ar/MLA-648833744-memoria-micro-sd-4gb-micro-sdhc-nueva-sandisk-micro-hc-_JM>
+$49).  And the ATMega328 is readily available
+(<http://articulo.mercadolibre.com.ar/MLA-609412290-atmega328-atmega328p-pu-dip28-bootloader-arduino-nubbeo-_JM#D[S:ADV,L:VQCATCORE_LST,V:3]>
+$70).
+
+So the basic hardware costs (+ 99 59 49 70) = AR$277 = (/ 277 15.8) =
+US$17.53.  Plus batteries I guess.  And the result has 105 full-sized
+keys, (\* 84 48) = 4032 pixels (8 lines of 24 4×6 characters, say,
+although originally it was used for 4 lines of 13 characters), and 4
+gigabytes of permanent storage — storage you can remove and read and
+write elsewhere!
+
+I actually already have an old PS/2 keyboard lying around, reducing
+the cost to AR$218.  It weighs about 800 g, and there's a space
+containing the LEDs with no keys of about 85×45mm where maybe the LCD
+could be mounted.  The Nokia 3110 from 1997, featuring the display I
+mentioned above, is only 45 mm wide, so the screen must be about 40×25
+mm.
+
+But what do you do about the software?  At a minimum you need a font,
+some screen update logic, editor buffer update logic, search, and
+probably some kind of snapshotting, ideally using the firesystem other
+machines will expect on the SD card.
+
+The ATMega328 has 32K of Flash and 4K of RAM.  You could probably fit
+all the code necessary for the editor and the LCD, filesystem, and
+keyboard drivers into that 32K.  Ant’s Editor, a simple buffer-gap vi
+clone written for the IOCCC around 1993, is a bit under 3K compiled to
+amd64 machine code.  But you probably want to do paging from the SD
+card as much as possible; in particular you don’t want the 4K of RAM
+to have to contain the whole document you’re editing.
+
+None of these three devices requires extremely tight timing.  The LCD
+is clocked from the microcontroller (its five lines are reset, chip
+select, clock, data, and “data/command”, of which I think the last
+three can be multiplexed with other things as long as chip-select is
+held high), the SD card in SPI mode is also clocked from the
+microcontroller (ideally at 20 megabits per second, 2.5 megabytes per
+second, using four lines: clock, data in, data out, and chip select,
+so again it only needs one dedicated pin), and the keyboard generates
+its own clock but only clocks at 10–16.7 kHz, which means that each
+phase of the clock lasts 30–50 μs (according to
+<http://www.computer-engineering.org/ps2protocol/>).  That means that,
+although there is a deadline, the deadline is very generous: 10 or 20
+microseconds, which is 160 to 320 clock cycles at 16MHz, 200 to 400 at
+20MHz, or 80 to 160 at 8MHz if I want to save myself a crystal.  And
+all we have to do at that time is sample the DATA line.
+
+Also, if we miss the deadline, all that happens is that we miss a
+keystroke.
+
+The whole microcontroller interface needs eight pins: the LCD reset
+line (maybe optional), two chip select lines for the LCD and SD card,
+three clock and data lines shared between the LCD and SD card, and two
+lines for the keyboard.  That leaves the other 15 GPIO pins of the
+ATMega328 free.

@@ -1,0 +1,73 @@
+All of what is below the line below is somewhat wrongthink.  A cube is
+the wrong shape; what you want is some set of perhaps abundant,
+perhaps relatively prime *lags* with (possibly running) totals along
+each lag.
+
+Running totals make incremental updates in the middle inefficient, but
+they permit efficient selection of arbitrary time-domain ranges.
+Running *second-order* totals permit efficient selection of arbitrary
+time-domain trapezoidal windows, which may actually be more valuable
+in many cases.
+
+Here’s an example:
+
+    b   a               b   a               b   a               b   a               b 
+    2,  7,  6,  8,  8,  1,  9,  7,  2,  9,  8,  7,  1,  2,  3,  5,  4,  4,  6,  7,  4 x
+    2,  7,  6,  8,  8,  3, 16, 13, 10, 17, 11, 23, 14, 12, 20, 16, 27, 18, 18, 27, 20 running sum by 5
+    2,  7,  6,  8,  8,  5, 23, 19, 18, 25, 16, 46, 33, 30, 45, 32, 73, 51, 48, 72, 52 running sum ⅱ by 5
+    2,  7,  6,  8,  8,  1, 11, 14,  8, 17, 16,  8, 12, 16, 11, 22, 20, 12, 18, 23, 15 running sum by 6
+    2,  7,  6,  8,  8,  1, 13, 21, 14, 25, 24,  9, 25, 37, 25, 47, 44, 21, 43, 60, 40 running sum ⅱ by 6
+    c                       c                       c                       c
+
+If we want the sums of the periodicity-5 component of x, we can just
+take the 5 last values of the second row.  For example, 27 (column a)
+is 7 + 9 + 7 + 4, and 20 (column b) is 2 + 1 + 8 + 5 + 4.  If we want
+the sums of the periodicity-5 component of some substring of x, we can
+subtract the 5 corresponding values from earlier; for example, the
+values 7, 6, 8, 8, 3 represent the totals after the first 6 elements,
+and we can subtract those from the final 5 elements to get the sums
+over this shorter interval.
+
+The “running sum ⅱ” lines are the running sums (with lags) of the
+corresponding running sum lines.  This allows us to compute average
+values of the running sum over some arbitrary interval; with two such
+average values of the running sum, we can calculate the sum over an
+interval of the original signal, but with fuzzy boundaries on the
+window.
+
+---
+
+Suppose that as you acquire samples from some signal, you assign them
+raster-wise to elements of a 6×5×7 “cube”, maintaining a running total
+of the samples for each of the 6×5 one-dimensional slices along the Z
+dimension.  This requires two memory updates (one add) per sample.
+When you finish with one such 210-sample cube, you move on to another.
+
+Now, if you want to take the dot product of a 210-sample cube with an
+arbitrary waveform of period 6, you can start by generating the
+stride-6 totals from the pre-existing totals on the 6×5 face of the
+cube, which requires 24 additions.  Then you perform your 6
+multiply-adds and get your result.
+
+You can take those 30 totals and add them up differently to get the
+periodicity-5 component of the waveform.
+
+This structure accelerates several other variants of the same
+computation, too:
+
+- If you only want to perform the dot product on a fortunately aligned
+  30-item or 60-item substring of the samples, you can take one or two
+  rows of the 5×6 totals, rather than all of them.
+- If you want to take dot products with several different period-6
+  waveforms, you can use the same totals.
+- If the waveform is actually of period 2 or 3, rather than 6, you can
+  do 4 or 3 additions instead of some of the multiply-adds.
+
+Other dimensions may have different advantages.  12×14×13, for
+example, with 12×14 totals, gives you somewhat efficient dot products
+with waveforms of 2, 3, 4, 6, 7, 12, and *24* samples — because the
+12×14 totals can be added up in groups of 7 to get the period-24 wave.
+
+This data structure, then, allows you to do certain computations with
+short-period waveforms at very low cost, while also permitting
+efficient incremental updates.

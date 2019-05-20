@@ -1,0 +1,78 @@
+Reading Physical Audio Signal Processing, I was struck by [the ]matrix
+equation for the impulse response][0] of the linear state-space model:
+
+    h(n) = D if n = 0 else CAⁿ⁻¹B
+
+[0]: https://ccrma.stanford.edu/~jos/pasp/Impulse_Response_State_Space.html
+
+Here D is the direct coefficient matrix from inputs to outputs (not
+mediated by the system state), A is the state space transition matrix,
+B is the matrix of input gains (inputs to their effects on state
+variables), and C is the matrix of output gains.
+
+The equation looks obvious, but suddenly I understand what a
+vibrational mode is — it’s an eigenvector of A, so it survives Aⁿ⁻¹
+unchanged except in phase and magnitude — and I see how to use matrix
+exponentiation to speed up the simulation of linear circuits.
+
+Maybe I’ve actually done this before, actually.  Specifically, to cut
+down on errors due to time discretization, you can start with the
+equations for some time step size, such as a millisecond — maybe
+dV(C₁)/dt = 5 V(L₃) + 2 V(C₂) — so in a millisecond you have .005 and
+.002 entries in your matrix.  But of course V(L₃) and V(C₂) are
+changing during that millisecond, which generates errors proportional
+to their second derivatives and the square of the time interval.  So,
+a thing you can do is to divide these deltas by, say, a million,
+getting the state-transition matrix for a nanosecond — the matrix
+becomes six orders of magnitude closer to the identity matrix.  But
+simulating the circuit nanosecond by nanosecond instead of millisecond
+by millisecond would run a million times slower.
+
+So — and this is the clever part — you *square the matrix* to get a
+matrix for the 2-ns change.  (Disregarding the influence of B for the
+time being, that is.)  This matrix is not quite the same as the one
+you would have gotten by dividing by 500 000 instead of a million,
+because it includes second-order effects; it precisely captures the
+effect of doing the 1-ns change twice.  Then you square it again, 19
+more times, and you have a new matrix for 1.048 576 milliseconds,
+which allows you to simulate just as fast as before, but with
+discretization errors that are 12 orders of magnitude smaller.
+
+Taking a really simple example, consider an object whose coordinates
+are (cos t, sin t).  dx/dt = -y and dy/dt = x, so we could try using
+the matrix
+
+    [[1 -1]
+     [1  1]]
+
+which will of course produce immense errors immediately, generating an
+exponential spiral through the powers of 2.  But suppose we divide the
+derivatives by a factor of 1048576, to get the transition matrix for
+about a microsecond:
+
+    array([[ 1.00000000e+00, -9.53674316e-07],
+           [ 9.53674316e-07,  1.00000000e+00]])
+
+And then we execute the above procedure.  Now we have this:
+
+    array([[ 0.54030256, -0.84147139],
+           [ 0.84147139,  0.54030256]])
+
+The correct values of cos(1 rad) and sin(1 rad) are closer to
+0.5403023 and 0.8414710, but being correct to six decimal places is
+nothing to sneeze at.  You can make a point orbit with this rotation
+matrix for many, many generations before it has spiraled outwards
+much.
+
+(Is this just CORDIC?)
+
+Of course, in this case, we could have corrected the spiraling
+behavior by noting that the matrix determinant was 2 and thus dividing
+by √2, giving us:
+
+    array([[ 0.70710678, -0.70710678],
+           [ 0.70710678,  0.70710678]])
+
+And that is definitely a rotation matrix, and it doesn’t lose or gain
+“energy” (which is squared radius in this case), but it’s also
+definitely not a rotation of one radian.

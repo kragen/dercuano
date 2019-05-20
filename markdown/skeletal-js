@@ -1,0 +1,101 @@
+I just hacked together some crappy JS.  I thought it would be good to
+write down a grammar for the subset of JS I happened to use, as a sort
+of benchmark of how big a grammar for a usable JSish language needs to
+be.  Here I’m using lowercase for tokens.
+
+    Stmt ::= Expr semicolon | Decl | Function | Block | Controlflow
+    Controlflow ::= If | For | Forin | Forof | continue semicolon | Ret | Throw
+    Ret ::= return semicolon | return Expr semicolon
+    Throw ::= throw Expr
+    Expr ::= Assexpr
+    Assexpr ::= Orexpr eq Assexpr | Orexpr
+    Orexpr ::= Orexpr or Andexpr | Andexpr
+    Andexpr ::= Andexpr and Cmpexpr | Cmpexpr
+    Cmpexpr ::= Cmpexpr Cmpop Addexpr | Addexpr
+    Cmpop ::= eqeqeq | eqeq | leq | geq | lt | gt | noteqeq | noteq | in
+    Addexpr ::= Addexpr (plus | minus) Mulexpr | Mulexpr
+    Mulexpr ::= Mulexpr (times | divide | modulo) Incexpr | Incexpr
+    Incexpr ::= not Incexpr | Atom | Atom plusplus | Atom minusminus
+    Atom ::= Literal | name | Listdisplay | Methodcall | Property | leftparen Expr rightparen
+    Literal ::= string | null | true | false | regexp
+    Listdisplay ::= leftbracket Exprlist rightbracket
+    Exprlist ::= Expr comma Exprlist | Expr
+    Methodcall ::= Property leftparen Exprlist rightparen
+    Property ::= Atom period name | Atom leftbracket Expr rightbracket
+    Decl ::= (let | const) Decls
+    Decls ::= name eq Expr | name | name eq Expr comma Decls | name comma Decls
+    Function ::= function name leftparen (Params | ε) rightparen
+    Params ::= name | name comma Params
+    Block ::= leftcurly Stmts rightcurly
+    Stmts ::= Stmt Stmts | ε
+    If ::= if leftparen Expr rightparen Stmt (else Stmt | ε)
+    For ::= for leftparen Forinit semicolon Fortest semicolon Forinc rightparen Stmt
+    Forinit ::= Decl | Expr | ε
+    Fortest ::= Expr | ε
+    Forinc ::= Expr | ε
+    Forin ::= for leftparen (let | ε) name in Expr rightparen Stmt
+    Forof ::= for leftparen (let | ε) name of Expr rightparen Stmt
+
+Noticeably missing are function expressions, object displays,
+try-catch statements, `break`, `new`, arrow functions, unary prefix
+operations + and - (same precedence as `!`),
+`...` spread operations, bitwise operators, and
+semicolon insertion.  That’s because I happened not to use them in the
+code in question.
+
+The tokens are something like the following:
+
+    semicolon ::= ';'
+    continue ::= 'continue'
+    return ::= 'return'
+    throw ::= 'throw'
+    eq ::= '='
+    or ::= '||'
+    and ::= '&&'
+    eqeqeq ::= '==='
+    eqeq ::= '=='
+    leq ::= '<='
+    geq ::= '>='
+    lt ::= '<'
+    gt ::= '>'
+    noteqeq ::= '!=='
+    noteq ::= '!='
+    in ::= 'in'
+    plus ::= '+'
+    minus ::= '-'
+    times ::= '*'
+    divide ::= '/'
+    modulo ::= '%'
+    not ::= '!'
+    plusplus ::= '++'
+    minusminus ::= '--'
+    leftparen ::= '('
+    rightparen ::= ')'
+    string ::= '"' ([^"\\] | '\\' char)* '"' | "'" ([^'\\] | '\\' char)* "'"
+    null ::= 'null'
+    true ::= 'true'
+    false ::= 'false'
+    regexp ::= '/' ([^/\\] | '\\' char)* '/'
+    leftbracket ::= '['
+    rightbracket ::= ']'
+    comma ::= ','
+    period ::= '.'
+    let ::= 'let'
+    const ::= 'const'
+    name ::= [A-Za-z_\u0080-\u10ffff] [A-Za-z0-9\u0080-\u10ffff]*
+    function ::= 'function'
+    leftcurly ::= '{'
+    rightcurly ::= '}'
+    if ::= 'if'
+    else ::= 'else'
+    for ::= 'for'
+    of ::= 'of'
+
+This omits whitespace, comments, and the complications of automatic
+semicolon insertion.
+
+The tricky part for PEG implementation would be the left-recursion in
+Orexpr, Andexpr, Cmpexpr, Addexpr, and Mulexpr; the comma ambiguity
+(once you add the comma operator) probably requires distinguishing
+Exprs from Commalessexprs, and the if-else ambiguity is handled
+reasonably by PEGs.

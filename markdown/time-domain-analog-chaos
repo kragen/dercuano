@@ -1,0 +1,68 @@
+There are a variety of circuits published with chaotic analog
+behavior, iterating chaotic maps like the logistic map (in its domain
+of chaos) or the tent map, typically producing either a voltage-mode
+signal or a current-mode signal.  These are sometimes used as analog
+noise sources similar to an amplified Johnson-noise source or an LFSR,
+but they operate in discrete time; each iteration of the map takes
+place after a clock pulse.
+
+I was thinking about jittering the sampling time of an
+analog-to-digital conversion to eliminate aliasing, and it occurred to
+me that what I wanted was a chaotic analog circuit that produced a
+signal that was not a voltage or a current, but a time interval.
+Moreover, a straightforward mechanism using two coupled relaxation
+oscillators occurred to me.
+
+The *dyadic map* is a particularly simple chaotic map when considered
+as a formula: just f(x) = 2x mod 1.  So, for example, it maps 0.1,
+0.2, 0.3, 0.4, 0.5, 0.6 to 0.2, 0.4, 0.6, 0.8, 0.0, 0.2.  This is
+equivalent to shifting a binary fraction to the left by one bit and
+discarding the overflow, so terminating binary fractions eventually
+find their way to the map’s single fixed point, 0.0, and repeating
+binary fractions are periodic with a period of their repeating length.
+So you have, for example, one attractor with period 2 (.0̄1̄/.1̄0̄, ⅓ and
+⅔), two attractors with period 3 (.001… and .011…), 3 attractors with
+period 4 (.0001…, .0011…, .0111…), 6 attractors with period 5
+(.00001…, .00011…, .00101…, .00111…, .01011…, .01111…), and so on.
+
+So all rational numbers are periodic in the dyadic map.  *But all
+irrational numbers are aperiodic*, and almost all numbers are
+irrational.  And so if you perturb a rational number by a small
+nonzero amount, you are almost certain to land on an irrational
+number.  So an analog circuit implementation of the dyadic map, which
+is subject to noise, should behave chaotically rather than get stuck
+in a fixed point.
+
+How can we implement the dyadic map in the time domain?  Well, we can
+convert a sampling time x to a voltage 2x mod 1 by sampling a sawtooth
+with a period of 1 and a slope of 2, in whatever units we’re using.
+And then to convert from the voltage back to the sampling time, we
+just use it as the starting voltage for a ramp generator that ramps ⅓
+as fast.
+
+(It’s ⅓ as fast because it has to finish up the current oscillation of
+the sawtooth too.)
+
+So, for example, suppose we sample the sawtooth at time 0.231.  Its
+voltage is 0.231, and so we start our other ramp generator at V=0.231.
+At time 1, it has reached 0.4873; at time 2, it has reached 0.8207;
+and then at time 2.538, it reaches 1 and triggers another sample of
+the sawtooth.  Now the sawtooth’s voltage is 0.538, so the other ramp
+falls to 0.538 and grows back up toward 1, which takes 1.386 time
+units, reaching voltage 1 at time 3.924 and triggering an additional
+sample of V=0.924.  And so it goes: 0.231, 2.538, 3.924, 4.151, 6.698,
+etc.
+
+Note that this is not the dyadic map!  0.538 is not 2·0.231 % 1.
+Rather, 0.538 = 2·(1-0.231) % 1.  This is an *inverted* dyadic map.
+It preserves the properties of the original when it comes to which
+points lead to periodic orbits, but the periods change.
+
+We can do better than that, though.  A ramp generator or a sawtooth
+generator requires a constant-current source.  But actually an
+exponential decay works just as well for this, as long as the
+exponential decay on the sampling-generator signal is three times as
+long.  You can think of the exponential thing as just a distortion on
+your oscilloscope.  So an RC circuit is a perfectly adequate
+substitute for a ramp generator here.
+
