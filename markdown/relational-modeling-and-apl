@@ -1,0 +1,84 @@
+Relational modeling and APL
+===========================
+
+I think there’s a kind of logic-programming or constraint-logic
+approach that preserves most of what’s good about array languages,
+while adding the kind of multidirectional inference languages like
+Prolog and especially miniKANREN have.
+
+I’ve noticed these notes are getting repetitive as I write down the
+same ideas over and over again, having forgotten them; I’ll try to
+link them here.
+
+I was thinking about [object-oriented equational rewrite rules] and
+file `funbot` today or yesterday, thinking about how it would be nice
+to define properties like “.vol = π.r²·.h; .area = 2π.r(.h + .r)” so
+that “foo.area” would do a search for formulas that could be applied,
+and use that one if it happened that “foo” has properties .h and .r.
+(I vaguely handwaved in my head that some kind of namespacing could
+alias this to “foo.cylinder::h” so it wouldn’t collide with, say,
+“foo.planck::h”.)  And it occurred to me that this is precisely the
+same thinking in file `principled-apl` about array conformability.
+(And in `views-and-ometa`, I opined that they were the same thing as
+Wadler’s Views.)
+
+[object-oriented equational rewrite rules]: http://lists.canonical.org/pipermail/kragen-tol/2007-March/000855.html
+
+A difference, though, is that in the rewrite-rule thinking, a single
+property can have multiple definitions, like methods overridden in
+different OO classes, of which normally only one is applicable, while
+in `principled-apl` no such merger was contemplated, except through
+explicit conditionals.
+
+In `funbot` I’d suggested resolving conflicts through a specificity
+ordering, like CSS or Aardappel.  But thinking of the rewrite rule as
+a *deduction rule* suggests another alternative.  Suppose we read
+“.vol = π.r²·.h” as specifying an equation in the usual sense — a
+relationship that is known to hold in all situations where the
+variables are defined.  In that case, it defines a *constraint*, which
+means that not only can we use it to compute .vol, but we can use it
+to compute .h if we happen to know .vol and .r from someplace else.
+That means that it’s also an *assertion* — if we have a different
+computation of .vol from some other definition, the two values must
+agree, or we have discovered an inconsistency in our model!
+
+So that’s a different way of dealing with “rewrite rule”
+conflicts — crash the program if two conflicting definitions give
+different results.
+
+(And Prolog, of course, considers conflicting definitions as equally
+valid possibilities, though there is a definite order to them; the
+second is only used if we backtrack out of the first.)
+
+But we can get that without giving up the yumminess of implicit loops
+we get in `principled-apl` (and `typed-apl` and `matrix-multiply`) by
+virtue of saying something like .r = [1mm 2mm 5mm 10mm], meaning that
+there are four situations of interest defined by different radii.  And
+these “different cylinders” can all “inherit” a common .h, have a .h
+that varies together with .r, or have a .h that varies independently
+of .r.  The underlying logic is conditional deduction over various
+different situations.
+
+I talked a bit about this connection in [More thoughts on powerful
+primitives](powerful-primitives.html#addtoc_12) as well.
+
+By using the more powerful kind of relational programming miniKANREN
+provides, rather than the more limited kind used by Prolog, we may be
+able to solve more models.  Also, for numerical relationships like the
+ones I used as examples above, interval arithmetic or affine
+arithmetic may be very useful for two reasons — first, in order to
+make progress toward solving or proving insoluble a system that starts
+out underconstrained (consider .x = exp(.x), which has no solution, or
+.x = exp(.x)/4, which has two solutions), and second, for determining
+whether two values of a numerical quantity reached through different
+computational paths are in fact equal or not.  (Interval arithmetic
+can’t prove that the values are equal, but it can reliably tell
+whether an apparent difference is too big to be due to rounding
+error.)
+
+There’s a potential conflict here between the use of implicit patterns
+of known values to distinguish situations where a property doesn’t
+*exist*, like trying to find the radius of a cube, and where a
+property *isn’t known yet*.  I suspect that there may be different
+valid design choices one can make to resolve this conflict which lead
+to interestingly different languages that work for different purposes.
