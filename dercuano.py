@@ -197,7 +197,7 @@ class Note:
         return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
 
     def link_ley(self, level=1):
-        return a(self.title(), href=("../" * level + self.localpart()))
+        return a(self.title(), href=("../" * level + urllib.quote(self.localpart())))
 
     def date_string(self):
         if self._date_string is None:
