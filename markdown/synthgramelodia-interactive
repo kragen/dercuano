@@ -1,0 +1,130 @@
+I wrote a thing a while back called "synthgramelodia", which randomly
+synthesizes melodies from a grammar, many of which are listenable.
+Its homepage, which is currently just a list of outputs, is at
+<http://canonical.org/~kragen/sw/synthgramelodia>.  I should probably
+at least put the software there.
+
+I think it's probably possible and worthwhile to use this same grammar
+for interactive improvisational composition, but I don't feel up to
+actually implementing it at the moment.  (I'm horizontal with what I
+think is a flu.)  But I think I can explain the idea.
+
+Synthgramelodia uses a tiny six-production grammar of melodies which
+is capable, in theory, of expressing basically any chromatic melody
+using the Chinese equal-temperament scale and the binary note values
+used in mainstream Western music today; but it's intended to be biased
+towards things that will sound "nice", so that the result will often
+be listenable, and it uses a DAG to promote repetition of motifs with
+some variation.
+
+The grammar can be expressed as follows in a single line:
+
+    m ::= "." | [a-z] | _<m> | +<m> | (<m> <m>) | (<m> ^ <m>)
+
+The two fundamental atomic melodies of the grammar are:
+
+- a **Rest**, written `.`, which is a silence lasting one beat, and
+- a **NoteScore**, written with a letter `a`, `b`, etc., to indicate
+  which of the synthesizer's various "instruments" to play.  A NoteScore
+  by itself represents the instrument being played for a single beat at
+  220Hz, which is A3 or A below middle C.
+
+On top of these, there are four compound melody types which modify one
+or more melodies:
+
+- a **Transpose**, written `_x`, where `x` is the melody being
+  transposed; it represents the same melody as `x`, except lower in
+  pitch by a perfect fifth.
+- a **Louder**, written `+x`, where `x` is the melody being amplified;
+  it represents the same melody as `x`, except louder in volume by 3
+  dB;
+- a **Sequence**, written `(x y)`, where `x` and `y` are two melodies
+  being concatenated, which consists of first the notes of `x` and
+  then the notes of `y`; if `x` and `y` are of different lengths, the
+  shorter one is slowed down to equal the longer one in length.  Also,
+  `y` is reduced in volume by 2 dB.
+- a **Parallel**, written `(x ^ y)` where `x` and `y` are two melodies
+  being played simultaneously; `y` is raised in pitch by an octave,
+  while the bass line `x` is left unchanged, and if they are of
+  different lengths, the longer of the two is accelerated in order to
+  be of the same length as the shorter.
+
+(At some point, I replaced the stretching of the shorter melody with
+repetition, which I don't think improved it.)
+
+Synthgramelodia builds up random melody DAGs using these productions
+or node types in a bottom-up fashion that tends to reuse the same node
+in many parts of the tree, with the result that you tend to hear the
+same motif at diferent speeds and transposed to different pitches,
+although not using different instruments.
+
+It should be apparent that you can raise a melody's pitch arbitrarily
+high by paralleling it with a bass line consisting of a rest several
+times, lower it arbitrarily low by transposing it several times, reach
+any chromatic pitch by combining these two, amplify it arbitrarily by
+loudering it many times, accelerate it arbitrarily by concatenating it
+with many rests (or with itself) and then paralleling it with a single
+rest, and slow it down arbitrarily to an arbitrarily slow speed by
+concatenating it with a long sequence of rests, although at the cost
+of embedding it in a longer silence.
+
+It should also be apparent that the only reachable pitches are in the
+chromatic scale, the only reachable melody lengths are powers of 2,
+and all integer numbers of decibels are reachable amplitudes.
+
+(It might make more sense to reverse the speedup/slowdown semantics of
+Parallel and Sequence, so that you can slow things down arbitrarily by
+paralleling them with a long silence, while speeding them up would
+just require concatenating them with a single rest; or maybe make a
+separate node type for speeding things up.)
+
+Given all this, it also seems clear that you should be able to write
+an expression (infix or Forthlike) to generate a "gramelodia", perhaps
+even synthesizing it in real time as you improvise.  I suspect that
+some kind of Forth-like interface, like GlitchMachine, is probably the
+best way to edit this; it gives you a linear thing you can edit which
+is essentially immune to syntax errors.
+
+Constructing arbitrary DAGs on a Forth stack might seem
+tricky. Arbitrary trees are of course straightforward: the postorder
+traversal of the tree forms the Forth-style command sequence, and
+you're done.  Some DAGs can of course be constructed with nothing more
+than "dup", but you need some amount of stack manipulation to
+construct things like `(a b) (a c)`.
+
+If we consider a Forth two-stack machine as a sort of Turing machine
+that can insert and delete cells on its tape, we can see that the four
+operations `dup`, `r>`, `>r`, and `shift` are sufficient to shuttle nodes
+around in order to construct arbitrary DAGs. With the operand stack on
+the left, the auxiliary ("return") stack on the right, and
+top-of-stack outlined with parens, these operations are as follows:
+
+- `dup`: "... (a) ..." → "... a (a) ..."
+- `>r`: "... b (a) ..." → "... (b) a ..."
+- `r>`: "... (b) a ..." → "... b (a) ..."
+- `shift`: "...(a) b ..." → "... b (a) ..."
+
+The sequence of cells on the tape, omitting duplication, remains
+unchanged except by `shift`, which moves the current top-of-stack to
+the right on the tape, which can be repeated until it reaches the
+position it needs to combine with whatever it needs to combine with;
+`>r` and `r>` move the head left or right on the tape; and `dup` is
+what you do to use a node in two places.  (Arguably the duplicate
+ought to be on the auxiliary stack to the right, not the main stack to
+the left.)
+
+I've made several attempts to reduce this to three operations, but
+none has yet been successful.  There's probably something hiding just
+out of sight; but, for example, with just `r!`, `shift`, and `r>`,
+there's no way to write `swap`, which is a problem in the presence of
+non-commutative operations like the gramelodia melody combinations;
+and if you integrate `dup` into one of the other operations, you
+probably need to add `drop` as well.
+
+You could imagine a live display not only of the melody, but also the
+sheet music, the DAG, sheet music for individual DAG nodes, an infix
+version of it, and a highlight on each of these indicating where your
+editing cursor is in the Forth sequence; and also keys to jump your
+cursor to the construction of one or the other top stack items at that
+point in execution, so you can navigate the DAG structurally.
+

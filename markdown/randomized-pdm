@@ -1,0 +1,137 @@
+Straightforward PDM (Pulse Density Modulation) is basically the
+Bresenham line drawing algorithm --- you bump up an error counter by
+the desired slope every iteration, and when that error counter hits a
+threshold, you move to the next discrete row of pixels on the display,
+and subtract from the error counter.  Like this:
+
+    error_counter += desired_slope * 2 * threshold;
+    output_value = (error_counter > threshold);
+    if (output_value) error_counter -= 2 * threshold;
+
+As `desired_slope` increases from 0 to 1, the duty cycle of
+`output_value` (which is always either exactly 0 or 1) likewise
+increases from 0 to 1.  (And of course in practice you probably want
+to store `desired_slope * 2 * threshold` in a variable,
+i.e. prescaling `desired_slope`.)  To draw a line, you add or subtract
+`output_value` to your X or Y coordinate, and always increment or
+decrement the other coordinate, according to which octant the line is
+in.
+
+One potential problem with this for, say, audio applications, is that
+it adds an artifact: a high-power pulse train at a single high
+frequency, and that frequency can potentially be fairly low; it's
+highest when you're using PDM to produce a 50% duty cycle, at which
+point you have a square wave at a frequency of half the "sampling"
+frequency.  At 25% or 75% duty cycle, the fundamental frequency dips
+to a fourth of the sampling frequency, which is to say two octaves
+lower; at more extreme duty cycles, the frequency drops reciprocally.
+At a 1% or 99% duty cycle, your artifact frequency is 100 times lower
+than your sampling frequency, more than six octaves lower.
+
+In an environment that can produce subharmonics, for example due to
+aliasing, even artifacts too high in frequency to perceive can become
+disturbing by producing strong perceptible subharmonics.  Pixel
+line-drawing is actually just such an environment: lines that cross
+one another interact nonlinearly, and it's easy for the high-frequency
+jaggies of Bresenham line-drawing to alias down into large-scale moiré
+patterns.
+
+But, ideally, in the PDM case, you keep this artifact frequency high
+enough that you can filter it out easily, restricting the available
+duty cycles if necessary, in the analog domain if that's where you're
+ultimately sending the pulse train.  But you may not be able to
+achieve that.  Alternatively, you could *spread* the artifact out so
+that it's less problematic, making it more closely resemble white
+noise:
+
+    error_counter += desired_slope * 2 * threshold;
+    output_value = (error_counter > threshold + r * drand());
+    if (output_value) error_counter -= 2 * threshold;
+
+Here `r` is a parameter that controls how much bandwidth the artifact
+noise is spread over.  At `r == 0` you have exactly Bresenham
+line-drawing, and as `r` grows to `threshold` the artifact noise gets
+spread over, I think, an entire octave, and I think grows slightly.
+If `r` grows further, it will *increase* the total artifact noise, but
+it might still become less obtrusive up to some point, by virtue of
+having lower spectral density.
+
+I suspect that you could probably produce nearly-telephone-quality
+audio this way with a "sample frequency" of only about 30kHz and an
+`r` of about `threshold`, giving you a sort of "shaped dither"
+spreading the 1-bit quantization noise over the upper octave or so of
+human hearing, where we're relatively insensitive.  A 100Hz wave would
+have 150 cycles positive and 150 cycles negative, so you'd have only
+at best an ENOB of about 8, and less for higher frequencies; but as
+long as the quantization noise stuck strictly to an annoying
+high-frequency hiss, that might not be so bad.  By comparison, a
+25%-to-75%-duty-cycle pure-PDM at the same sample rate would on
+occasions produce a high-power frequency-modulated whistle as low as
+7.5kHz, which would be extremely noticeable; and an equivalent 7-bit
+PWM would use a fundamental frequency of 30kHz/128 = 234Hz, right in
+the heart of the sounds you're trying to reproduce, making it almost
+completely unusable.
+
+If you're doing this on a microcontroller, such as an Arduino, you
+might be extremely interested in how many clock cycles the above code
+needs, since if the timer ISR you're running it in takes too long, you
+have to lower the sample rate further in order to have time to run
+other code.  The basic 8-bit Bresenham PDM code is something like
+
+       r1 := ram[error_counter]
+       r2 := ram[scaled_desired_slope]
+       r1 += r2
+       ram[error_counter] := r1
+       jump_if_overflow 1f
+       io[output_pin] := 0
+       reti
+    1: io[output_pin] := 1
+       reti
+
+using the wraparound carry to implicitly subtract `2 * threshold`.
+The overflow bit (assuming you have an overflow bit) gets set when the
+byte overflows from positive to negative.  If you only have a carry
+bit (are there CPUs with only a carry bit?), you can use that instead
+by initializing `error_counter` to the most negative number
+(e.g. -128) instead of zero.
+
+(As a side note, I don't know why this logic isn't embedded as a
+PDM-generation circuit in microcontrollers.)
+
+I think that's about 8–16 clock cycles on a RISC machine, so on an
+Arduino you could probably up to do 1MHz or 2MHz, or more if you can
+reserve a couple of registers for the ISR so it doesn't have to access
+RAM.  Another three cycles would give you 16-bit `error_counter` and
+`scaled_desired_slope` values, and maybe something approaching
+CD-quality audio:
+
+       r1 := ram[error_counter]
+       r2 := ram[error_counter+1]
+       r3 := ram[scaled_desired_slope]
+       r4 := ram[scaled_desired_slope+1]
+       r2 += r4
+       r1 += r3 + carry_bit
+       ram[error_counter] := r1
+       ram[error_counter+1] := r2
+       jump_if_overflow 1f
+       io[output_pin] := 0
+       reti
+    1: io[output_pin] := 1
+       reti
+
+Adding the random diffusion is probably best done on the Arduino,
+which has a two-cycle hardware multiplier, with a linear congruential
+generator whose results are right-shifted to the proper scale.  The
+LCG probably needs at least 16 bits, so you need at least four 8-bit
+multiplies and four 8-bit additions, an additional 12 cycles.
+However, this is not the end of it; the comparison complicates things
+somewhat, because we can no longer depend on a single test of a carry
+bit.  Probably it's best to restrict the `error_counter` range to a
+subset of its possible values, requiring an actual conditional
+subtraction, and use an actual subtraction for the threshold test.
+
+If you're thus limited to, say, 300kHz, then at 30kHz you'll be using
+10% of the microcontroller's compute cycles for the audio PDM.
+
+(Hmm, I should probably try this out with Python programs generating
+WAV files before I worry too much more about its efficiency...)

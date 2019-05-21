@@ -1,0 +1,144 @@
+It occurred to me that there is a simple way to build lookup-table
+(LUT)-based mechanical finite state machines with planar fabrication.
+I think this is considerably less dense than than the heightfield-
+based LUTs I’ve written about previously.  It represents the
+transition matrix as a maze of channels cut into a surface, with a
+single follower traversing the maze under the influence of springs and
+friction.
+
+Press the button on the back of a pushbutton ballpoint pen, and the
+tip extends; press it again and it retracts.  It’s a mechanical state
+machine with two states that takes no inputs.  It works by having a
+rotating cylindrical thingy that slots into guides in the outer barrel
+of the pen; they force it to rotate when it moves longitudinally.
+
+We can extend this mechanism to more general state machines, that take
+N discrete inputs and transition arbitrarily between M discrete
+states, each of which has one of P discrete outputs.  The input is
+encoded as a distance to which you push the thing corresponding to the
+ballpoint pen button against the spring; the state is encoded in the
+rotation of the barrel; and the output is encoded as a distance to
+which the spring is able to push back once the input is withdrawn.
+And the mechanism is changed somewhat to be able to handle general
+state machines.
+
+For simplicity of diagramming I will unroll the cylindrical thingy to
+be planar.  Here’s a way to realize our ballpoint pen with my new
+scheme:
+
+      State    State
+        1        2
+    +————————————————+
+    |                |
+    |   |            |  Output 1
+    |   |            |
+    |   |            |
+    |   |        |   |  Output 2
+    |   |        |   |
+    |   |\      /|   |
+    |   | \    / |   |  Follower (larger scale):
+    |   |  \  /  |   |
+    |   |  |  |  |   |   _______________
+    |   |   \/   |   |  (_______o_______)
+    |   |   /\   |   |
+    |   \  /  \  /   |
+    |    \|    |/    |
+    |     #    #     |
+    |                |
+    +————————————————+
+
+The paths here are smoothly curved channels in the plane.  An oblong
+“follower” with rounded ends begins in either the State 1, Output 1 or
+State 2, Output 2 position at the top of the diagram, and is then
+pushed down to the bottom.  It’s free to move horizontally, but has to
+overcome some friction to do so.  Where the channels branch, the
+branch points are wide enough that it is kinematically capable of
+following either branch; but the horizontal friction ensures that it
+simply continues straight down; it follows the curves down to one
+of the transition points marked #.
+
+When the input pressure is removed, it begins to return back upwards,
+but because it’s at a branch point with an available vertical path it
+follows that branch rather than returning by the same path by which it
+came — and thus it ends up going to the other state.  At the point
+that the two return paths cross, the intersection is not wide enough
+to allow the follower to turn to follow the wrong return path, like
+the shuttles in a trammel of Archimedes.
+
+(If the plane were a cylinder, the two paths would not have to cross
+over each other, and that is in fact the approach taken by actual
+ballpoint pens.  Also, they typically have a larger number of states,
+such as 8 or 12, but with only 2 outputs.  And commonly they have a
+separate “nudge” in the thing propelling the follower vertically to
+push it into the return path, but that isn’t strictly necessary.)
+
+When there are multiple possible inputs, there will be multiple return
+branch points on each path down, branching off at different heights:
+
+    |    \| | |      |
+    |     # | |      |
+    |      \| |      |
+    |       # |      |
+    |        \|      |
+    |         #      |
+
+These different branch points are independently routable to arbitrary
+different next states.  This lets you use any arbitrary transition
+function for your state machine.  However, in the general case, all
+these separate M*N return paths need to be able to pass in parallel
+and cross over before getting back to the states, which puts a limit
+on how complex our state machine can be in a given space.
+
+This mechanism provides fan-out, but not fan-in: unlike with the
+heightfield LUT, combining two separate inputs, such as two summands
+or multiplicands, must be done with some other mechanism.  But such
+mechanisms can be fairly simple.
+
+In addition to wrapping the transition maze around a cylinder, you can
+also wrap it around on a disc, as shown by the spiral cams in “[Basic
+Mechanisms in a Fire Control Computer (1953)][0]”, using rotation
+rather than translation as one of your dimensions of motion; and
+indeed, if you distort the other dimension into a series of arcs, you
+can use rotation rather than translation for both of them, while
+retaining the compactness of planarity.
+
+[0]: http://youtu.be/s1i-dnAH9Y4 "MN-6783a, MN-6783b, US Navy"
+
+Heightfield LUTs are not novel
+------------------------------
+
+This video also shows that my [heightfield LUT][1] was already
+invented, in analog form for continuous functions in 1953; apparently
+it’s called a “barrel cam”.  The Equation of Time Cam, from the first
+prototype of the Clock of the Long Now, is an example that I had seen.
+It compensates for the changing time of solar noon throughout the
+year.
+
+[1]: http://lists.canonical.org/pipermail/kragen-tol/2010-June/000919.html "mechanical computation: with Merkle gates, height fields, and thread"
+
+Investigating further, it turns out that, before 1953, the Jaquet-Droz
+automaton known as The Writer used a heightfield LUT, in the form of a
+stack of cams, to encode a vector font; this automaton is a pen
+plotter with a non-ASCII character set, in the shape of a small boy
+with curly hair.  Three cam followers control the X, Y, and Z motions
+of the pen, and the axial displacement of the camshaft determines
+which character is produced.  Wikipedia explains that the automaton
+was constructed between 1768 and 1774.  It still works, more or less,
+and is demonstrated once a month at the Musée d’Art et d’Histoire de
+Neuchâtel.
+
+In between the Writer and the Cold War barrel cams, the rotational
+dimension of the cam was generalized to be any continuous input
+variable, rather than just time; and the axial displacement dimension
+was generalized to be possibly continuous rather than discrete.  I
+don’t know when between 1774 and 1953 these two generalizations
+occurred, nor whether they might have been present in other machines
+even before 1774.
+
+This is interesting to me because, as I wrote in 2010, LUTs have major
+advantages for mechanical digital computation: they’re much easier to
+design than combinations of universal gates like NANDs or NORs, and
+they also involve many fewer moving parts.  So it seems like you could
+have built a general-purpose digital computer in the 1700s, at least
+in Switzerland, if you had the idea that it was an interesting thing
+to want to build.

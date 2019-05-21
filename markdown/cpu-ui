@@ -1,0 +1,125 @@
+In designing simplified computing systems for bootstrapping, one of
+the problems is that even once you have built a CPU and RAM, you still
+somehow need to bootstrap useful software into the thing.  At one
+point this was usually done by entering an “IPL” or “bootstrap”
+program into the memory one bit at a time using switches, then making
+the CPU run, but this requires the electronic interface to the CPU and
+RAM to support such direct manipulation, which complicates it
+somewhat.  Also, it’s a terrible user interface.
+
+Somewhat later, machines came with a “monitor program” in ROM, which
+would use the usual I/O mechanisms to interact with a user and allow
+them to enter the IPL program using, say, a hexadecimal keypad.  The
+Heathkit H8 was an 8080-based computer that worked in this way.  The
+later H89, which was a miniaturized Z80-based H8 built into an H19
+terminal, substituted a terminal-based monitor program.  Other PCs of
+the era were less slavish followers of the minicomputer tradition and
+typically had Microsoft BASIC in ROM, and would run that initially,
+sometimes giving you the option to use it to load other binary
+software from other media.
+
+However, all of these alternatives involve a fairly large amount of
+ROM and RAM: tens of thousands of bits, if not more.  An amount that
+would take an unreasonable amount of time to solder together out of
+individual transistors, let’s say.
+
+The HP 9100A took a different approach that didn’t require a lot of
+ROM (well, except the 32-kilobit microcode!) or RAM.  It was sold as a
+calculator, a forerunner of HP’s later popular line of electronic
+pocket calculators (beginning with the HP-35), but it was in fact a
+programmable computer, just with a very small amount of read-write
+memory: each of its 19 registers was 14 6-bit-wide BCD digits, for
+1596 total register bits.  This is a very small amount of memory, but
+the 9100A took full advantage of it by using a 6-bit instruction set,
+thus supporting programs up to 266 instructions long.  (I think.
+Maybe you couldn’t store program steps in the X, Y, and Z registers.
+Certainly it wouldn’t be very useful to do so.)
+
+The more interesting thing about this is that the HP 9100A’s
+instruction set was in fact its keyboard: each keystroke, more or
+less, executed a CPU instruction.  This, plus a simple mode for
+storing a sequence of keystrokes in memory and an instruction set
+tailored to support use as a user interface, allowed it to survive
+without a ROM monitor.
+
+(Unfortunately, both its keyboard and its display were tightly coupled
+to its processor; there was no mode that allowed a program to
+interactively process keyboard input, as opposed to processing data
+entered into memory before it was started, or to display data of its
+choice on the display.)
+
+This might turn out to be a useful way to simplify bootstrapping a
+computer: rather than toggle data into its memory with a direct
+front-panel memory interface, and then providing it with a RUN/STOP
+switch and a single-step switch so that you can debug it, you can feed
+it instructions directly, letting the CPU interact with memory on your
+behalf.
+
+One possible GreenArrays-like way to do this is to memory-map the
+keyboard, don’t increment the program counter when executing from the
+memory-mapped part of the address space, and make the standard
+interactive keyboard-read address blocking, so the CPU halts execution
+until you send it a keystroke.  (You could additionally provide a
+nonblocking-read location or an is-keystroke-ready location.)  This
+still requires hardware to automatically display CPU registers while
+the CPU is halted on keyboard input in order to be useful, as well as
+probably some kind of interrupt to send execution back to the
+keyboard-read address on manual program cancellation or detected
+program trap.
+
+I suspect that all of that requires less transistors than a ROM
+monitor routine!
+
+My current Calculus Vaporis design would not be very usable in such a
+scheme.  Its seven instructions are $, ., -, |, @, !, and nop, of
+which $ is the biggest problem.
+
+$ includes an entire 11-bit immediate constant.  You could replace it
+with eight separate instructions 0, 1, 2, 3, 4, 5, 6, and 7, each of
+which shifts the accumulator left by three bits and ORs the
+appropriate octal digit in.  This could almost allow you to use
+four-bit instructions, which could be packed three per 12-bit word;
+the other 6 instructions would use 6 of the other 8 opcodes.  9 bits
+of immediate constant per 12-bit word is very nearly as good as 11
+bits, although it would take three times as many cycles; also, you’d
+get the benefit of much denser other instructions.
+
+This would also require a separate PUSH or DUP instruction to achieve
+the function currently provided by $ of getting a second item onto the
+stack.  A PUSH0 instruction is probably the best way to do this.
+
+However, the rest of the instruction set is not very usable as it is;
+it lacks unconditional calls or jumps as well as addition (it has
+subtraction) and bitwise operations other than NAND (|).  All three of
+these are problems in practice for writing programs for it.
+
+Expanding to a 5-bit instruction set, of which half could still be
+hexadecimal digits, would provide room for 8 bits of constant in a
+12-bit word and also provide instruction encoding space for some of
+those other operations.  (I’d vote for unconditional jump-and-link,
+addition, NOT, and AND, at least.)  It’s clear that there’s a strong
+tension between usability and hardware simplicity in this context.  A
+separate return stack would permit passing arguments to subroutines on
+the stack; a third parameter stack register, as on the 9100A, would
+allow the evaluation of nested expressions without an intermediate
+store to memory; and so on.
+
+The “dontmove” design I’ve been playing with as an archival virtual
+machine may be an interesting alternative.  Instead of a stack with
+different instructions to perform different ALU outputs, dontmove is
+nearly a MOV machine — except that the load and store parts of the MOV
+are done in separate instructions.  It has 26 immediately-accessible
+registers, named with the Latin letters, and 52 instructions that load
+and store them from its single temporary register.  Of these, five are
+memory-mapped magic: Aa is byte I/O, Bb is a subtractor, Cc and Dd are
+a PIC-like indirect access and its pointer, and Ee is the program
+counter.  (Writing to it magically saves the return address in the
+temporary register, so it’s a jump-and-link.).  Then you have ten more
+instructions to multiply the temporary register by 10 and add a
+decimal digit to it.  Conditional jumps are obtained by setting Dd to
+4 (Ee) or to somewhere else (such as Ff, which is just a normal
+location), then storing into Cc.
+
+I suspect that such a machine could be roughly as simple as Calculus
+Vaporis, but perhaps more amenable to interactive instruction entry at
+the extremely low levels of complexity we’re talking about.

@@ -1,0 +1,156 @@
+Reading about Rust, and having just written a raytracer that doesn't
+use the heap and is almost trivially statically safe, it occurs to me
+that you could probably do a lot better than OCaml efficiency-wise,
+especially on modern hardware, without much more compilation
+complexity.
+
+The ML type system has basically one kind of immutable container,
+which is like a variant record.  Typically this is implemented as a
+type tag followed by a pointer for each value.  Many types only have
+one variant.  Types can be parametric and recursive.
+
+Here are the most basic type definitions from my raytracer:
+
+    typedef float sc;               // scalar
+    typedef struct { sc x, y, z; } vec;
+    typedef vec color;              // So as to reuse dot(vv,vv) and scale
+    typedef struct { color co; sc reflectivity; char texture; } material;
+    typedef struct { vec cp; material ma; sc r; } sphere;
+
+In memory, a `sphere` occupies nine contiguous 32-bit words:
+
+    cp.x
+    cp.y
+    cp.z
+    ma.co.x
+    ma.co.y
+    ma.co.z
+    ma.reflectivity
+    ma.texture
+    r
+
+(`texture` is one byte, but on almost all platforms, it will be padded
+out, basically to align the `r` that follows it.  If you used parallel
+arrays you could avoid this memory bloat.)
+
+We can translate this same type definition into, say, OCaml:
+
+    type sc = float
+    and vec = Vec of (sc * sc * sc)
+    and color = vec
+    and material = Material of (color * sc * char)
+    and sphere = Sphere of (vec * material * sc)
+    ;;
+
+The semantics are very similar, but with this definition, a `sphere`
+is actually a graph of objects on the heap:
+
+    Sphere
+    vec ----------------------------------- Vec
+    material -------- Material              sc -- float
+    sc -- float       color -- Vec          sc -- float
+                      sc -- fl sc -- float  sc -- float
+                      char     sc -- float
+                               sc -- float
+
+That's a total of 11 heap allocations.  If OCaml had unboxed floats,
+it would be only 5, but even 5 is a lot.  If the boxed floats don't
+need a separate in-memory type tag (I haven't looked), while the
+others do, then this is a total of some 24 words, more than twice the
+count for the C approach.  With in-memory type tags, the total is 32
+words!
+
+Now, this is clearly a problem with memory efficiency, but it gets
+worse.  Half of those 24 words are pointers, and if the object
+survives until a garbage collection, the garbage collector has 12
+pointers to traverse, where it could have had zero.  And they're
+likely to be in different cache lines (perhaps segregated by size in
+different pages, to cut down on allocator space overhead), so if you
+have a lot of spheres (I don't), you miss out on cache locality.
+
+In a dynamically-typed language, these allocations really have to be
+separate — there's no telling when you could replace the `Material`
+with an integer or something.  And you might want some of the parts to
+be shared with other objects, either because they're mutable or
+because they're large.  But these objects are neither large, nor
+mutable, nor do they vary in type (we might say "mode", to use the
+Algol-68 term for in-memory representation).  And the cost of the
+implementation strategy is clearly unacceptable.
+
+"Sum types", that is, types with multiple possible representations,
+more or less clearly need to be implemented with pointers:
+
+    type 'a mylist = Mycons of ('a * 'a mylist) | Mynil ;;
+
+both because they can be recursive (while being finite and acyclic)
+and because their elements can vary in size.
+
+There are, as I said, cases where you actually *want* aliasing
+semantics, either because of mutability or because of size; the C and
+Pascal approach to this — a type constructor like `^` such that `x^`
+means "pointer to an x" — seems to me entirely harmonious with an
+ML-style type system.
+
+(You could lump mutability in with explicit pointerhood, since if
+you're going to be changing the color of a sphere frequently you're
+quite likely to want to be able to do that with a single operation
+instead of three; that would be useful if you wanted a language with a
+minimal number of features, like C; but in theory the two are
+orthogonal features.)
+
+This is similar to the approaches taken by Golang and Rust, but Golang
+doesn't have full type inference.
+
+By eliminating the majority of pointers from your heap, you eliminate
+the majority of work for the garbage collector, reduce your memory
+consumption, and probably dramatically improve locality of reference.
+This makes garbage collection substantially cheaper.  It also makes
+other memory-management disciplines substantially cheaper — for
+example, single-ownership inherited deletion, or reference counting,
+are much cheaper when you have fewer pointers.
+
+Golang's approach to arrays and pointer arithmetic seems basically
+sound, but it seems like it would work better if you could hoist array
+bounds checks in more cases.
+
+So what's the simplest compiler for a reasonably complete language
+along these lines?  We can dispense with Schemeish simplifications
+that simplify the language at the cost of complicating the compiler:
+automatic closure of free variables, automatic tail-call detection,
+and call-with-current-continuation.  OCaml further dispenses with
+polymorphic arithmetic and implicit arithmetic type conversion,
+showing that this is practical.  Scheme and Forth dispense with syntax
+above the level of tokens, showing that this is practical.  If you're
+going to have ML-style variant constructors, you can dispense with
+conditional statements, but you still need loops if you're not going
+to do automatic tail-call detection; and you still need a stack if
+you're going to support recursion that isn't tail-recursion.  (And not
+supporting recursion seems to me to go beyond just "not complicating
+the compiler" into "turning implementation shortcuts into subtle
+bugs".)
+
+So you need functions, arithmetic, recursion, pattern-matching (with
+iteration), type declarations, (mutable) pointers, and perhaps
+variables; and you probably also need arrays, even if you don't use
+them much, so you need array indexing; loops; assignments; and
+sequences of statements.
+
+The simplest way to get loops, other than tail recursion, is to have a
+pattern-matching construct that repeats unless you break out of it.
+For example:
+
+    while (listnode) {
+    case Cons(a, b) ->
+        listnode := b;
+        total_weight += weight(a);
+    case Nil -> break;
+    }
+
+Not sure that really compares well with C:
+
+    for (; listnode; listnode = listnode->next) {
+        total_weight += weight(listnode->item);
+    }
+
+Hygienic macros — i.e. rewrite rules — may be a convenient way to
+implement a fairly rich compiler fairly quickly.
