@@ -1,0 +1,256 @@
+I just installed this app called “μMath+” or “microMathematics plus
+v2.18.0” from F-Droid on my hand computer, and it’s pretty cool.  It’s
+the first calculator for Android that’s good enough to criticize, so I
+will.
+
+Conceptual overview
+-------------------
+
+You have “worksheets” which consist of sequences of “elements” or
+“objects”, stacked vertically and horizontally; the five types of
+elements are text fragments, images, equations (really assignment
+statements and function definitions), result views, and plots.
+
+Text fragments are just paragraphs; the five available styles are
+“Chapter”, “Section”, “Subsection”, “Subsubsection”, and “Text body”,
+all with or without numbering.  There’s a per-document flag to
+word-wrap them at some line length.
+
+The expressions in the assignment statements are displayed using
+conventional math notation, and include Σ, Π, ∫, and derivatives.
+Values include complex floating-point numbers, Octave-like ranges of
+them (called “intervals”), multidimensional arrays of them (I think up
+to three dimensions), and versions of these dimensioned with units.
+Functions are defined in the assignment syntax by assigning to a
+function with formal parameters, as “f(x) = x² - 4”.  “Result views”
+pair a user-entered expression, on the left, with its computed result,
+on the right.  Plots come in 2-D, 3-D, and heatmap versions; normally
+you evaluate a function on an “interval” to get an array result which
+you can plot on the y-axis.  (“Intervals” work very similarly to
+arrays in APL and related languages, and even more so the independent
+variables I talked about in file `relational-modeling-and-apl` and
+file `principled-apl`.  They are not the interval objects used in
+interval arithmetic, though they have some things in common.)
+
+Moreover, you can export your whole document as LaTeX, though the
+plots are PNGs — high-resolution PNGs with transparency, but PNGs.
+
+All in all, it can do all kinds of cool stuff.
+
+Results
+-------
+
+So you can, for example, write
+
+    E := 3 V
+    I := 0.1 A
+    E/I =
+
+and it will tell you “30.0 Ω”.  You can change these values and
+recalculate.  You can write
+
+    x := [-5, -4.9 .. 5]
+    y := x³ + -2·x² + x
+
+and then plot x versus y.  In fact, you don’t even need to define a
+variable for y; you can enter the polynomial directly on the y-axis of
+the plot, though because of the horizontal layout of the formula
+there, it takes up a lot of space.  By long-pressing on the plot, you
+can get a button to view the values of x and y in a table.
+
+You can intersperse your formulas and plots with explanatory text, as
+in Jupyter, but, at least in theory, somewhat more intimately — you
+aren’t constrained to vertical stacking — but I haven’t found a way to
+make that work well yet.
+
+Missing features
+----------------
+
+Given that it does all this array and interval stuff, I was sort of
+hoping it would handle matrix arithmetic (matrix products and inner
+products and least-squares solutions of systems of differential
+equations and whatnot) but it doesn’t.
+
+UI infelicities
+---------------
+
+Unfortunately I’m not very happy using it.  It feels very clumsy.
+
+It’s hard to figure out how to do anything, and it takes a lot of
+clicks, because the equation editor is a structure editor, but there’s
+no visualization of the structure to work on, and you suffer the usual
+gulfs of execution.  For example, x² is an exponentiation node, which
+you can create by scrolling the toolbar to the right to the
+create-exponentiation-node button and then pressing it, or by using
+the “^” key on the keyboard, and then typing “x”.  At times, to reach
+the exponent from there, you can press the soft keyboard’s Enter key
+(when it displays as “⇥”) but at times you have to tap the spot on the
+display where you want to put the “2”.  It *is* possible to replace an
+existing node with a new node that has it as a child; for example, you
+can place the cursor before the “x” and insert “--”, which makes the
+“x” node the second child of a new subtraction node, so you can
+transform it into (1 - x)².  So far I haven’t found a way to reverse
+this transformation (other than using undo — fortunately it does have
+multiple undo) or to put the focus on the exponentiation node itself
+so I can transform it into x² + 1.
+
+Analogously, I haven’t figured out how to change the layout, for
+example changing the order of elements or their stacking direction.
+
+The use of long-press to activate many functions exacerbates the
+discoverability problem.
+
+The only way to see the value of anything is to add a result view or
+plot to the document, and typically then to long-press on the result
+to bring up a dialog with a table of all of its values.  This is,
+however, pretty awesome in that it allows you to bring up a table of
+all the numeric values being plotted in a plot.
+
+You can’t define an array by listing the items, as R = [1, 2.2, 4.7,
+10, 22, 47].  You have to assign the individual items one at a time:
+R[1] := 1, R[2] := 2.2, and so on.
+
+Error handling leaves a lot to be desired.  If there’s an error
+anywhere in a worksheet, nothing in the worksheet will evaluate.
+Usually it highlights the error with a red border, which you can tap
+on to get a transient notification telling you what the error was.
+I’ve had times where I couldn’t find the error, though, so I opened up
+a new worksheet.  Really good error handling might include suggesting
+similarly spelled variables when one is not defined, or offering to
+create a definition for it, or offering to change it the same way you
+changed the definition that used to exist.
+
+The “New document” menu item discards your current worksheet without
+confirmation, apparently irretrievably — though only if you’re editing
+the default autosave.mmt.
+
+Every time the screen orientation changes, the worksheet scrolls back
+to the top.  Zooming is also troublesome; positioning in the document
+after a zoom is unpredictable, perhaps because the zoom feedback moves
+the document horizontally as well as vertically, while the actual
+resulting position is much more horizontally constrained.  At times
+zoom is disabled for no apparent reason, and at times the document
+moves multiple screen widths diagonally when I’m pinch-zooming in
+place.
+
+The formula formatting looks ugly; it’s using a sans-serif monoline
+font without even any obliquing for the variables, except of course
+that Σ and ∫ are in a serif font with diagonal stress, and Π must be
+too but it looks like a child’s drawing.  The parentheses and brackets
+do not match the rest of the font, being thinner, and they aren’t
+properly spaced; “(x + 1)!” will butt the “!” up to the parens.
+Superscripts and subscripts are smaller than the text they modify, but
+still too large and too far away; then at four levels of superscript
+the font has gotten far too small.
+
+It includes export to LaTeX and HTML, but although it seems to use SVG
+internally (in its documentation, and maybe for its plotting), it
+doesn’t seem to be able to export SVG.
+
+The 3-D plots are lovely but being able to interactively rotate them
+to get a good angle would be a big plus.  This is a general problem
+with a lot of things: to change a property you have to bring up a
+dialog box, but in order to see the result of changing the property,
+you have to close it.  The even more egregious result of this is that
+there’s no way to resize a 2-D plot by dragging; you have to bring up
+a dialog box on top of it, type in a new width in pixels, and tap OK.
+(And the default plot size is pretty small.)
+
+It’s possible to plot multiple functions on the same plot, and it’s
+possible to plot parametric functions, but doing both at once seems to
+be impossible.
+
+There doesn’t seem to be a way to label plot axes by anything other
+than the actual expression that produces them, which would be useful
+if you have, for example, two plots covering different intervals of
+the same axis, which you will necessarily have to name with different
+variables.
+
+You can’t just sum an array or an interval; you have to go the whole
+nine yards with Σᵢ₌₁⁹ xᵢ instead of just Σx.
+
+You can define n := [0, 1 .. 32] and then ask 2ⁿ = and get a result,
+but you can’t just inline the interval value in the superscript.  In
+fact, I think that’s true of all operations on intervals — the
+interval literal can’t occur in any context other than an assignment
+statement.
+
+Because it uses the regular Android soft keyboard, numeric entry is a
+pain; you often have to switch modes, and the number keys are always
+tiny.
+
+Bugs
+----
+
+The HTML export doesn’t include plots, or, if it does, they aren’t
+showing up in Chrome.
+
+Although dimensional analysis works for simple quantities, if you do
+this you get “V/A” instead of Ω for the units, although they’re at
+least still correct values:
+
+    E0 := [2.5, 2.6 .. 3.5]
+    E := E0 · 1 V
+    I := 0.1 A
+    E/I =
+
+However, if you make I also an “interval” without units, then you get
+the error message on E/I: “There are indirectly referenced intervals:
+[E0]”.  Dividing E0/I directly gives a matrix-like display of results,
+though with no real way to see which result corresponds to which
+inputs.
+
+Although you can define an array by enumerating values as described
+earlier and it displays the same way intervals do, attempting to
+divide E/R produces the error, “Array is not allowed for this field.”
+
+I mentioned above that four levels of subscript produce text that is
+too small.  Five levels returns to the normal size again, but it’s not
+the normal size for your zoom level; it’s the normal size for your
+display. So if you zoom out, your fifth superscript will be huge
+compared to everything else in the document, while if you zoom in far
+enough, it will be tiny compared to everything else, because it always
+stays the same size on the screen.
+
+How to do better
+----------------
+
+File `interactive-calculator` and file `dnd-calculator` talk a bit
+about how calculators could take advantage of multitouch screens, but
+for pure formula entry, I feel like it’s really easy to do better than
+using the standard onscreen soft keyboard — the built-in calculator
+app does it already.  The exception is when you’re assigning a name to
+something, when you need to be able to type the name, or when you have
+so many variables and functions that you need to find one by text
+search instead of picking from an LRU list.
+
+The standard Android calculator these days displays the result of each
+formula incrementally as you edit it.  This is a big help for simple
+calculations like 500×46.5.  μMath+ doesn’t, for some reason.
+
+Note that the ersatz Casio calculator profiled in file
+`scicalc-usability`, though very limited in hardware, got a bunch of
+things right: once you *have* a formula, you can attach it to a name.
+Unfortunately this, along with the whole RPN universe, adds an extra
+gulf of execution to the problem: you have to figure out that the way
+to get “y = x²” on the screen is to first get “x²” on the screen and
+only then activate “STO Y”, as the ersatz Casio’s keyboard labels call
+it.
+
+Going further, you could imagine writing *actual generalized
+equations* rather than assignment statements, then submitting the glob
+of equations to some kind of solver; or, in the opposite direction in
+some sense, writing explicit algorithms with loops and conditionals.
+
+OCR of handwritten equations might also be a good approach, given how
+clumsy interacting on the touchscreen is.
+
+Structure editors are hard to make usable, but not impossible.  A
+useful step would be providing visible handles to each of the tree
+nodes you might be trying to select.
+
+Given the amount of symbolic computation and ad-hoc UI interaction
+tailoring this problem needs, writing it in Java was probably not a
+good idea; a development environment that better supports symbolic
+computation and iterative development, especially code changes without
+program restarts, would probably work better.

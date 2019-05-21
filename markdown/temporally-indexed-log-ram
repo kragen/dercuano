@@ -360,3 +360,15 @@ generate one value per instruction.)
 Alternatively, spilling memory to disk could permit your program to
 generate a terabyte or more of past values before any must be
 discarded.
+
+You could imagine some class of programs might be easier to
+automatically parallelize or strength-reduce in this memory model,
+since in a way what it supports natively are simple recurrence
+relations like those discussed in file `dynamical-systems`.  The idea
+is that you write your program as an initial state and a reduction
+function that updates the initial state, either according to an input
+datum or on its own; then the compiler turns some or all of the
+program into elementwise operations and parallel prefix-sums using
+some subset of the program it’s proven associative so that the
+parallel prefix-sum algorithm applies.  Thus the different reductions
+aren't really running sequentially.
