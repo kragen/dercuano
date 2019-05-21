@@ -1,0 +1,54 @@
+A common way we organize storage in computer programs is as a
+Cartesian product of some set of entities and some set of attributes
+that pertain to those entities.  We might represent entities as, for
+example, struct base addresses or array indices, and attributes as,
+respectively, offsets into a struct and array base addresses.
+
+In both of these cases, at the machine level, we are representing both
+entities and items as machine words and combining them with binary
+addition, possibly composed with a bit shift or even multiplication by
+a constant.  In some cases, you can use a simpler operation, dividing
+the memory address into one field for entities and another for
+attributes, which could save you an adder at the hardware level; this
+allocates memory space of a power of 2 to each entity and each
+attribute.  Combining the fields in hardware can be done with some
+wires.
+
+What happens if you try to use some other operation to combine the
+identifiers of entities and attributes?  An easy example is to use a
+limited-width adder: given a 16-bit entity address and an 8-bit struct
+offset, use a 10-bit adder rather than a 16-bit adder to combine them,
+and then don’t allocate structs that cross 1024-byte page boundaries.
+This is intermediate both in restrictions and in implementation
+complexity between the field-division approach and the usual approach.
+
+In the same context, if you use XOR instead of an adder, you have the
+same memory-allocation restrictions as the field-division approach,
+but now you have the ability to reverse the order of the list of
+entities (or of attributes, or of power-of-2-sized blocks of either)
+by using an address with 1 bits in the field for the other kind of
+thing.
+
+If you use OR or AND instead of XOR, you have the same restriction
+again — but now stray bits (ones in the OR case, zeroes in the AND
+case) allow a sort of “inheritance”.  Instead of reversing the order
+of the entities, or of entities in some subgroup (or correspondingly
+attributes), they allow an attribute to be shared among all entities,
+or all entities in a power-of-2 group; or, correspondingly, to allow
+an entity to have the same value for all attributes, or all attributes
+in a power-of-2 group.
+
+This seems like it could be useful under some circumstances; you could
+imagine, for example, allocating memory for a potentially buffer-local
+variable in every buffer, then making the variable buffer-local by
+changing its “offset”.
+
+(The other possible 13 bitwise operations all seem to fall into the
+same category as one of OR/AND and XOR or be inapplicable. Operations
+with truth tables 0000 and 1111 discard both inputs, and 0011, 1100,
+0101, and 1010 discard one of their inputs.  1000 (NOR) and 1110
+(NAND) are simply AND and OR (respectively) with both inputs inverted;
+1001 (XNOR) is XOR with one input inverted; 0010 and 0100 (implication
+and reverse implication) are AND with one input inverted; 1101 and
+1011 (negated implication and negated reverse implication) are OR with
+one input inverted.)

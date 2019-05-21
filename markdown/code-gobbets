@@ -1,0 +1,79 @@
+Suppose we have this scrap of code:
+
+    f = buxus.open(buxus_filename)
+    viewport = f.bbox()
+    canvas = buxcanvas.create(viewport)
+
+There are lots of ways to read this gobbet of code, but one of them is
+as a rule which, given values for `buxus`, `buxus_filename`, and
+`buxcanvas`, can produce values for `f`, `viewport`, and `canvas`.  Or
+possibly fail to.
+
+Or consider these two lines of code separately:
+
+    interval_size_log = math.log(stop) - math.log(start)
+
+That gives us a rule to compute `interval_size_log` given values for
+`stop`, `start`, and `math`.
+
+    n_divisions = int(math.ceil(interval_size_log / math.log(1 + spacing)))
+
+That gives us a rule to compute `n_divisions` given values for `int`,
+`math`, `interval_size_log`, and `spacing`.  This rule chains nicely
+with the previous one, which provides `interval_size_log`.
+
+If you were going to apply this approach in a general way to large
+programs, you’d need some way to namespace these names, of course.
+And you need some kind of subroutine call mechanism.
+
+In Python 3.3 and later, you can supply a custom mapping to `exec`
+that logs these accesses as they happen.  So you can really write
+these just as little gobbets of Python code.
+
+Here are some ideas for how such a soup of code gobbets could be
+useful:
+
+- Conditional computation.  Given the knowledge that
+  `interval_size_log` depends on `stop`, `start`, and `math` (or, more
+  pleasantly, `log`) you can efficiently compute all the
+  `interval_size_log` values for a range of `stop` values, a range of
+  `start` values, corresponding sets of `stop` and `start` values
+  (depending, for example, on some index `i`), or independently
+  varying sets of `stop` and `start` values.
+
+  This becomes more powerful if you add quantifiers and aggregation,
+  although it is not clear to me how this should work.
+
+- Incremental recomputation, although of course this requires you to
+  make your changes to variables rather than down inside of data
+  structures somewhere.
+
+- Transactions.  You can run an arbitrary piece of code that runs in
+  an environment where the variables it reads and writes are
+  monitored, and only commit its writes if none of the variables it
+  read have been changed by a previously committed transaction.
+
+- Inference systems.
+
+- Hot code reloading.
+
+- Lazy computation — although you do have to try to run each gobbet at
+  least once to see what it might produce.
+
+- Pattern matching.  You can provide different possible ways to
+  compute the same variable, given different possible inputs.
+
+For many of these applications, you could have a subroutine call
+mechanism that works by putting some parameters into a new namespace
+and then trying to pull things out of it.  For example:
+
+    isl = ns(start=1, stop=20).interval_size_log
+
+Something like that might be the way to handle quantifiers and
+aggregation, too.  Instead of saying, "What if start=1?" you’re saying
+“What if start is any value in range(10)?”  But then of course if you
+are going to get a scalar value out of it at the end you need to
+specify how you are going to aggregate the pointwise values.
+
+(Related: `principled-apl`, `relational-modeling-and-apl`, `funbot`,
+`views-and-ometa`.)

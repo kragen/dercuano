@@ -1,0 +1,61 @@
+For decades, I’ve appreciated the aspiration of literate programming,
+to produce software that can be pleasantly and easily read as
+literature.  However, notably, for decades, literate programming has
+remained unpopular.  I think the biggest reason for this is that
+literate programming as we have practiced it so far omits one of our
+most powerful tools for understanding programs in practice: running
+them.
+
+That is, standard literate programming tools like CWEB or noweb
+include nothing in the readable text that is contingent on what the
+program actually does when you run it.  Typical literate programs
+don’t even include unit tests, which implicitly make claims about what
+*would* happen if the program were to be run — if the author tells you
+the unit tests succeed, then you can suppose that that is what
+actually does happen.  In cases like tests written with Python
+`doctest`, the test case shows the actual output from the program.
+
+The Mathematica-derived “notebook” interface of IPython/Jupyter seems
+like a promising step forward, because it does show example output.
+Peter Norvig is working on a set of such notebooks called [pytudes][0]
+to demonstrate some challenging problems.
+
+[0]: https://github.com/norvig/pytudes
+
+Jupyter notebooks are pretty awesome, but they have some limitations.
+To wit:
+
+Because Python is an imperative language, the interpreter state (and
+thus the results of cell evaluation) depends not only on the contents
+of the notebook, but also the order in which the cells have been
+evaluated — and, potentially, even the number of times each cell has
+been evaluated, and previous cell contents that were evaluated, even
+if they no longer exist.
+
+Perhaps worse, there’s no way to “export” a class, function, or value
+defined in a notebook so that it can be used from elsewhere.  Each
+notebook is relatively self-contained — for better or worse.  You
+can’t use a notebook as a way to present and document one module of a
+larger system, although you can use them as a way to document how to
+*use* such a module.  (There is the somewhat primitive `%run`
+mechanism, which I think is analogous to C’s `#include`.)
+
+Jupyter notebooks are also less than ideal for multiuser use.  There
+are a variety of ways you could imagine a multiuser notebook
+working — for example, all the users could all be editing a single
+shared document, or each one could have their own document that
+imports certain cells from other documents, or some combination.
+
+The flatness of Jupyter notebooks makes them hard to navigate once
+they’re over a certain size.  Hyperlinks and folding could help.
+
+However, it’s important to point out all the ways the Jupyter notebook
+interface is vastly superior to traditional command prompts, REPLs,
+and source code editing environments and even, in most cases,
+traditional literate programming tools:
+
+- Typography: headers, equations, bold and italics;
+- Collapsible output (i.e. you can hide the output of a cell, and
+  actually the whole cell, if you like);
+- Multimedia output — plots, raw HTML, tables, equations.
+- Pywidgets provides interactive experimentation with variable values.

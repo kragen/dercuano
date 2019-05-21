@@ -1,0 +1,73 @@
+I found this paper from last year on a thing called DReX, which claims
+to be “a declarative language for efficiently evaluating regular
+string transformations”.  Apparently a “regular string transformation”
+is a kind of transformational equivalent to a regular expression, and
+they came up with a linear-time evaluation algorithm for it; “regular
+string transformations” seem to be a thing they invented more or less
+for the paper before this one.
+
+I think their notation could use some work though.
+
+One of their examples is a program to delete one-line comments from a
+(C++) program; here’s the original version from DReX paper:
+
+    del_slashes = split(del('/'), del('/')),
+    del_non_nl = iterate(del(x ≠ '\n')),
+    del_comm = split(del_slashes, del_non_nl),
+    del_comm_line = split(del_comm, del('\n')).
+
+Here’s an inlined version:
+
+    split(split(split(del('/'), del('/')), iterate(del(x ≠ '\n'))), del('\n'))
+
+Here’s an RPN version:
+
+    '/' del '/' del split x '\n' ≠ del iterate split '\n' del split
+
+Here’s an infix/postfix version:
+
+    '/' del, '/' del, x ≠ '\n' del*, '\n' del
+
+How is this different from sed or whatever?  Would this maybe work as
+an editor user interface?
+
+They say:
+
+> …regular string transformations is a… class that strikes a balance
+> between decidability and expressiveness.  In particular this class
+> captures transformations that involve reordering of input chunks, it
+> is closed under composition, it has decidable equivalence…
+
+So DReX is a combinator-based DSL that covers exactly this class with
+a prototype linear-time implementation (polynomial-time in program
+size, linear-time in input size).
+
+The DReX combinators are:
+
+- φ → d, where φ is a predicate and d is a function: maps any
+  character a that satisfies φ(a) to d(a);
+- split(f, g), which is unambiguous concatenation;
+- iterate(f), which is unambiguous Kleene closure;
+- combine(f, g), which applies both f and g to the same string and
+  concatenates their results (unambiguous intersection);
+- f else g, which falls back to g if f fails (unambiguous union); and
+- chain(f, R), where R is a regexp for tokenizing, which applies f to
+  pairs of tokens.
+
+Split, iterate, and chain also
+
+> have a left-additive version in which the outputs computed on each
+> split of the string are concatenated in reverse order.
+
+Apparently the domains of DReX functions are in some sense inspectable
+and don’t include the whole universe of strings.  Their only primitive
+combinator is the → combinator, whose domain I guess is the set of
+characters for which φ returns true.
+
+They come up with this definition for “consistent” that allows fast
+(linear-time) evaluation and argue that it “does not sacrifice
+expressiveness”.  Interestingly, even though regular string
+transformations are closed under composition, they don’t include
+composition because it makes the evaluation-problem PSPACE-complete,
+so their definition of “does not sacrifice expressiveness” may be
+counterintuitive.

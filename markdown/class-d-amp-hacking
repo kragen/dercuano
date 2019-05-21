@@ -1,0 +1,52 @@
+I was thinking about this 5V-output buck converter I dumpster-dived.
+A plausible-looking datasheet says the input is 8–48 volts and the
+output is 5V at up to 2.1 amps.  It has a feedback pin which it uses
+to adjust the duty cycle of the 150kHz PWM signal it uses to generate
+the output; you’re supposed to hook that up to the output side of the
+inductor so it can regulate the output voltage properly.
+
+It occurred to me that this sort of implies that if, instead of
+hooking up the feedback pin directly to the output side, you hook it
+up to the output side through a voltage divider to ground, you should
+be able to get it to act as a 6V or 8V or 10V regulated power supply
+instead of a 5V one.  Maybe it won’t compensate for load changes quite
+as quickly, but I don’t think it should oscillate.
+
+But what if, instead of using a voltage divider to ground, you use a
+voltage divider to a *variable* reference voltage?  Maybe you could
+make a high-power class D audio amplifier!  Say you use a
+high-impedance 4:1 divider, so that a 1-V shift in the “reference”
+voltage (really the input) requires a 4-V shift in the output in the
+opposite direction to compensate.  It’ll be superimposed on a 20VDC
+level that you probably want to block with a capacitor, but 4 volts
+RMS across 8Ω should give you 500 mA RMS, which is 2 watts, which is
+pretty loud.  Filtering out the 150kHz (and harmonics) carrier should
+be pretty easy.
+
+Also, you might be able to use this as an AM radio transmitter.  AM
+radio is in the range 540 kHz to 1610 kHz, so there ought to be some
+harmonics of the 150kHz PWM signal in there (at least the fourth
+through ninth or so), and their power ought to vary with its duty
+cycle.  Some experiments reveal that the second harmonic of a PWM wave
+is zero at 0% power, 50% power, or 100% power (which is the same as
+0%), but maximum at 25% power; the third harmonic is zero at 0% and I
+guess 33⅓% and 66⅔%; the fourth harmonic is zero at the same places as
+the second harmonic and also at 25% and 50% power; the fifth harmonic
+at multiples of 20%; and so on.  So lower harmonics should modulate
+more reliably.  If you’re trying to modulate the fourth harmonic,
+you’d probably want to use a duty cycle on the steepest part of this
+slope, like in between the maximum at 12½% and the minimum at 25%,
+around 18.75%, which means you want to regulate the nominal output
+voltage to be around 18.75% of the input voltage, and vary that
+percentage according to the signal you’re trying to modulate.  Then
+you “just” need to filter out the other harmonics (a bit tricky since
+the actual frequency could be anywhere from 125kHz to 175kHz, so the
+desired fourth harmonic could in theory be anywhere from 500kHz to
+700kHz, while the undesired fifth harmonic could be anywhere from
+700kHz to 875kHz), hook it up to an antenna, and tune a radio to it.
+
+The thing isn’t designed for an output duty cycle of over 62⅕% (⅝),
+but maybe using the region between the maximum at 37½% and the minimum
+at 50%, like around 43.75%.  For its nominal 5V output, this would
+mean an input voltage of around 11.43 volts, which is more manageable
+than the input voltage needed to get 18.75%.

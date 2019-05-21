@@ -1,0 +1,65 @@
+[Nayuki wrote a very clear description of a data structure she calls a
+binary array set, or
+BAS](https://www.nayuki.io/page/binary-array-set).  It’s a linked list
+of sorted arrays in power-of-2 increasing sizes, merged upon overflow;
+insertion is θ(1) amortized (Θ(N) worst case), and membership testing
+is average-case and worst-case Θ((log N)²).
+
+I asserted to a friend of mine that incrementalizing it to get Θ(1)
+worst-case insertion time was straightforward.  The transformation
+also gives you an FP-persistent† version of the BAS data structure.
+Here I sketch the details.
+
+Merging strategies
+------------------
+
+With power-of-2 array sizes, if you happen to be at a state with 1024
+items, the immediately previous state will have had array sizes of 1,
+2, 4, 8, 16, 32, 64, 128, 256, and 512.  The item in the array of size
+1 will have been merged zero times, the two items in the array of size
+2 will have been merged one time, the size-4 array will have been
+merged from two size-2 arrays and thus each item in it has been merged
+twice, and so on; the 512-item array contains items that have all been
+merged 9 times.  That is, the items in an array of size 2ⁿ have been
+merged *n* times.  So, in fact, under this merging policy, amortized
+insertion time per item is not constant; it is Θ(log N).
+
+I thought we could do better using a multi-way merge.  All the items
+in the 1024-item array have been through the same number of merges
+(10) because the behavior upon inserting the 1024th item is to merge
+it to produce an array of 2 items, which then must be merged and
+discarded to produce an array of 4 items, etc, doing a total of 10 · 1
++ 9 · 2 + 8 · 4 + ... 2 · 256 + 1 · 512 = 2036 work, where each unit
+is a comparison and a couple of pointer copies.  If we instead did a
+single 9-way merge using a 9-item binary heap, the average work per
+item is about 3.17, so we end up doing about 3200+1024 work instead.
+Memory locality is surely better; not counting the accesses to the
+tiny heap, we only have to do 1024 work this way.
+
+This is not obviously better, and although I haven’t done the analysis
+for real, I don’t see a strong reason to expect it to get better
+asymptotically.  So it’s probably best just to use the simple
+strategy.
+
+Incrementalizing
+----------------
+
+The basic idea is that every time you perform an insertion, you also
+do enough merge work to ensure that the merging stays ahead of
+insertion.  This is somewhat tricky, in that we can’t simply stop
+merging newly inserted data until the completion of a large merge
+further down the chain; that would kill our search-time guarantee.  So
+at times a large merge must be paused while a small merge is
+performed.
+
+As noted above, the 
+
+An incremental BAS state is either a merged BAS (one with no
+
+-----
+
+† “Persistent” unfortunately has two conflicting meanings when it
+comes to data structures; functional programmers use it to mean that
+modifying the data structure does not make its previous states
+inaccessible.  By “FP-persistent” I mean this meaning, not the more
+common meaning of “retrievable after rebooting your computer”.
