@@ -1,0 +1,61 @@
+Engrave a metal surface with a controlled low-energy arc because, like
+a laser, it can deliver very high power levels, but it’s a lot easier
+to build than a laser is.  You can vaporize a little bit of metal, or
+you can melt it and then blow it away with air.
+
+There are a couple of things that make it difficult to melt metals.
+One is that most metals don’t melt until they’re pretty hot, so you
+can’t melt them at all with things that only get moderately hot, like
+most flames.  (Jet fuel, as they say, can soften steel beams until
+they can support almost nothing, but not melt them.)  The other is
+that it’s a good heat conductor, so if you deliver the heat slowly, it
+gets conducted away and the metal never gets very hot.  Aluminum
+especially is a good heat conductor.
+
+The easiest approach is to bring an electrode, charged with a
+capacitor, toward the surface of the oppositely-charged metal until
+the air breaks down and the energy discharges in a spark.
+
+Striking an arc in air needs on the order of 300 volts at a minimum at
+a distance of about 13 microns.  If you have a 1-microfarad low-ESR
+capacitor supporting that arc, it has an energy of about 45
+millijoules.  Vaporizing aluminum takes about 14 kilojoules per gram
+`(((2470 - 20) K 24.20 J/mol/K + 10.71 kJ/mol + 284 kJ/mol) * 27.0
+g/mol)`, the majority of which is from its heat of vaporization.  That
+means that this spark can vaporize about three micrograms of aluminum,
+which sounds insignificant, but if it’s hemispherical, it’s actually a
+crater about 160 microns across, which you will note is more than ten
+times the distance from the electrode to the workpiece.  A 160-micron
+crater is clearly visible and palpable; it’s comparable to the kerf
+you get from a laser cutter.
+
+That’s kind of a best case, though, because some of the heat will go
+into heating the electrode and the air, some of it will be conducted
+away, and some of it will go into heating the already boiled metal in
+its gaseous form.  If the workpiece is connected to the negative side
+of the circuit (the cathode), most of the heat of the arc will be
+deposited at the surface of the workpiece, as it is bombarded by
+ionized air, rather than on the marking electrode, which is receiving
+only electrons.
+
+Thermal runaway concentrates the electrical current on the hottest
+part of the cathode, as that’s the part that can emit the largest
+number of electrons, so the spot that the arc heats can be very small
+indeed.
+
+That still leaves the question of how fast the whole discharge
+happens, which depends crucially on the E/I curve of the arc, where
+most of the resistance in the circuit is found.  The RC time constant
+of just the electrode and wires can easily be around a microsecond,
+which would imply a power of around a kilowatt and a power density of
+50 gigawatts per square meter or 50 kilowatts per square millimeter,
+which is in the neighborhood of what metal-cutting lasers put out, so
+it should probably work okay.  [(WP says][0] 1500 watts in a 25-micron
+laser spot is common, and you can cut 1-mm aluminum at 14.82 cm/s at
+1000 W; if we figure the kerf is 200 μm, that works out to 12.5 mJ/μg,
+very close to the value of 14 I calculated above; and at that rate the
+laser is vaporizing a volume of material comparable to our crater
+every 36 microseconds, which should be an easily achievable speed for
+the spark.)
+
+[0]: https://en.wikipedia.org/wiki/Laser_cutting

@@ -1,0 +1,66 @@
+Okay, I can’t find my previous notes on frequency identification, but
+here’s what I came up with tonight, which I’m pretty sure is good.
+You get two booleans by comparing the current sample to 0 and to the
+simple moving average (or maybe double simple moving average) of the
+last N samples, getting a kind of estimate of its derivative.  These
+two booleans give you a quadrature rotation signal: 00, 01, 11, 10,
+repeat.  The timing of the (corresponding forward) transitions of this
+signal is ¼ the period of the input signal.  You get the transition
+immediately at the sample, with no codec or processing latency the way
+an STFT has, and fairly little computation per sample:
+
+    // Advance ring buffer sample pointer
+    xj = &x[j++];
+    if (j == n) j = 0;
+    // Update ring buffer x and moving average numerator m
+    m -= *xj;
+    *xj = xi;
+    m += xi;
+    // Compute new quadrature state.
+    s = (xi > 0) << 1 | (xi * n > m);
+    if (s != os) transition(t[os << 2 | s]);
+    os = s;
+
+So in the usual case, that works out to an increment, an indexed
+address computation, four comparisons, a memory fetch, a subtraction,
+a memory store, an addition, a multiplication by constant N, a bit
+shift, a bitwise or, and a state variable update which could be
+eliminated by unrolling the loop once: 14 operations per sample, all
+very simple except possibly the constant multiplication.  In the case
+of a detected transition, you get a bitshift by two, an or, and a
+table lookup.
+
+All of this is LTI up to the last bit where we take the signs and look
+stuff up in a transition table.
+
+The FIR frontend is a very chintzy bandpass filter: the (implicit)
+subtraction from the current sample attenuates low frequencies, while
+the moving average itself attenuates high frequencies, but can only
+manage about 3dB of attenuation on the overall transfer function
+because of the impulse at lag 0.  An additional moving-average pass (6
+more operations, including the memory references and wrap) cleans up
+the high-frequency part of the response.  We could make it a somewhat
+better bandpass filter, at the expense of fractional cycles of
+response latency, by using something else than the current sample:
+another simple moving average, which of course suggests that maybe we
+should use two moving averages of the same size, abutting but not
+overlapping, thus removing the multiplication as well.
+
+Perhaps more interesting, though, is to use several moving-average
+filters of different sizes, which, if they are single-stage, can use
+just one single buffer of input data.  If their sizes are powers of 2,
+you can rescale the sums for the subtraction just by a bit shift of 1.
+In the limit, this takes the same 14 operations per sample per octave,
+but gets you much better low-pass filtering.  Each filter will detect
+a separate frequency, which may or may not be the dominant frequency
+in its octave.
+
+You could try to track the phase of the signal more closely than just
+within 90°, and this may be useful.  However, the moving-average
+filter that provides the "derivative" signal imposes a somewhat
+arbitrary attenuation, which means that your phase velocity will vary
+throughout a cycle, perhaps wildly.  However, the lag between crossing
+a given phase angle on successive cycles should be consistent.
+
+Median filtering, PLLs, blah.  Everybody uses variants of
+autocorrelation (ASDF and AMDF).

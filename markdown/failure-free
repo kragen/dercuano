@@ -1,0 +1,84 @@
+Approaches to failure-free, bounded-space, and bounded-time programming
+=======================================================================
+
+Often, the most convenient way to program a piece of software is to
+use garbage collection, recursion, and the Lisp object-graph memory
+model they were born in, often along with closures and dynamic typing.
+But these approaches have their drawbacks: almost any part of your
+program can fail or require unbounded time to execute.  Sometimes it
+is useful to write programs that will not fail, even on a computer
+with finite memory, and will make progress in bounded time.
+
+The basic incompatibilities are the following:
+
+- In the object-graph memory model, heap allocation happens often,
+  usually implicitly (although not in early versions of Java), can
+  always fail, and can almost always take an unbounded amount of time.
+- Closures in particular — at least, the way they are normally
+  implemented — give rise to implicit heap allocation.
+- Recursive function calls can potentially use both unbounded space
+  (for the stack) and unbounded time.  If you have no recursion and no
+  closures, you don’t strictly need a stack; it’s purely an
+  optimization.
+- With dynamic typing, any primitive operation — and, in OO languages,
+  any method call — can fail due to a type error.
+
+Here I will discuss approaches that can be used to write programs that
+can execute in bounded time, bounded space, and without the
+possibility of error conditions arising.
+
+These approaches are usually used in contexts where system resources
+are very limited, and so they are usually used in conjunction with a
+lot of optimization, which can reduce both the average-case resource
+use and the worst-case resource use of the program.  However, they are
+conceptually distinct from optimization, even though they may be
+confused with it.
+
+Static checking, including type checking
+----------------------------------------
+
+The most general technique is to check invariants before the program
+is run.  An invariant that is (correctly) verified to hold by static
+reasoning cannot be violated give rise to a run-time error.  For
+example, object-oriented programs in languages such as OCaml are
+guaranteed not to compile a method call on an object that might not
+support that method.  This is almost true in C++, but C++ has enough
+undefined behavior that it is in practice impossible to make any
+compile-time assertions about program behavior.
+
+Such static checking can happen after compile time as well as before.
+For example, for TinyOS, a stack depth checker was developed that
+statically verifies the maximum stack depth of a machine-code program.
+
+Pointer-reversal tree traversal
+-------------------------------
+
+
+
+Fixed-size queues
+-----------------
+
+
+
+Fixed-size object pools
+-----------------------
+Anytime algorithms
+------------------
+Mathematical optimization
+-------------------------
+Moving things in linked lists
+-----------------------------
+Constant-space representations
+------------------------------
+The object-embedding memory model
+---------------------------------
+Interval arithmetic?
+--------------------
+Arena allocators
+----------------
+Functional iteration/concurrency
+--------------------------------
+Hard priority scheduling
+------------------------
+Wait-free synchronization
+-------------------------

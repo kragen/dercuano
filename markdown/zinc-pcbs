@@ -1,0 +1,63 @@
+The typical way to make printed circuit boards is by buying
+copper-clad glass-reinforced epoxy circuit boards and etching away
+part of the copper — either with ferric chloride, with air-regenerated
+cupric chloride, or with electrolytic etching.  Occasionally people
+will instead use end-mills in milling machines instead, which
+inevitably cuts into the highly-abrasive GRP board and spreads glass
+dust.  Typically the copper is around 25 microns thick.  But what if
+we could laser-cut the metal instead?
+
+Well, [copper][] is hard to laser-cut.  It heats at 24.4 J/mol/°,
+boils at 2562°, sucks up 300kJ/mol, and from yellow well into the
+infrared, it reflects more than 90% of incoming light.  (It only
+reflects about 60% of blue light, giving it its characteristic red or
+orange color.)  But all the kinds of blue and ultraviolet lasers I
+know about are a real pain in the ass.  So you’re just about stuck
+with an extra factor of ten or so in the already-gigantic energy.
+(Maybe you could avoid the extra factor of ten by pre-oxidizing the
+surface.)
+
+[copper]: https://en.wikipedia.org/wiki/Copper
+
+(Calculating: 2540° · 24.4 J/mol/° + 300kJ/mol ≈ 360kJ/mol; multiply
+by another factor of ten or so and you need 3.6MJ/mol for copper.  At
+an atomic weight of 63.5 that’s 5.7kJ/g; at a density of 9.0g/cc it's
+51.3 J/cc.  I’m leaving out heat of fusion because it’s quite small.)
+
+[Zinc][] might seem like a more reasonable metal to laser-cut.  It
+weighs 65.4 g/mol, boils at 907°, heats at 25.5 J/mol/°, weighs 7.1
+g/cc, and sucks up 115 kJ/mol to boil, and typically has about 80%
+reflectance across the VNIR spectrum, with an inconvenient peak in the
+red, but a very convenient dip well below 70% in the 1μ range.  Its
+conductivity is about a fourth of copper’s, at 59 nΩm to copper’s 17
+nΩm, which you’d have to compensate for by making it four times as
+thick.  So you need 885° · 25.5 J/mol/° + 115 kJ/mol ≈ 138 kJ/mol to
+ablate it, and if you get ⅓ laser efficiency, you need 0.4MJ/mol, an
+order of magnitude less ablation energy than copper.  But then you
+lose most of that again with the factor of four increased thickness,
+making laser energy ablate only about two or three times as much
+circuit board area per joule.
+
+(Or, if your laser pulses are longer time scales, maybe more, because
+copper conducts heat at 400 W/m/° while zinc only conducts it at 120
+W/m/°.  But I’m assuming the laser pulses are short enough that this
+isn’t a consideration.)
+
+[zinc]: https://en.wikipedia.org/wiki/Zinc
+
+Zinc has a major disadvantage for circuit boards: it tends to form
+zinc whiskers.  It may be possible to fix this by alloying it with
+some other metal, such as copper (forming brass) or tin (forming a
+sort of pewter).
+
+I don’t know if it’s possible to reduce the boiling point of metals by
+forming positive-azeotrope alloys from them.
+
+Other candidate metals might include magnesium (1090°), bismuth
+(1560°), manganese (1962°), indium (2000°), and tin (2270°).
+Ytterbium (1466°) and thallium (1473°) are too unstable and toxic,
+thulium is too expensive, and aluminum doesn’t boil until 2470° and is
+particularly highly reflective.
+
+Other candidate methods for thermal ablation of metal coatings include
+arc heating, electron-beam heating, and ion-beam heating.

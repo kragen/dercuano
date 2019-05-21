@@ -1,0 +1,79 @@
+Over the last three nights I’ve written a substantial part of an RPN
+calculator in C in order to rebrain a four-function pocket calculator
+with a somewhat more reasonable calculating facility.  Last night I
+spent about 1½ hours on it; the night before, about an hour; the night
+before that, about 3½ hours; for a total of six hours.
+
+Performance and battery life projections
+----------------------------------------
+
+The basic user-level functionality mostly works on Linux with a sort
+of testing stub implementation of keyboard and screen, although there
+are a couple of egregious bugs.  So it should be adequate for
+estimating performance.
+
+Using it more or less continuously for 90 seconds, on Linux, compiled
+with optimization, executed 340,838 amd64 instructions.  Just starting
+and stopping it executed 162,347 instructions, for a difference of
+178,491, or almost 2000 instructions per second.  Running it with four
+numeric-entry keystrokes executed 169,718 instructions, or 7371
+instructions beyond setup and teardown, about 1800 instructions per
+keystroke; adding 3 + 4 (four keystrokes) took 168,824 instructions,
+or 6477 instructions beyond setup and teardown, about 1600
+instructions per keystroke.  If we round this to 2000 amd64
+instructions per keystroke or per second, which will probably be more
+like 4000 AVR instructions, and if the AVR uses 8 nJ per instruction,
+this is about 32 μJ per keystroke (or per second).
+
+My intent here is to replace the calculator’s existing chip with an
+AVR or something similar, without replacing its keyboard, LCD, and
+maybe even battery.
+
+Some sample batteries:
+
+- the 300 mAh 1.2 V NiCd AA cell that powers my garden light: 1.3 kJ
+  or 11000 hours
+- a CR2032 lithium coin cell: 240mAh at nominally 3 V but down to 2 V;
+  supposedly 192 mWh/g and 3.0 g, so 576 mWh or 691 J or 6000 hours.
+  [The datasheet][0] makes it look like it’s reasonable to suck up to
+  about 10 or 20 mA out of the battery from time to time without
+  unduly hurting its capacity.
+- a regular non-alkaline 1.5 V AA cell: the Energizer E91 datasheet
+  says that it’s 3000 mAh down to 0.8 V if discharged at 25 mA.  If it
+  were 1.5 V until the end, that would be 16 kilojoules, which is
+  unreasonably high since it would actually be higher energy density
+  than the lithium cell; we can probably estimate half that or 8 kJ or
+  69000 hours.
+
+[0]: http://data.energizer.com/pdfs/cr2032.pdf
+
+I conclude that the AVR’s active power draw will not consume a
+significant amount of battery unless the code gets a lot less
+efficient or I program it to do much more complicated things.
+
+However, the AVR can run at 20 MIPS, which requires over 100
+milliwatts; at this speed, it could drain some of the batteries
+mentioned above in an hour or two.
+
+Possible features
+-----------------
+
+So far all I’ve done is a basic four-function calculator, in part
+because the keyboard on the thing I want to rebrain is not very large.
+But it already offers these features above and beyond a standard
+four-function calculator:
+
+- Deep expression nesting;
+- Visual feedback on pending values (by displaying the whole stack, or
+  as much of it as will fit);
+- RPN syntax;
+- Character-by-character number error correction.
+
+It should be feasible to also include features like:
+
+- Stored programs, including iterative ones;
+- Named variables;
+- Measurement units (i.e. dimensional analysis);
+- Undo;
+- Persistence;
+- Vector values with broadcasting.

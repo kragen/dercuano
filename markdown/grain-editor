@@ -1,0 +1,62 @@
+A sentence-granularity hypertext editor
+=======================================
+
+I’ve been thinking about doing storage and communication in terms of
+small, atomic “grains”, in the range of 64–2048 bytes.  In particular
+I was thinking it would be interesting to structure a hypertext system
+in terms of such grains, such that you have a few grains on the screen
+at a time.  Grains can include “implicit links” to other grains, and
+when you change focus to a new grain, the system tries to change the
+layout so the implicitly-linked grains are also on the screen, maybe
+hiding grains that have been less recently used in order to make room.
+
+On a cellphone screen you have room for somewhere around 2048–4096
+characters of text at a time comfortably, and that text may be
+referring to equations, graphs, drawings, schematics, computational
+models, or other parts of the text.  If we display 8–16 grains at a
+time, and each grain has implicit links to the things it refers to (as
+well as the previous and next grains in the text), we should be able
+to always have all the referents of the focused grain displayed all
+the time, as long as that grain doesn’t have more than 7–15 referents,
+plus a maximum amount of context.  A simple LRU policy should be
+adequate to choose which grains to collapse (or scroll off the top, or
+whatever) to make room.
+
+This suggests somewhere on the order of 128 to 512 displayable
+characters per textual grain, about a sentence, or a few tens of
+thousands of pixels (which, for raster graphics, is one impedance
+mismatch between this UI thing and the packet IPC systems I’d been
+thinking of).
+
+What would an editor for this structure look like?  If you have a
+petabyte of mostly-ASCII text in your hypertext, broken down into
+128-character grains, that’s 2³³ grains, so an unambiguous grain
+number for each (mutable) grain would require almost exactly 10
+decimal digits: “3804448033”.  Using letters shortens the identifiers
+to 7–8 characters, or with alternating numbers and letters (as in
+Augment, sort of) 8–9.  A 512-byte grain would have room for about 64
+grain identifiers in links, so a full B-tree would be about 5 or 6
+layers deep.
+
+You could use this structure directly for your editor’s data
+structures; ideally you’d have keys to merge two consecutive grains
+and break the current grain at a point (into two grains linked with
+implicit prev and next links), and maybe some kind of UI affordance to
+encourage you to press the split key once a grain got uncomfortably
+large.  You really only need to keep in memory the grains that are
+currently on the screen; you can flush the updated grains out to a
+transaction log (or sandpile?) as they are evicted.  For many
+purposes, a search function that only finds strings within a single
+grain would be adequate, as searches for strings that cross sentences
+are rare, and could perhaps be accommodated with some kind of graph
+search.
+
+In addition to implicit links, of course, you’d want explicit links
+which only activate when clicked on.
+
+A particularly useful kind of enhancement for such a system would be
+the ability to pass parameters to grains which they use to run some
+kind of code to render a template for display — potentially the
+identifiers of other grains.  In this way, for example, you could
+instantiate a pipe flow formula in a hypertext with the particular
+parameters of a pipe you were considering.

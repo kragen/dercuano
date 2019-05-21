@@ -1,0 +1,55 @@
+The Arduino’s PWM output can output at up to 31.25kHz with 256 levels,
+because the counter increments at 8MHz.  You can get a 4MHz square
+wave out of that counter, but maybe more interestingly, that square
+wave has harmonics at 12MHz, 20MHz, 28MHz, and so on.  You should be
+able to amplify the original signal with a transistor or two and
+filter out the higher harmonics as a way to generate an RF signal.
+Maybe even more interesting, if you change the cycle length and duty
+cycle, you can generate different harmonics.
+
+Now, if you want to generate an FM signal, it’s going to be a little
+bit tricky; you need a harmonic in the range of 87.5 to 108 MHz, which
+is not impossible, but the tricky part is that the peak deviation is
+75kHz, which is a bit under 0.1% of the frequency.  So you need some
+way to somewhat reliably vary the frequency you’re generating by
+quantities less than 0.003%.  Maybe you can do this using the AVR’s
+external RC oscillator on the Xtal1 pin with a varactor to adjust the
+clock frequency of the whole chip a bit.
+
+However, an AM signal should be a lot easier.  This is in the 540 kHz
+to 1610 kHz range, and the Arduino is capable of generating these
+signals more or less directly; 1600 kHz, 1333 kHz, 1142 kHz, 1000 kHz,
+888 kHz, 800 kHz, 727 kHz, 666 kHz, 615 kHz, and 571 kHz are all
+available subharmonics of the 8MHz timebase, and if you want to use
+the third harmonic of a frequency that’s three times lower, you could
+very easily get three times as many stations; but that isn’t necessary
+and probably creates more filtering headaches than it’s worth.
+
+In the middle of this range, at 800 kHz, you have 10 bits available.
+If you stick to pure PWM modulation, you then have 10 power levels
+available for each oscillation, but that’s measuring from DC; you
+really only have 5.  But if you’re transmitting a max-5kHz audio
+signal, which is all AM radio receivers can really handle, your
+Nyquist frequency is 10ksps, so you have 80 oscillations available per
+“sample” to dither with.  This means you really have more like 400
+amplitudes to play with — almost 9 bits, 54 dB SNR — and more at lower
+frequencies.  So you should be able to transmit a perfectly
+respectable-sounding AM signal.
+
+If you simply adjust the PWM threshold between, say, 5 and 10, with a
+repetition time of 10 cycles, to adjust the amplitude of the 800 kHz
+signal, you will introduce a “DC” bias as well, which will vary with
+the amplitude.  If this is undesired, you might want to alternate
+between >50% and <50% duty cycle at some frequency, but doing this
+without going out of phase may be tricky.
+
+The dithering will produce subharmonic distortion, but if the dither
+changes levels relatively infrequently, most of the subharmonic can be
+down in the near-audio range.  For example, if you adjust the PWM
+limit by 1 at irregular intervals averaging 40000 times per second, I
+think nearly all of the dithering noise will be in the 20kHz to 60kHz
+range.  And you’ll only need to service a timing interrupt once every
+200 cycles, making it feasible to do other things at the same time.
+
+A small magnetic loop antenna, maybe one stolen from an AM radio
+receiver, is probably the best way to do the coupling to the air.

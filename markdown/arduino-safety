@@ -1,0 +1,63 @@
+I just watched [a video][1] on the YouTube channel “[GreatScott][0]”
+in which the author builds a modified-square-wave inverter using a
+MOSFET H-bridge driven through a couple of TC4427s.
+
+[0]: https://www.youtube.com/user/greatscottlab
+[1]: https://youtu.be/zASxHFxf6oY
+
+I was somewhat horrified at the way he wrote the software; he writes
+`off()`, `lowon()`, and `highon()` functions which each set the
+transistors to the appropriate states.  If you call the `off()`
+function often enough, everything is fine, but if you call `highon()`
+after calling `lowon()` without an intervening `off()`, you get
+shoot-through; the first thing it does is bring Arduino pin 9 LOW,
+which pulls pin 1, the gate of the P-channel MOSFET on the high side
+of the left of the H-bridge, to ground, turning on the MOSFET.  But
+Arduino pin 8 is still HIGH, pulling pin 3, the gate of the N-channel
+MOSFET to ground on the left side of the H-bridge, to 12V, also
+turning it on.  So you get shoot-through and a potentially damaging
+current spike through your MOSFETs.  Similarly, you get shoot-through
+on the right side if you call `lowon()` after calling `highon()`
+without an intervening `off()`, because it brings pin 10 LOW, turning
+on the P-channel MOSFET on the high side of the right side of the
+H-bridge, before bringing pin 7 LOW, turning off the N-channel MOSFET
+on the low side of the right side.
+
+So it is very important to make sure that you don’t call these
+functions without calling `off()` in between.  Furthermore, you would
+like to ensure that enough time elapses in between the call to `off()`
+and the subsequent function for the high-side MOSFETs to be entirely
+turned off, since in general they have a small RC delay, though in
+this case it’s probably less than a nanosecond.  (And for this reason,
+just rewriting the `lowon()` and `highon()` functions to turn things
+off before turning other things on is not necessarily adequate, though
+it would probably be a good idea.)
+
+You’d like to be able to encapsulate this timing safety logic in some
+kind of tiny capsule of code that is small enough to be sure that it
+says what you think it does, then validate that it’s called correctly
+at compile-time, since after you’ve already plugged your refrigerator
+into your homemade inverter, it’s too late to report a timing
+constraints violation.
+
+You could make this almost work in Arduino’s dialect of C++ by adding
+a little bit of state and checking the current time when these
+functions are called.  But what do you do when it’s too early?  You
+could delay until the appropriate time, but that hangs the whole
+system, which is really unfortunate if it’s doing something else like
+updating an LCD.  Or you could just return without doing anything,
+which would result in missing an output pulse in this case, which
+might cause real problems.
+
+A slightly less shitty solution would be to allocate a timer to MOSFET
+control (as GreatScott does) and use it to delay the state transition
+until a later time, using an ISR.  This approach doesn’t block
+everything else on the device, but it does use up a timer;
+generalizing this to share a timer between multiple users essentially
+produces a real-time operating system.  But it doesn’t guarantee you
+get the timing you asked for, just that the timing you get doesn’t
+cause shoot-through and explode your MOSFETs.
+
+To really encapsulate the timing constraint so that it’s not spread
+across your entire codebase, you probably need some kind of theorem
+prover that can prove things about function execution times.
