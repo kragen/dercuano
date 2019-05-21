@@ -198,6 +198,43 @@ reverse-engineering problem .mobi does.  Otherwise (in terms of
 supported features, preservability, file size, and so on) it seems to
 be pretty similar.
 
+### One giant HTML file ###
+
+At first I didn’t think of this as an option, since my experience with
+hand computers is that they typically can’t read HTML offline
+reliably.
+
+Recent versions of (Chrome on) Android are capable of saving HTML
+pages for offline reading, including the CSS and JS and whatnot, so
+combining the entire contents of Dercuano into a single
+fifteen-megabyte, six-thousand-page HTML file might be a possible
+alternative.  This would probably require fiddling with the CSS and JS
+a bit to get it to scale and not clash, but perhaps more importantly,
+I think Blink may choke on such large HTML documents; it’s designed
+for HTML files two or three orders of magnitude smaller.  Even Dillo
+might balk.
+
+It appears Chrome is saving a multipart/related MIME document with a
+filename ending in ".mhtml", which is a totally reasonable way to do
+this, and provides a reasonably readable file adhering to well-known
+standards, in a single file.  It does, however, have a couple of
+significant drawbacks:
+
+1. Basically any useful access to it requires reading the whole thing,
+   though that’s really probably the least of your troubles if 90% of
+   it is a 15-megabyte HTML document.
+2. If you open the file in Chrome from a file manager, Chrome renders
+   it as plain text.  It’s only when you load it from the “downloads”
+   app that Chrome opens it as expected.
+
+I’m not clear on how easy it is to transfer these from one hand
+computer to another, which, as I was saying earlier, is a sine qua
+non.  I was hoping it would be a matter of just copying the .mhtml
+file across, but it doesn’t seem to be.
+
+However, the one-giant-HTML-file approach might be useful as a first
+step in other workflows, like creating PDFs or ePubs.
+
 ### PDF ###
 
 That brings us to PDF, which is usually in last place in anyone’s list
@@ -326,6 +363,16 @@ columns, nominally 40 ems.  That’s a text size of 0.6 em for the
 `<pre>`.  Using an even larger font size for the normal body text
 would cause an even larger disharmony between the two text sizes.
 
+### Hyperlinks in PDF ###
+
+PDF supports tables of contents and hyperlinks, but at least the
+default PDF viewer on Android 7.0 doesn’t seem to have any way to see
+them.  It has a fairly effective scrollbar, though, so page numbers
+may be a reasonable replacement — but they need to count monotonically
+from 1 at the beginning, since the page numbers displayed in the
+Android viewer do that; even though PDF supports page numbers that do
+things like “i, ii, iii, iv, 1, 2”, they are not displayed.
+
 ### ZUI in PDF for navigating illustrations? ###
 
 Illustrations (see file `dercuano-drawings`) are a really hard problem
@@ -340,7 +387,9 @@ demand, and even some degree of hierarchical navigation.
 Hyperlink navigation within the illustration is probably not
 supported, though, and the maximum zoom is probably quite limited; the
 popular AndroidPdfViewer open-source component defaults to 3× as its
-default maximum zoom.
+default maximum zoom, but the Android 7.0 default PDF viewer defaults
+to 10×.  It also permits zooming *out* until several pages are on the
+screen, though, sadly, stacked vertically.
 
 ### Hyphenation and equations in PDF ###
 
