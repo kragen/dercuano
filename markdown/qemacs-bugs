@@ -1,0 +1,51 @@
+I downloaded and built QEmacs.  It's a good enough Emacs I could almost use it!
+Which is inspiring, since it was an individual spare-time project by one
+person, even if that one person is Fabrice Bellard.  So I thought I'd take some
+notes on its deficiencies to see if it's fixable, or how much more work would
+be needed to make something really usable.
+
+- Crashes sometimes in help.  Open qe_g, C-h b q
+- open a C file and type
+
+    typedef struct node {
+
+    and QEmacs takes you to the beginning of the line. Follow that up with
+    `enum {` and it happens again.
+
+    Type `typedef int buf[4];` and it happens again. I think this is just
+    part of a general problem it has with indenting C.
+
+- Yes, it can open a text file of nearly 300 megabytes. But going to the end
+  of the file is slow.
+
+- Doesn't support M-^, M-;.
+
+- C-x C-e (compile) tries to execute the make command in the directory where
+  qemacs started, not where the file is.
+
+- repeated C-k doesn't append to the latest kill-ring item as it should, so
+  you can't use it to cut blocks of text.
+
+- M-q takes you out of your paragraph, so you can't just keep typing.
+
+- Redisplay is visibly slow and not double-buffered.
+
+- Doesn't support ~ in filenames.
+
+- Doesn't support M-/
+
+- Control-backspace is "help" instead of "backward-kill-word".
+
+- When there's pending keyboard input, it wastes time updating the screen
+  with already-stale state!
+
+- Undo works in individual buffer changes, rather than commands, which is
+  quite suboptimal with M-q and also with undoing typing.
+
+- Doesn't support prefix arguments. M-5 M-6 M-g prompts you for a line
+  number.
+
+- M-y (yank-pop) causes subsequent C-y to yank the same thing. Maybe this is
+  an improvement.
+
+Still, it's impressive how much like Emacs it can feel with only 88 commands!

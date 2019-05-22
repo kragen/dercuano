@@ -1,0 +1,25 @@
+I was thinking about chasing-the-beam-style raster-generation software
+in low memory, and how to achieve smooth curves.
+
+Suppose you want to rasterize some kind of shape.  You can approximate
+the border of the shape in a number of different ways: a polygon, a
+Bézier spline, etc.  One particularly interesting way, to me, is as a
+tilewise polynomial.
+
+Suppose you have divided your screen up into tiles of 256×256 pixels.
+The screen I'm looking at at the moment is 1024×600, so it would need
+four such tiles horizontally and three vertically, for a total of
+twelve.  But coordinates within each tile are only 8 bits per
+coordinate, which means that you can do parallel computations over 16
+tiles using SSE instructions.
+
+Suppose you decide to represent the shape's border within a given tile
+as a polynomial, either for the horizontal axis in terms of the
+vertical or vice versa, along with limits.  What degree of polynomial
+do you need?
+
+Clearly if the shape border is of arbitrary complexity you need a
+degree-256 polynomial.  But if you just want to hit three points in
+the tile, you only need a degree-2 polynomial.  And if you need two
+points with specific derivatives — say, the top and bottom of the tile
+— you can do that with a degree-3 polynomial.

@@ -1,0 +1,37 @@
+Modern laptop screens are 16:9 rather than the traditional 4:3.
+They're also much higher resolution.  Could you take advantage of this
+for programming?  It's helpful to see a lot of text on your screen at
+once for programming, but we're somewhat inflexible about the shape of
+the text, since it's not easy to reformat program source code for
+wider and narrower windows.
+
+The traditional terminal format was 80x24 or 80x25, the former of
+which is also the default size for xterm and gnome-terminal; each
+glyph contained roughly 5x8 pixels which were almost square.  There's
+a "5x8" font that ships with X11 that shows what this looked like; try
+`xterm -fn 5x8`.  There's also a 5x7 font, which is just about as
+readable, and there are somewhat less readable 4x6 fonts floating
+around.  The appearance on an LCD is a little blockier than it was on
+the hardware terminals, because their pixels were not neat little
+squares like LCD pixels, but rather fuzzy dots or horizontal segments
+of scan lines.
+
+However, modern LCD displays actually have not only grayscale but also
+three times the horizontal resolution of a CRT with the same nominal
+number of pixels.  This extra horizontal resolution can be, and is,
+used to dramatically the readability of text, which correspondingly
+allows the use of smaller fonts.
+
+So let's suppose, conservatively, that we can use 3x6 fonts, which are
+really 9x6 --- 54 subpixels per glyph rather than the traditional 32,
+which ought to be eminently readable.  How much text can you fit on
+the screen?
+
+Suppose you break up the screen horizontally into 80-column columns.
+Each of these will be 240 pixels wide; if you have a modest 1024x600
+screen (very slightly narrower than 16:9) then you can divide 960 of
+the 1024 pixels into four 80-column columns, with another 64 pixels
+left over for margins, scrollbars, or other UI chrome.  Each of these
+columns then holds 100 6-pixel-high lines of text, for a total of 400
+lines, or six printed standard 80x66 pages.
+

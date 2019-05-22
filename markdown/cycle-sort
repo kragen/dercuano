@@ -1,0 +1,18 @@
+Cycle sort is an O(N²) in-place sorting algorithm that only performs N
+writes to the original array in the worst case, handy if that array is
+stored somewhere very costly such as Flash.  It's O(N²) because it
+eventually compares every element to every other element, twice, to
+find that element's position.
+
+It seems to me that it's usually possible to do better, even under the
+constraint of only performing N writes.  Of course, if you have an
+unlimited amount of RAM, you can just read the items into RAM, sort
+them, and write them back in order.  That's why the "in-place"
+qualifier on cycle sort is important: it uses only O(1) space, while
+doing the RAM sort uses O(N) space.
+
+What about the middle ground?  What if you can afford O(log N) or
+O(sqrt(N)) memory?  Is there a sorting algorithm that does better than
+the 2N² comparisons of cycle sort, while maintaining the O(N) writes
+to the original array?
+

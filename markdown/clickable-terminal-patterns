@@ -1,0 +1,62 @@
+libvte9 includes the ability to tell its clients if a particular
+position is within a match to any of a list of regexps; this ability
+is used by gnome-terminal and xfce4-terminal to make links in
+terminals clickable.
+
+However, the list of regexps is hardcoded.  It would be useful to add
+additional regexps, for reasons like the following:
+
+* Clicking on `grep -n` output like
+  "./terminal/terminal-widget.c:292:" could request Emacs to open the
+  file at the line in question.
+* Clicking on a company-internal bug number like "ITN-6748" could open
+  the URL of the ticket in question.
+* Clicking on a date could open your favorite calendar app to that
+  date.
+* Clicking on a Bitcoin address could open your Bitcoin client to send
+  Bitcoins to its owner.
+* Clicking on an IP address could prompt you with various things to
+  do: mtr, nmap, reverse DNS lookup, etc.
+* Clicking on a street address could search for it in Google Maps.
+* Clicking on a Twitter @username could open their Twitter page.
+* Clicking on a DOI number could look it up in a way appropriate to
+  your campus.
+* Clicking on a phone number could call it, add it to your address
+  book, or look it up in your address book.
+
+These suggest a configuration file with a syntax like
+
+    /home/paul/bin/open-ticket ITN-[[:digit:]]+
+    /home/paul/bin/open-editor ^[./][^ ]*:[[:digit:]]+:
+    /home/paul/bin/open-calendar \<[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}\>
+
+where the scripts alluded to will be invoked with the matched string
+as an argument.  `open-editor` could be implemented, for example, as
+follows:
+
+    #!/bin/sh
+    exec >"$HOME/editor.log" 2>&1
+    IFS=:
+    set $1
+    emacsclient +$2 $1 &
+
+In the case of xfce-terminal, this would involve:
+
+1. Dynamically allocating new pattern types when reading this file, in
+   addition to the four predefined ones at
+   terminal/terminal-widget.c:65.
+
+2. Adding the new regexes to the libvte widget, along with the ones
+   from `regex_patterns` at terminal/terminal-widget.c:78, in
+   `terminal_widget_update_highlight_urls` at
+   terminal/terminal-widget.c:772.
+
+3. Perhaps factoring the two calls to `vte_terminal_match_check` in
+   `terminal_widget_context_menu` at terminal/terminal-widget.c:292
+   and in `terminal_widget_button_press_event` at
+   terminal/terminal-widget.c:403 into a single thing?  In any case,
+   wire them both up to invoke a new function to invoke the
+   user-defined action.
+
+4. Writing the new user-defined action function, which would spawn off
+   a subprocess with the requested command.

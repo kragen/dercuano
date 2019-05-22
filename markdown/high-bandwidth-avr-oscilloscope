@@ -1,0 +1,46 @@
+An oscilloscope is a crucial tool for serious circuit hacking.  The
+minimum serious oscilloscope input bandwidth is 20MHz, which is to
+say, it attenuates 20MHz signal components by 3dB (and probably
+phase-shifts them), 40MHz signal components by 9dB (and phase-shifts
+them more), 80MHz signal components by 15dB, and so on; so on a
+"20MHz" oscilloscope you should still be able to *see* if there's an
+100MHz signal, even if you can't measure it very well or see what its
+shape is.
+
+It would be nice if it were possible to improvise a 20MHz oscilloscope
+out of inexpensive electronics.
+
+Suppose, though, you're trying to work with an AVR ATMega328.  This
+chip can only run at a max of 20MHz clock, and its ADC can only manage
+some 77000 conversions per second, and those at 7.5 bits of
+resolution.  It would seem that you're pretty much fucked for seeing
+anything above 35kHz, which is some 500 times slower than you would
+like, and 500 times slower than the processor's own clock.  That is,
+you're not going to diagnose much of anything related to an AVR with
+another AVR, right?
+
+Well, consider this.  It's common, although far from universal, for
+the 1MHz or 3MHz or 10MHz signal you're interested in to repeat many
+times.  So if you can figure out its period, you can sample different
+points from many waves, then reassemble them into a picture of what
+one period of the wave looks like.  Each sample-and-hold cycle should
+take place in well under a microsecond, and a faster external
+sample-and-hold circuit can be built, perhaps with an op-amp on its
+input to raise the input impedance.
+
+(You probably can't show more than about 1000 samples horizontally on
+the screen at a time anyway, and you can't do that more than 60 times
+a second.)
+
+Suppose, though, that it doesn't repeat many times?  There's not a
+whole lot you can do about that if you don't have some way to store
+the analogue signal until you have a chance to digitize it.  All the
+options I know of (Williams tubes, magnetostrictive delay lines,
+acoustic delay lines) seem improbable.
+
+As for guessing the period, you can bandlimit your input signal with
+an analog input filter, sample the waveform at more or less random
+intervals, and then seek the period that provides the best continuity.
+
+That won't give you a 20MHz oscilloscope but it should give you a
+200kHz oscilloscope.  One order of magnitude down, two more to go.

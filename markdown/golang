@@ -1,0 +1,45 @@
+In 2012, starting again with golang.
+
+- The email address parsing functionality is a little tied into the
+  email system; you apparently have to make a fake header.
+- go doc is pretty cool, but looking at the actual library source is
+  even better in most cases.
+- Type equivalence is by name, so even if a mail.Header *is* just a
+  map[string][]string, you still can't mutate it.  But you can
+  construct a new one.
+- for x := range somearray makes x range over the indices of
+  somearray, not its values.  You want _, x :=.
+- How do you find the length of an array?  Oh, Pythonwise, len(array).
+- Okay, so suppose I want to do the equivalent of this Python:
+
+        def main(outbox, inbox):
+            important_senders = recipients(outbox)
+
+    I guess I need to be able to open the outbox file and accumulate
+    stuff in a map.  Hmm, isn't there a thing about named return values?
+    How does that work?  Oh, (name type, name type, name type) after the
+    argument list.
+
+- How do I open a file?  os.Open.
+- How do I print messages to stderr and return failure from main?
+  Looks like log.Fatal does that, and even log.Printf prints to
+  stderr.  (Presumably fmt.Printf doesn't.)
+- Now that I have the file open, how do I get messages from it?  Looks
+  like the file is already an io.Reader, so I'm good.
+- Hmm, now it seems like I'm suffering from email parsing problems,
+  from apparently trying to parse a header starting in the middle of a
+  subject line.  I guess I need to read that message body.
+- But hmm, io.Reader.Read(p) reads up to len(p) bytes.  How do I make
+  a slice (?) that I can pass in there?  (Looks like make([]byte, 16).)
+  Oh, there's an
+  ioutil.ReadAll?  That solves the problem.  But now I still have no
+  addresses! ...
+  Also related to problems like these: bufio.NewReader(os.Stdin) 
+  and r.ReadString("\n").
+- Oh, hmm, this is just message parsing, not mailbox parsing.  I still
+  have to do mailbox parsing myself, and provide an io.Reader
+  interface?  Well, there's an io.LimitReader in the library.
+- Cool, the I/O 2011 talk mentions an SDL binding for Go.
+- Looks like the email message parsing chokes on this:
+
+        To: Kragen Sitaker <kragen>

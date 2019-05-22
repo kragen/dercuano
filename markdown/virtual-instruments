@@ -1,0 +1,61 @@
+Playing with Carolina's idea of an expanded theremin.
+
+There are two major questions: inputs and outputs.
+
+Inputs
+------
+
+Minority-Report-style lights on hands in front of a webcam?
+
+Kinect body scanning in real time?
+
+Arduinos with accelerometers?
+
+Power-glove-style strain gauges?
+
+Theremins use capacitive sensing.  This is clearly a possibility, but
+it is harder with high-speed electronics around, since the capacitance
+signals you're looking for are very small.  An actual theremin circuit
+might be the best way to measure proximity.
+
+Ultrasound signaling is another traditional approach for VR equipment.
+
+Outputs
+-------
+
+Some of this is tricky because the input channels we're considering
+are possibly pretty high latency: webcam plus image processing
+algorithms, say.  So it might make some sense for the musician to
+control the tempo and type of rhythm rather than the exact timing.
+
+(Some prototyping will reveal how big a problem this is in practice.
+You could imagine that a QVGA 320x240 image wouldn't really take that
+long to process, and might be adequate.)
+
+The possibility of the music coming out is, fortunately or
+unfortunately, many-dimensional.  Even a single note can be loud or
+soft, high or low, bent up or down, of many different timbres, and of
+many different envelopes, and at any time.  An entire melody has many
+notes, and the relationships they bear to one another are potentially
+very complicated.
+
+So one crucial question is how many low-latency high-bandwidth
+dimensions of input we can achieve: two with each hand?  Another with
+angle?  Another with finger separation?  Other joint orientations?
+
+One possible mapping is with radius for volume or timbre, and angle
+for pitch.  Going around the circle more than once would go up or down
+a whole octave.
+
+Another possibility is moving virtual objects around a space, maybe a
+time-frequency representation where time is streaming past you.
+
+Another kind of exploration would adjust parameters of different state
+machines with your movements: a melody generator, a rhythm generator,
+a timbre generator or two.  Maybe, at its simplest, you could have one
+direction to move in to seek change, and another direction to move in
+to stay the same; or you could have a sort of pie menu thing where
+you're always selecting one of the parameters to vary, and your
+distance from the center controls how fast it varies.  It's crucial
+for the feedback here to be within a few hundred milliseconds in order
+for the interface to be discoverable.

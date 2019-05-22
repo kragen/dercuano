@@ -1,0 +1,47 @@
+What's the sense in which e is the optimal branching factor?  The
+number of nodes you have to traverse to reach one of N nodes with
+branching factor B is ceil(log N / log B), and if you're examining
+each of the B branches in the node to figure out which one to follow,
+you end up examining B ceil(log N / log B) branches.  If we remove the
+discretization, we get log N (B / log B), and it turns out that B /
+log B has a minimum at B = e, so in practice the optimal branching
+factor is 3.
+
+This still holds if you are only examining B/2 branches at each node.
+It's only if there's an additional cost to visiting a new node that
+the minimum cost moves to a larger branching factor.
+
+To be a little more concrete, suppose you're trying to track down an
+incorrect result from the execution of a program that runs for a
+hundred billion instructions, or about a minute.  If the program is
+built out of functions that call other functions and combine their
+results, and you can tell from looking at each result whether it's
+correct or not, maybe you can navigate to the result you want by
+expanding the execution history as an outline.
+
+If each function calls three other functions, then within 24 clicks,
+you can make your way from the top-level result to the particular
+incorrect result; at each step, you have to examine on average 1.5
+intermediate results, so you need to look at about 35 results.
+
+If each function calls only two other functions, you have to look at
+about 37 results, which is slightly worse; and the same is true if
+each function calls four other functions.  So the B/log B function is
+pretty flat over the region of 2-4.  Then it starts to climb: at 5
+callees, you need to examine 39 results; at 6, 42; and at 7, 46.  At
+15 callees, the number of results you have to examine to find your way
+to the bottom-level fault has doubled to 70.
+
+However, the number of nodes you have to examine (and the number of
+clicks you have to make) at that point has shrunk from 24 to 9.  So if
+the cost of visiting a node is significant (e.g. you need to reorient
+yourself in a new context, or clicking is slow) then the optimal
+number of callees for debugging might be higher than 3.  Already at 9
+you've cut in half the number of nodes visited (12 instead of 24) at
+only a 50% extra cost in number of branches examined.  So if the cost
+to visit a node is comparable to the cost to examine a branch (the
+same order of magnitude) then the optimum is probably somewhere around
+9, say, between 5 and 18.  (At 18, you're examining 79 branches, but
+still visiting 9 nodes.  So going from 9 to 18 saves you about 3
+nodes, but costs you 27 branch examinations, which only makes sense if
+examining a node costs at least 9 branch examinations.)

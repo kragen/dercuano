@@ -1,0 +1,54 @@
+DJB makes a good argument for using crit-bit trees as the fundamental
+string-set data structure: you get to use two words of memory per
+string, or three if you store the strings as pointers instead of
+inline in the nodes.
+
+The trouble is, how do you generalize it?  A hash table can store
+pointers to arbitrary objects as long as they support .hash() and
+.equals() methods.  But crit-bit trees can apparently store only
+strings.
+
+For a small set of strings, you could perhaps do even better.  For up
+to 128 strings, say, you could use parallel arrays: 
+
+    uchar left[128],  // left child pointer (as array index)
+          right[128], // right child pointer
+          nbits[128], // number of bits to skip from parent node bit offset
+          start[128], // string #3 is contents[start[3]:start[3]+length[3]]
+          length[128], 
+          contents[256];
+
+These definitions support strings of up to 256 bytes total, with no
+shared prefix of 256 bits, 32 bytes, or more; the high bit being set
+in a pointer indicates a leaf node.  Increasing `start` to 16 bits per
+entry allows your strings to be up to 255 bytes each, removing the
+aggregate limit.
+
+An empty dict in CPython costs about 180 bytes.  With a structure like
+
+    typedef struct { uchar left[N], right[N], nbits[N]; object *out[N]; } tinydict;
+
+you have some 7 bytes per potential entry in your dict; that gives you
+Python's degree of overhead at N=25, so N=16 is probably a reasonable
+choice, using up 112 bytes per tinydict.  (At which point you could
+save a little further space by using nibbles, but don't.)
+
+An amusing thing about these parallel-array structures: like PHP's
+arrays, they have an implicit sequence to them, the sequence of array
+indices.  You could imagine a routine that shuffles the order of
+treenodes around without changing the shape of the tree, thus
+providing an additional traversal order.
+
+A larger `tinydict`:
+
+    typedef struct { u16 left[N2], right[N2], nbits[N2]; object *out[N2]; } smalldict;
+
+This can support up to 64Ki items.
+
+What does the protocol for an `object` look like?  Presumably you have
+a `.key()` method which returns a sequence of bytes — perhaps a lazy
+sequence, one or a few words at a time.
+
+As an amusing exercise, perhaps many objects could be normally stored
+as strings, with a small cache (a few kilobytes) of objects built in
+a pointer-filled manner.
