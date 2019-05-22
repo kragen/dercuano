@@ -1,0 +1,50 @@
+Suppose you wanted to construct a set of Wang tiles that performed
+base-10 addition.  Like, you would start with a row of interlocking
+puzzle-piece tiles that said “ 3280+834 ”, with a flat edge along the
+top, left, and right, but a ragged edge along the bottom, and all the
+possible ways to complete a smooth-edged shape would have the correct
+answer “4114” on the bottom row.
+
+This involves four kinds of top-row tiles: digits, left boundary,
+right boundary, and “+”.  (Or 13 kinds, if we count each digit
+separately.)  These can mostly all fit together in an arbitrary order,
+but the left and right boundary have smooth edges that won’t interlock
+with anything else.  And if you put more than one “+” sign in there,
+you will have created an unsolvable puzzle.  (You could use two
+different kinds of digit tiles, one for the left addend and one for
+the right, in order to make this impossible.)
+
+The first order of business is to get the corresponding digits lined
+up, so that you get some kind of representation of “(3+0), (2+8),
+(8+3), (0+4)”.  This involves introducing an extra “0” to the “834”,
+and then shifting digits over, one per row, until they reach their
+final position.  Then, once the corresponding digits are lined up, you
+need to reduce the pairs to sum digits, one by one, and finally once
+everything is a sum digit, you can finish off the bottom with a nice
+smooth-edged line.
+
+Introducing extra leading zeroes
+--------------------------------
+
+Here we’re copying the original problem down, row by row; so we have
+“copy digits” whose tops interlock (only!) with the bottoms of the
+corresponding digits above them, and similarly a “copy left edge” and
+“copy right edge” and “copy plus sign”.  Except that there are 120
+kinds of extra “digit insertion tiles” which allow you to, under the
+right circumstances, shift a number over by one tile to the right.
+Each of these kinds of digit insertion tiles has a digit printed on it
+that is determined by its left and bottom edges, which are the same,
+and a right edge that is the same as its top edge.  There are top-edge
+versions for each of the possible digits that could be above, and also
+the “+” tile and the right-edge tile.
+
+The “copy down +” and “copy left edge” tiles have a special right edge
+that allows an “insert leading 0”, so you can add an
+extra-leading-zero tile to shift over either the left or the right
+operand by one.  The “copy down” tiles are not “shift tiles”, so you
+can only use them directly below the thing they’re copying, so you can
+only insert one leading 0 per row.
+
+Shifting corresponding digits left
+----------------------------------
+

@@ -1,0 +1,68 @@
+Leconscrip is a family of languages for implementing BubbleOS (see
+file `bubbleos`).
+
+It’s mostly a subset of JS, since that eliminates unnecessary
+syntactic obstacles.  But it’s implemented as a series of levels.
+
+Leconscrip level 0: Lecon
+-------------------------
+
+Lecon is nearly the lowest programming level at which it makes sense
+to use JS syntax at all; it’s barely above the assembly level.  It has
+recursive functions with global and local `let` variables, assignment,
+integers, `if`, `while`, binary `+`, `-`, `*`, `%`, `&`, `|`, `^`, and
+arrays of integers.  The arrays must be defined with the syntax `let x
+= Array(k)`, where `k` is a compile-time constant.  Expressions are
+only permitted as the right operand of a variable initialization or
+assignment.  It doesn’t support closures, objects, object references,
+or `for` loops.  Functions can return integers.  Identifiers are
+limited to two characters.  Semicolons are required.  I/O is done with
+`read` and `write` functions on arrays of integers representing bytes.
+
+Variables are of three types: arrays, integers, or functions.  Type
+inference is used; only arrays can be indexed, only integers can be
+indexes or participate in arithmetic, and only functions can be
+called.  Parameters can be arrays or functions.
+
+Because Lecon doesn’t directly permit runtime allocation, it is (in
+conjunction with a stack-depth checker) suitable for functions in
+which failure is not an option.
+
+Here’s the whole grammar, bottom-up, as a PEG.
+
+    _ <- (` ` / `\t` / `\n`)*.
+    LP <- `(` _.
+    RP <- `)` _.
+    LB <- `{` _.
+    RB <- `}` _.
+    LS <- `[` _.
+    RS <- `]` _.
+    EQ <- `=` _.
+    C <- `,` _.
+    S <- `;` _.
+
+    literal <- [0-9]+ _.
+    name <- [A-Za-z] ([A-Za-z0-9] / ) _.
+    atom <- name / literal.
+    op <- [-+*%&|^] _.
+
+    aparams <- atom (C aparams / ) / .
+    fparams <- name (C fparams / ) / .
+
+    call <- atom LP aparams RP.
+    expr <- atom op atom / atom LS atom RS / atom.
+    assign <- name EQ expr.
+    decl <- name EQ `Array` _ LP literal RP / assign.
+    decls <- decl (C decls / ).
+
+    return <- `return` _ atom.
+    let <- `let` _ decls.
+
+    block <- LB statement* RB.
+    if <- `if` _ LP atom RP statement.
+    while <- `while` _ LP atom RP statement.
+    statement <- block / (let / return / if / while / assign / call) S.
+    
+    func <- `function` _ name LP fparams RP LB statement* RB.
+
+    prog <- func*.

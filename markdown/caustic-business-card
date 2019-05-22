@@ -1,0 +1,48 @@
+Suppose my selective electro-etching process works to produce caustic
+surfaces.  Can I make myself a business card?
+
+I'm not sure how big a business card is.  If it’s 50 mm × 30 mm and
+has a 50 × 30 mm reflection, presumably the focal distance needs to be
+short enough that the sun’s ½° size gives adequate resolution to the
+letters.  Minimally we need 5×8 and 5 lines of 20 letters, amounting
+to 4000 pixels in the caustic.  The reflection could potentially be
+larger than the card itself, but if that’s going to be significant, it
+needs to be curved.  A spherical bead would be cool, but let’s start
+by thinking about flat metal plates.
+
+That’s about 2.7 pixels per square millimeter (of the image), or about
+0.6 mm per pixel.  Half a degree is about 9 milliradians, so the
+projection distance can’t be more than about 70 mm to get that
+resolution.  This is feasible but uncomfortably tight.
+
+That is: the sunlight, with ½° = 9 mrad divergence, comes in and
+illuminates the overall-flat shiny mirror-polished metallic 50 mm ×
+30 mm surface, producing a 50 mm × 30 mm reflection on a surface in
+shadow in the same direction as the sun, 70 mm away.  Because of the
+divergence, there’s a fuzzy border around the reflection with a radius
+of 0.3 mm.  Tiny variations from flatness across the mirror result in
+major variations in brightness across the reflection, in particular
+bright spots from caustics, which also have a fuzziness radius of
+0.3 mm.  These bright spots spell out my name, email address, and so
+on.  They can reasonably be spaced some 0.6 mm apart, giving a
+resolution of some 83×50 “pixels”, which is 16 5×8 letters on each of
+6 lines, a total of 96 character positions.  This can be improved
+somewhat with subpixel positioning and proportional fonts but not a
+whole lot.
+
+The bright spots reach their maximum brightness when the corresponding
+0.6-mm-diameter spot on the mirror is concave parabolic with a
+spherical radius of curvature of 140 mm.  This means that the center
+is depressed from the edge by 140 mm - √((140 mm)² - (0.3 mm)²) =
+320 nm, about half a wavelength of light.
+
+This is small enough that the geometrical optics approximation may not
+apply and we may have to consider diffraction.  (We can perhaps
+improve the situation there a bit with a blue coating.)  The usual
+Airy limit is sin θ = 1.220λ/D for a circular aperture; in this case
+our λ is about 555 nm and our D is about 600 μm, so this works out to
+sin θ = 0.0011, which is to say that our first diffraction null is
+about 1.1 milliradians in radius, 2.2 milliradians in diameter.  This
+is substantially smaller than the 9 milliradians of the sun’s disk, so
+the diffraction effect is significant, but not dominant; we’re in good
+shape.
