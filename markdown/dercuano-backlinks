@@ -1,0 +1,83 @@
+I want to add backlinks to Dercuano articles.
+
+Backlinks
+---------
+
+Backlinks are the Wiki feature which shows you all the pages that link
+to a page; they make links in some sense bidirectional, and they
+allowed us to categorize pages on Wiki years before Wikipedia — you
+would just create a page called CategoryWhatever and then link to it
+from whatever pages you thought should belong to it, and look at its
+backlinks page.
+
+I think having backlinks will improve Dercuano’s navigability
+dramatically.
+
+Desired implementation in Dercuano
+----------------------------------
+
+In Dercuano I’d like to display the backlinks on the same page as the
+rest of the article, maybe at the end, and ideally with a bit of
+context.  This is especially helpful when I have a later note that
+essentially obsoletes an earlier one.
+
+Implementation techniques
+-------------------------
+
+Dercuano goes to some amount of trouble to avoid rerendering notes
+unnecessarily, because rerendering all the notes takes 28 seconds on
+my laptop, while just regenerating the categories and the index page
+takes only 6.3 seconds.  A more detailed timing breakdown (as of
+dercuano-20190522):
+
+    |                                        |   sec |
+    | rerendering all the notes              |    28 |
+    | just regenerating categories and index |   6.3 |
+    | instantiating Bundle and all Notes     |   0.5 |
+    | reading `triples`                      | 0.065 |
+    | bundle.generate_index()                |   2.0 |
+    | bundle.generate_categories()           |   2.9 |
+
+Actually about a quarter of this time to generate categories and
+indices is finding note titles, and another 10% is finding the notes
+in a category; most of the rest is generating HTML, though some of it
+is querying the unnecessarily inefficient triple store, which is also
+a factor in the note titles being slow.  But 77% of the execution time
+is rendering notes, which is mostly a matter of running Markdown,
+though it actually spends about 25% of its time finding the notes in a
+category too.
+
+So Dercuano is a lot more usable when it doesn’t rerender notes when
+it doesn’t have to, although it produces incorrect results when it
+fails to rerender notes whose titles and categories have changed.  The
+trouble is, the point at which we learn about the backlinks is when we
+render the bodies of the notes.  (At present, repl() on line 469
+inside `replace_links` is getting called 3095 times, some of which it
+finds a backlink.)
+
+One of the things I’d like to do is do the actual rendering in
+subprocesses, so that I can run four or so of them; ideally, this
+should speed up the 22 seconds of rendering to 5.5 seconds, although
+lazy memoization may result in some duplication of work between the
+subprocesses.
+
+Without caching, the minimal-work way of handling the
+unknown-backlinks problem would be to do it in two phases: one phase
+where we render all the bodies, and a second phase where we render all
+the backlinks.  However, this adds complication if we want to farm the
+rendering out to subprocesses, since they would then need to deliver
+both the backlinks and the bodies back to the main process, probably
+via the firesystem.
+
+A different approach would be to store the relevant backlinks in the
+filesystem somehow, in the output directory probably, and rerender the
+page when its backlinks change.  Most of the time, they wouldn’t
+change even when some other note that links to it changes, but when
+they do, this could require you to render the same note twice in the
+same run.  In particular this results in rendering nearly all the
+notes twice when starting from a missing output directory, since at
+first each note is rendered with no backlinks, and then later it will
+be rendered with backlinks.
+
+…this suggests I should optimize the triple store a bit and profile my
+execution times again.
