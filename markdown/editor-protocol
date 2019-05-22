@@ -1,0 +1,60 @@
+I was pondering a design for gap buffers in C, trying to figure out
+the interface.  At first I thought two access functions would be
+enough, one to read a range and one to write a range, in both cases to
+a raw char pointer.  (Plus a function to get its length.)
+
+Then I realized that meant that reading from or writing to a file
+would require an extra inefficient copy through an intermediate
+buffer.  So I thought I’d want to add functions that take file
+descriptors, too, because that’s a pretty important thing to do with
+strings, really the only thing other than copying them around in
+memory if you’re on Unix.
+
+But then I realized that I’d probably want to copy data from one gap
+buffer to another at some point, but for that I’d still need the extra
+inefficient copy.  So I was thinking of adding another function, and
+then I realized what I was doing.
+
+All that’s needed here is a generic interface for piping byte streams
+around, which could be either push (a byte-sink interface) or pull (a
+byte-source interface).  Then we just need pipe and antipipe façades
+for gap buffers, files, and raw char pointers.
+
+C isn’t that great for generic interfaces, but you could do it this
+way:
+
+    typedef struct {
+        int (*write)(void *user_data, const char *s, size_t len);
+        void *user_data;
+    } byte_sink;
+
+Given a `byte_sink`, you can invoke it several times with different
+pieces of data.  A gap buffer asked to write its contents to a
+`byte_sink` might invoke it twice, once for the part of the text
+before the gap and once for the part after it.
+
+(In other contexts, a byte-sink interface might also include a close
+method, an error method, and so forth.  In this case, the `write`
+function has a return value that I intend to use to indicate errors.)
+
+Here `user_data` is used to distinguish different objects of the same
+type, since C function pointers aren’t closures.  I originally heard
+the term in the context of Tcl, but by now Lua, OpenGLUT, GLFW, GTK+
+and GLib, Core Audio, systemd, and Box2D also use the term to mean
+more or less the same thing.
+
+Then, to write to gap buffers, file descriptors, or raw byte buffers
+requires three different `byte_sink` write functions, and functions
+that return `byte_sink` wrappers for them; to read from gap buffers,
+file descriptors, or raw byte buffers, we need three different
+functions that take `byte_sink` arguments.
+
+So instead of five functions, now we have nine functions.  But now, in
+addition to being able to copy data into and out of gap buffers, we
+can also copy data from one file descriptor to another; and if we add
+a new string buffer type in the future (like an array of gap buffers)
+we can copy data to and from it in the same way.
+
+This is still kind of crappy for reading data from files, because it
+still involves an extra buffer copy — the file descriptor byte source
+function is obligated to allocate it.

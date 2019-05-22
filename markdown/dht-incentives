@@ -1,0 +1,52 @@
+I was thinking about the incentive problem in DHTs.
+
+DHTs sort of inherently mean you can’t choose which node will host
+your data, right?  You can choose which network, but if the nodes that
+your key hashes to are unfriendly, they can forget you ever tried to
+store data on them; and so there’s no way to set up BitTorrent-like
+reciprocity, where other DHT nodes have an incentive to store my data
+so that I’ll be more willing to store their data.
+
+I’m wondering if there’s a way to solve that problem without
+completely losing the desirable aspects of DHTs.  In particular, node
+load in a DHT scales sublinearly with the system size, assuming churn
+is low (which is an incentive problem!), node count scales with data
+size, and update rate doesn’t change.  That would fit in, say, 64
+bytes.  But nodes might discard your data item because it’s deemed to
+be an anti-Islamic data item, for example, if the DHT node happens to
+be hosted in Saudi Arabia, or a heretical data item if it happens to
+be hosted in a Christian country.
+
+The data that is thus incentive-protected need not be large, because
+the data items can be very small and still be useful.  For example,
+you could store a (key, favorableserver) pair that redirects querents
+to a server that you do have some kind of ongoing mutual relationship
+with, such as ownership, payment, or reciprocal storage.
+
+One possibility is that there’s some way to ensure that the DHT node
+can’t erase *your* data with certainty without erasing *everyone’s*
+data with some probability, which converts the incentive from a
+relationship with only you to a relationship with the entire network.
+(This is the motivation behind Verónica Estrada’s helical entanglement work.)
+Like, if the node couldn’t tell which data was yours.
+
+Typically, DHTs already do store your data on multiple DHT nodes to
+provide some resilience in the face of node churn; even Karger’s
+original “Consistent Hashing” paper from 1997 that Akamai was founded
+on explains that you can hash the URL to several different points on
+the circle, which will probably map to different servers; but this
+doesn’t really solve the incentive problem.
+
+As another way of thinking about the incentive problem, consider the
+case of expiry times.  You have a DHT that typically maintains object
+validity fo ra day.  But you want to store data in it that will be
+consulted perhaps once a week.  If your publisher is reliable, it will
+re-store the data in the DHT nodes about every 12 hours, which is to
+say about 14 times as often as it's consulted.  It would be a lot more
+efficient on an overall basis to persuade the DHT to store your data
+for a week or ten instead of a day, and also be more resistant to you
+being arrested for publishing un-Islamic material.
+
+DHTs suffer badly from churn, and churn in practice is pretty high,
+which is arguably another aspect of the same incentive problem — how
+do you incentivize people to keep their nodes running?
