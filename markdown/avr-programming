@@ -1,0 +1,52 @@
+There are apparently three different ways to program AVRs:
+
+- High-voltage “parallel” programming with +12V on the /RESET pin
+  (e.g. §21.2, p.184, of the ATtiny2313A datasheet), used by e.g. the
+  STK500, which, despite the name, still uses only a single pin for
+  the data bits in and out;
+- “Serial” programming with the SPI bus while /RESET is low
+  (e.g. §21.3, p.193, of the ATtiny2313A datasheet), which is what is
+  explained in [Limor Fried’s tutorials][0], which I think requires
+  the /RESET pin to exist, i.e. not be reconfigured as PA2, debugWIRE,
+  or PCINT10 — the RSTDISBL pin of the fuse bits determines this, and
+  additionally there’s a SPIEN pin;
+- with the “store program memory” instruction, e.g. from the Arduino
+  bootloader, as explained in e.g. §19, p.173, of the ATtiny2313A
+  datasheet, which can get its data from anywhere you like.
+
+[0]: http://www.ladyada.net/learn/avr/programming.html
+
+I think I should be able to bitbang the serial programming interface
+from an Arduino or other AVR, but this will require talking some
+protocol to avrdude.  This is I think the purpose of the [mega-isp
+firmware][2] and [ArduinoISP firmware][1] derived from it.
+
+[1]: https://www.arduino.cc/en/Tutorial/ArduinoISP
+[2]: https://code.google.com/archive/p/mega-isp/
+
+The ArduinoISP page shows using an external clock crystal and two
+18–22 pF capacitors to get the device being programmed to be
+sufficiently functional to accept programming, if it isn’t configured
+to use its internal clock.  [By default the divide-by-8 fuse is
+set][3] so the chip’s clock rate is only 1MHz.  At least the
+ATtiny2313 is documented to use the internal oscillator by default.
+
+[3]: http://forum.arduino.cc/index.php?topic=125248.0
+
+It seems like maybe even an ATTiny45 ought to be enough to use for
+serial programming: it has 8 pins, of which 3 are used for Vcc,
+ground, and /RESET; three more are used for SCK, MISO, and MOSI, which
+can control the serial bus of another AVR being submitted to
+programming; and two more are available for some other kind of
+communication.  Or you could bitbang the SPI protocol for programming
+and use the SCL and SDA pins to speak I²C to get programmed.
+
+The ATtiny2313 SOIC unfortunately has the ground pin at the opposite
+extreme of the chip from the Vcc, /RESET, SCK, MISO, and MOSI pins
+that are needed for in-circuit programming, so you need a full 20-pin
+SOIC clip to program it this way.  So I need 13mm of PCI bus to clip
+the whole thing into, with the attendant possible problems with good
+contact.
+
+Arduinos have a standard six-pin ISP programming header, which I
+hadn’t realized.

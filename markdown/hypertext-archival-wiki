@@ -1,0 +1,48 @@
+The pages you look at are deterministically executed code drawn from a
+content-addressable store, using indirections through a namespace.
+(So far, this is very much like Git.)
+
+Code execution, since it’s deterministic, can have its outputs cached.
+Ultimately what you need to see is a pixel image, so that's the
+product of the final bit of code.  But it’s working from a variety of
+inputs, and intermediate steps in the process can be cached.
+
+The interaction with a page is structured more or less as in Redux: a
+state is built up by applying a set of reducers to a sequence of user
+interface events, and what you see on the screen is a function of that
+state and stuff drawn from the content-addressable store.  In this
+case, the user interface events are ultimately just keystrokes, mouse
+events, and touch events.  But these are transformed into higher-level
+events such as scroll events, button clicks, and text changes,
+according to a sort of previous document state.
+
+This approach allows a very small, stable computational core to be
+extended to arbitrary interactive documents.
+
+Because the code’s interaction with the files it draws upon (images,
+libraries, etc.) is indirected through a namespace, you can get new
+results from the same code by runnning it in a new namespace.  This
+means that, for example, if you want to view an existing document with
+a new font, you can make a modified version of it with the new font in
+the relevant place in its namespace, where it used to find the old
+font.
+
+The blobs in the content-addressable store are simply sequences of
+bytes.  The code’s access to items in its namespace is by way of
+memory-mapping, and it has the option to view those sequences of bytes
+in a variety of ways, including as arrays of integers.  The code’s
+output is, similarly, some set of blobs placed in a particular part of
+its namespace, found there when its transaction terminates
+successfully.  This means that many jobs can be performed without
+undergoing the overhead of serializing and deserializing data
+structures.
+
+Jobs cannot map new blobs into their namespace except by supplying
+their contents; thus they cannot access any data they are not
+initially granted access to, nor can they delegate such access to
+other jobs.  This means that you can statically determine the entire
+transitive dependency set of not only a given job but also all jobs
+that could be launched from it via UI interaction.  This makes it
+possible to securely archive the data necessary to run it, which means
+that you can run it without risk of a failure due to data not being
+available, and also means that you cannot 

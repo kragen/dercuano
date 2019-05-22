@@ -1,0 +1,48 @@
+Consider a transmission line shunted at some point with a diode and an
+ac pulse (a wave packet, say) propagating along it.  When the pulse
+reaches the diode, if the diode is forward-biased, the wave packet
+will see a short and will reflect back, inverted.  On the other hand,
+if the diode is reverse-biased, the wave packet will see an open
+circuit (with perhaps some extra capacitance, which can be mostly
+compensated for by reducing the distributed impedance of the
+transmission line or by adding inductance) and will pass through
+unimpeded.
+
+Perhaps by this means you can compute the bitwise OR of two bitstreams
+stored in a transmission line with a diode, by looking at the signal
+past the diode; and perhaps you can calculated their bitwise AND by
+isolating the reflected signal.
+
+Off-the-shelf PIN diodes like the US$2.73 (US$1.27 in quantity)
+M/A-Com MADP-011027-14150T operate at up to 12GHz.  So you could
+imagine doing this operation on bits that were 13mm long traveling
+through a transmission line at 0.5c.
+
+With an ordinary diode, unfortunately, this provides no way to amplify
+the signal.
+
+Specialty parts like Gunn diodes (available as USSR new-old-stock on
+eBay for US$8–20) can operate at higher frequencies, up to some 40GHz
+in some cases (supposedly up to 200GHz in some devices I haven’t seen
+for sale), and additionally have a negative differential resistance
+region which can serve to amplify signals.  Supposedly, gallium
+nitride Gunn diodes can reach 3 THz.  (Tunnel diodes, which are also
+specialty parts, are also a possible option, although they do not
+reach such high frequencies; they are available on eBay at much lower
+costs, like US$1.)
+
+These frequencies are far, far higher than any transistor.
+
+Suppose that you found a way to do universal computation with some
+kind of network of transmission lines and 3 THz Gunn diodes.  You
+could very reasonably use 100 meters of coaxial transmission lines in
+a desktop-sized device.  At 3 THz and a transmission speed of 0.5c,
+the transmission lines would contain about 200 million oscillations at
+any given time, each about 50 microns long.  You could imagine this
+waveform containing 400 million bits.  With a reasonable number of
+bitwise computing elements, such as 32, the device would perform 96
+trillion bit operations per second.  A Skylake CPU with three 256-bit
+arithmetic units might perform 1536 useful bit operations per cycle
+(if we count an add with carry as two bit operations), which would be
+6.144 trillion bit operations per second at 4GHz.  So such a device
+could be computationally useful even without integrated circuits.
