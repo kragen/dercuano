@@ -228,9 +228,11 @@ class Note:
         return [' ', date, ' ' if date else '', self.minutes_string()]
 
     def minutes_string(self):
-        # Wikipedia’s Reading article says "reading for comprehension"
-        # is 200–400 words per minute.
-        minutes = round(self.word_count() / 300)
+        # Wikipedia’s Reading article says “reading for comprehension”
+        # is 200–400 words per minute.  I’m going to figure that
+        # enough of these notes involve equations and source code that
+        # we should halve that.
+        minutes = round(self.word_count() / 150)
         return '(%d %s)' % (minutes, pluralize('minute', minutes))
 
     def word_count(self):
