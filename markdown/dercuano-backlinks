@@ -84,4 +84,50 @@ execution times again.  So I did.  Upon adding code to index the
 triple store on startup, the Bundle instantiation time ballooned from
 0.50 s to 0.55 s; upon using it, the build-from-scratch time went down
 from 28 s to 18 s, and the just-rebuild-index-and-categories time went
-from 6.3 s to 2.5 s.
+from 6.3 s to 2.5 s.  Now the top time consumers are all Markdown
+rendering functions, except for 650 ms waiting for tar to finish.
+
+This in some sense makes the case for avoiding and parallelizing
+Markdown rerendering more urgent than before: previously Markdown took
+75% of the runtime, and now it takes 85%.
+
+So, my thought is to do the following:
+
+1. At program startup, read all the backlinks.
+2. For each note:
+    1. Generate a glob of metadata for a note from the triple store
+       (for example, the titles and note counts of categories) and the
+       backlinks.
+    2. Compare the glob of metadata to the previous glob of metadata for
+       that note, stored on disk.  If it’s the same and the note source
+       file hasn’t changed, continue to the next note.
+    3. Render the note and generate backlinks.
+    4. Store the glob of metadata and the backlinks.
+3. Update the backlinks store and do #2 a second time.  A second time
+   should be sufficient to reach a fixed point.  This should be done
+   automatically, rather than requiring the user to do it as
+   L<sup>A</sup>T<sub>E</sub>X does.
+
+This requires separate stores for the glob of inputs for a note and
+the glob of outputs (including backlinks).  I’m thinking this can be
+in places like .meta/cheap-frequency-detection.inputs and
+.meta/cheap-frequency-detection.outputs for the note
+notes/cheap-frequency-detection.html.
+
+The code path actually needs to be a little bit more complicated,
+because the set of other notes’ titles that the note HTML depends on
+is a function of the note source file’s contents, and finding out what
+that set is presently would require us to rerender the Markdown, which
+is what we’re trying to avoid.  But we don’t actually need to go that
+far — if the source file has changed, we need to rerender it anyway.
+
+We could imagine storing the titles of notes parsed from the HTML in
+the same store as the backlinks (thus the filename .output rather than
+.backlinks) in order to avoid opening and parsing the same files
+multiple times.
+
+This is of course very much the kind of thing discussed in
+`minimal-dependency-system`, `dependent-data`,
+`blob-computation-notes`, and `dehydrating-processes`, and to a lesser
+extent `dependencies`.  I haven’t written any of the systems described
+therein, so I need to do it by hand.
