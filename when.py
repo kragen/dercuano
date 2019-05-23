@@ -21,8 +21,7 @@ def format_when(filename, start, end):
     if start is None or end is None:
         return '%s needs manual-investigation-of-dates\n' % filename
     return ('%s written %s\n'
-            + '%s updated %s\n') % (filename, date(start),
-                                    filename, date(end))
+            + '    updated %s\n') % (filename, date(start), date(end))
 
 def date(time_t):
     if time_t == 1232577326:

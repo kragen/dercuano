@@ -17,6 +17,7 @@ from __future__ import print_function, division
 import cgi
 import errno
 import os
+import string
 import re
 import urllib
 import urlparse
@@ -163,13 +164,17 @@ class Bundle:
 
 def load_triples(filename):
     with open(filename) as f:
+        last_subj = None
         for line in f:
             if not line.strip():
                 continue
             fields = tuple(urlparse.unquote(field.replace('+', '%20'))
                            for field in line.split())
+            if line[0] in string.whitespace:
+                fields = (last_subj,) + fields
             for fn in fields[2:]:
                 yield (fields[0], fields[1], fn)
+            last_subj = fields[0]
 
 
 def as_relations(triples):
