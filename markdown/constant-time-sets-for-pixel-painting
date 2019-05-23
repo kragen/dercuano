@@ -1,0 +1,40 @@
+There’s a data structure for representing sets of small integers, up
+to M integers less than N, using a count variable and two arrays, A of
+size M and B of size N.  The membership test is
+
+    mem(i)  ⇐  B[i] < count  ∧  A[B[i]] == i
+
+from which you can derive the constant-time item insertion, item
+deletion, start-unordered-iteration, iterate-next-item, and
+set-to-empty-set operations.  Additionally the array contents do not
+need to be initialized, so creating a new such set is a constant-time
+operation (although not, I suspect, in standard C, since I think
+reading the uninitialized data in B[i] is undefined behavior).
+
+You can also use this structure as a sparse array, either adding an
+additional array of data-values parallel to A or by making A an array
+of (small-int, data-value) tuples.  And in particular I was thinking
+that this could be useful for scanline rendering of overlapping or
+self-intersecting polygons.  The idea is that, to compute a scan line,
+you maintain a sparse array of pixel value changes (polygon
+boundaries), and the resulting scan line is the prefix sum of that
+sparse array.
+
+This requires efficient sequential (rather than unordered) access to
+the items of the set, but this is readily provided by running a
+sorting step after you’re done storing boundaries into the array, but
+before you start generating pixels.  It’s not quite constant-time per
+drawing operation, but it’s pretty close.
+
+(Asymptotically speaking, it would be better to iterate over the B
+array, since you need to visit every pixel anyway.  In practice, this
+is probably silly.)
+
+By using subpixel coordinates as the indices in B, you should be able
+to get decent antialiasing in the X dimension at little additional
+cost.
+
+I don’t know if you can extend this to painting translucent or
+gradient-filled polygons; that seems like it would require a
+nearest-neighbor kind of test to find out what color a given range
+currently was.

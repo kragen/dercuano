@@ -1,0 +1,35 @@
+If you’re trying to sync audio with video, for example because you
+recorded them on different devices, you acquired them via different
+sources (that don’t share a timebase), or you’re playing them back
+through devices with different latencies, you traditionally need some
+kind of interactive successive approximation where you twist some kind
+of knob or something until you get it right.
+
+A difficulty with this is that only occasionally are there events in
+the video that you can associate with high precision with the audio.
+So you have to wait for one of them to happen once for each
+approximation.
+
+The ideal solution is probably to find a short segment of video with
+such an event and repeat it at as high a frequency as possible as you
+adjust the audio–video lag.  Around 20 Hz, rhythms — pulse
+trains — fade into continuous tones.  So you need something a little
+slower than that, which possibly limits you to about 50 ms feedback
+latency on the knob.  Also, you probably need several frames of video
+to successfully interpolate movement, and video is commonly
+interpolated at rates as low as 24 Hz, so you might not be able to do
+better than, say, 6 Hz or 4 Hz for the repetition.
+
+However, at these rates, the impulsive event you’re looking to
+synchronize the sound with — ideally a clapboard, but often in
+practice a spoken plosive or something — may be overwhelmed by the
+much larger impulsive event of jumping back in time by 167 ms or 250
+ms.  A possible solution is to play both the video and the audio
+segment boustrophedonically: first forward, then backward, then
+forward again, and so on.  This eliminates the first-order
+discontinuities, though the remaining second-order
+discontinuities — objects instantly reversing their direction of
+motion — may be disturbing.
+
+The knob should probably directly control the video displacement, not
+the audio displacement, to avoid screwing with the pitch.
