@@ -1,0 +1,41 @@
+I thought it would be fun to hand-draw a font on paper and scan the
+paper, but producing a TrueType font from this in the usual way then
+requires a certain amount of manual work, converting it to Béziers and
+whatnot.  But, in a sense, you don’t really need all that manual work;
+the input is pixels, and the output is also pixels, and the output is
+a sort of pasteup of the input.
+
+Minimally you do need some way to identify the location and
+orientation and size of each character in the font on the page, which
+is best done with some kind of interactive UI.  And you might want to
+separately indicate the character cell and the bounds of the drawn
+character — either because, in your drawing, some descender or
+something impinged upon the character cell undesirably, or because you
+have some kind of swash protruding.
+
+Leaving aside the UX details of such an interface for now, there’s the
+question of how to do the compositing of the different characters to
+produce the rendered image.  Assuming you’re drawing on white paper,
+you’d like to threshold the background paper to pure white, and treat
+that as transparent.  So if you have overlapping bits of letterforms,
+you’d like to composite them in something like logical-AND fashion:
+
+    | A | B | A & B |
+    | 0 | 0 |     0 |
+    | 0 | 1 |     0 |
+    | 1 | 0 |     0 |
+    | 1 | 1 |     1 |
+
+Now, it might be a reasonable thing to do to actually do this in
+binary, using oversampling.  (Maybe you do 2× oversampling in both X
+and Y, so that each 32-bit word represents the top or bottom half of
+16 different pixels; once you’re done with compositing using &, you
+can use parallel population-count on the subpixels to decide on the
+grayscale value.  The apparent efficiencies of this approach, with an
+average of 8 antialiased pixels per word instead of 1 or 4, are
+somewhat compromised by the amount of bit-shifting required.)
+Alternatively, though, you could use grayscale or even RGB
+representations directly.  And in that case, clearly the compositing
+operation you want is pointwise *multiplication* followed by rescaling
+the result.
+

@@ -1,0 +1,37 @@
+Transistors, especially FETs, are lovely little devices.  They have
+very high energy gain — effectively infinite in the FET case.  They
+respond very quickly, and aside from that finite response speed, their
+response is historyless, which makes the electronic design and test
+problems considerably more tractable.  In particular, circuits that
+are linear, noninverting, or non-amplifying are not capable of
+universal computation, and the transistor immediately takes care of
+all three of those barriers at once.  (I’m fairly sure it’s possible
+to imagine nonlinear, inverting, amplifying circuit elements that are
+still incapable of universal computation, but I don’t know what they’d
+look like.)
+
+Transistors do have a few problems, though.  One is that their
+response speed, while good, could still be better; it’s in the
+picoseconds range for sizes that are practical to fabricate.  Another
+is that the transistors that we know how to fabricate are still
+somewhat tricky to fabricate, requiring exotic materials, materials
+not found in nature and of very high purity.
+
+Braess’s Paradox gives us a way to convert some kinds of noninverting
+nonlinearities into inversion; the well-known construction with
+resistors and a Zener diode is an example.  In general, the bridge
+topology (used in the Braess circuit) provides a way to materialize a
+*difference* in your circuit, which gives you a way to get inversion
+and amplification, in some sense anyway.  A change of 1% in the
+voltage across one of the “shores” of the bridge can easily result in
+a change of 10,000% in the voltage across the bridging element.
+
+Nonlinear circuit behavior and behavior with memory is actually fairly
+universal in real circuit elements; it’s just that normally we
+consider it a problem to solve, because especially in analog circuits,
+the distortions introduced by nonlinearity are difficult to
+characterize and predict.  But, for example, capacitor databooks are
+full of information about the capacitors’ deviations from linearity,
+which often reach 20% or more despite their best engineering efforts
+to remove them.  What if we could take advantage of such everyday
+nonlinearities to implement digital logic?
