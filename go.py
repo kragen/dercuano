@@ -9,7 +9,7 @@ import cgitb
 
 def go(dirname):
     bundle = dercuano.Bundle(dirname)
-    for note in bundle.notes():
+    for note in bundle.notes:
         note.render_if_outdated(print=print)
     bundle.generate_categories()
     bundle.generate_index()

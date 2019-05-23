@@ -4,18 +4,13 @@
 Next up:
 
 - maybe reify categories as a class?
-- add author name to pages
-- a more convenient way to query the triple store
-- maybe some metadata about word counts and time spans and unfinished
+- maybe some metadata about unfinished
   status?
 - maybe list categories on the link to the note?
-- maybe count notes in the category title?
 - A Bayesian classifier
 - add "INCOMPLETE UNVERIFIED DRAFT" to everything, and maybe
   SPECULATIVE to some things too
-- add 90 more notes
-- add Mathjax?  That’s not possible, is it?  Maybe it is, but the
-  package is 33MB.
+- add more notes
 
 """
 from __future__ import print_function, division
@@ -38,12 +33,11 @@ def ok(a, b):
 class Bundle:
     def __init__(self, dirname):
         self.dirname = dirname
-        self._triples = list(load_triples(self.filename('triples')))
-        self._relations = compute_relations(self._triples)
+        self._relations = as_relations(load_triples(self.filename('triples')))
         self.output_dir = 'dercuano-' + self.get_version()
         self.cached_titles = {}
-        self.note_list = list(self._notes())
-        self.note_map = {note.notename: note for note in self.note_list}
+        self.notes = list(self._notes())
+        self.note_map = {note.notename: note for note in self.notes}
 
     def __repr__(self):
         return 'Bundle(%r)' % self.dirname
@@ -60,25 +54,15 @@ class Bundle:
         with open(self.filename('intro.md')) as f:
             return RawHTML(markdown.markdown(f.read().decode('utf-8')))
 
-    def notes(self):
-        return self.note_list
-
     def _notes(self):
         dirname = self.filename('markdown')
         for notename in sorted(os.listdir(dirname)):
             if notename.endswith('~') or notename[0] in '.#':
                 continue
-            yield self.note(notename)
+            yield Note(self, notename, os.path.join(dirname, notename))
 
     def note(self, notename):
-        dirname = self.filename('markdown')
-        source_file = os.path.join(dirname, notename)
-        if ('/' in notename
-            or '\0' in notename
-            or notename.startswith('.')
-            or not os.path.exists(source_file)):
-            raise KeyError(notename)
-        return Note(self, notename, source_file)
+        return self.note_map[notename]
 
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
@@ -154,7 +138,7 @@ class Bundle:
                 print("erroneous category subject", notename)
 
     def category_size(self, category_name):
-        return len(self.notes_in_category(category_name))
+        return len((~self.relation('concerns'))[category_name])
 
     def generate_index(self):
         vomit_html(self.filename(self.output_dir, 'index.html'),
@@ -169,9 +153,6 @@ class Bundle:
         subprocess.check_call('cd %s; tar czf dercuano-%s.tar.gz %s' % (
             self.dirname, self.get_version(), self.output_dir),
                               shell=True)
-
-    def triples(self):
-        return self._triples
 
     def relation(self, verb):
         try:
@@ -191,7 +172,7 @@ def load_triples(filename):
                 yield (fields[0], fields[1], fn)
 
 
-def compute_relations(triples):
+def as_relations(triples):
     relations = {}
     for subj, verb, obj in triples:
         if verb not in relations:
@@ -209,7 +190,6 @@ class Note:
         self.bundle = bundle
         self.notename = notename
         self.source_file = source_file
-        self.category_set = self._categories()
         self._word_count = None
         self._date_string = None
 
@@ -303,9 +283,6 @@ class Note:
                 or ['Anonymous'])[0]
 
     def categories(self):
-        return self.category_set
-
-    def _categories(self):
         return set(self.bundle.relation('concerns')[self.notename])
 
     def is_outdated(self):
@@ -329,15 +306,6 @@ class Note:
 
 def pluralize(noun, number):
     return noun if number == 1 else noun + 's'
-
-def markdown_replacing_links(bundle):
-    def replace(s):
-        return replace_links(markdown.markdown(s.decode('utf-8')), bundle)
-    return replace
-
-markup_flavors = {
-    '<pre>': lambda s: ley(tag('pre')(s)),
-}
 
 def vomit_html(output_filename, html_contents):
     dirname, _ = os.path.split(output_filename)
@@ -373,9 +341,7 @@ def note_date(note):
     return note.date_string()
 
 def index_html(bundle):
-    categories = sorted(bundle.categories())
-    bundle_title = bundle.get_title()
-    notes = sorted(bundle.notes(), key=note_date)
+    notes = sorted(bundle.notes, key=note_date)
     note_years = []
     last_year = None
     for note in notes:
@@ -391,6 +357,8 @@ def index_html(bundle):
     if last_year != None:
         note_years.append(ol(current_ol))
 
+    bundle_title = bundle.get_title()
+    categories = sorted(bundle.categories())
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(level=0),
                     h1(bundle_title),
@@ -473,15 +441,19 @@ def note_html(bundle, note_title, body, footers):
                     footers))
 
 ad_hoc_link_re = re.compile(r'(?:[fF]ile\s+)?<code>(.*?)</code>')
-def replace_links(html, bundle):
-    def repl(mo):
-        try:
-            note = bundle.note(mo.group(1))
-        except KeyError:
-            return mo.group(0)
-        return ley(note.link_ley())
+def markdown_replacing_links(bundle):
+    def replace(s):
+        def repl(mo):
+            note = bundle.note_map.get(mo.group(1))
+            return ley(note.link_ley()) if note else mo.group(0)
 
-    return ad_hoc_link_re.sub(repl, html)
+        return ad_hoc_link_re.sub(repl, markdown.markdown(s.decode('utf-8')))
+
+    return replace
+
+markup_flavors = {
+    '<pre>': lambda s: ley(tag('pre')(s)),
+}
 
 def head_stuff(level=1):
     stylesheet = '../' * level + 'liabilities/style.css'
