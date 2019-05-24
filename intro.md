@@ -38,7 +38,11 @@ Much of what is written here is wrong in a variety of ways.
 - some of it, perhaps most of it, amounts to getting distracted from
   the most important aspects of an issue by some minor detail.
 
-On the other hand, some of it is correct.
+On the other hand, some of it is correct.  Of the correct part, most
+is unoriginal — sometimes I’m just taking notes on well-established
+concepts, and sometimes I’m laboriously rediscovering things that are
+already obvious to others — while some small part is original.
+Unfortunately, I don’t know which part.
 
 Most of these notes are about things I barely understood, or
 didn’t really understand at all, when I wrote the notes.  In some
