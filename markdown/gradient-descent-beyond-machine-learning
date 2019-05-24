@@ -1,0 +1,32 @@
+Gradient descent and friends are widely used in machine learning.  The
+basic recipe is that you have some statistical model which contains
+some parameters, and you use gradient descent to set the parameters
+to, hopefully, minimize the prediction error.
+
+This is an extremely useful approach, and you could argue that, even
+by itself, it’s revolutionary.  But gradient descent is useful for
+other things that don’t fit into this model.  Gradient descent is a
+general continuous optimization procedure; it can be used to
+approximate a local minimum of any differentiable function, and it
+scales well to large numbers of dimensions.
+
+Let’s unpack this a little bit.  In the standard ML approach, you have
+a MODEL which, given PARAMETERS and INDEPENDENT VARIABLES, produces a
+PREDICTION of some DEPENDENT VARIABLES with some amount of ERROR.  You
+use gradient descent, or some related algorithm, to try to set the
+PARAMETERS to minimize the ERROR.  And you have to worry about whether
+you’re overfitting, and so you use a training set and a test set to
+see if the model is starting to overfit your training data.
+
+But gradient descent doesn’t know anything about predictions or
+overfitting or the dependent and independent variables of your model.
+From gradient descent’s point of view, the model and training set
+(including dependent and independent variables) are just part of a
+LOSS FUNCTION which, given INPUTS, produces an error or LOSS.
+
+Gradient descent is a somewhat general procedure for finding the
+inputs that minimize such loss functions.
+
+It turns out that there are a lot of other things in the world that
+can be represented in this way.  There are a lot of things you might
+want to minimize that are not prediction errors.

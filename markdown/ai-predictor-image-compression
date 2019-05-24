@@ -1,0 +1,34 @@
+Image compression algorithms work, in some sense, by finding a good
+way to predict the value of each pixel from the already-known pixels,
+and then correcting the prediction more or less.  (It's kind of a
+stretch to apply this description to JPEG, I guess...)
+
+One possible predictor is a simple spline fit to the previous pixels.
+If it's zero-order, this reduces in some sense to RLE; first-order
+predicts gradients; second-order and higher may not be useful.
+
+A more interesting predictor for screenshots is perhaps a KNN
+predictor: given the so-far decoded pixel data, what are the K
+previously-decoded pixels whose environment was most similar?
+Perhaps, for concreteness, we take the two pixels above, two pixels to
+the left, and one pixel diagonally up and to the left.  Let's take
+them in grayscale so we only have a 5-dimensional parameter space,
+since RGB TrueColor would form a 15-dimensional parameter space.
+
+Now we can search the so-far-decoded image for the K pixels whose
+environments are most similar to our current environment, using
+e.g. Manhattan distance, and take the mean or, more likely, median of
+their color to form our predictor of the current pixel's color.
+
+5 dimensions is small enough that we could reasonably build a k-d tree
+to keep the search efficient.
+
+My thought is that the vast majority of pixels in screenshot
+environments would have exactly the predicted color, because those 5
+pixels have enough information to nearly uniquely identify the font
+glyph, pixel position within that glyph, and background color that
+we're looking at.  That means you can encode the average residual in
+less than a bit, particularly if you accept some quantization noise.
+
+(We might want to do some kind of dimensionality reduction, e.g. PCA,
+to be able to use color and more than 5 pixels.)

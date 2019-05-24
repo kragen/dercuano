@@ -1,0 +1,28 @@
+Let’s say some color component, say red, is a linear function of pixel
+position (x, y) in some region: rᵢ = a₀xᵢ + b₀yᵢ + r₀.  This is an
+arbitrarily oriented linear gradient.  Now, if we α-blend this red rᵢ
+with some other red rⱼ painted over it with some opacity α, we get
+rₖ = (1 - α)rᵢ + αrⱼ.  This gives us a new gradient:
+
+    rₖ = (1 - α)(a₀xᵢ + b₀yᵢ + r₀) + α(a₁xᵢ + b₁yᵢ + r₁)
+       = ((1 - α)a₀ + αa₁)xᵢ  +  ((1 - α)b₀ + αb₁)yᵢ  +  (1 - α)r₀ + αr₁.
+
+That is, the three components of the gradient (r, a, b) blend
+according to the alpha-blending equation just as if they were colors.
+Except really they are nine components; in some sense a linear
+gradient is a transformation matrix from (x, y, 1) space into
+(r, g, b) space.  These matrices then react to alpha-blending in the
+same way that individual color vectors do: (1 - α)M + αN, at least if
+this α is constant and not a gradient as well.
+
+This means that if we have several layers, each of which is divided
+into disjoint regions, each painted with a linear gradient with a
+constant alpha, we can compute the intersection regions of the
+single-layer regions in different layers, and compute the resulting
+gradient for each of those intersection regions, then render the
+resulting gradient.
+
+For things like drop shadows, it would be nice to have gradients of
+alpha, as well, so that things can be gradually feathered into
+complete transparency.  Linear alpha multiplied by a linearly varying
+color gives us a quadratic gradient.

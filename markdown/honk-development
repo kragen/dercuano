@@ -1,0 +1,47 @@
+As I listened to a car honking its horn for a long period of time far
+away with no pause, I noticed that the quality of the sound changed
+subtly several times over the first second or two.  I think this is a
+result of echoes: at first I heard only the incident horn, but after a
+short time it was joined by one, two, three, several echoes of the
+original horn.  Depending on the particular details of the time
+delays, some of the harmonics in each echo interfered constructively
+with those in the original sound, while others interfered
+destructively.
+
+Aside from what this implies about what we can learn about our built
+environment from analyzing the sound, it occurred to me as being a
+very easy effect to simulate; this took me about 15 minutes:
+
+    /* ./horn | aplay */
+    #include <stdio.h>
+    #include <stdint.h>
+
+    typedef uint8_t u8;
+
+    u8 wave(long long t)
+    {
+      return (t & 128 ? 256 - (t & 255) : 128 + (t & 127)) >> 1;
+    }
+
+    u8 horn(long long t)
+    {
+      enum { attack = 600 };
+      int v = t < 0 ? 0 : t > attack ? 256 : t * t * 256 / attack / attack;
+      return wave(t) * v >> 8;
+    }
+
+    int main()
+    {
+      for (int a = 0; a < 32000; a++) {
+        putchar(horn(a - 1000)
+                + (horn(a - 6242) * 64 >> 8)
+                + (horn(a - 8932) * 32 >> 8)            
+                + (horn(a - 12333) * 64 >> 8)            
+                + (horn(a - 3013) * 128 >> 8)
+        );
+      }
+    }
+
+The waveform of the sound doesn’t sound very much like a horn, but the
+changes in the tonal quality over time are similar to what I was
+hearing.

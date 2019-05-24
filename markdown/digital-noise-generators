@@ -1,0 +1,39 @@
+The traditional approach to generating noise with a digital circuit is
+to use a maximal-length LFSR, which has the great advantage of using
+only a single bit operation per generated bit, although XOR is perhaps
+a somewhat more complicated bit operation than NAND or abjunction.
+
+A crucial feature of the LFSR is that its state transitions are
+reversible; they do not lose information.  Consequently its cycles
+form a partition of the state space; every state is the successor of
+some state, by a counting argument.  In maximal-length LFSRs, there
+are two cycles: one of period 1, containing just the zero state, and
+one containing all the other states.
+
+When thinking about generating digital noise on CPUs, it is
+interesting to think about other available reversible operations.  For
+example:
+
+- Rotating left or right by a constant number of bits.
+- Adding or XORing a constant.
+- Multiplying by an odd number.
+    - As a special case, 2’s-complement negation.
+- Permuting the bits or bytes of the state vector with a constant
+  permutation.
+- XORing any part of the state vector with the state vector, as long
+  as no bits XOR with themselves, which is irreversible.
+- Multiplying by a constant m modulo some other relatively prime
+  constant n, iff the current state is less than n.
+- Running an arbitrary substitution on the bit vector via a constant
+  lookup table.
+
+These are, as it turns out, the usual building blocks of symmetric
+cryptosystems and hash functions.
+
+What if we investigate the periods and spectra of the functions
+comprised of different sequences of these operations?  Perhaps we
+could find something that was fast to execute on a CPU, but also
+provided long-period white noise.
+
+Such techniques are also useful for hashing to, for example, generate
+Perlin noise.

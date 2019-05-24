@@ -1,0 +1,39 @@
+# I couldn’t fit this 37GB Wikipedia dump (English with no images)
+# <magnet:?xt=urn:btih:267d148412ad50361e0c0384c905fabe35e8539a&dn=wikipedia%5Fen%5Fall%5Fnopic%5F2018-09.zim>
+# onto my flash disk because VFAT doesn’t support large files.  So, I
+# thought, I’d stick it on an ext4 filesystem in a disk image file on
+# the VFAT, thus circumventing all of VFAT’s restrictions.  Not so
+# fast — that file can’t be 4GB or over either.  So what to do?  We
+# can take advantage of Linux software RAID:
+
+set -e
+DANGER() {
+         :
+}
+
+: ${usb?} ${user?} # ensure the $usb and $user variables are set
+# This first part takes about 40 minutes because VFAT doesn’t support
+# sparse files either:
+DANGER time truncate -s 2g "$usb"/wikipedia-zim.img.{1..20}
+for i in {1..20}; do sudo losetup "/dev/loop$i" "$usb"/wikipedia-zim.img."$i"; done
+DANGER sudo time mdadm --create /dev/md0 --level 5 --force --raid-devices=20 /dev/loop{1..20}
+# 0.00user 0.02system 0:33.79elapsed 0%CPU (0avgtext+0avgdata 2592maxresident)k
+# This seems to work for subsequent mounting but never the first time:
+sudo time mdadm --assemble /dev/md0 /dev/loop{1..20}
+DANGER time sudo mkfs -t ext4 /dev/md0
+# real	2m24.296s
+DANGER sudo tune2fs -r 0 /dev/md0   # no root-reserved blocks; frees up about 2GB
+sudo mount /dev/md0 /wikipedia-zim/
+df -h
+# Filesystem                 Size  Used Avail Use% Mounted on
+# /dev/md0                    38G   48M   38G   1% /wikipedia-zim
+# However, Transmission reports 39.9 GB.
+DANGER sudo chown "$user"."$user" /wikipedia-zim/
+
+
+remove_raid() {
+    sudo time umount /wikipedia-zim/
+    sudo mdadm --stop /dev/md0
+    sudo losetup -D
+    umount "$usb"
+}

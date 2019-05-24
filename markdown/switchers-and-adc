@@ -1,0 +1,32 @@
+Switching power supplies generate a lot of electrical noise.  The AVR
+has the option of temporarily halting everything on the chip except
+the ADC during an analog-to-digital conversion in order to remove
+sources of noise.  Could you shut off a switching power supply during
+analog-to-digital conversions in order to get further precision?
+
+You’d need to have a big enough capacitor to keep the processor going,
+plus perhaps adequate voltage regulation.
+
+If you were running an AVR ATMega328 on 5V, well, its “typical” power
+consumption is listed as 1.2 mA when idle at 8 MHz on 5V; we can
+safely extrapolate to 3 mA at 20 MHz.  A 10-bit conversion takes it
+260 μs.  Let’s say it’s safe to let the voltage droop from 5.45 V to
+4.55 V during that time (hopefully this 20% variation in input voltage
+during the conversion won’t hork the ADC).  This requires the
+capacitor to be at least 870 nanofarads, which is eminently feasible,
+even in a low-L MLCC.
+
+If this would cause problems for the ADC, you could charge the
+capacitor up to a higher voltage and use a linear voltage regulator
+(perhaps an LDO for efficiency) in between the capacitor and the
+microcontroller.  Then the ADC wouldn’t see a changing reference
+voltage.
+
+So it this approach seems workable.  It requires that you not be
+spending all your time doing conversions, though, because otherwise
+your switcher is going to be generating even more noise that will keep
+ringing through the system during conversions.
+
+Oh hey, I think it can actually do a 10-bit conversion in more like
+67 μs at a higher clock rate.  This reduces the required capacitor to
+more like 220 nF.

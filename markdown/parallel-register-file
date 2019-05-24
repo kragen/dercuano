@@ -1,0 +1,34 @@
+A thought that occurred to me as I read about the [LMI K-machine][0]’s
+duplicated register file:
+
+[0]: http://fare.tunes.org/tmp/emergent/kmachine.htm
+
+Suppose you are executing a 32-bit 3-address instruction with three
+8-bit register fields.  As a possible alternative to having 256
+registers (or a smaller register field), you could have 8 registers,
+one bit in each register field identifying some subset of the
+registers to use.  For example, you could specify 00001000₂ to
+indicate register 3, or 01000000₂ to indicate register 6.  In the case
+where you specify more than one register to write to, the results are
+written to all specified registers; 11111111₂, for example, writes to
+all 8 registers, and 00000000₂ discards the result.
+
+A perhaps more reasonable design here is to have an output register
+field that is twice the length of the input register fields, each of
+which can address only one half of the register space, thus
+eliminating the necessity for a multi-ported register file.  For
+example, you could have 6 bits per input register field and 12 bits of
+output register field.  If the two halves of the output register field
+were always identical, it would look like a machine with 6 registers
+and the usual dual-ported register file, just with an inefficient
+instruction encoding.
+
+Presumably the results when you select more than one input register
+should be specified; for example, wired-AND or wired-OR would be
+reasonable.  Wired-OR has the advantage that 000000₂ produces 0, which
+is more commonly useful than the -1 that would be produced in the
+wired-AND case.  This also, of course, eliminates any necessity for an
+OR instruction.
+
+12 registers in this form would probably be about as comfortable as 8
+registers in the more usual form.
