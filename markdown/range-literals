@@ -1,0 +1,207 @@
+Range literals
+--------------
+
+Python syntax and semantics, considered as executable pseudocode, has
+a curious wart relating to ranges of numbers.  Because it’s so common
+to store data in arrays in Python (called "lists"), this wart comes up
+often.
+
+This is: if we want to iterate over the numbers 1 to 15 (excluding
+15), we have to write:
+
+    for i in range(1, 15):
+        ...
+
+But if we want to do something `f` with the corresponding elements of
+an array `arr`, we must write:
+
+    f(arr[1:15])
+
+It’s possible to store the object encapsulating those indices from 1
+and 15 in another object and pass it to `arr` later.  You would think
+you would do it like this, like in Octave:
+
+    idx = 1:15
+    f(arr[idx])
+
+but actually that’s invalid syntax and you have to do it like this:
+
+    idx = slice(1, 15)
+    f(arr[idx])
+
+This syntax and function names are far from self-explanatory.  Far
+better, in terms of readability, would be to write this:
+
+    for i in 1:15:
+        ...
+
+Or even this:
+
+    for i in (1:15):
+        ...
+
+And, in terms of consistency, it would be far better for the
+expression syntax within `[]` to be the same as the expression syntax
+outside of them.  This would speed up the learning of Python.
+
+This is one of the few obstacles to universally using Python in place
+of more traditional pseudocodes in the explanation of algorithms.  As
+things are now, it is much clearer to write the traditional:
+
+    for i = 1 to 14
+        ...
+    end for
+
+than the Python
+
+    for i in range(1, 15):
+        ...
+
+This proposed universality of the slice syntax would simplify this,
+although you'd still have to explain that `1:15` doesn't include 15.
+
+You could maybe make the argument that the extra redundancy improves
+the Python interpreter's error-reporting ability.  That is, there are
+some cases where someone might accidentally write a range literal, or
+something like one, which would currently be a syntax error, which
+would give you a less clear syntax error or even broken code.  I can
+think of a few possibler cases of this — when you want to iterate over
+an infinite range, for example:
+
+    for i in 2::
+        ...
+
+Or worse:
+
+    for i in ::
+        ...
+
+I think these can be basically solved by always requiring parens
+around the range literal, as is currently done with generator
+expressions, with the added looseness that the parens can also be
+square brackets:
+
+    for i in (2:):
+        ...
+    for i in (:):
+        ...
+
+Negative indexing
+-----------------
+
+Python's array indexing has an additional semantic wart, shared with
+Perl and I think originally from APL, which is that the use of
+negative indices counts from the end of the array.  This has
+occasionally worsened bugs in my Python code, but mostly it's just
+unnecessarily mysterious for newcomers to Python.
+
+I think a better approach would be to have a special object, called,
+say, `end` or `last`, which can have integers subtracted from it to
+produce indices that are interpreted to mean "N from the end".  You
+wouldn't be able to iterate directly over ranges containing it, but
+that's not really a problem.
+
+So, for example, you could say:
+
+    while line.endswith("\n") or line.endswith("\r"):
+        line = line[:end-1]
+
+which I think is clearer than the current real Python code for doing
+this.  But you couldn't say:
+
+    for i in (:end-1):
+        print line[i]
+
+This would also eliminate the need for omitted indices in slices.
+Rather than `arr[:]`, you could write `arr[0:end]`, at a slight cost
+in verbosity but a great gain in clarity, at least to my eyes.
+
+Greek letters
+-------------
+
+JavaScript allows you to use Greek letters in your variable names,
+which lets you write code like this (from
+<http://canonical.org/~kragen/sw/dev3/spirals.html>):
+
+    var Δθ = 1/r/2
+      , Δr = slope * Δθ
+    ;
+    if (Δr > 0.5) {
+      Δr = 0.5;
+      Δθ = Δr / slope;
+    }
+    if (neg) Δθ = -Δθ;
+
+    r += Δr;
+    θ += Δθ;
+
+This code would be substantially wordier and less clear if it had to
+be written without Greek letters, and the same is true for a
+substantial amount of code that is more or less mathematical in
+nature.  (You could argue that Greek letters are going to be
+intimidating for people who aren’t familiar with math, but those
+people are going to have to learn the math before they understand the
+code anyway.)
+
+I would argue that being able to use Greek letters in pseudocode often
+improves its clarity substantially.
+
+An example
+----------
+
+Here's a function from the scrypt paper, rendered in the traditional
+ALGOLish pseudocode from the paper, though without the LaTeX
+typography:
+
+    Algorithm ROMix_H(B, N)
+    Parameters:
+            H               A hash function.
+            k               Length of output produced by H, in bits.
+            Integerify      A bijective function from {0,1}^k to {0,...2^k-1}.
+    Input:
+            B               Input of length k bits.
+            N               Integer work metric, < 2^{k/8}
+    Output:
+            B'              Output of length k bits.
+    Steps:
+     1: X ← B
+     2: for i = 0 to N - 1 do
+     3:   Vᵢ ← X
+     4:   X  ← H(X)
+     5: end for
+     6: for i = 0 to N - 1 do
+     7:   j ← Integerify(X) mod N
+     8:   X ← H(X ⊕ Vⱼ)
+     9: end for
+    10: B' ← X
+
+Here's the Python version, with the notational improvements suggested
+above:
+
+    def ROMix(H):
+        """H: a hash function producing k bits.
+        Returns a function(B, N):
+        B: Input suitable for H.
+        N: Integer work metric, < 2**(k/8)
+        returns an output of length k bits.
+        Uses a bijective function Integerify from {0,1}^k to {0,...2**k-1}.
+        """
+
+        def f(B, N):
+            V = [B]
+            while len(V) < N:
+                V.append(H(V[end-1]))
+
+            X = V[end-1]
+            for i in (0:N):
+                j = Integerify(X) % N
+                X = H(X ^ V[j])
+
+            return X
+
+        return f
+
+I think this is substantially clearer than the original pseudocode
+version, especially if you already speak Python or C.  It would be
+better if the inner function `f` didn't have to be named, or if the
+return statement could be placed before its definition (as in JS).

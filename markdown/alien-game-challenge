@@ -1,0 +1,127 @@
+"8-bit" or "New Aesthetic" games like Minecraft, Bit Trip Runner, and
+arguably Dwarf Fortress are increasingly popular, perhaps reflecting a
+newfound appreciation for gameplay in place of high production values.
+To some extent this is also a way to disguise lack of production
+values: if you put crappy models on top of Unreal Engine, the
+environment they're in makes them look worse by implicitly comparing
+them to the ones in Counterstrike or Call of Duty [0], and indie devs
+can avoid suffering such comparisons in part by avoiding the engines
+that create production-values expectations they will inevitably fail
+to meet.
+
+[0]: CoD is on Unreal Engine, right?  Did I misspell that?
+
+Occasionally there are games programming competitions that focus on
+some kind of artificial restriction like this, sometimes even using
+specific old platforms.  The problem is that, for obvious reasons,
+these restrictions tend to resemble restrictions we have actually
+suffered in the past, so the aesthetic of the games tends to be
+somewhat predictable: square pixels, small color palettes, 2.5D,
+7-segment displays, FM or square-wave or triangle-wave synthesis.
+
+But what if, instead of creating video games that recall the age of
+Space Invaders, we tried to create video games that recalled the
+analogous stage of technological development on an alien planet, or
+perhaps an alternate-history Earth?  We could have been laboring under
+different restrictions and produced different kinds of games.
+
+A number of things have happened recently in games that suggest some
+possibilities.  Flappy Bird could easily have been written in 1985
+[1], but there were no similar games.  3-D wireframe games were
+feasible in 1985 (Maze War, the first first-person shooter, was from
+the 1970s, and the Star Wars game was a popular arcade game of the
+time) but they greatly benefited from vector displays, which went out
+of style at the time.
+
+[1] I think James Hague pointed this out but I'm offline at the moment.
+
+So, some example alternative histories:
+
+0. As I said, what if vector displays?
+
+1. What if hexagonal pixels had been the standard?  They have more
+consistent spacing and thus reduce sampling error for the same number
+of pixels, which is why tabletop strategy games (arguably including
+Settlers) use hexagonal tiles.
+
+2. What if Tek-4014-style storage tubes had been the mainstream
+display technology?  You can't erase part of the screen; you have to
+erase the whole screen.
+
+3. What if touchscreens?  But we're already exploring that with game
+dynamics like Flappy Bird and Angry Birds.
+
+4. What if timesharing?
+
+5. Music synthesis with electronic difference engines, sort of like
+vector-display display lists, but for waveforms?
+
+    a. Music synthesis with circulating bit sequences in shift registers
+    (like the Apple ]['s NTSC colors) rather than analog waveforms?
+
+6. Vector displays with higher-order display lists?  You could display
+quadratic splines as easily as points, but maybe only a small number
+of new ones per second.
+
+7. What if the CPU itself were fundamentally different in some way?
+
+    a. If most of your memory were write-once read-many, so that every
+    time you played a game, you irreversibly used up some of the memory?
+
+    b. If most of your memory were fundamentally sequential-access, like
+    bubble memory or magnetic tapes?  (Arguably we're suffering that now
+    with disks, and of course videodisc games of the 1980s explored some
+    of this too.)
+
+    c. If the CPU were a combinator-graph reduction machine like the SKIM
+    rather than a RAM machine?
+
+8. Character-cell displays created an aesthetic that survives in Dwarf
+Fortress and Nethack, but also that influences any number of modern
+"8-bit" games, because they use fixed-width fonts.  But to a great
+extent those displays were very culturally contingent, and while
+perhaps Greek and Latin alphabets are among the simplest systems to
+draw this way, it seems like it's probably a coincidence that the
+cultures that invented computers happened to use alphabets rather than
+other writing systems.  So consider, what if your character display
+were for a language that was:
+
+    a. Top-to-bottom?
+
+    b. A syllable-block system like Korean hangul?
+
+    c. One of those where accents are essential to understandability?
+    Maybe, like APL, your display would need to support arbitrary
+    overstrikes, or at least two or three overstruck characters.  How
+    could this reduce the size of the character set?
+
+    d. Necessarily variable-width, or necessarily supported character
+    overlaps?  I don't know if Devanagari, for example, is actually this
+    way, but I've never seen non-proportional Devanagari.  Proportional
+    font rendering isn't actually that much harder than fixed-width font
+    rendering.  Historically it came along with framebuffers, which
+    certainly make it easier, but are framebuffers really necessary?
+
+    e. Ideographic?  Would you necessarily move to a small syllabary for
+    computers, like 1980s Japanese PCs used katakana, or could you perhaps
+    handle some kind of large ideographic character set in reasonably
+    simple hardware?
+
+9. Hardware sprites and hardware scrolling were a big deal in 1980s
+games, since you didn't have time to redraw the entire screen each
+frame.  Similarly, for fractals, hardware palette color-cycling was a
+big deal, a technique which also permits fade-to-black, flashing a
+certain color index, and so on, without having to redraw the entire
+screen; and a bit earlier, XORing objects into the framebuffer allowed
+you to move them around the screen without having to save the
+background they passed over in separate memory.  But suppose the
+available display hardware had supported other interesting operations
+instead?  Of course, there's an infinite variety of possible
+operations, most of which (like XOR) are mostly visually
+uninteresting.  But there are a wide variety that seem like they would
+have been interesting but were never implemented in hardware:
+
+    a. Displacement mapping, which is kind of a generalization of
+    sprites: you have a number that you add to the pixel coordinates
+    generated by the hardware counter to get the address in the
+    framebuffer (or tiles, or whatever) to draw the pixel.

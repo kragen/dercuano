@@ -1,0 +1,106 @@
+I think I know how to print 140 to 200 pages of comfortably naked-eye-
+readable text and full-color images on a transparency foil using a
+regular 1200dpi laser printer with reasonable resolution and only a
+factor of 10 or 20 loss of contrast; you will see different pages of
+text from different angles.
+
+In 2001 I came up with this idea of opacity holograms, which is a
+multi-image nonsecure version of Naor and Shamir’s visual
+cryptography, and in 2007 I figured out how to extend Naor and
+Shamir’s idea directly to grayscale.  I’ve been thinking about using
+opacity holograms for low-cost text archival in order to take
+advantage of the high storage capacity of laser-printed paper without
+needing a microscope to read it; but a major problem has been that the
+technique I’d come up with, like lenticular 3-D, reduces image
+brightness/contrast/resolution by a factor of N to encode N images;
+while real holography, using interference patterns you can’t plausibly
+print on a regular laser printer, only reduces these by a factor
+proportional to √N.  So real holography has, so far, been vastly
+superior for encoding large numbers of images in a single image.
+
+I finally think I have a √N technique, but I haven’t tried it yet.
+
+You have N low-resolution truecolor input images to encode, plus a
+bilevel “key” image at the resolution of your actual output device,
+which could be random but need not be; the crucial features of the
+“key” image is that its autocorrelation is very small at all small
+spatial shifts other than 0, and that its correlation to any input
+image at some small spatial shift is also very small.  As the key is
+bilevel, each of its pixels is either black or white, which we will
+consider as -1 and 1.  Its autocorrelation at small shifts being very
+small requires that it be almost exactly half black.  When
+laser-printed on a transparency film, the black pixels of the key will
+obscure corresponding pixels of the output image, while the white
+pixels will remain transparent.
+
+Each of the N input images is encoded with the key at a different
+spatial shift, one at which it is effectively uncorrelated with the
+key.  Each encoded pixel is equal to the corresponding input pixel if
+the corresponding key pixel is white, or color-inverted from the
+corresponding input pixel otherwise: black for white, white for black,
+red for cyan, 50% gray for 50% gray, and so on.  That is, we multiply
+the spatially shifted key by the input, considering medium gray as 0,
+black as -1, and white as 1.  Since the “key” image contains very
+little large-scale variation in black-pixel density, each of the
+encoded images will appear entirely as a flat medium gray from a
+distance, or random noise, close up; but if either multiplied by or
+obscured by the key image, a close approximation of the input image is
+visible.
+
+What’s the distribution of that random noise?  It’s guaranteed to have
+a mean of medium gray, but beyond that, it could be anything from
+constant medium gray to a bimodal distribution where all the pixels
+are either white or black.
+
+Then, we sum all of these encoded images (without saturating!) to
+produce a combined encoded image.  From the perspective of any
+individual encoded image, this amounts to adding Gaussian noise whose
+variance is proportional to the number of other input images
+(multiplied, I guess, by how far they tend to get from medium gray).
+So we can expect that the noise from adding 100 images will be only
+about 6× worse than the noise from adding 3.
+
+Converting this into something you can actually see on the screen or
+print is a little tricky.  The combined encoded image will probably
+have a nearly Gaussian distribution of color, which means it’s barely
+using most of its dynamic range.  To display on the screen, it’s
+probably okay to lop off the tails of the distribution at a point that
+most (say, 99%) of the pixels are accounted for; but then dithering is
+a problem, because regular dithering will shift errors to neighboring
+pixels on the theory that your eye will kind of blur them together.
+But that doesn’t work if your eye can't see the neighboring pixels
+because they’re obscured by the key image.  Fixed dithering would
+work, and so would random dithering, but you’ve already effectively
+done a bunch of random dithering by adding other effectively random
+images.  So nearest-neighbor “dithering”, which amounts to mere
+thresholding at the median in the case of a bilevel device like a B&W
+laser printer, is probably just fine.
+
+You could print the key on one side of transparency film (preferably
+archival polyester, not acetate, which is prone to vinegar syndrome)
+and the combined encoded image on the other.  The pixel shifts you can
+get with the parallax between the different sides of normal
+transparency film add up to somewhere around a hundredth of an inch
+total, so you should be able to get up to about, say, 12 to 14 by 12
+to 14 (144 to 196) separate spatial shifts for the key; so you can
+encode that many different documents on a sheet.
+
+The noise will reduce the contrast.  If you have 144 documents adding
+together, the noise will be about 10 or 20 times larger than the
+“signal” of the input image you’re trying to decode.  This means that
+input features that are smaller than about 30 to 200 pixels will be
+swamped by the noise. 100 pixels (10 pixels square) at 1200dpi is a
+120th of an inch square, which compares favorably to normal computer
+monitors and old dot-matrix printers, although it’s lower-quality than
+we're used to seeing on laser printers.  At that resolution, my
+6-pixel-high font could still fit 20 lines of text per inch (a point
+size of 3.6 points), which is too small for normal people to read
+comfortably.  Six lines of text per inch was traditional for computer
+printers.
+
+You could also use this technique to share a single computer monitor
+between different people, or between the two eyes of a single
+stereoscopic user, or even to provide an easy hands-free way to shift
+between virtual desktops: mount the key image on transparency film
+some hundreds of microns in front of the monitor, and merge the video
+images for the different angles by using different shifts of the key.
