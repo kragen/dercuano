@@ -1,0 +1,128 @@
+Parsing a conservative approximation of a CFG with a FSM
+========================================================
+
+We know we cannot parse context-free languages with a finite state
+machine; this was central to Chomsky’s destruction of behaviorism in
+the 1950s.  But we can do a pretty good approximation.
+
+All the ideas in here are due to Björn Höhrmann, who explored them in
+some depth in [parselov][], which is an implementation of these ideas
+in JS, plus a bunch of other ideas I don’t understand yet but which
+are probably even better.  (That is, unless I accidentally invented
+something and didn’t notice.  But I think all the ideas here are his.)
+
+[parselov]: https://github.com/hoehrmann/demo-parselov
+
+Consider this algebraic-expression CFG:
+
+    e where
+    e ::= e "+" f | e "-" f | f
+    f ::= t "*" f | f "/" t | t
+    t ::= "-" t | "+" t | number | variable | "(" e ")"
+
+If we omit the last alternative, which recurses back to the beginning,
+we have an entirely regular language.  All of the other recursions are
+either left-recursions or right-recursions, and so we can rewrite them
+as loops; for example, the alternatives for `e` add up to a sequence
+of `f` separated by “+” and “-” signs.
+
+The final case, though, requires parentheses to match, which is a
+thing that a regular expression cannot guarantee.
+
+But let’s consider the “unstructured control flow” of the “subroutine
+calls”.  We can arrive at the beginning of `f` from any of five
+callsites (three in `e` and two in `f` itself) and, when we get to the
+end of it, we can return to any of those sites.  In this way we can
+mechanically convert the entire grammar into a finite state machine.
+Of course, this finite state machine loses some information — it does
+not know whether it got into `e` from the top-level parsing or due to
+a recursion inside `t`.  So it will match “(4” where it shouldn’t.
+Nevertheless, it will not match “+*4” or “4 x”.  It’s guaranteed that
+if it doesn’t match a string, the full CFG cannot parse it either.
+
+We can make it more precise by duplicating rules that are called more
+than once.  For example, this CFG parses the same language, but if
+converted to a FSM in the same way, will no longer match “(4”:
+
+    e where
+    e ::= e "+" f | e "-" f | f
+    f ::= t "*" f | f "/" t | t
+    t ::= "-" t | "+" t | number | variable | "(" e2 ")"
+    e2 ::= e2 "+" f2 | e2 "-" f2 | f2
+    f2 ::= t2 "*" f2 | f2 "/" t2 | t2
+    t2 ::= "-" t2 | "+" t2 | number | variable | "(" e ")"
+
+That’s because `e2` can “return to” the point in `t` before the “)”,
+or the points in itself before the “+” and “-”, but not the final
+accepting state.
+
+It would have been equally valid for the `e` in the final `t2` to
+invoke `e` rather than `e2`, but it would have yielded a different
+approximation.  The grammar as modified above will convert to an FSM
+which tracks whether to expect an even or odd number of closing
+parentheses.  If instead we had recursed into `e2`, it would track
+whether it had never seen a left parenthesis.
+
+It is not obvious to me how to choose which nonterminals should be
+duplicated in this way.  These rules occur to me, in order to get a
+more precise regular approximation of the context-free language:
+
+1. There is no need to duplicate a nonterminal invocation that does
+    not form part of a recursive loop, mutual or otherwise.  You can
+    attempt to stratify the nonterminals to figure out which calls
+    form part of such a recursive loop, but this is not guaranteed to
+    give you a minimal set of invocations.
+
+2. There is no need to duplicate immediately-left-recursive or
+    immediately-right-recursive invocations, because they can be
+    handled precisely by a FSM without more effort.
+
+Of course, this process can be repeated.
+
+It also occurs to me that if the FSM, upon entering a state with more
+than one predecessor state, records which predecessor state it entered
+from, then it is recording all of the candidate derivations it has
+discovered.  To the extent that we elide ε-edges, we end up
+multiplying these cases, but in the simple case, we have one
+derivation per edge.  Considering parsing the string “(4)” with this:
+
+    e where
+    e ::= e "+" f | e "-" f | f
+    f ::= t "*" f | f "/" t | t
+    t ::= "-" t | "+" t | number | variable | "(" e ")"
+
+we, at the end, transition from after the “)” nondeterministically to
+all of the five callsites of `t`, from two of those
+nondeterministically to all of the five callsites of `f`, and from
+three of those to all of the four callsites of `e`, one of which is in
+fact the top-level `e` invocation, which accepts the string.
+
+If we duplicate each nonterminal for each callsite, this process
+becomes more precise.
+
+In a sense we could say that we are multiplying the states of the
+nondeterministic FSM by labeling them with some finite summary of the
+stack (or continuation) that a nondeterministic PDA would use if it
+parsed the grammar in the obvious way: the sequence of “return
+addresses” it would have.  (Of course the PDA is an FSM if you leave
+out the stack.)  The important thing is that we are mapping the
+infinite set of states-of-the-stack states to a finite set of states,
+and we’re doing it in such a way that we don’t need to magically
+recreate information that we erased — if we forget whether the number
+of right-parens we’re expecting is odd or even, we can’t define our
+mapping in such a way that we have to later recover that datum.  (We
+can, however, nondeterministically guess it!)
+
+That said, though, there are a wide variety of possible mappings of
+stack-states to finite states.  I’ve talked about some of the
+possibilities above, although it was phrased in terms of duplicating
+productions.
+
+A consideration for practical implementation of these concepts is that
+we would, ideally, eventually reduce the FSM to a deterministic FSM,
+so that we can execute each step on a real (deterministic) computer in
+constant time.  For this we would like to avoid the potential
+exponential blowup of the powerset of the set of NFA states into DFA
+states, and counterintuitively it turns out that erasing *less*
+information about the stack can actually help to *reduce* the number
+of states.

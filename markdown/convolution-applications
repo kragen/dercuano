@@ -1,0 +1,117 @@
+Consider synthesizing a xylophone melody.  The score is a
+time-frequency representation of the music: at certain moments, there
+begins a note of a certain pitch with a certain amplitude.  This is a
+scalar function of two independent variables, time and pitch.  An
+instrument patch representing the xylophone can also be thought of as
+a scalar function of the same two independent variables, with the time
+in this case being the time since the beginning of the note and the
+independent variable being the PCM sample — say, the instantaneous air
+pressure.  And if we reverse the instrument patch in time and
+frequency, its convolution with the score produces a new function from
+time and pitch to PCM samples.  A timewise slice through that result
+at pitch=0 gives us the synthesized melody; timewise slices at other
+pitches, if we use equal temperament and the typical logarithmic scale
+measured in semitones, give us the melody synthesized in other keys.
+
+There are some other dimensions to consider.  If the notes in the
+“score” are not perfect impulses, but rather have some variation in
+their frequency content, they will simulate striking the xylophone
+keys differently; for example, impulses bandlimited to low frequencies
+will simulate striking them with a softer hammer; using a sharpening
+kernel instead of an impulse will drop out the lower frequencies from
+that note.  Of course, you can consider convolving the one-dimensional
+output slice with a reverberation, but this convolution can also be
+applied to individual notes in the “score” to add reverberation or
+softness (or especial sharpness) to particular notes.
+
+But suppose we add a third dimension to the score, such as the note’s
+position in its measure.  Then we can convolve the score with a
+function that applies such color systematically to notes in particular
+positions in their measures before summing along the measure axis.
+
+Consider also the problem of synthesizing a string sound, such as a
+violin.  Karplus-Strong string synthesis traditionally works by
+feeding white noise into a digital delay line, which is an all-pole
+IIR filter with high-Q resonances, which amounts to convolving the
+(potentially very long) impulse response of the delay line with the
+input noise.  If the noise is continuous and low-amplitude, this
+sounds a lot like a violin; the process of stimulating the violin
+string with the random roughness on the bow is somewhat similar,
+although there’s some nonlinear amplification involved.  But of
+course, modulo nonlinear effects like dispersion (e.g. from piano
+string stiffness), this is just convolving the input noise with the
+impulse response of the IIR filter.
+
+If you take a “mother wavelet” that is a windowed sample of a
+continuous sound and convolve it with white noise in this way, the
+result will have the frequency content of the original continuous
+sound, frequency-broadened by the time restriction of the window,
+multiplied by white noise, which has little effect.  This should allow
+you to provide arbitrary amplitude envelopes to an arbitrary
+continuous sound, within the limits set by the bandwidth-
+responsiveness tradeoff.  (If your window is about 64ms, your
+frequencies will be uncertain by around 15Hz, and your .)
+
+Or consider rendering text on a sc
+
+
+
+
+If the signal representing the original font is two-dimensional, you
+can space the glyphs farther apart than the width of the window; the
+convolution output is then a very large two-dimensional surface
+containing the text of the window and also a large number of scrambled
+copies of the text of the window.  The original window codepoints
+signal is then a very sparse signal that is almost equally large, with
+an impulse at each coordinate where it is desired to select a
+character.
+
+Putting the glyph index instead into a third dimension avoids the need
+for the font encoding to depend on a maximum window size and instead
+produces the desired window as one spacewise slice across a
+glyph-index axis, with scrambled versions of the window in other
+spacewise slices.
+
+You could imagine adding a fourth dimension of font style, which could
+be continuous.
+
+This convolution approach to font glyph rendering can handle
+overstrikes, hinted glyph rendering, accents, blurring, and even
+coloring, but it falls down on rotation, multiple font sizes
+(including zooming), and even, surprisingly, text drop shadows.  The
+drop-shadow problem is that where the solid letter is present, you
+would like it to opaquely obscure the shadow, not linearly add to it.
+You need some kind of opacity.
+
+So suppose that, instead of directly producing the two-dimensional
+image, the convolution generates a three-dimensional opacity field,
+and we use perspective volume rendering techniques to render it into a
+2-D image.  Drop shadows can be physically *behind* the glyphs, and
+larger letters can simply be closer to the camera (with their X and Y
+coordinates scaled accordingly, of course).
+
+With the addition of this final nonlinear stage of opacity and
+perspective, convolution becomes much more powerful: not only can it
+produce drop shadows and multiple font sizes, but it can also take
+over much of the work of rendering the glyph outlines.  You can
+convolve stroke fonts such as Hershey fonts with a sphere or circle,
+for example, or more interestingly, with an ellipse at the traditional
+calligraphic 45° angle, or even a spiky ball to produce a shape with
+surface striations following the pen.  You can represent a serif-font
+letterform as a sparse three-dimensional signal in (x, y, feature)
+space, then convolve it with a library of features such as serifs,
+stems, and bowls in order to generate overlapping three-dimensional
+forms that comprise the glyph; and you can modify this library to
+modify the font.  Cursive pen-strokes might be signals in an (x, y,
+pressure) space, allowing you to vary the stroke width, opacity, or
+ink color by convolving with the appropriate pen.  (And of course you
+can convolve with a small sphere or horizontal ellipsoid to thicken
+the outlines of outline fonts.)
+
+There’s an existing body of knowledge in rendering convolutional
+surfaces, that is, implicit surfaces defined by level sets of the
+convolution of some fixed “kernel function” with a skeleton of a 3-D
+model.  This involves an additional level of nonlinearity between the
+convolutional operation and the image you see: rather than smoothly
+varying between opaque and transparent, with the nonlinearity imposed
+by the tendency of nearby objects to nonlinearly obscure faraway ones.
