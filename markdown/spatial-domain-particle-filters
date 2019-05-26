@@ -1,0 +1,28 @@
+Can you synthesize textures using particle filters?
+
+The idea is that for each position (block of pixels, or maybe pixel),
+you have a model of what might appear there, based on what appears
+above it and to its left, determined by the conditional probabilities
+of that patch in those environments in some kind of a training set.
+You maintain a potentially large set of hypotheses for each position,
+each one with a weight representing its probability weight.  When you
+move to a new position, you resample the set of hypotheses according
+to the weights, and ultimately you may end up with a few hypotheses
+with most of the probability weight and you can choose one or average
+them.
+
+An interesting thing about this is that it allows you to take into
+account different kinds of information in many different ways.  For
+example, you could know most of the pixels in an image and want to
+fill in a few (perhaps to replace something you erased or to fill in a
+seam), or you could attempt to synthesize an image from nothing, or
+you could try to synthesize an image that approximates some pattern of
+light and dark, or that has edges in particular places.
+
+This seems to have been done to some extent;
+<http://link.springer.com/article/10.1186/2193-9772-2-2> (“High
+resolution micrograph synthesis using a parametric texture model and a
+particle filter”, 2013) describes using this algorithm to fill in
+plausible high-resolution detail on a large low-resolution image by
+using texture from small high-resolution images.  But I think this may
+be a slightly different algorithm.

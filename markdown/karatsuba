@@ -1,0 +1,27 @@
+> (aX + b)(cX + d) = acX² + (ad + bc)X + bd
+
+Here X is some power of the base of your number system, and this is
+the conventional algorithm for multiple-precision multiplication.
+This divides the problem of multiplying two numbers “ab” and “cd” into
+the problem of multiplying four pairs of numbers, each half as long;
+so it’s a sort of recursive divide-and-conquer algorithm which, in the
+end, takes O(N²) time: for 2ⁱ digits, you do i levels of
+divide-and-conquer, producing 4ⁱ bottom-level multiplications, which
+is just the square of the number of digits.  These multiplications are
+then combined in a smaller number of shifted addition operations.
+
+Karatsuba came up with a different way to do this, computing
+(a + b)(c + d) = ac + bc + ad + bd.  This contains the ad + bc
+sum we need as a couple of subterms.  If we compute ac and bd,
+we can subtract them off to get ad + bc.
+
+For example, 93 × 24: ac = 9×2 = 18; bc = 3×4 = 12; (a + b)(c +d) =
+(9+3)(2+4) = 12 × 6 = 72; 72 - 18 - 12 = 42.  So our final result is
+1800 + 420 + 12 = 2232, which is correct.
+
+This has the advantage that, although the operations per internal node
+are slightly more complicated, instead of 4ⁱ bottom-level
+multiplications you have 3ⁱ.  So, for example, if you have a
+1,048,576-digit number, you need 1,099,511,627,776 bottom-level
+multiplications with the conventional algorithm, but only
+3,486,784,401 with Karatsuba’s algorithm, 
