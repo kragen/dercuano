@@ -1,0 +1,74 @@
+Thinking about image registration and feature extraction, I thought:
+what about hashing?
+
+In particular, think about a record player playing a scratched-up
+record, full of random crackles and pops, each due to a pit in the
+record surface left by the needle being shoved into it by long-ago
+dust.  If you’re looking for a particular location on the record, you
+can cross-correlate the audio stream with the specific sequence of
+crackles and pops at that location, and you are nearly sure to have a
+sharp peak at exactly the right point.  This, in theory, allows you to
+determine the position of the turntable disc at that moment to within
+a fraction of a micron.
+
+This won't work in its simple form if the playback speed is a little
+bit off — the distance between the pops in the pattern you’re looking
+for will be off by more than the width of a pop, and so the
+correlation won't have a clear peak.  But this can be remedied
+inexpensively, and save you the expense of running the full
+cross-correlation to boot.
+
+Suppose our sample pattern is one second of audio.  Take the
+strongest, say, five pops in that second.  Typically, they'll be a
+decibel or so louder than the sixth-loudest pop, which is a decibel or
+so louder than the seventh-loudest, and so on.  Now, take the last 1.5
+seconds of audio and find the loudest eight pops in it, and try
+matching all 56 three-pop subsequences of those eight against all 10
+three-pop subsequences of those five you’re looking for, 560
+comparisons in all.  The candidate pops might not be in exactly the
+same order of loudness, because some of them might be very similar to
+the same level, and there is noise in the playback, but because the
+pops are so much louder than the rest of the recording, it’s almost
+certain that there will be a match.  And because you’re matching a
+three-pop sequence, you have a ratio of intervals that have to match
+pretty closely between the pattern and the signal, according to some
+kind of time stretch.  And that gives you a probably-unique candidate
+alignment on which to try the whole correlation.
+
+You can adjust the values of 8, 5, 3, and 1.5, of course.  Increasing
+8 and 5 will increase the number of candidate alignments to try, thus
+increasing the chances of finding the correct alignment; increasing
+the value of 3 will increase the number at first and then decrease it.
+Increasing 1.5 will increase the amount of scale variation that can be
+tolerated, but at the risk of missing a match unless you increase
+8, 5, 3, or all three.
+
+(Of course, you can do much better if you have a pretty good idea
+where you are in the record groove to start with, because then you
+just need to adjust your estimate of the velocity up or down a bit as
+each pop or crackle goes by.)
+
+In a sense, image feature detection algorithms are an attempt to
+superimpose crackles and pops onto images in such a way that their
+position, relative to the underlying image, remains precise in the
+face of a panoply of insults: from noise to 2-D rotation to scaling to
+3-D rotation obscuring part of an object.
+
+But in some sense, at least in the one-dimensional world where we
+don't need to worry about rotations in two or three dimensions, it
+seems like it should be trivial to develop a robust feature-detection
+algorithm.  Nearly any function should work as long as it’s local, not
+totally disrupted by noise, and positions itself relatively precisely.
+For example, if we apply a couple of noise-reduction filters (maybe a
+median filter, if speckle noise is not actually signal as in the above
+example, and a Gaussian convolution) the last few peaks or
+zero-crossings should often be pretty stable; perhaps we can hash the
+distances between them, or the ratios of distances between them,
+perhaps quantized a bit.  Then we can apply a filter to this stream of
+hash values: for example, ignore the hash unless its last 10 bits are
+zeroes.  This should make our “pops” sufficiently sparse to be useful.
+
+If we're trying to apply such an approach to images, it might be
+useful to do it by tracing paths in the image, using some kind of
+convergent approach, like maybe ascending the gradient of the absolute
+value of the gradient, thus seeking to walk along edges.

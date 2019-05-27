@@ -1,0 +1,107 @@
+Maybe we're doing something wrong, because I can't find anybody
+writing on the web having trouble with git and umask, although it
+looks like the umask situation in Debian has been kind of a PITA for a
+while.
+
+The Current State of the umask Problem
+--------------------------------------
+
+So I made the mistake of believing /etc/skel/.profile when it
+said:
+
+    # the default umask is set in /etc/profile
+
+It turns out /etc/profile doesn't do squat when you do this:
+
+$ ssh watchdog.notabug.com umask
+
+because there's no login shell involved.  It does read .bashrc, but
+having every subshell reset your umask would be annoying and maybe
+dangerous.
+
+/etc/login.defs explains:
+
+    # UMASK usage [in /etc/login.defs] is discouraged because it
+    # catches only some classes of user entries to system, in fact
+    # only those made through login(1), while setting umask in shell
+    # rc file will catch also logins through su, cron, ssh etc.
+    #
+    # At the same time, using shell rc to set umask won't catch
+    # entries which use non-shell executables in place of login shell,
+    # like /usr/sbin/pppd for "ppp" user and alike.
+    #
+    # Therefore the use of pam_umask is recommended (Debian package
+    # libpam-umask) as the solution which catches all these cases on
+    # PAM-enabled systems.
+    #
+    # This avoids the confusion created by having the umask set in two
+    # different places -- in login.defs and shell rc files (i.e.
+    # /etc/profile).
+    #
+    # For discussion, see #314539 and #248150 as well as the thread
+    # starting at
+    # http://lists.debian.org/debian-devel/2005/06/msg01598.html
+
+But for whatever reason, libpam-umask is not installed and used by
+default.
+
+Consequently there are now a bunch of directories in
+/home/watchdog/code/.git that are writable only by "aaronsw", so I
+probably won't be able to push any more changes until we fix that.
+
+Why This Problem Arose
+----------------------
+
+Probably everybody knows, but just for the record.
+
+Debian by default uses "UPG" or "User Per Group".  This lets you leave
+your umask at 002 (or 007, or 000) all the time, and just use group
+ownership to distinguish private from shared files; private files
+belong to the group that contains only you.
+
+> http://www.redhat.com/docs/manuals/linux/RHL-8.0-Manual/ref-guide/s1-users-groups-private-groups.html
+
+But not all people, or all software, have adapted to this new world,
+so sometimes people like to have other umasks.  This causes the
+problem we're seeing here: accidentally creating directories other
+people can't write to in shared spaces.
+
+Why We Should Care
+------------------
+
+If we can get the infrastructure into a smoothly working state, we
+don't have to struggle with it later on.  The opportunity cost of time
+at the start of a project is high, so it's hard to justify spending
+time on stuff like this up front, but the psychological phenomenon of
+hyperbolic discounting exaggerates that opportunity cost.  I think
+putting in an hour or so on this stuff now will save us two or three
+hours over the course of the next few weeks.
+> http://en.wikipedia.org/wiki/Hyperbolic_discounting
+
+Probably all of us have been burned a few times by not keeping our
+infrastructure in adequate order, so I expect this should be an easy
+sell.
+
+What We Should Do
+-----------------
+
+First, aaronsw or root should fix the nonwritable directories:
+
+$ chmod g+w $(find /home/watchdog/code/.git -perm -200 ! -perm -020 -print)
+
+Then we should fix the umask. Two choices:
+
+1. use libpam-umask.  I've tested this on my server and it works:
+
+    kragen@courageous:~$ sudo apt-get install libpam-umask
+
+    Put this line at the end of /etc/pam.d/common-session:
+    session    optional     pam_umask.so umask=002
+
+    Remove the "umask 002" line from /etc/profile.
+
+2. Put 'if [ "$SHLVL" = 1 ] ; then umask 002; fi' into
+   /etc/bash.bashrc.  Putting this in .bashrc does seem to work (I'm
+   testing it on another server where other people didn't like the
+   libpam-umask approach), so putting it in /etc/bash.bashrc should
+   work too, as long as everyone uses bash.
