@@ -1,0 +1,105 @@
+In Neal Stephenson’s novel _Seveneves_, there is a group of people
+called Cycs who have undertaken to collectively memorize a carefully
+preserved five-thousand-year-old Encyclopedia Britannica.  One of the
+characters is named Sonar Taxlaw, after the 17th volume, which she has
+full mastery of at her 16 years; she also has a loose acquaintance
+with the rest.
+
+It beggars belief that a novel written so recently would have chosen
+the Britannica over a paper copy of Wikipedia, but what would the
+Wikipedia-based equivalent look like?
+
+The English Wikipedia is about 5 million articles at this point and
+about 50 gigabytes of UTF-8 text, for a mean of some 10 kilobytes per
+article.  The “[Vital Articles][0]” lists are carefully chosen subsets of
+10, 100, 1000, and 10 000 (actually 9841) articles, which tend to be
+longer than the mean (which is dragged down substantially by stub
+articles, which are vanishingly unlikely to be Vital), at around 22
+printed pages or 320 kilobytes each.
+
+[0]: https://en.wikipedia.org/wiki/Wikipedia:Vital_articles
+
+If we take Stephenson at his word that a 500-or-so-page Britannica
+volume can be adequately mastered by one bright person, then we have
+about 23 Wikipedia articles per person; so the Wikipedia Vital 100
+could be summarized by four or five people, the Vital 1000 (close to
+Britannica in size) by about 44 people, and the Vital 10000 by about
+440 people.
+
+However, it is often the case that useful knowledge arises only from
+connections between topics.  Suppose that instead we want to ensure
+that each *pair* of articles is present in the mind of at least one
+person, so that at least syntheses that need to draw on any two
+different articles have a chance to arise.
+
+Here’s one scheme for how to do that: divide the articles, perhaps
+randomly, into groups of 11, and make a matrix with a row and a column
+for each group of articles: 91 groups to cover the Vital 1000, say,
+gives us a 91×91 matrix.  Then, assign a person to each above-diagonal
+cell in this matrix, (\* (/ 90 2) 91) = 4095 people in this example.
+Have that person learn all 22 articles from their row and their
+column.
+
+This seems somewhat wasteful: each person contains (\* (/ 22 2) 21) =
+231 pairs of articles, but (\* (/ 10 2) 11) = 55 of them are shared
+with everybody else on their row, and another 55 with everybody else
+on their column.  So only (- 231 55 55) = 121 of their pairs, just
+over half, are unique.  So out of the total (\* 4095 231) = 945945
+pairings of articles in people’s heads, you only have (\* (/ 1000 2)
+999) = 499500 unique pairs.  Furthermore, a person who can master 23
+articles could actually contain (\* (/ 22 2) 23) = 253 pairs, which
+could potentially reduce the necessary number of people further to (/
+499500 253.0) = 1975.  But it’s not clear how to reach or approach
+that bound.
+
+Regardless, the number of people needed to cover all the article
+*pairs* in this way is proportional to the square of the number of
+articles, or rather, the amount of information.  So to cover all the
+pairs in the Vital 100 with the simple assignment scheme above, you
+would need only ten people.
+
+Printing out all of English Wikipedia on paper at full size would use
+about 3.4 million pages; linearly reduced 4:1, at which point it’s
+3-point text that’s barely still readable without a magnifying glass,
+would be about 212 thousand pages, or 212 reams of paper.
+
+[Wikipedia:Size][1] notes, “In 2015, Michael Mandiberg published the
+English Wikipedia in 7473 volumes of 700 pages each via Lulu, an
+online e-books and print self-publishing platform, distributor, and
+retailer.”  Probably nobody has yet printed out all 7473 volumes, a
+total of 5.2 million pages of paper at a cost of US$500k, but he did
+print out 106 volumes for an art exhibit in New York.  The [Print
+Wikipedia blog post][2] notes that the table of contents occupies 91
+volumes.
+
+Presumably the same 4:1 reduction trick would bring this down to
+325 000 pages, a mere 465 volumes or 325 reams at a cost of US$31,250.
+At the standard 80 g/m², an A4 sheet weighs 5 g, so this printout
+would weigh 812 kg.  Staples sells 75 g/m² US Letter paper in a case
+of 10 reams for US$56, so the paper alone would cost US$1820.
+However, their acid-free paper costs US$22 per ream and weighs
+89 g/m², which would raise the price to US$7150.  Presumably you could
+get the weight down by using thinner paper, as was normally used for
+encyclopedias and dictionaries, perhaps at a higher dollar cost.
+Wikipedia says “onionskin” typically weighs 25–39 g/m²; 30g would
+lower the weight to (\* 325 500 (/ 30 16.0) .001) = 305 kg.  Amazon
+lists a “9-pound” “FIDELITY” brand onionskin bond paper for US$25 per
+ream, weighing 3 pounds per ream, which works out to about 34 g/m².
+It’s 100% wood pulp, but despite that, it’s buffered, pH neutral, and
+100-year rated.  (1000 years is readily achievable.).  If it’s 50μm
+thick, then the shelf length in A4 size would be (\* 325 500 50 .001
+.001) = 8.125 m.
+
+[1]: https://en.wikipedia.org/wiki/Wikipedia:Size
+[2]: http://blog.wikimedia.org/2015/06/19/meet-print-wikipedia/
+
+(Working out from the shitty [basis weight standard][3], the basis
+ream for bond paper is 500 sheets of 17" × 22", which is how we know
+it’s 34 g/m².)
+
+[3]: https://en.wikipedia.org/wiki/Grammage
+
+Here in Argentina, the terminology seems to be “papel alcalino”, and
+75g “papel alcalino” costs only about US$10 per 500-sheet A4 ream.
+This would bring the paper cost of the whole Wikipedia project to
+US$3250.

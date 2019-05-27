@@ -1,0 +1,105 @@
+Suppose you're washing out a bottle.  You want to achieve the maximum
+dilution of the contaminants in the bottle for a given amount of
+water; a miser might phrase this as minimizing the amount of water
+needed to get the needed dilution of the contaminants.
+
+If we abstract a little, we're repeating this process some number of
+times:
+
+1. dumping all the water out of the bottle except for the little bit
+   that won't come loose, which contains all the remaining
+   contaminants; call that remaining water volume V0;
+
+2. adding more water to dilute the water already in the bottle, up to
+   some volume V1, diluting the contaminants by a factor V1/V0 by
+   using an amount of water V1-V0, which we will then dump out when
+   we repeat step 1.
+
+After cycling some quantity V2 of water through this process, we've
+repeated it V2/(V1-V0) times, more or less, and achieved a dilution of
+(V1/V0)^(V2/(V1-V0)) times.
+
+You might think that you don't want to go to extremes here.  If V0 is
+one milliliter, and V1 is two milliliters, then on each cycle, you
+reduce the contamination by a factor of 3; so if you use twenty
+milliliters, you've reduced it by 3¹⁰, almost sixty thousand.  By
+contrast, if you dump all twenty milliliters in at once, you achieve
+only a dilution of 1/21, which is pathetic; and if you go toward the
+other extreme and use one microliter of water on each rinse cycle, you
+go through twenty thousand rinse cycles, each providing a 1001/1000
+dilution, which you might think wouldn't make much difference.  But it
+turns out that that adds up to a dilution factor of 480 340 920 times.
+(You need the first thousand rinse cycles just to get to a dilution of
+roughly e, 2.717, but every thousand rinse cycles then adds up to
+another factor of e, and e²⁰ is almost five hundred million.)
+
+That's about as good as you can do, though: rinsing with 20 times the
+amount of residual water that you can't get out will give you a
+dilution of up to e²⁰.  And you can reach almost that optimum, three
+hundred million, say, with only 400 rinses, each of 50 microliters.
+At only 20 times the residual water, you don't get much additional
+benefit from reducing the amount of water on each rinse cycle below a
+twentieth or so of the residual water.  However, because it's an
+exponential process, small differences in dilution will grow into
+larger ones as you repeat the process.
+
+Which is to say that, perhaps unsurprisingly, a more or less
+continuous rinse is the ideal; you want to remove rinse water as fast
+as it's added.  Allowing any amount of rinse water to accumulate
+that's significant compared to the residual, unremovable water will
+dramatically reduce the dilution you achieve.  Once your effective
+number of rinses drops to 50, in the scenario above, you've lost more
+than an order of magnitude of dilution over 20 rinses.
+
+Of course, if you have a way to reduce the residual water, that will
+be even more effective.  Reducing the residual water is equivalent to
+increasing the rinse water by the same factor, which increases the
+exponent on e; in the above example, reducing the residual water by 50
+microliters pumps up the optimum from e²⁰ to e²¹ (plus a bit),
+improving your final dilution by a factor of 2.7!
+
+(This exponential sensitivity of the final result to the precise
+dilution ratio suggests use for sensitive measuring equipment.  If you
+have a 1%-precision measure of the final concentration, say, you can
+derive an 0.05%-precision measure of the geometric-mean ratio of the
+ratio of the residual and rinse water in each step, or more if you
+repeat the dilution procedure more times.)
+
+On the other hand, since it's an exponential process, the absolute
+magnitude of the problem is not so terrible.
+
+The ideal is to achieve dilutions in the mole range (10²⁴), such that
+even if mole quantities of the contaminants were originally present,
+no molecules of them remain afterwards.  (Succussion has not been
+shown to help.)  The minimum to reach a dilution of 10²⁴, with the e²⁰
+limit above, is when 20 ≈ 55.3; that is, you need 55.3 times as much
+rinse water as the residual water.  If for some reason you're stuck in
+a low-efficiency regime where you can't avoid rinse-water
+accumulation, such that each rinse cycle only dilutes contaminants by
+a factor of 2, you need 80 rinse cycles, which means you need 80 times
+as much rinse water as residual water.  At 55 rinse cycles, you will
+have only reached a dilution of about 3 × 10¹⁶, thirty million times
+more concentrated than with the optimal strategy.
+
+That is, in more or less the worst case, your non-optimal rinsing
+strategy costs you only about 45% more water, even though when using
+the same amount of water, it's thirty million times worse.
+
+(It's kind of amazing that it's feasible to achieve such extreme
+dilutions at all, let alone achieve them in your kitchen.  Of course,
+there are always tricky details to get right, like that congealed
+grease spot full of PCBs that isn't getting diluted by your water.
+Don't get cocky.)
+
+If your desire is not to remove every single molecule of whatever
+contaminants you have, but simply to reduce the pH of your laundry to
+the point where it won't deteriorate while drying or in storage due to
+the alkali, you have a much easier task.  I'm going to guess that the
+pH of alkali laundry systems rarely goes above 10 and almost never
+goes above 11, and that reducing the pH to 8 before drying the laundry
+will provide adequate protection; that's a dilution of only 10³, which
+you can achieve with 10 rinse cycles in what I described as "more or
+less the worst case" and 7 "rinse cycles" in the best case of
+continuous mixing.
+
+Welp, guess it's time to rinse this laundry.

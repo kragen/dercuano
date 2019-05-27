@@ -1,0 +1,120 @@
+Studies in Simplicity
+=====================
+
+In the last year or so, without quite knowing what I was doing, I’ve
+been constructing a series of “studies in simplicity”.  I’ve been
+inspired by apostles of simplicity such as Niklaus Wirth and Chuck
+Moore; by friends from whom I’ve learned a lot such as Dave Long,
+Darius Bacon, Norm Hardy, and Aristotle Pagaltzis; and by current
+projects such as VPRI’s “Reinvention of Computing” effort and the
+“NAND to Tetris” or [“The Elements of Computing Systems”](http://www1.idc.ac.il/tecs/) course.
+
+I’ve been doing this to construct working, useful systems with small
+amounts of code, with the functionality of the aspects of computers
+that used to scare me, or seem magical, or seem impossible to
+understand.  For a long time, I’ve known that there aren’t *really*
+magic elves in the computer, but I’ve always felt pretty uncomfortable
+with the handwaving I have to do to explain how, say, a compiler
+works.
+
+Part of my objective has been to enable other people to share my
+newfound fearlessness.  I haven’t gotten much feedback, so I can only
+assume I haven't succeeded in that yet.
+
+To a great extent, this stuff is nothing special; I think it’s stuff
+that any computer science undergraduate does, or should do, in a
+compilers or operating-systems class, and indeed the “TECS” course
+covers most of it in a single semester.
+
+Tinylisp (2007-09)
+------------------
+
+Tokthr (2007-11)
+----------------
+
+*An interactive Forth interpreter under 2kiB; 1000 lines of code;
+unfinished*.
+
+One of the first things I tried was implementing a tiny token-threaded
+interactive Forth system.  I worked on this for about a week, in
+November 2007.  It’s not quite complete, and it’s 1534 bytes in size
+when compiled, from about 1000 lines of assembly.
+
+The primary objective is to see if it’s possible to build a usable
+interactive development environment in two kilobytes or so, so that
+software development doesn’t have to be limited to the wealthy and the
+fortunate.  I’m pretty confident that this shows that it’s possible,
+at least for people who like Forth.  Here’s my basic rationale, quoted
+from the source:
+
+> There are still a lot of computers out there that have tens of
+> kilobytes of memory or less, and they cost a lot less than,
+> say, a cellphone.  Cellphones are apparently still too
+> expensive for half the world’s population.  I want to see how
+> close I can get to having a comfortable programming
+> environment in a smaller device.
+> 
+> Some smallish microcontroller chips from five different
+> manufacturers, with current Digi-Key prices:
+> <table>
+> <tr><th>Name              <th>bytes RAM  <th>bytes ROM  <th>MHz  <th>price
+> <tr><td>ATtiny2313        <td>128        <td>2048       <td>20   <td>US$1.38
+> <tr><td>ATMega48-20AU     <td>512        <td>4096       <td>20   <td>US$1.62
+> <tr><td>MSP430F1111AIPW   <td>128        <td>2264       <td>8    <td>US$2.43
+> <tr><td>LPC2101           <td>2048       <td>8192       <td>70   <td>US$2.52
+> <tr><td>H8/300H Tiny      <td>1536       <td>8192       <td>12   <td>US$3.58
+> <tr><td>M16C/R8C/Tiny/1B  <td>1024       <td>16384      <td>12   <td>US$3.54
+> <tr><td>SX28AC/SS         <td>136        <td>3072       <td>50   <td>US$2.79
+> </table>
+
+In a sense it’s a fairly slow interpreter; it needs about 100ns per
+bytecode on my 700MHz laptop, about 70 clock cycles per bytecode.
+That’s about as slow as Python 2.4’s bytecode interpreter, but the
+bytecodes are much lower-level, so it’s actually slower than Python.
+
+If I (or somebody else) should finish Tokthr, it will be one of the
+smallest Forths, and indeed the smallest interactive interpreters,
+ever created; it should provide an interactive development environment
+in under 2kiB of program with a few hundred bytes of RAM.
+
+Tokthr draws on, among other things:
+
+* My [cheap electronics dissection project](http://considerate.murch-sitaker.org/~kragen/electronics/), where I
+  found out that you could buy a variety of electronic devices for
+  under US$10, some with enough space and computational power to be
+  usefully programmable, but none that were actually programmable
+  (2006);
+
+* Richard W. M. Jones’ [JONESFORTH](http://annexia.org/forth), a
+  Forth implementation in x86 assembly language (2007);
+
+* C. H. Ting and Bill Muench’s public-domain eForth Model 1.0, which
+  shows that you can build a practical Forth in very little space and
+  very little code (1992?).
+
+* The inspiration of Chuck Moore, obviously, and Jeff Fox’s
+  evangelical and sometimes slightly unhinged zeal in telling the rest
+  of us what Chuck had achieved.
+
+[Ur-Scheme] (2008-02)
+------------------------
+
+*Compiler from a subset of Scheme to x86 assembly, written in itself;
+1600 lines of code; finished*.
+
+This was my first real compiler.  It compiles a subset of R5RS Scheme
+big enough to write a compiler in, which I know because I wrote it in
+that subset.
+
+Although it takes a very naïve approach to code generation, the code
+it produces runs surprisingly fast, only about a factor of 5 slower
+than C compiled with GCC.  In part this is due to its omission of
+first-class continuations and garbage collection.
+
+It does implement closures, and the assembly it generates compiles to
+statically-linked, standalone executables.
+
+Ur-Scheme draws on many inspirations, which are listed on its home
+page.
+
+[Ur-Scheme]: http://canonical.org/~kragen/sw/urscheme/

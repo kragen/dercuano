@@ -1,0 +1,114 @@
+I was thinking about the relative costs of materials, and it occurred
+to me that there are three principal figures of merit on which you
+might consider using a material for mechanical engineering:
+
+1. Cost per tensile support: dollars per newton-meter before it breaks
+2. Cost per tensile stiffness: ???
+3. Cost per impact energy: dollars per joule
+
+Of course, for non-mechanical and even manufacturing purposes, many
+other properties are relevant: transparency, color, smell,
+machinability, magnetic permeability, conductivity, dielectric
+constant, thermal conductivity, dielectric strength, melting point,
+electronegativity, heat capacity, chemical resistance, UV resistance,
+viscosity when molten, resistance to galling, lubricity, fatigue
+resistance, and so on.  And even for mechanical purposes, ratios of
+weight or volume to tensile support, stiffness, and impact energy are
+of secondary importance; and there are other kinds of stiffness and
+strength other than tensile: shear and compressive, normally.
+Additionally, these fundamental properties give rise to emergent
+properties like Vickers hardness.
+
+But mostly those three are the ones we care about.
+
+Cost is an extensive quantity — twice as many grams of the same alloy
+costs twice as much — so, to take these ratios, we need to convert
+tensile strength, stiffness (Young’s modulus), and impact resistance
+into extensive quantities too.
+
+Cost per tensile support
+------------------------
+
+Consider [ASTM A36 structural steel, with a yield stress of 250
+MPa][0].  A square-millimeter fiber of it can thus support 250 N,
+about 25 kg weight.  Suppose it costs US$0.60 per pound ($1.32/kg) and
+has a density of 7.8 g/cc; then it costs about 10.3 μ$ per cubic
+millimeter, which means that it costs 10.3 μ$ per millimeter to
+support 250 N.
+
+[0]: https://en.wikipedia.org/wiki/Ultimate_tensile_strength
+
+Normalizing, this works out to about 41 μ$ per newton-meter.  If you
+need to hang 1000 N one meter below a support, or 10kN 100 mm below,
+this steel will do it for you for 4.1¢.
+
+This is just reinterpreting 250 MPa from 250 N / m² to 250 N m / m³,
+then dividing by the density to get 32 kN m / kg.  Dividing the cost
+by that gets you to the 41 μ$ / (N m):
+
+    $ 0.60 / pound / (250 MPa / (7.8 g/cc))
+
+Cost per tensile stiffness
+--------------------------
+
+The Young’s modulus E has, like tensile strength, units of pressure;
+it’s the stress that would stretch a cable to twice its natural length
+if it stayed Hookean over that range, which nothing does.  A less
+fanciful, but more arbitrary, way of looking at it is that it’s a
+million times the stress per microstrain.
+
+If we consider the square-millimeter cable of A36 steel again, [whose
+Young’s modulus is about 200 GPa][1], it will elongate by a
+microstrain under a force of 0.2 N.  But we have a somewhat different
+situation.  While the force needed to break the cable is independent
+of its length, that microstrain is a micron if it’s a meter long, or
+ten microns if it’s ten meters long.  But if we make the cable ten
+times thicker instead of ten times longer, it becomes ten times
+stiffer rather than ten times less stiff.
+
+[1]: http://www.engineeringtoolbox.com/young-modulus-d_417.html
+
+How do we derive an extensive quantity from this, so that we can
+divide the cost per pound by it?  I have no idea.  I have to think
+about this.
+
+Cost per impact energy
+----------------------
+
+When our aforementioned square-millimeter cable of A36 steel is
+stretched, it stores energy in its elastic deformation.  If deformed
+too much, beyond its tensile strength, it will deform plastically or
+break (sometimes the difference between these is important, but I’ll
+gloss over it here).  The ratio between its tensile strength (yield
+stress S in this case) and its Young’s modulus is its elongation at
+break (or at yield), about 0.125%†, which is an intensive quantity; but
+in itself that doesn’t tell us much.
+
+† this differs by more than two orders of magnitude from [the
+elongation at break in MatWeb][2], and ultimate tensile strength isn’t
+that much higher than yield stress, so I’m probably wrong.
+
+[2]: http://www.matweb.com/search/DataSheet.aspx?MatGUID=d1844977c5c8440cb9a3a967f8909c3a&ckck=1
+
+It turns out, though, that the energy it can store is also an
+intensive quantity — which ought not to be surprising in retrospect.
+If we integrate the force over the deformation distance up to the
+yield stress times the wire length, we get the energy that can be
+stored in the cable before breaking.  This energy is proportional to
+the force, which is proportional to the cross-section of the cable and
+doesn’t change with its length; it’s also proportional to the
+distance, which is proportional to the length of the cable and doesn’t
+change with its cross-section.  The force F = EAx/L is also
+proportional to the Young’s modulus E: it’s the cross-section A times
+the Young’s modulus E times the distance x, divided by the length to
+get the strain.  So we have ∫EAx/L dx from x=0 to x=LS/E, so the total
+energy is ½E A/L (LS/E)² = ½ALS²/E.  The AL part of this is just the
+volume of the wire, so ½S²/E is the energy that can be stored per unit
+volume.
+
+In the case of A36 steel, this gives us an impact energy (before
+plastic deformation) of about 156kJ/m³, or 20 J/kg, which works out to
+6.6¢/J of elastic deformation at the US$0.60/pound price above:
+
+    $ 0.60 / pound / (1/(7.8 g/cc) * (250 MPa)^2/200GPa/2)
+

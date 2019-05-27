@@ -1,0 +1,106 @@
+So I’ve been thinking a bunch lately about the Z-machine’s object-tree
+memory model for embedded systems like the Arduino, as an alternative
+to the usual C approach of nesting structs and arrays inside other
+structs and arrays.
+
+There are a couple of problems with the usual Lisp or ML memory model,
+where all values are either pointers or fit into pointers, and can be
+referred to from any number of places.  One problem is that you almost
+need a garbage collector, which means that you can only use a fraction
+of physically available memory for your data; a garbage collector that
+collects garbage too often will use up the vast majority of your
+system’s runtime.  This is a big problem if you have 2048 bytes of
+memory available.  Another problem is that the garbage collector
+imposes relatively large pauses on things — when you try to allocate
+and the GC needs to collect first, you get a pause, which can be tens
+of thousands of instructions long, even if you only have 2048 bytes of
+memory.  A third problem is that the conditions under which your
+allocation can fail are relatively poorly defined; fragmentation and
+tenuring, among other things, can keep pieces of memory unavailable
+that ought to be available, causing allocation to fail unpredictably.
+A fourth, comparatively minor, problem is that the pointers themselves
+occupy a lot of memory space, and they are usually a relatively
+inefficient encoding of the facts about the world with which the
+program must grapple.
+
+The more subtle underlying problem is that, in some sense, if you’re
+allocating memory at run-time instead of compile time, it’s probably
+because you didn’t know how much memory you were going to need when
+you wrote the program.  That, in turn, means that the program could
+need more memory than is physically present.  And that’s true even if
+you don’t use a garbage collector.
+
+In desktop and server applications, where programs have error-handling
+options that include popping up a dialog box with an error message,
+notifying a user that they are exiting, paging a system administrator,
+shedding load by dropping network requests without answering them, and
+logging error messages in logfiles, the occasional failure is accepted
+as a fact of life.
+
+Embedded applications are different: their options for handling
+failure are often limited to blinking an LED and rebooting.  Ideally
+you would like your jet engine, robot arm, chemical plant, or antilock
+braking system to simply not fail, rather than just having ways to
+report the failure gracefully.
+
+C has other options.  It inherits from COBOL, by way of Algol, the
+possibility of hierarchically composing structs and arrays out of
+primitive types and other structs and arrays; no pointers are
+necessary.  C code for life-critical embedded systems is usually
+supposed to obey a set of rules called MISRA, which, among other
+things, entirely forbids the use of dynamic heap allocation.
+
+However, C code to handle things made out of structs and arrays with
+no pointers accommodates any kind of polymorphism only awkwardly, and
+consequently exhibits very poor generality.  Common Lisp includes
+generic functions like `concatenate`, `append`, `map`, `remove-if`,
+`reduce`, `every`, `some`, `length`, `reverse`, `search`, and `equal`;
+the C++ STL includes generic algorithms like `copy_n`, `swap_ranges`,
+`nth_element`, and `set_intersection`; Python code has at its disposal
+generic dictionaries, lists, heaps, and sets.
+
+It would be very desirable to program our embedded systems at a
+similarly high level of abstraction and generality without paying the
+heavy memory-efficiency and reliability costs imposed by the Lisp
+memory model.
+
+The Z-machine object containment tree seems like a possible candidate.
+Each object contains three pointers: its parent, its first child, and
+its next sibling.  (In the Z-machine itself, these were 16-bit object
+indices; on the Arduino, 8 bits each would make more sense.  Also, it
+might make more sense for only active cursors into the object tree to
+carry the parent information, rather than every object.)  Rather than
+destroying or creating objects, including by copying, our algorithms
+can only move them around and mutate them.
+
+Despite this, most of the Common Lisp generic functions immediately
+make sense in the context of this rigid object tree.  It’s just that,
+unlike most of their Lisp antecedents, they destructively consume
+their inputs, and in some cases need to be directed as to where to
+place their output.  The sorted set-arithmetic functions in
+particular, except for symmetric difference, probably reduce to a
+single `set_filter(comparator, targets, input, output)` subroutine
+which moves all the objects from `input` that are equal to an object
+in `targets` into `output`.
+
+The hierarchical structure might prove valuable for persistence
+support, where it could segregate persistent from nonpersistent
+objects.
+
+I suspect that this is related to linear or affine typing, as used in
+Rust, but I don’t understand them well enough to really know.
+
+There is a thing wrong with all of my analysis above.  It may be only
+slightly wrong, but enough to make a difference.  It doesn’t really
+account for function call stacks.
+
+In the absence of recursive functions (and they should certainly be
+absent if you want high assurance of no stack overflows) we could
+certainly statically allocate the activation records of each function,
+which would ensure no stack overflows.  But this is probably much more
+costly than necessary; functions overlay one another’s stack frames in
+a guaranteed-safe way (modulo uninitialized variables and taking the
+address of local variables) and give a much tighter memory-usage
+bound.
+
+Can we extend this property in general?

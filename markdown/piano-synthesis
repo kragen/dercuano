@@ -1,0 +1,126 @@
+Looking at this “grand piano” synth sample, I see that toward the
+beginning (19 cycles just after the attack has settled down a bit):
+
+there’s a fair bit of white (or rather pink) noise between the
+harmonics;
+
+its fundamental is at 443 Hz at -13dB,
+
+its second overtone at 883 Hz is 6.8dB lower,
+
+its third overtone at 1326 Hz is the same (well, only 1.1dB lower),
+
+its fourth overtone at 1775 Hz is a bit lower at 16.1dB below the
+fundamental,
+
+its fifth overtone at 2223 Hz is substantially depressed at 23.1 dB
+below the fundamental (almost as low as the second subharmonic),
+
+its sixth overtone at 2678 Hz is about 13 cents sharp (twice the
+inharmonicity of anything so far) and is 19.3dB below the fundamental;
+
+its supposedly undesirable seventh overtone at 3129 Hz is almost 16
+cents sharp and is 23.4dB below the fundamental;
+
+its eighth overtone at 3597 Hz is 25.9dB below the fundamental, and
+inharmonicity continues to increase sharply to 26 cents;
+
+its ninth overtone at 4072 Hz is 31dB below the fundamental;
+
+higher overtones (which probably don't matter) continue to diminish in
+amplitude exponentially with their frequency.
+
+Overall this spectrum looks a lot like an impulse train has had its
+fifth harmonic attenuated by about 6dB, has been low-pass filtered at
+about 9 dB per octave with a cutoff below the note frequency, and has
+had its overtones stretched out a bit, by about 9 cents per octave.
+
+(It seems strange that amplitude would diminish *exponentially* with
+frequency, though.  9 dB per octave would give you amplitude
+diminishing *cubically* with frequency.  Might be hard to tell the
+difference with this much noise, though.)
+
+This suggests that my attempt to synthesize a piano with triangle
+waves didn’t sound very piano-like because it was *too* low-pass
+filtered, not the opposite, which I guess I should have figured out
+just by looking at the waveform.
+
+Looking at it about 500ms later, the peaks are much more separated
+(much less pink noise in between), everything is quite attenuated (the
+fundamental, which has moved down to the more correct 441Hz, is down
+to -30.9 dB, a decay of 27.9dB, indicating a half-life of about 55ms
+or about 24 cycles) and the rolloff is sharper: the second overtone is
+now 13.8dB below the fundamental, and the third 25dB below the
+fundamental.  This is consonant with my understanding of the
+low-pass-filtering nature of the KS model, but it is being generated
+from a very realistic synthesized sample.
+
+Looking at a somewhat noisy and MPEG-4-artifacted sample from an
+upright piano shortly after the attack, I see peaks at
+
+119 Hz -46.7dB  
+247 Hz -19.2dB  
+370 Hz -28.4dB  
+491 Hz -34.0dB  
+614 Hz -40.5dB  
+739 Hz -32.1dB  
+866 Hz -34.2dB  
+986 Hz -41.6dB  
+1110 Hz -47.2dB  
+1236 Hz -44.5dB  
+
+It also has a notably high peak at 1867Hz at -45.7dB.
+
+(Those are from a 2048-sample window.  Later I got better numbers with
+a 4096-sample window but didn't update it, but in particular the first
+peak really peaks closer to 124Hz.)
+
+These are roughly harmonics of about 123.47 Hz, which would be B2 in
+A440 pitch (although as I recall, the guy was tuning the piano a
+little flat) and which is nearly *missing* from the sound, which is
+probably why Débora says her upright piano sounds shitty compared to a
+grand.
+
+If we figure that the two octaves from the second overtone 247Hz at
+-19dB up to 986Hz at -42dB represent the normal falloff, that’s about
+11.5dB per octave.  The fifth overtone at 614Hz is attenuated some 8dB
+below this line, just like in the synthesized sample, and the seventh
+overtone at 866Hz is not particularly attenuated at all.
+
+Looking at it after a second or two of decay, there’s less noise
+between the overtone peaks, everything is of course much quieter (the
+first overtone is down to -61.8dB and the second down to -38.3), and
+the third and seventh harmonics have gotten much stronger
+relatively — stronger, in fact, than anything else!  And there’s a
+second subharmonic peak at 55Hz at a barely-detectable -82dB,
+presumably due to nonlinearities in the instrument.  This is after
+about 850ms, or about 105 cycles.  If we figure the overall
+attenuation is about 12dB, that’s a half-life of about 26 cycles,
+which is quite similar to the half-life of the synthesized piano
+signal.
+
+The initial attack is about 35ms long, and seems to be pretty similar
+across all the frequencies; it doesn’t show the phenomenon I saw in
+the synthesized sample where the high frequencies start later.
+
+So, overall, our piano recipe is:
+
+- an attack time about four cycles of the fundamental;
+- a half-life of about 25 cycles of the fundamental, shorter for
+  higher overtones;
+- about 9 to 12 dB per octave of low-pass filtering in the initial
+  spectrum (compared to an impulse train);
+- attenuate the fifth overtone by about 6dB over and above the basic
+  low-pass filter;
+- overtone tuning stretched by about 9 cents per octave from perfect
+  harmonicity (the Railsback curve, although that curve shows that
+  it’s not linear) or perhaps significantly less for a better piano;
+- beating among different oscillators for a given note at about 1Hz;
+- to sound like a cheap upright piano, also high-pass the thing such
+  that stuff below 250Hz or so is subject to a vicious 25dB/octave
+  rolloff.
+
+There’s also some stuff about sympathetic strings and energy transfer
+among different modes of vibration, but that stuff doesn’t really show
+up in my analyses.  You can definitely hear it at times in the highest
+strings on the actual physical piano.
