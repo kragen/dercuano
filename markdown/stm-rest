@@ -1,0 +1,29 @@
+Suppose you design a REST system in which every GET or PUT includes a
+transaction ID, which is a URL, assigned by some kind of transaction
+serialization service.  Any piece of code that wants to make changes
+to resources must allocate a transaction ID from the transaction
+serialization service.
+
+Some resources are merely files, while others are synthetic, with
+their representations produced on demand from other resources.  When
+you GET the URL of a file, the file notes your transaction ID, and if
+it changes in the future while your transaction is still active, it
+will post a change notification to your transaction ID.  When you PUT
+a file, the new state is at first only visible to GETs with your
+transaction ID.
+
+When a transaction is completed, you tell the transaction service to
+commit your transaction.  It first verifies that none of the files you
+GETted have had changes committed to them by a previously committed
+transaction; if this is true, it tells all the files you PUTted to
+commit your change.
+
+(It’s unclear to me whether the transaction service has to do all of
+this dependency tracking or whether the file servers can do some of
+it.)
+
+If, instead, one or more of the files have changed, then the
+transaction service refuses to commit your transaction, instead
+rolling it back.  Then you can retry the whole transaction from the
+beginning, or give up and report failure.
+

@@ -1,0 +1,27 @@
+Symmetric NAT is a tricky problem for peer-to-peer applications.
+[Ierymenko says][0] you can get 96% success in establishing
+connections if you do port prediction, but also that you can succeed
+eventually with random port trials because there are only 65535 ports.
+
+[0]: https://news.ycombinator.com/item?id=15038468
+
+The idea is that A and B send a pair of UDP packets to each other at
+the same time (on the mark of some third party) and have a 1/65535
+chance of happening to guess the correct UDP port for the other.  So
+if they do this once a second, they will succeed on average in 18
+hours, at an average cost of 65535 packets per party.  The time to
+success takes an exponential distribution.
+
+I was thinking that perhaps you could increase your success by sending
+larger batches of packets, so that each packet has a larger “target
+size” to aim at, but that only makes sense for full-cone and
+address-restricted-cone NAT, which can be tackled by easier techniques
+anyway.
+
+The purely random approach can still work faster than one packet per
+second.  16 packets twice a second should be feasible in most cases,
+which should take 2048 seconds on average.  As long as this doesn’t
+crash your NAT or disrupt your existing connections, which should be
+detectable, the expected bandwidth is (20 bytes IP header + 8 bytes
+UDP header) * 65536 = 1.8 megabytes, roughly the same as loading one
+extra web page.
