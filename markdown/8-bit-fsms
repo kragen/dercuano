@@ -1,0 +1,19 @@
+Suppose we have, as a fundamental unit, a simple finite state machine:
+an asynchronous ROM with some address inputs fed from its own
+registered output and other address inputs coming from elsewhere.  To
+be concrete, consider the case where the ROM contains 256 8-bit words,
+4 address lines attached to its own registered output, and 4 address
+lines coming in from elsewhere.  The ROM contains 2048 bits; if it is
+in fact programmable (for example by way of a serial bitstream) it
+amounts to a programmable lookup table; it can plainly run quite fast.
+What can we do with such a machine?
+
+It’s straightforward to use it to hold 4 bits, or one decimal digit,
+of an up/down counter; you can also use it as a 3-bit accumulator
+slice, adding its input to its contents on each clock cycle, with
+carry in and carry out.
+
+However, upon further thought, I think this is probably not a useful
+design; it necessarily contains upward of 4000 transistors, enough for
+an entire 8-bit CPU.  The 256×8 configuration memory is surely better
+off as 128 16×1 memories, as in a normal FPGA.

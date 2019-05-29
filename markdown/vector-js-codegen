@@ -1,0 +1,24 @@
+Numeric loops running over large arrays are among the easiest kinds of
+code for JIT compilers to optimize.
+
+Numba is a popular BSD-licensed Python library for LLVM code
+generation for numerical code; among the things it can do are to
+compile graphs of Numpy array operations into efficient machine code,
+including GPU code.
+
+However, Python itself doesn’t have a general JIT compiler; Numba is a
+limited-scope attempt at one.
+
+JS does have a general JIT compiler, several of them actually
+(SpiderMonkey, V8/Crankshaft, and JavaScriptCore).  It doesn’t,
+unfortunately, have operator overloading.  But maybe building
+computation graphs of arbitrary-dimensional arrays would be a
+reasonable thing to do in JS; then you could compile them into JS
+code, from which the existing JIT compilers could generate efficient
+CPU code, and maybe you could write a new compiler to compile the
+computation graph into GPU code, whether using WebGL in browsers or
+something else.
+
+An initial hack at generating numerical code for V8
+(sweetdreams-js.js) yielded disappointing results.  But it was
+straight-line, loop-free code, so it may not be applicable.

@@ -1,0 +1,20 @@
+For generating PWM waveforms, it would be nice to have a state machine
+design that could expand to larger registers without increasing its
+depth.  Synchronous ripple carry has O(N) depth, while lookahead carry
+has O(log N) depth, but designs with O(1) depth include ring counters,
+LFSRs, and Johnson counters.  However, those three cases have
+disadvantages: ring counters require N bits to represent N states,
+while Johnson counters are almost as bad, requiring N/2.  LFSRs are
+nearly optimal in flip-flop efficiency and can always work with depth
+of one or slightly more, but comparing LFSR states for beforeness is
+very difficult.  In some cases it may be adequate to compare the LFSR
+state for equality.
+
+Carry-save counters have depth of 1, but it is also not clear to me
+that they can be compared for greaterness with any reasonable degree
+of circuit depth.  Also, they use twice as many bits as a regular
+binary counter, and while this isn’t as bad as a Johnson counter, it's
+significantly bad.
+
+The context of all of this is that it would be nice to have counters
+that we can clock very quickly.
