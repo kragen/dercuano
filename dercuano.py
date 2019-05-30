@@ -22,6 +22,11 @@ import re
 import urllib
 import subprocess
 
+try:
+    from urllib.parse import quote_plus
+except ImportError:
+    from urllib import quote_plus
+
 import markdown
 
 import relation
@@ -326,7 +331,7 @@ def vomit_html(output_filename, html_contents):
 
 def as_filename(candidate_filename):
     "Escape slashes, colons, NULs, etc., that break some filesystems."
-    return urllib.quote_plus(candidate_filename, safe='')
+    return quote_plus(candidate_filename, safe='')
 
 ok(as_filename('a/bad file\\name: this\0'),
    'a%2Fbad+file%5Cname%3A+this%00')
