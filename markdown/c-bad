@@ -1,0 +1,67 @@
+The other day I was helping a friend of mine with a bug in his C
+program.  It turned out that he hadn't initialized a variable that was
+used as an in-out parameter, carrying a buffer length on the way into
+a Win32 API function, and the length of the data in the buffer on the
+way out; and consequently the function was failing with an error,
+which he didn't check for.  This took me about 45 minutes to figure
+out, talking with him, partly because my Win32 is pretty rusty.  It
+would have taken a much longer time if he hadn't been fairly competent
+himself, having very nearly figured out the problem before we talked.
+
+I asked why he was writing the program in C, where both of the two
+bugs that combined to create this problem were possible, instead of,
+Python, Java, OCaml, C#, Haskell, or really any high-level programming
+language.  His answer surprised me:
+
+> we do everything at my work in C or C++  
+> I'm sure that almost makes you puke
+
+I said that was stupid.  C is a beautiful language, but that doesn't
+make it the best tool to use for everything.  Quartz crystals are
+beautiful too, but if you build a bridge by gluing quartz crystals
+together, it's going to take a lot of work, and when you're done, your
+bridge is still likely to be fragile.  (Although, if you do it right,
+it will be beautiful.)  Much better to build your bridge by welding
+steel I-beams together, maybe using some cables to bear its weight.
+
+Descending from analogy to reality, working large programs are built
+by incrementally improving working small programs.  There are four
+major reasons that each incremental improvement to a C program takes
+longer than the corresponding improvement to a program in a
+higher-level language:
+
+1. The C program contains a lot more code than the corresponding
+   higher-level program, which makes it harder to find the parts you
+   need to change, and harder to understand them well enough to change
+   them when you find them.
+
+2. The new code you add is several times as large, with the
+   consequence that it contains several times as many opportunities
+   for bugs, and therefore probably several times as many bugs.
+
+3. In C, cause and effect are not localized.  If any part of the
+   program invokes some kinds of undefined behavior (uninitialized
+   data, out-of-bounds pointers, double-frees, and so on), then it can
+   interact with any other part of the program at all.  This kind of
+   spooky action-at-a-distance makes debugging difficult --- a newly
+   manifesting bug may be caused by an error introduced in any part at
+   all of the code.  The traditional Unix solution to this problem is
+   to *not write large programs*: instead, write small programs that
+   do one thing only (“and do it well”), and then connect them
+   together with a scripting language.
+
+4. The first three points are, in part, related to the absence of
+   garbage collection in C; but garbage collection not only reduces
+   the amount of code in your program and helps to keep cause and
+   effect localized, it also has other benefits.  For example, it
+   reduces coupling between modules, since the interfaces don't have
+   to specify who owns memory allocations when.  It improves
+   performance, usually (although it reduces the predictability of
+   performance).
+
+5. The C toolchains are suboptimal; you often have to futz with
+   Makefiles and compiler options, compilation has to be manually
+   invoked and takes long enough that you have to wait for it, and
+   when you make a mistake in your Makefile, you often end up with a
+   program that crashes or otherwise mysteriously misbehaves until you
+   `make clean; make`.
