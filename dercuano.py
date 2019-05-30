@@ -20,7 +20,6 @@ import os
 import string
 import re
 import urllib
-import urlparse
 import subprocess
 
 import markdown
@@ -168,7 +167,7 @@ def load_triples(filename):
         for line in f:
             if not line.strip():
                 continue
-            fields = tuple(urlparse.unquote(field.replace('+', '%20'))
+            fields = tuple(urllib.unquote(field.replace('+', '%20'))
                            for field in line.split())
             if line[0] in string.whitespace:
                 fields = (last_subj,) + fields
