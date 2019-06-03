@@ -20,8 +20,12 @@ import os
 import string
 import re
 import urllib
-import urlparse
 import subprocess
+
+try:
+    from urllib.parse import quote_plus, unquote
+except ImportError:
+    from urllib import quote_plus, unquote
 
 import markdown
 
@@ -168,7 +172,7 @@ def load_triples(filename):
         for line in f:
             if not line.strip():
                 continue
-            fields = tuple(urlparse.unquote(field.replace('+', '%20'))
+            fields = tuple(unquote(field.replace('+', '%20'))
                            for field in line.split())
             if line[0] in string.whitespace:
                 fields = (last_subj,) + fields
@@ -327,7 +331,7 @@ def vomit_html(output_filename, html_contents):
 
 def as_filename(candidate_filename):
     "Escape slashes, colons, NULs, etc., that break some filesystems."
-    return urllib.quote_plus(candidate_filename, safe='')
+    return quote_plus(candidate_filename, safe='')
 
 ok(as_filename('a/bad file\\name: this\0'),
    'a%2Fbad+file%5Cname%3A+this%00')

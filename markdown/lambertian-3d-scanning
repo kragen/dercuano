@@ -1,0 +1,21 @@
+Lambertian surface reconstruction
+
+To 3-d scan a Lambertian surface with a plain video camera and a
+light:
+
+Move a point source of light near a Lambertian surface as you capture
+video from a camera stationary relative to the surface. Pixelwise
+differences between frames show the effect of removing the source from
+one frame and adding it to another. Hypothetically, ambient diffusion
+from other reflectors contributes negligibly to this difference, since
+the source is close to the surface being scanned. Given an estimated
+depth for each pixel and per-frame estimated light locations in
+3-space, you can compute a simulated frame difference, which you can
+compare to the real frame difference to get an error. Each pixel of
+this error is a nonlinear (?) function of ten unknowns: the two x, y,
+z of the light locations, the estimated depth to that pixel, the
+surface gradient depth at that object point, and the estimated
+reflectance at that point. Given just one such error image, we can
+optimize the two light locations to minimize the error using gradient
+descent, holding the estimated depths fixed, or we can optimize the
+depths

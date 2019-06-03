@@ -1,0 +1,72 @@
+I want to implement preemptive multithreading inexpensively at the
+level of a language compiler with a hard upper bound on response
+times, without depending on interrupts.  This means that the compiled
+program has to yield control to a scheduler every so often, and we
+need to statically guarantee that it never goes for a long time
+without yielding; but, while the scheduler check is relatively
+inexpensive, it isn’t free — maybe 100 or 1000 CPU cycles.  (For
+example, if the scheduler calls select() to see if there are I/O
+events that need to be handled, that’s about 3000 cycles.)  So we’d
+like to use static analysis to avoid inserting it in too many places
+if we can.
+
+Let’s suppose our program is built from the following grammar:
+
+    function ::= name expr
+    expr ::= instruction | call | seq | forloop | whileloop | conditional
+    call ::= "call" name
+    seq ::= expr ";" expr
+    forloop ::= "for" var const expr
+    whileloop :;= "while" expr expr
+    conditional :;= expr "if" expr "else" expr
+
+This version has a statically computable control-flow graph and
+therefore doesn’t accommodate function pointers; you could treat them
+as CLOS-style generic functions and treat them as conditionals on a
+type test.
+
+I’m glossing over parameter passing and local variable allocation for
+the time being; you can consider them to be implemented by some
+unspecified instructions.
+
+It seems clear how to compute a conservative approximation of
+run-time-before-yield.  whileloops can run forever, as can recursive
+functions; either of these need to have a yield inserted into them.
+Then, the run-time-before-yield of a call expression is the
+run-time-before-yield of the function it calls, plus a tiny amount;
+each instruction presumably has a known worst-case
+run-time-before-yield; a seq expression’s worst-case
+run-time-before-yield is the sum of those of its children; a forloop’s
+is N times that of its body expression, where N is the constant; and a
+conditional is the maximum of its two branches plus its condition.
+
+It may be necessary to separately compute a worst-case run-time
+*before* yielding and a worst-case run-time *after* yielding for each
+syntax tree node.
+
+Note that the above remains safe even in the presence of early-exit
+instructions from either loops or entire functions: those might
+shorten the run-time, but they can’t lengthen it.
+
+Inserting yields optimally is almost certainly an NP-hard problem.
+
+Ideally if you have a recursive loop of functions, you would only
+insert a yield into the prologue of one of the functions rather than
+all of them.
+
+You can generally do a better approximation.  Most while loops are not
+intended to run forever; by supplying a “loop variant”, an integral
+nonnegative quantity that strictly decreases every iteration, you can
+guarantee that the loop terminates and even provide an upper bound on
+its iteration count.  But that level of detail probably isn’t
+necessary for inserting yields, and it probably requires extra work
+from the programmer.
+
+This kind of analysis also works, with some tweaks, for bounding stack
+depths and total heap allocation size, either to optimize the number
+of checks down toward some limit or to provide strong static bounds on
+resource usage, statically guaranteeing resource adequacy.  (Heap
+allocation can be twice as fast if it doesn’t have to check the
+allocation pointer against the end of the arena, and implementations
+of threading and call/cc that use segmented stacks also normally have
+to bounds-check the stack poitner on every function call.)

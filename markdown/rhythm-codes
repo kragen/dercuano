@@ -1,0 +1,62 @@
+Suppose your codeword is a common-time measure; the symbols available
+for use within it are a quarter-note, two eighth notes, and a rest;
+you’re using two pitches simultaneously, separated by a perfect fifth;
+the first beat, for timing, cannot be two rests or two eighth notes,
+nor can the second beat be two rests; and if only one of the pitches
+appears in the measure, it must be the low one (since without hearing
+the other one, it’s hard to guess whether it’s meant to be the low one
+or the high one).  How many possible codewords do you have?
+
+Well, a normal beat (the third or fourth) has 9 possibilities
+available.  The first beat can be 7 of those 9 possibilities, and the
+second can be 8 of them.  That gives us 7·8·9·9 = 4536 possibilities,
+but of these, a few have only rests at the lower pitch: 2·2·3·3 = 36.
+So the total number of these very simple biphonic melodies is 4500, so
+each one can encode just over 12 bits, which is roughly a single
+English word, depending on how sophisticated a model you use to
+measure the entropy.
+
+I chose a perfect fifth because, although the two pitches are
+assonant, their harmonics will be largely distinct, potentially
+enabling decoding even if large swaths of the spectrum are lost.  The
+fundamentals of the two of them are the second and third harmonic of a
+fundamental an octave below the lower pitch, and so the
+divisible-by-three harmonics of the low note will be the even
+harmonics of the high note.  This means that half of the harmonics of
+the high note will not be found in the low note’s harmonics, and two
+thirds of the low note’s harmonics will not be found in the harmonics
+of the high note.
+
+If, for example, we choose 220Hz (A, I don't know, is that A below
+middle C?) for the low note, then 330Hz (E?) will be the high note.
+The 220Hz note has about 68 harmonics in the easily-human-audible
+range, of which 46 are not among the harmonics of E; and E has 46
+harmonics in the easily-human-audible range, of which 23 are not among
+the harmonics of A.  You should be able to distinguish between these
+notes by finding the 9.09ms-lag autocorrelation peak and comparing it
+to the 4.55ms-lag one and the 3.03ms-lag one (they should be higher if
+there is a note there and lower if there isn’t?), and that should work
+even if big parts of the spectrum (including the fundamentals) are
+strongly suppressed.  And you should be able to find the note onset by
+differentiating these autocorrelations over time.
+
+If you play the melody at 180bpm, which is pretty durn fast for music,
+you will get through one measure every 1333ms, for a total of 9 bits
+per second.  This is slower than people talk, so people might be able
+to learn it.  Your eighth notes will run for 167ms each, which is
+about 37 cycles of A’s fundamental, which is plenty.
+
+A 30ms window is 1323 samples at 44.1kHz, and brute-forcing its ACF is
+thus about 0.9 million multiplications, which seems like a lot.  A
+1024-sample Fourier transform should be something like 0.02 million,
+and you can derive the ACF by DFT | take magnitude | DFT.  But if
+you’re only looking to compare autocorrelation at three particular
+lags, you can do that much more simply, with only three
+multiply-accumulates per sample and without explicit windowing.
+
+(A thought here for pitch tracking: if you’re trying to track a
+changing pitch using autocorrelation, maybe you could hill-climbingly
+adjust a pair of lags bracketing the true frequency, like nostrils,
+and get by with only two multiply-accumulates per sample?  That's
+maybe cheaper even than the Goertzel algorithm or a software PLL,
+although it does require a multiply.)

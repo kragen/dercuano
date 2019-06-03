@@ -1,0 +1,68 @@
+I saw an article on HN the other day with a title like “the opposite
+of a Bloom filter”, making the observation that if you make a hash
+table where you resolve collisions by simply discarding one of the
+colliding keys, then you get a probabilistic-set data structure that
+may have false negatives but never false positives, which is in some
+sense the reverse of a Bloom filter.  It's very similar in a sense to
+a CPU memory cache (which also tracks the contents of memory as well
+as the data present there).
+
+This comes at a fairly heavy space cost compared to typical Bloom
+filters, since you have to actually store the keys in order to ensure
+that you aren’t getting false positives.
+
+It occurred to me that you could use this approach to implement an
+efficient stateless gossip protocol for large datasets, but then it
+occurred to me that actually you can do better with Bloom filters.
+
+Bloom filter approach
+---------------------
+
+When you make contact with a new peer, generate a
+high-false-positive-probability Bloom filter of your current set of
+keys, using HMAC as the hash algorithm, keyed with a random nonce.
+Send the filter and the nonce to the peer.  The false-positive
+probability can reasonably be as high as 90%, which should allow you
+to use a single hash function and much less than one bit per key.
+
+When you receive a filter and a nonce, hash all your keys with the
+nonce and probe to see which are in the filter.  If any are not in the
+filter, send them in your reply.
+
+This sends a randomly selected 10% of the missing data to the peer.
+This should be sufficient to provide efficient information
+distribution if encounters are frequent but happen at intervals
+relatively large compared to the communication latency.  In
+particular, it should be possible to keep the filters several orders
+of magnitude smaller than the dataset being synchronized, and each
+node will almost always receive each data item only once, even if it's
+simultaneously syncing with multiple peers.
+
+With a fixed false-positive probability, the filter will grow linearly
+with the dataset.  This problem can be avoided by increasing the
+false-positive probability over time, but of course that makes the
+network gradually slower as information accretes.  Suppose that,
+instead, we partition the dataset into epochs of, say, one day each,
+in such a way that each node can determine independently which epoch a
+particular key belongs to, and we compute and transmit a separate
+filter for each epoch.  Then we can choose a different convergence
+rate for each epoch: perhaps I want today's epoch to have a 90% false
+positive rate, but yesterday's 95%, 97% for the day before, and so on.
+In this way it is possible to continue very slow convergence even for
+very old epochs.
+
+(Rathe than choosing different filter sizes, you could merge different
+numbers of epochs into each filter, producing different load factors;
+this is probably actually a better idea.  So you might have one filter
+for the current minute, one filter for the previous three minutes, one
+filter for the previous nine minutes, and so on.)
+
+In addition to being more efficient, this approach is somewhat more
+privacy-protecting than the standard approach used by e.g. BitTorrent,
+in which you send a full list of all the keys (pieces, in the
+BitTorrent case) you have.  That list of keys is almost certainly
+enough to identify you uniquely for a period of time.  By contrast, it
+should be somewhat more difficult to identify the sender of such a
+filter: infeasible if you have no idea what keys might have been
+hashed into it, but even if you have some candidate keys, each one
+only gives you a small, probabilistic amount of information.

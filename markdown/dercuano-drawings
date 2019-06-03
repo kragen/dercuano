@@ -330,3 +330,65 @@ reversed — the bandwidth from my brain to the mouse is definitely not
 on the keyboard.  If the drawing program can somehow filter out the
 other 1000+ bits per second of pure noise, it might actually make it
 *easier* to draw things rather than harder.
+
+### Penrose looks like an appealing approach, but would need reimplementing ###
+
+The unfortunately named [Penrose](http://penrose.ink/)
+([GitHub](https://github.com/penrose/penrose)) diagramming software
+project is not related to Penrose diagrams (also known as
+Penrose–Carter diagrams), the Penrose Graphical Notation, the Penrose
+Project (a band), or the OpenJDK project Penrose.  Instead, it’s
+Katherine Ye’s research team at CMU, which has produced software that
+largely consists of three DSLs, with even more unfortunate
+names — “DDL” defines the primitive objects of some mathematical
+domain, such as the vector space ℝ² or ZFC set theory; “STYLE”
+explains the desired visual representation of each domain concept in
+terms of constraints and optimization objectives; and then “SUBSTANCE”
+describes the particular objects to put into a particular diagram.
+Further interactive tweaking is then used to adjust one of the various
+outputs from the constraint solver to look best.
+
+The underlying approach sounds reasonable, and they’ve gotten some
+impressive results, but the implementation is 8000 lines of Haskell,
+plus substantial bits in Java, TypeScript (for a React UI), JS, and
+Emacs Lisp; they’re actually using Alloy (thus the Java) to reduce
+some kind of problem to SAT and solve it with SAT4J (maybe the layout
+optimization problem itself, although I don’t think SAT4J would be
+particularly good at that?  Or maybe some other problem).  Using
+Penrose itself for diagrams in Dercuano would thus involve generating
+vector graphics in SVG or whatever during the Dercuano build process,
+since running the existing Penrose software in the browser would not
+be practical, even with Emscripten, which itself would probably blow
+Dercuano’s space budget.
+
+### Something like [Zdog](https://zzz.dog/) might be interesting for 3D ###
+
+Zdog is a browser-based 3-D engine using points, lines, arcs, and
+splines rendered with stroke thickness, with SVG (and, I think,
+`<canvas>`) output.  Its implementation, though lightweight, doesn’t
+run in old browsers, and I’m not that fond of its API.
+
+It does a great job of demonstrating the potential of the approach,
+which is pretty easy to implement; doing it just for points with
+diameter (“spheres”) [took me just a few lines of JS on
+`<canvas>`](http://canonical.org/~kragen/sw/81hacks/topopt-ar) a few
+years ago:
+
+    var s = Math.sin(theta)
+      , c = Math.cos(theta)
+    ;
+
+    var ty = y.times(c).plus(z.times(s))
+      , tz = z.times(c).plus(y.times(-s))
+      , seq = tz.gradeDown()     // painter’s algorithm
+    ;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var ii = 0; ii < seq.length; ii++) {
+        var i = seq[ii];
+        circle(ctx, x[i] + 128, ty[i] + 128, 2048 / (tz[i] + 128), color(r[i], g[i], b[i]));
+    }
+
+In that case, though, the “scenegraph” (coordinates and colors) was
+randomly generated at startup.  It doesn’t really help with the
+question of how to get the 3-D models made in the first place.

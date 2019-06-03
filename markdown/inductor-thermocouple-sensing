@@ -1,0 +1,285 @@
+I was wondering if a simple way to measure the temperature of a
+thermocouple is to use an inductor, and it looks like a viable
+approach, perhaps even providing precision comparable to or better
+than the standard op-amp approach, though it requires much thicker
+sensor leads.
+
+Thermocouples can generate substantial power — those used for safety
+cutoffs in gas appliances typically power solenoids directly — but
+very low voltages — typically 20–40 μV/°, with 41 μV/° for the common
+type-K thermocouple (which is the one commonly used in gas
+appliances).  Being made of solid metal, they have very low output
+impedances, but the low voltages are not particularly friendly to
+precise sensing with essentially capacitive CMOS.
+
+So what if we use an inductor and a switch to generate a
+higher-voltage waveform from the low-voltage thermocouple signal, then
+measure the waveform with a cheap microcontroller?
+
+An LR circuit would amplify the voltage, but requires fast measurement
+----------------------------------------------------------------------
+
+The conventional approach to solving this problem is to use an op-amp
+(maybe a chopper to mask out flicker noise) to amplify the output
+voltage to a level where you can conveniently digitize it, but it
+occurred to me that perhaps you could put a thermocouple in series
+with an inductor, then open the circuit so that the inductor is
+obliged to discharge through a higher, known resistance.
+
+To be more specific, consider the problem of trying to measure a
+temperature between 600° and 1200° (against a reference temperature we
+will assume is 0°) using a type-K thermocouple in series with a
+100-μH, 1-Ω inductor in parallel with a 100-Ω resistor.  At ΔT =
+1200°, the thermocouple generates 49.2 mV, thus pushing 49.2 mA
+through the inductor (and 0.492 mA through the resistor).  When the
+thermocouple is disconnected, the 49.2 mA starts to flow through the
+resistor instead, raising the voltage across it to 4.92 V, which is
+easily measured without further amplification.  The current is then
+declining at 49.2 A per microsecond, so we only have a few
+microseconds (L/R = 1 μs) to measure it in, which is challenging but
+not infeasible with an off-the-shelf STM32.
+
+A larger inductor would give us more time, but to avoid annoyingly
+high voltages, would require a correspondingly smaller resistor, and
+so parasitic resistances would start to play a larger role.
+
+An LC circuit should make the measurement task easier
+-----------------------------------------------------
+
+A different approach is to use a capacitor instead of the resistor for
+the inductor to discharge through, so that the current can oscillate
+back and forth several times.  With the same 100-μH, 1-Ω inductor, our
+inductor energy ½LI² is ½·100μH·(49.2 mA)² = 121 nJ; if we want our
+capacitor to charge up to ±2.5 V or less (so we can bias the whole
+oscillation into the +0–+5 VDC range), then C ≥ 2 · 121 nJ/(2.5 V)² =
+39 nF.  Using a conventional 0.047 μF capacitor, then, we get up to
+±2.27 V, and the oscillation frequency is 1/(2π√(LC)) ≈ 73 kHz, so we
+need to digitize the result at at least 150 ksps to avoid aliasing,
+which is straightforward.
+
+Q = sqrt(L/C)/R, which works out to about 46 — about 200 μs per factor
+of e decay (τ), so the signal should remain detectable for up to a
+millisecond or two.  I think this is probably a higher Q than we’ll
+actually get in practice, but maybe not much higher.
+
+So the procedure is to open the switch (which needs to operate in less
+than about 10 μs) and measure the ringing-down signal in order to get
+a reasonably precise indication of its amplitude over time, and in
+particular to extrapolate what its initial amplitude was when the
+circuit opened.
+
+The sources of error I can see here are:
+
+1. Error estimating the time-domain start of oscillation; an error of
+   1τ results in an error of e ≈ 2.7, so to get 10°C of error at 1200°
+   we need about τ/120 = 1.7 μs.  Measuring this *directly* would mean
+   we’d need to sample at hundreds of kHz, but that isn’t
+   necessary — we know the precise phase of the oscillation
+   start — the current was at near-max and the capacitor was charged
+   only according to the resistance of the inductor (49.2 mV in the
+   above example).  So we only need the accurate phase of the signal
+   (to within 0.78 radians in this case) and to successfully detect
+   its first oscillation.  (In theory we don’t need to estimate this
+   because we’re controlling it, but there might be delay in the
+   switch.)  Roughly half of our samples give us phase information
+   whose precision is comparable to the precision of the amplitude
+   information in (roughly) the other half; if we have 1000 useful
+   samples (1 ms) then we have a few hundred samples each telling us
+   the phase with something like 12 bits of precision, so we have
+   maybe 16 bits of precision on the phase: something like an error of
+   15 microradians, which gives us a time-domain error for the cycle
+   start on the order of 30 ps, translating to an amplitude error of
+   0.15 ppm, and thus totally overkill precision of 180 μK.
+
+2. Error estimating the amplitude of the signal, which is potentially
+   a sort of weighted average of contributions from all the samples,
+   maybe with some nonlinear filtering to reject out-of-band noise.
+   Our 2.27 V initial amplitude will decrease proportionally by some
+   2 mV/°, so even 10 bits of precision (in the weighted sum, not each
+   individual measurement) should be adequate.  Offsets are
+   inconsequential.  If we figure we have about a millisecond of
+   useful 12-bit samples at a megasample per second, that’s 1000
+   samples, which gives us a precision of about 17 bits, a precision
+   of about 17 microvolts on the 2.27 V initial measurement, or 375 nV
+   on the original low-impedance thermocouple voltage, working out to
+   a totally overkill precision of 9 mK.  (Of course, the precision of
+   your analog voltage reference is going to be a limiting factor
+   here, too; if it's not accurate to 17 μV, you’re not going to hit
+   that.)
+
+3. Error in estimating the voltage amplification factor of the
+   circuit — the 49.2 mV to 2.27 V factor described above, which comes
+   from ½L(V₀/R)² = ½CV₁², and thus V₁² = (L/(CR²))V₀², so V₁ = (1/R)
+   √(L/C) V₀ = Q V₀, precisely the Q factor of the resonator.  This is
+   most sensitive to the precise value of the inductor’s resistance,
+   which will vary with the inductor’s temperature, since the inductor
+   is not a precision resistor.  However, the fact that this is
+   precisely the Q factor of the resonator is wonderful — it means
+   that we can measure the rate of ringdown and get a very precise
+   measurement of this very amplification factor, accurate as of that
+   moment.  If we let the 2.27 V ring down to 0.5 mV (the limit of a
+   12-bit ADC) that’s about 8.4τ ≈ 1.6 ms, and getting a 10°/1200° ≈
+   0.8% error in the time domain would require an error of about
+   13 μs — not plausible, since we’re talking about a systematic
+   timing error over many measurements.  In the voltage domain, an
+   error in estimating the Q factor of 0.8% would amount to a
+   (differential!) voltage error of 1 - (1.008)⁸·⁴ ≈ 7%, which is even
+   less plausible.
+
+    The only remaining source of error in this voltage amplification
+    factor, then, will be parasitic resistance in the thermocouple,
+    its leads, and the switch, which are outside the resonating loop,
+    and the capacitor, which is in the resonating loop but not part of
+    the series resistance that sets the initial inductor current.  As
+    an example, a 2N7002’s on-resistance is 7Ω (see file
+    `jellybeans`).  This could be improved by adding resistance
+    *inside* the resonating loop, in series with the inductor, thus
+    reducing the Q factor and thus increasing the earlier-mentioned
+    errors; this would probably be a good tradeoff.
+
+4. Switch slowness error: we’re indirectly measuring a discontinuous
+   step function in current through the thermocouple by way of
+   measuring its 73-kHz component.  But discontinuous step functions
+   of current cannot exist in the real world of nonzero parasitic
+   inductances; any real switch, whether solid-state, thermionic, or
+   electromechanical, will take some finite time to open and close,
+   and electromechanical switches have the even more alarming behavior
+   of bouncing when they close.  If these errors attenuate or
+   strengthen the 73-kHz component of the step function, you could get
+   potentially totally incorrect measurements or even a blown input
+   circuit.
+
+    This is somewhat exacerbated by the fact that MOSFETs with low
+    on-resistance are big power MOSFETs like the IRF540N (44 mΩ), and
+    so they have much larger Qg (71 nC in that case, compared to 2 for
+    the 2N7000 — see file `jellybeans`.)  Driving 71 nC into the gate
+    in under 100 ns, which I guess would keep the switch-slowness
+    error under about 1% and thus the temperature error under 12° at
+    1200°, requires a large transient current of 710 mA; the IRF540N
+    datasheet does claim its turn-off delay time is 39 ns and its fall
+    time is 35 ns.
+
+    This problem, too, can be ameliorated with a Q-spoiling resistor
+    in series with the inductor, reducing the error due to the
+    switch’s on-resistance and thus allowing the use of smaller
+    transistors.  ON Semiconductor’s 2N7000 datasheet claims a 10-ns
+    turnoff time and 1.2–5Ω on-resistance at room temperature.
+
+    It could also be ameliorated by using an exotic GaN power
+    transistor like the 39¢ EPC2036 with its 65 mΩ and Qg = 0.91 nC,
+    or possibly an electromechanical relay.
+
+5. Thermocouple error: the metals in the thermocouple may not be pure,
+   and their purity may change over time, especially at higher
+   temperatures.  Eventually it will probably burn out.  It should be
+   easy to make this the dominant form of error, but presumably it’s a
+   form of error we can calibrate out, since at any given time it
+   depends only on the temperature we’re measuring.
+
+6. Cold-junction compensation error: thermocouples really measure a
+   *difference* in temperature between two points, one of which is
+   typically inside the measuring instrument.  This is probably not a
+   major problem for the ±10° precision I’m looking for, since a
+   calibration at 18° is good from 8° to 28° even without any
+   temperature compensation.
+
+Here I’ve talked about the possibility of using an extra resistor in
+series with the inductor — which could take the form of just winding
+your inductor with thinner wire, and therefore perhaps just buying a
+cheaper inductor — but another possibility is using a precision
+resistor of 10–100 Ω *outside* the resonant loop.  This would avoid
+reducing the Q (though it’s probably excessive anyway) and reduce the
+error introduced by resistance in the thermocouple’s leads, but by
+dropping most of the thermocouple’s voltage, it would also attenuate
+the signal being measured and make the results sensitive to the
+unknown drifting parasitic resistance of the inductor.
+
+Since the dominant sources of error here are parasitic resistances
+(which can be measured), the unknown thermocouple characteristics
+(which can be calibrated), and switch slowness, you can probably get
+better measurements by using an electromechanical relay.
+
+A thing to consider is that this approach can quite reasonably measure
+100 samples per second, but the thermocouple’s temperature can’t vary
+under non-disastrous circumstances by more than a hundred degrees per
+second or so, and in many circumstances, not more than a degree per
+second.  So errors that pertain to only a single measurement, like
+phase error, can be averaged out over hundreds of measurements to
+obtain another 4–5 bits of precision.
+
+Comparison with a variant of the usual design, which may perform worse
+----------------------------------------------------------------------
+
+Horowitz & Hill (2015 edition) talks a bit about the problem of
+amplifying thermocouples.  On p. 936 it explains that you can use a
+US$16 Cirrus CS5532 24-bit delta-sigma converter to digitize the
+signal “directly” — by way of its integrated chopper-stabilized
+programmable-gain amplifier, which you can set to 64× gain to get a
+±40 mV input range, or 32× for twice that.  They mention that they
+balanced their thermocouple lines around ground to reduce EMI pickup.
+
+On p. 1033, they also mention the Maxim MAX6675, which is a
+“thermocouple-to-digital-converter chip” with SPI output, and on
+p. 1083 they mention the MAX31855 SPI thermocouple ADC with 0.25°
+resolution from -270° to +1372° and built-in cold-junction
+compensation.  The 1989 edition has a good deal more information on
+the subject of thermocouples on pp. 989–992, in fact recommending 10kΩ
+or more of input impedance to avoid errors from lead resistance.
+
+But basically you just rig up an op-amp to amplify the small low input
+voltage to a larger output voltage, in, for example, the simplest
+non-inverting configuration: connect the thermocouple to the + input
+and run a voltage divider across the - input between the op-amp output
+and ground, with, say, a precision 47kΩ resistor and a precision 1kΩ
+resistor.  This circuit makes no difficult demands of bias current,
+input range, bandwidth, slew rate, output power, power consumption,
+stability, gain, or broadband (as opposed to flicker) noise, but it
+does require a low input offset voltage (and precision resistors).
+Horowitz & Hill suggest using a chopper-stabilized op-amp, which
+typically requires a couple of external capacitors, like the US$1.60
+MAX9617 — typical offset voltage 0.8 μV + 5 nV/°, with a 10–140 pA
+bias current.  0.8 μV in this context is a temperature error of 0.02°.
+This is fine for my intended application of controlling a pottery
+kiln, but it seems large compared to the much smaller errors I was
+talking about above.  Worse, its worst-case offset voltage is
+specified as 10 μV, which is a temperature error of 0.2°.  Other
+choppers are comparable — some a little better, others a lot worse.
+
+Horowitz & Hill (1989) recommend rigging up the op-amp as a
+differencing amplifier in order to get good common-mode rejection of
+EMI, which I think is in large part a function of the high input
+impedance they’ve chosen due to their fine wires; but they emphasize
+that low offset voltage, a microvolt or better, is essential.
+
+In the land of garden-variety op-amps, things are much worse.  The
+US$0.24 Microchip MCP6001T-I/OT I declared in file `jellybeans-2016`
+to be “the world’s cheapest op amp” is specified as ±4.5 mV input
+offset voltage, ±2μV/°.  ±4.5 mV would be an error of ±110°.  The
+LM324 is ±2–7 mV, the LM741 is ±1–5 mV, and the CMOS TLC272 is
+±1.1–10 mV, though its precision-trimmed TLC277 variant is ±500μV.
+And that’s before we even get into flicker noise and drift!  So if you
+were in the unfortunate position of having to improvise the
+thermocouple amplifier with whatever op-amps you could scrounge (see
+file `ghettobotics`) the straightforward circuit wouldn’t work; the
+resonant tank circuit this note is about would be a lot better.  You
+might be able to get the straightforward circuit, or an
+instrumentation-amplifier variant of it, to work with a trimming
+resistor, since you only need about an order of magnitude improvement
+to get to the 10° (400μV) precision I wanted.
+
+But can the inductor hack compete with the precision of a
+chopper-stabilized op-amp for thermocouple sensing?  The chopper here
+is giving us 10 μV of error on a 49.2-mV signal, an error of about one
+part in 5000, 200 ppm.  The inductor hack above is estimated to get an
+error of about 0.15 ppm from the time-domain start error, 7 ppm from
+the amplitude estimation error, some small error I didn’t actually
+estimate from estimating the Q factor (probably dominated by the same
+voltage-measurement error as the amplitude estimation, and so probably
+of similar magnitude), and some potentially large errors from
+parasitic resistances (≈4000 ppm if we assume that we’re using the
+IRF540N and its on-resistance varies unpredictably by 4 mΩ) and
+switching softness (say, the IRF540N’s 35-ns fall time reducing the
+measured voltage at 73 kHz by 0.25%, 2500 ppm — although I may be
+estimating that wrong).  So it might be possible to get the inductor
+hack below 100 ppm of error, especially by using exotic components
+like electromechanical relays or GaN FETs.
