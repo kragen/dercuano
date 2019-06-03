@@ -104,7 +104,7 @@ The sources of error I can see here are:
    on the original low-impedance thermocouple voltage, working out to
    a totally overkill precision of 9 mK.  (Of course, the precision of
    your analog voltage reference is going to be a limiting factor
-   here, too; if it's not accurate to 17 μV, you’re not going to hit
+   here, too; if it’s not accurate to 17 μV, you’re not going to hit
    that.)
 
 3. Error in estimating the voltage amplification factor of the
@@ -207,6 +207,15 @@ second.  So errors that pertain to only a single measurement, like
 phase error, can be averaged out over hundreds of measurements to
 obtain another 4–5 bits of precision.
 
+(XXX I am not sure my calculations of how many bits of precision you
+get from averaging over some number of samples are right; I think I
+may have dropped a squaring or a square-root somewhere.  The above
+calculations are based on the idea that quadrupling your number of
+samples gets you an extra bit of precision, which is 6 dB.)
+
+(This design might also be adaptable for use as an energy-harvesting
+frontend.)
+
 Comparison with a variant of the usual design, which may perform worse
 ----------------------------------------------------------------------
 
@@ -283,3 +292,51 @@ measured voltage at 73 kHz by 0.25%, 2500 ppm — although I may be
 estimating that wrong).  So it might be possible to get the inductor
 hack below 100 ppm of error, especially by using exotic components
 like electromechanical relays or GaN FETs.
+
+(But then Horowitz & Hill get serious about precision design and
+explain the design of HP multimeters with 0.1 ppm error.)
+
+Measuring parasitic lead resistance with multiple measurements
+--------------------------------------------------------------
+
+The problem with the switch on-resistance and the resistance of the
+thermistor and leads in the above design is that it drops some unknown
+amount of voltage before getting into our resonating tank circuit.
+Parasitic resistances in the tank itself introduce no error, as long
+as they’re on the inductor side, because they show up in our Q
+measurement of the ringdown.
+
+The problem is that we’re faced with a Thevenin voltage-resistance
+pair, the voltage coming from the thermocouple and the resistance
+coming mostly from its leads, and we’re trying to estimate the voltage
+from a single measurement from outside of it.  This is clearly going
+to introduce significant error, and is the reason Horowitz & Hill
+suggest using a high input impedance, even though the thermocouple
+itself is very low impedance.
+
+A different approach is to add some more switches with different
+known, precision, low-drift series resistances.  Then we can measure
+how much the voltage across our tank changes with these various
+resistances, and thus the internal resistance of our voltage source.
+In the absence of measurement error, two switches would be enough.
+
+However, if we’re talking about MOSFET switches, we have the problem
+that the resistance of each switch is significant, significantly
+different from other switches, and variable over time and with
+temperature.  So it might be worthwhile to instead seek a way of
+taking multiple measurements to calibrate out the source resistance
+that lets us keep using the same switch.
+
+Specifically, we can leave the switch closed for less time than is
+needed for the current through the inductor to reach its steady state,
+which we’ve calculated above is about 1.6 ms.  If we leave the switch
+open for only 100 μs or 200 μs, for example, the current through the
+inductor won’t have ramped up to its max, and so we’ll get a smaller
+pulse when we open the switch again.  These shorter pulses will depend
+less on the parasitic lead resistances, because until the current gets
+going, those resistances aren’t dropping any voltage, so the initial
+ramp-up of current in the inductor is independent of lead resistance
+and indeed of any resistance at all.  By taking several different such
+measurements, it should be possible to calculate the outside-the-loop
+parasitic resistances with good precision — not just the resistance of
+the leads but also of the switching MOSFET.
