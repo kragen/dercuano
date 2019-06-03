@@ -1,0 +1,25 @@
+Lots of energy-harvesting devices use capacitors for energy storage.
+The simplest way to do this, given a somewhat unpredictable AC voltage
+source, is with a diode or bridge rectifier.  This has a couple of big
+problems, though: the diodes dissipate more than half of the energy
+you’re trying to harvest, and without any significant linear
+resistance, the capacitor gets fully charged during the first
+quarter-cycle, so if the capacitor is large, they’re dissipating it
+very rapidly and will explode.
+
+(A reason you might not see this happen in practice is that your
+energy source isn't actually a voltage source, i.e. negligible
+impedance; more on that later.)
+
+If you have a diode or resistor or some other passive element in
+series with the capacitor, it’s going to take up whatever the voltage
+difference is between the capacitor’s current state of charge and the
+voltage source.  Ideally you would like that to be just enough to push
+the right amount of current through the passives to charge the
+capacitor, so that almost all the energy gets harvested instead of
+dissipated.
+
+You could maybe do it literally like that using a buck regulator:
+instead of regulating the duty cycle of the PWM signal in the buck
+regulator to seek a fixed goal voltage, regulate it to seek a fixed
+goal current.

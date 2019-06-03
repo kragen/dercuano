@@ -1,0 +1,79 @@
+Landsat 8 images are now freely available, including the 15-meter
+panchromatic band that was new in the Landsat 7 ETM+ sensor.  The
+thermal bands have lower resolution than in the L7 sensor, but
+whatevs.
+
+An immediate problem is how to deal with the images in the Level 1
+Data Product.  They're 16-bit TIFFs with dozens to hundreds of
+megapixels; it turns out that, at least on my netbook, things like
+ImageMagick (`display` and `convert -sample` anyway) and the GIMP just
+do not manage to open them in a reasonable amount of RAM.  netpbm
+seems to be able to come through here, successfully generating a
+thumbnail of a 225-megapixel image in only three minutes:
+
+    anytopnm LC82250842013110LGN01_B8.TIF | pnmscale -height=600 | \
+        pnmtopng > small-pan.png
+
+The results in a rather dim, but still 16-bit, image, with a maximum
+pixel value of 9007; a contrast autostretch with `pgmnorm` helps, but
+leaves the image proper rather low in contrast, because the black
+border pixels are so far from the image values.  `pnmhisteq` results
+in a striking and highly legible grayscale.
+
+In the thumbnail, Buenos Aires is 40x34+365+278 out of the 624x600
+image (found with `display small-pan.png`, then Image Edit → Region of
+Interest).  The original image is 15201x14621, according to `anytopnm
+LC82250842013110LGN01_B8.TIF | head -2`.  That means I should be able
+to extract a 974x829 image at (8892, 6774) to find the city, using
+`pamcut`:
+
+    time anytopnm LC82250842013110LGN01_B8.TIF | \
+        pamcut -left 8892 -top 6774 -width 974 -height 829 | \
+        pnmtopng > buenos-aires.png && \
+        < buenos-aires.png anytopnm | \
+        pnmhisteq | \
+        pnmtopng > buenos-aires-stretched.png
+    
+It would be a lot more efficient to break these images up into
+compressed tiles of near the latency-bandwidth product of the disk
+drive, using `pamdice`, and mipmap them, rather than spending over a
+minute rereading the entire 400-megabyte GeoTIFF for every operation,
+but at least it's workable.  The above took a little under 90 seconds,
+producing a striking image of most of the city (my RoI was a little
+too conservative) in `buenos-aires-stretched.png`.  Every street and
+every plaza is clearly visible, but not every building.  Using
+`pgmnorm` instead of `pnmhisteq` gives much better results, with
+large-scale patterns becoming visible.  The resulting city map is only
+about 1.5MB in PNG form or 470kB in JPEG form.
+
+It would probably be a big improvement to add chroma data from the
+other bands, but that's a little more work.
+
+Now that it's so easy to get unlimited Landsat 8 scenes, we can quite
+reasonably make movies of construction and the like, albeit on a
+block-by-block basis rather than a building-by-building basis.  That
+is, you'll be able to see which block construction is happening on,
+but not what shape the buildings are, unless they're humongous.
+
+(If we figure the latency-bandwidth product is 500kB and that we need
+about 1.5 bytes per pixel, the tile size would be around 600×600; this
+particular scene would then be 25×26 tiles, and it would probably make
+sense to produce 3:1, 9:1, and 27:1 reductions, adding another
+1+9+27=37 reduced-size tiles to the original 650; the total would be
+some 350MB.  Divide by roughly two to account for the fact that the
+zero pixels added around the edges compress to almost nothing.)
+
+Extracting bands 1, 2, and 3 for red, green, and blue, we have
+
+    for band in 1 2 3; do 
+        time anytopnm "LC82250842013110LGN01_B$band.TIF" |
+        pamcut -left 4446 -top 3387 -width 487 -height 415 |
+        pnmtopng > buenos-aires-$band.png
+    done
+    rgb3toppm <(anytopnm buenos-aires-3.png | pgmnorm) \
+              <(anytopnm buenos-aires-2.png | pgmnorm) \
+              <(anytopnm buenos-aires-1.png | pgmnorm) |
+        pnmtopng > buenos-aires.rgb.png
+
+This produces a somewhat legible color image of the same region as
+previously, but it's fairly unsaturated.

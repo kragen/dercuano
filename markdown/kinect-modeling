@@ -1,0 +1,24 @@
+So I have a bunch of depthmaps (aka range images) of a sculpture,
+acquired with a handheld Kinect.  Now I want to generate a 3-D model
+of them.
+
+<http://pointclouds.org/documentation/tutorials/in_hand_scanner.php#in-hand-scanner>
+(dependent on color; uses ICP) and <http://wiki.ros.org/rgbdslam> are
+two ROS-related things that do this kind of thing.
+<http://pointclouds.org/documentation/tutorials/registration_api.php#registration-api>
+has an overview of the process, including an alarmingly large number
+of options for how to do each step (although apparently SIFT and NARF
+are the usual feature detectors?), and
+<http://pointclouds.org/documentation/tutorials/interactive_icp.php#interactive-icp>
+has a demo thingy (which uses Blender, but only to generate the input
+as a .ply file), using the ICP algorithm that is also used in
+<http://pointclouds.org/documentation/tutorials/iterative_closest_point.php#iterative-closest-point>.
+It looks pretty easy to use but I don’t know how well it works for
+incomplete point clouds with errors.
+
+But I don’t really want a point cloud.  I want a triangle mesh so I
+can render it efficiently and then simulate projecting images onto the
+sculpture.
+
+NARF, the “normal aligned radial feature”, is
+<https://www.willowgarage.com/sites/default/files/icra2011_3dfeatures.pdf>.

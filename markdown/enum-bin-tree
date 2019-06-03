@@ -1,0 +1,148 @@
+Enumerating binary trees and their elements
+===========================================
+
+<link rel="stylesheet" href="style.css" />
+
+[Raphael Finkel's
+book](http://www.nondot.org/sabre/Mirrored/AdvProgLangDesign/) says,
+"Enumerating binary trees (see Chapter 2) is quite difficult in most
+languages, but quite easy in CLU."  Of course I am not enthusiastic
+about the idea that CLU has any merits not shared by my own favorite
+languages, and so I am curious how hard it would be in, say, Python or
+Scheme.
+
+So, I thought, enumerating the binary trees of a particular size
+should be fairly straightforward in Python:
+
+    # With a generator.
+    def enum_bin_tree(n):
+        if n == 0:
+            yield None
+        for leftsize in range(n):
+            for left_tree in enum_bin_tree(leftsize):
+                for right_tree in enum_bin_tree(n - leftsize - 1):
+                    yield left_tree, right_tree
+
+    # With a multi-for list comprehension.
+    def enum_bin_tree_eager(n):
+        if n == 0: return [None]
+        return [(left_tree, right_tree)
+                for leftsize in range(n)
+                for left_tree in enum_bin_tree_eager(leftsize)
+                for right_tree in enum_bin_tree_eager(n - leftsize - 1)]
+
+    # With a simple nested loop.
+
+    def enum_bin_tree_simple(n):
+        if n == 0: return [None]
+        rv = []
+        for leftsize in range(n):
+            for left_tree in enum_bin_tree_simple(leftsize):
+                for right_tree in enum_bin_tree_simple(n - leftsize - 1):
+                    rv.append((left_tree, right_tree))
+        return rv
+
+Or in Scheme:
+
+    (define (enum-bin-tree n)
+      (if (= n 0) '(())
+          (mapappend (lambda (left-size)
+                       (mapappend (lambda (left-tree)
+                                    (map (lambda (right-tree)
+                                           (list left-tree right-tree))
+                                         (enum-bin-tree (- (- n left-size) 1))))
+                                  (enum-bin-tree left-size)))
+                     (iota n))))
+    (define (iota n) (iotaplus (- n 1) '()))
+    (define (iotaplus n rest) 
+      (if (< n 0) rest (iotaplus (- n 1) (cons n rest))))
+    (define (mapappend fn lst)
+      (if (null? lst) '()
+          (append (fn (car lst)) (mapappend fn (cdr lst)))))
+
+Then I looked at Finkel's pseudo-CLU version; it is 24 lines, compared
+to 14 for the Scheme version and 6-8 for the Python versions.
+However, it happens to be very similar to the first (7-line) Python
+version above; the only differences in the algorithm are the position
+of the -1 and its use of side effects in place of constructing new
+tree nodes.
+
+A variant of the approach above can be used to enumerate the sentences
+of a given length in at least some context-free languages; the tricky
+part is making sure that the recursion terminates.  I think it will
+work for grammars with no epsilon-productions and no cycles in which a
+nonterminal can expand to itself A -> A.  I'm not quite sure if it can
+be expanded to include those languages; I'm pretty sure allowing the
+cycles don't add any power (you can rewrite the grammar to an
+equivalent grammar without them) but I'm not sure about the
+epsilon-productions.
+
+Enumerating binary search tree keys
+-----------------------------------
+
+Another example Finkel's book gives, which is perhaps more to the
+point, is comparing two binary trees to see if their nodes have the
+same value in inorder traversal.  This is very similar to the
+samefringe problem, in that the recursive formulation of inorder
+traversal is very straightforward:
+
+    def inorder_traverse(fn, bintree):
+        if type(bintree) is type(()):
+            left, middle, right = bintree
+            inorder_traverse(fn, left)
+            fn(middle)
+            inorder_traverse(fn, right)
+
+A nonrecursive procedural formulation, on the other hand, is
+considerably more opaque.
+
+    def inorder_traverse_nr(fn, bintree):
+        stack = [("node", bintree)]
+        while stack:
+            action, arg = stack.pop()
+            if action == "node":
+                if type(arg) is type(()):
+                    left, middle, right = arg
+                    stack.push(("node", right))
+                    stack.push(("visit", middle))
+                    stack.push(("node", left))
+            else:                           # action == "visit"
+                fn(arg)
+            
+And if you want to be able to get those items on demand, for example
+so that you can compare them with the items being produced from
+another such traversal, you end up structuring it into some objects:
+
+    class Inorder_Iterator:
+        def __init__(self, bintree): self.stack = [Node(bintree)]
+        def next(self):
+            if self.stack: return self.stack.pop().next(self)
+            raise StopIteration
+        def push(self, other): self.stack.push(other)
+        def __iter__(self): return self
+    class Node:
+        def __init__(self, bintree): self.node = bintree
+        def next(self, stack):
+            if type(self.node) is type(()):
+                left, middle, right = self.node
+                stack.push(Node(right))
+                stack.push(Visit(middle))
+                stack.push(Node(left))
+            return stack.next()
+    class Visit:
+        def __init__(self, val): self.val = val
+        def next(self, stack): return self.val
+
+By contrast, Python generators let you write this:
+
+    def inorder_traverse(bintree):
+        if type(bintree) is type(()):
+            left, middle, right = bintree
+            for item in inorder_traverse(left): yield item
+            yield middle
+            for item in inorder_traverse(right): yield item
+
+That's 6 lines of code instead of the 19 of the explicit object
+version.  Both are noticeably shorter, however, than the 25-line
+pseudo-Simula version with coroutines that Finkel presents (in chapter
+2, subsection 2, p.33, figure 2.8).

@@ -1,0 +1,29 @@
+I want to do a reduced-affine-arithmetic raytracer.
+
+The idea is that an “image” is a function from pixel coordinates x and
+y to color component intensities r, g, and b, and we merely want to
+compute an adequate approximation to that function.  We recursively
+subdivide the image into rectangular regions, and restrict ourselves
+to a linear approximation within each region, so that the overall
+approximation is piecewise linear (though not necessarily continuous
+between the pieces).
+
+In this way, we can avoid spending much computation time on smooth
+gradient regions, concentrating on the regions where aliasing is
+possible.
+
+Extending this, a “video” is a similar function, but has three
+independent variables: x, y, and t.  This allows us to avoid spending
+computation time on parts of the scene that don’t change much from
+frame to frame.
+
+You can derive such an approximation by applying a self-validated
+arithmetic model from a mathematical description of the ray-traced
+scene.  Most self-validated arithmetic models only give you
+zeroth-order approximations in any given region; interval arithmetic
+and the use of Lipschitz constants are examples.  Affine arithmetic
+gives you a first-order approximation, but it is crushingly
+computationally expensive; reduced affine arithmetic, though it
+doesn’t provide such tight bounds, is more efficient, and has been
+successfully used for raytracing.
+

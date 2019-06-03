@@ -1,0 +1,25 @@
+A cascade of recursive (i.e. feedback) comb filters
+at subharmonics of a desired
+frequency should be able to provide a high-Q bandpass filter at very
+low computational cost.  For example, to isolate a 256-Hz signal with
+a sampling rate of 1024 Hz, you can subtract the sample 2, 6, 10, 14,
+18, or 22 samples ago.  Suppose you start by subtracting the sample
+X[i-14] 14 samples ago, which is 3½ cycles; this produces a new signal
+A.  Now add the sample 16 samples ago from that new signal A[i] +
+A[i-16]; this produces a new signal B.  Now subtract the sample 18
+samples ago from that new signal B[i] - B[i-18].  This produces a new
+signal C.  Now add the sample 20 samples ago C[i] + C[i-20], producing
+a new signal D.
+
+This signal C is the input signal filtered with the product of the
+frequency responses of the three component filters; that filter has
+exact nulls at every place any one of the filters had an exact null,
+including DC, and it has peaks at multiples of the least common
+multiple of their periods, which I think is well above the Nyquist
+frequency in this case.
+
+Wait, I’m confusing feedforward and feedback implementations.
+
+Hmm, with unit impulse amplitude this ends up being a linearly growing
+signal if you make it feedback.  You probably need to apply some kind
+of Hogenauer-style limit thing to keep its amplitude below a limit.

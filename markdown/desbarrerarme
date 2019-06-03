@@ -1,0 +1,87 @@
+Desbarrerarme: a UI for speaking to people
+==========================================
+
+Facebook chat is dangerously addictive in part because it is so easy
+to use, and constantly offers you new opportunities for what to do.
+However, aside from the political problems with using it, it’s
+somewhat repulsive in that its HTML UI often hangs for long periods of
+time and makes your machine slow.
+
+But it has a number of good points, which I want to incorporate into a
+UI of my own for talking on chat:
+
+1. Saying “OK” in your current conversation is three keystrokes: O, K,
+   and Enter.  No need to choose a subject line, no need to invoke a
+   “new message” command.
+
+2. Nevertheless, you can send arbitrarily long messages, with
+   formatting.  FB has removed the boldface from asterisks it used to
+   support, and it tends to mangle complex formatting, but it’s still
+   perfectly usable for multiple paragraphs filled to your screen
+   width.
+
+3. You can move among recent conversations with single keystrokes, ↑
+   and ↓, to be specific.
+
+4. It suggests that you interact with people you haven’t interacted
+   with in a while, to a limited extent, by using their presence
+   information.
+
+5. Regardless of which device you’re interacting from, you always see
+   the same message history.  Opening a chat shows you your previous
+   conversations with the person.
+
+6. It supports links and embedded images.
+
+So my plan is to rig up something similar, but for email.  As with
+Gmail, you’ll see the emails in a thread above your text box at the
+bottom, with repeated crap elided.  By default, you’ll have only a
+single thread with a given person, and you’ll always be replying to
+their latest message, if any.  If they change the subject line, it
+will be a new thread.  You should be able to answer ten emails from
+ten different people with one-word answers in ten seconds, even if you
+don’t have an internet connection.
+
+Each thread has a simple read/not-read flag.  When you open it, it
+gets marked as “read”.  When you receive a new message in it, it gets
+marked as “not-read”.
+
+Furthermore, I want to use this for chat systems other than mail,
+including everything Pidgin supports.
+
+To allow scaling to a larger number of historical threads, and more
+important threads, than Facebook, I want to do some amount of
+search-based navigation — to let you see just the results of a
+search. XXX
+
+I want to use this to try out a theoretical design for distributed
+user interfaces I called “rumor-oriented programming”.  Every time you
+receive a message, mark a message to be sent, successfully send a
+message, start writing a draft, or update a draft, that information is
+recorded as a “rumor” in the “rumorset” of your Desbarrerarme
+installation.  When you synchronize your Desbarrerarme installations,
+which will happen constantly while you’re online, they spread all the
+new rumors to each other.
+
+The user interface is rendered from a query on the current rumorset
+state, a query which is not sensitive to the order in which the rumors
+arrived at the current node.  Therefore, once two Desbarrerarme nodes
+have finished synchronizing, their user interfaces are guaranteed to
+render the same information.
+
+However, there is a little bit of information, like which thread
+you’re currently looking at and where your cursor is in the draft,
+that should not be replicated.  This is “control state”, and not
+replicating it is crucial to preserving usability in the face of
+multiple clients being used by, potentially, multiple people.
+
+To keep things simple, I want to write the user interface view as a
+pure function of the rumorset state and control state.  But, to keep
+things efficient, I want to cache and reuse the results of previous
+computations.  This is much more important for the rumorset part of
+the question, which could contain gigabytes of information, than for
+the user interface, which might be a megabyte or, in the form of
+drawing operations, a couple of kilobytes.
+
+I also want to avoid complete recomputations of large results.  For
+example, the leftmost column of the screen layout should contain the 
