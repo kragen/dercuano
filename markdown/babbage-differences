@@ -1,0 +1,122 @@
+On the method of finite differences used in Babbage’s Difference Engine
+=======================================================================
+
+The “method of finite differences” as used in the Difference Engine is
+closely related to, but slightly different from, Newton’s [method of
+divided differences][0] (used, for example, for polynomial
+interpolation or for boundary-value problems in ordinary differential
+equations) and the [finite difference method][1] used in the solution
+of ODEs and PDEs.
+
+[0]: https://en.wikipedia.org/wiki/Divided_differences
+[1]: https://en.wikipedia.org/wiki/Finite_difference_method
+
+The [Wikipedia page on the Difference Engine explains][2] how to
+calculate the initial values, but I am skeptical of its explanation.
+However, it cites [Nathan Myhrvold’s instructions for setting up the
+machine][4], which we can suppose have been tested on the one he had
+built.
+
+[2]: https://en.wikipedia.org/wiki/Difference_engine#Method_of_differences
+[4]: http://ed-thelen.org/bab/bab-intro.html
+
+Reading [F. Baily’s 1823 comments on the Difference Engine][3] we
+find:
+
+> 2º. Tables of Square Numbers. The squares of all numbers, as far as
+> 1000, were a long time ago published … In computing a table of this
+> kind by the machine, even if extended to the most remote point that
+> could be desired, the whole of the mental labour would be saved: and
+> when the numbers 1, 1, 2 are once placed in it, it will continue to
+> produce all the square numbers in succession without
+> interruption. This is, in fact, one of those tables which the engine
+> already made is capable of computing, as far as its limited number
+> of wheels will admit.
+> 
+> 3º. Tables of Cube Numbers. Tables of this kind have likewise been
+> already computed… In computing such a table by the machine, the
+> whole of the mental labour would be in this case also saved: since
+> it would be merely necessary to place in the machine the numbers 1,
+> 7, 6, 6; and it would then produce in succession all the cube
+> numbers.
+
+[3]: https://en.wikisource.org/wiki/Astronomische_Nachrichten/Volume_46/On_Mr._Babbage's_new_machine_for_calculating_and_printing_mathematical_and_astronomical_tables
+
+The table of cubes begins 1, 8, 27, 64, 125; its first differences are
+7, 19, 37, 61…, and its second differences are thus 12, 18, 24…, its
+third differences 6, 6…, and its fourth differences merely a sequence
+of zeroes, since the third-order approximation is actually precisely
+correct.  The first item of each of these sequences gives the (1, 7,
+6, 6) setup described in Baily’s article.
+
+XXX no it doesn’t; 6 is the difference between 1 and 7, so I think Baily
+actually took into account the half-cycle offset I claim below that he
+didn’t take into account; his numbers give the correct answer as shown
+at the end.
+
+However, to update this state (1, 7, 6, 6) to its successor state (8,
+13, 12, 6) without any extra storage, we must work strictly from left
+to right, because the previous value of each number (except the 1, in
+the lowest-order register, T) is needed to update the next-lower-order
+term, before being itself updated (except the second 6, in the
+highest-order register, Δ³).  So we must proceed as follows:
+
+    | T | Δ¹ | Δ² | Δ³ |
+    | 1 |  7 |  6 |  6 |
+    | 8 |  7 |  6 |  6 |
+    | 8 | 13 |  6 |  6 |
+    | 8 | 13 | 12 |  6 |
+
+XXX note that 13 is wrong because it should be 19
+
+However, at least in the “Difference Engine No. 2” design Babbage
+developed between 1846 and 1849 (23–26 years after Baily’s letter),
+the calculations are not performed in this serial fashion.  [As
+explained in Swade’s analysis][5], instead a set of four parallel
+additions is carried out, then a set of three parallel additions:
+
+> However, the sequence of additions as executed by the engine does
+> not proceed in a stepwise way from right to left as one might expect
+> from the manual method. One complete calculating cycle consists of
+> two symmetrical half-cycles. During the first half-cycle the number
+> values on the odd-numbered axes are simultaneously added to those of
+> the even-numbered axes to the immediate left i.e. axes 1 [Δ⁷], 3
+> [Δ⁵], 5 [Δ³], 7 [Δ¹] are added to 2 [Δ⁶], 4 [Δ⁴], 6 [Δ²],and 8 [T]
+> respectively. Similarly, during the second half-cycle all the
+> even-numbered axes are simultaneously added to the odd-numbered axes
+> again to the immediate left. Provided this is taken account of when
+> setting up at the start of a run by offsetting the initial values on
+> alternate axes by a half-cycle, the end result is the same i.e. each
+> full calculating cycle results in a new tabular value which is the
+> cumulative sum of the number of active differences.
+
+[5]: http://ed-thelen.org/bab/bab_tech_calc.html#Odd
+
+So, in fact, if we want to compute a table of cubes, to get 8 as our
+second cube, we do indeed need to set Δ¹ (column 7 on the machine) to
+7, as Baily says.  And then, having been used, it is incremented by Δ²
+(column 6 on the machine) in the second half-cycle — but that Δ² had
+previously been incremented by Δ³ in the first half-cycle.  So the
+correct initial state we would need is not Baily’s (1, 7, 6, 6) but
+(1, 7, 0, 6), proceeding as follows:
+
+    | T | Δ¹ | Δ² | Δ³ |
+    | 1 |  7 |  0 |  6 |
+    | 8 |  7 |  6 |  6 |
+    | 8 | 13 |  6 |  6 |
+
+XXX this is the wrong answer.  If we start from Baily’s setup we get the
+right answer:
+
+    |   T | Δ¹ | Δ² | Δ³ |
+    |   1 |  7 |  6 |  6 |
+    |   8 |  7 | 12 |  6 |
+    |   8 | 19 | 12 |  6 |
+    |  27 | 19 | 18 |  6 |
+    |  27 | 37 | 18 |  6 |
+    |  64 | 37 | 24 |  6 |
+    |  64 | 61 | 24 |  6 |
+    | 125 | 61 | 30 |  6 |
+
+
+

@@ -1,0 +1,289 @@
+I’m thinking that, with modern electronics, the most expedient way to
+heat up a small pottery kiln to a controllable temperature might be
+induction heating of iron inside the kiln, using coils outside the
+kiln driven by a simple 300W ultrasonic inverter; this avoids the need
+for any exotic materials or components.
+
+The basic design
+----------------
+
+A small cylindrical space is the kiln proper, as in file
+`electric-micro-kiln`, perhaps 150 mm across and 100 mm tall; it is
+enclosed by insulating refractory material.  This is divided into a
+bottom plate with a raised rim and a sort of inverted bucket that fits
+on top of it; lining the upper part of the bucket is a steel or
+cast-iron pipe (`##` in the cutaway diagram below) heated by coils of
+copper wire (`oo` in the diagram) wound around the *outside* of the
+refractory.
+
+     ___________________________________________
+     |                                         |
+     |     _______________________________     |
+     |_  ##                               ##  _|
+    oo|  ##                               ##  |oo
+    oo|  ##                               ##  |oo
+    oo|  ##                               ##  |oo
+     |   ##                               ##   |
+     |    |                               |    |
+     |    |                               |    |
+     |    |                               |    |
+     |_   |                               |   _|
+       \  |                               |  /
+        \_|                               |_/
+                                         
+     __                                       __
+     | \                                     / |
+     |  \___________________________________/  |
+     |                                         |
+     |_________________________________________|
+
+With this arrangement, when the contents overheat and melt into the
+bottom of the kiln, they destroy only the bottom plate, which is the
+easiest part to replace; and, of the electrical components, only the
+inexpensive steel pipe is exposed to the high temperatures inside the
+kiln.  The copper windings, in particular, are insulated from the pipe
+by a significant thickness of refractory material.
+
+The raised border around the edge of the plate also serves to lengthen
+and crookedify the air path between the inside and the outside of the
+kiln, thus reducing thermal leakage, though probably at the cost of
+increasing wear when you open and close it.
+
+The power delivered to the pipe can be on the order of 100 to 500
+watts, and there isn’t any particular advantage (and maybe a bit of
+disadvantage) to its tendency to deposit primarily in the outer
+diameter of the pipe, due to the skin effect, so we can use
+frequencies as low as is convenient.
+
+(As explained below in “materials and thermodynamics”, the walls and
+floor probably need to be proportionally thicker than is shown here.)
+
+Temperature feedback
+--------------------
+
+We can use the type-K thermocouples used for safety cutoffs for gas
+ovens and pilot lights; these are available at any hardware store and
+cost about US$3.  To avoid creating a low-thermal-resistance path
+through the kiln wall, the lead can be passed through the wall in a
+spiral path from the inside to the outside.  Accurately measuring the
+50-millivolt DC signal from the thermocouple is somewhat challenging,
+as explored in file `inductor-thermocouple-sensing`, but also a
+well-understood electronics problem with off-the-shelf designs to
+solve it.  We might have to turn the induction heater off when we’re
+taking temperature measurements.
+
+Materials and thermodynamics
+----------------------------
+
+As described in file `electric-micro-kiln`, refractory firebrick has
+thermal conductance in the range 0.2–0.5 W/m/K.  We can use ghetto
+firebrick made by mixing used yerba mate with a ball-clay-based clay
+body; as noted in file `ceramics-notes`, my previous experiments
+firing it at 1020° burned out all the yerba cleanly (making a terrible
+stench) and left solid ceramic results at ratios of 1:1, 3:2, 1:2,
+1:3, 1:4, 1:6, and 1:8 in favor of the yerba; but the 1:6 and 1:8
+results were noticeably friable and porous, so 1:2 (probably about
+0.8 g/cc) or 1:3 (probably about 0.6 g/cc) is probably a safe bet.
+These probably conduct about 0.3 W/m/K.
+
+The surface area of the inner cylinder described above is 100 mm · 2 π
+75 mm + 2 π (75 mm)² = 0.082 m², so it will lose 100 W at ΔT = 1000 K
+if the 0.3 W/m/K refractory averages 246 mm thick; this suggests that
+300 W and 82 mm thick is a reasonable goal.  You probably want to be
+able to burst above 300 W in order to hit temperatures at or above
+1020 K in a reasonable time.
+
+This gives an outer diameter of 314 mm and an outer height of 264 mm,
+for a total outer volume of 20.4 liters, 1.8 of which are taken up by
+the inner chamber; this leaves 18.6 liters of refractory material,
+about 11.2 kg of fired clay (and 13 kg of used yerba or coffee grounds
+or sawdust or whatever) if we assume 0.6 g/cc.
+
+It’s probably worthwhile to put 5 mm or so of solid clay on the top of
+the plate to make it resist impacts and abrasion. a little better.
+
+Although you would clearly get better results if you fired the kiln in
+a larger kiln before using it, I think it will probably be usable even
+if you don’t do this — the steel pipe will reach a high enough
+temperature to burn out the yerba in its near vicinity, which will
+provide enough insulation to allow it to start heating up the inner
+chamber and burn out the yerba there.  The ball clay I was using
+really needs to be sintered at 1020° to reach full strength, but full
+strength may not be necessary for this application.  The yerba should
+eventually burn to charcoal at even 250° or 300°, which is probably
+adequate insulation.
+
+It would be nice to prevent the yerba from stinking before the thing
+is dry, and maybe a small amount of copper sulfate or something would
+work as a biocide for this.  This depends in part on how tolerant the
+neighbors are, though.
+
+Nickel-plating the steel pipe might extend its life — steel doesn’t
+melt until at least 1130° and usually 1300° or more, and pure iron
+won’t melt until 1492° (and the mild steel we can most easily get will
+be close to that), but iron or steel in direct contact with air
+oxidizes rapidly above 200° or so.  Nickel-plating isn’t totally
+trivial (nickel salts are fairly toxic) but can be done successfully
+with nothing more than salt, vinegar, and electricity.
+
+Induction heating
+-----------------
+
+Rudnev et al.’s _Handbook of Induction Heating, 2nd Ed._ explains that
+it’s possible to heat pretty much any metal (and also graphite) by
+induction heating, but there are significant differences; in
+particular, ferromagnetic metals have a much thinner skin depth δ in
+which the heat is deposited than non-ferromagnetic metals.  For good
+heat transfer, the metal must be thick enough to be
+“electromagnetically thick” (p. 65), at least six times the skin depth
+δ.
+
+This is substantially complicated when you are heating steel, because
+its skin depth increases by about a factor of 15 when it passes its
+Curie point (p. 64), which is around 720–770°, and also because the
+skin depth in ferromagnetic materials depends on the the magnetic
+permeability of the material, which is not constant but varies with
+the magnetic field intensity — perhaps 300μ₀ at room temperature and
+low fields, it may drop to 150μ₀ at room temperature and 20% of the
+saturation field intensity (Fig. 3.10, p. 60).
+
+Now, in theory, we might not have to worry about this, because we
+don’t really care where the heat gets deposited inside the kiln; it
+will eventually conduct to where it’s needed.  But at 60 Hz the skin
+depth in SAE 1040 steel is already 2.5 mm at low field intensity
+(Table 3.5 on p. 64).  Six times that (to be “electromagnetically
+thick” and absorb nearly all the field) would be 15 mm, and 15 times
+*that* (when we pass 700°) would be 225 mm.  Since I think it’s going
+to be hard to find or work with steel pipes that are more than 5 mm
+thick, it’s probably worthwhile to use a higher frequency; if we want
+a skin depth of a 90th of 5 mm, we need 100 kHz (0.06 mm in SAE 1040
+at 10 A/mm and 21°, according to the same table).
+
+(However, the penetration depth scales as the square root of the
+frequency, and the power delivered scales as a negative exponential of
+the number of skin depths, so even two or three skin depths would
+already be pretty good, so lower frequencies might be adequate.
+Probably not powerline 50 Hz, though.)
+
+On p. 97 et seq. we have expressions for the electrical efficiency ηₑₗ
+and related quantities.  It points out that you have losses from the
+resistance of the coil itself and losses from heating up nearby random
+metal objects, and it gives this approximate formula for heating a
+solid cylinder in an electromagnetically long solenoid coil made from
+electromagnetically thick copper tubing:
+
+> ηₑₗ = 1/(1 + (D'₁/D'₂)√(ρ₁/(μᵣρ₂)))
+
+Here D'₁ and D'₂ are the inside diameter of the coil and the outside
+diameter of the cylinder, offset by their respective skin thicknesses,
+and ρ₁ and ρ₂ are their respective resistivities.
+
+Now, the pipe isn’t a solid cylinder, and the coil here isn’t
+electromagnetically long or electromagnetically thick, but let's
+assume that the situation is close enough.  We have the major
+disadvantage of having 82 mm of refractory between the coil and the
+pipe, so D'₁/D'₂ ≈ 2.1, which would give us ηₑₗ ≈ 0.3 absent other
+considerations; but our resistivity ratio ρ₁/ρ₂ is about
+0.017μΩm/0.16μΩm ≈ 0.1 (Table 3.1, p. 54), and, at least at first, the
+μᵣ of the steel pipe ≈ 300, so our √(ρ₁/(μᵣρ₂)) ≈ √(0.1/300) = √.00033
+= 0.018, so ηₑₗ ≈ 1/(1 + 2.1 · 0.018) ≈ 96%, though it might decline
+to 83% as the steel heats up and stops being ferromagnetic.  On the
+other hand, the hotter steel will be even more resistive, so the
+situation might improve.
+
+An interesting thing about this equation is that it doesn’t include
+any explicit dependence on the number of turns or the current, except
+indirectly through the lower μᵣ that comes with a higher field.  I
+don’t yet understand what the implications of more or less turns are,
+except that more turns means more inductance and thus more
+impedance — easier to drive at low frequencies, harder to drive at
+high frequencies.
+
+Electronics
+-----------
+
+Suppose we decide on 20 kHz and 50 V as being relatively friendly
+numbers.  To get 300 W out of 50 V we need 6 A, and thus about 8 Ω of
+impedance; with a 50% duty cycle we’d need 4 Ω.  A MOSFET like the
+IRF540N (see file `jellybeans`) should work well for this if we have a
+source for the 50 V, but it can handle 33 amps; maybe a more
+interesting approach is to drive the low-impedance induction coil
+through a step-up transformer, perhaps stepping up voltage 4:1 from
+12 V to 48 V and stepping current down from 24 A to 6 A.  Perhaps even
+a higher induction coil voltage could work.
+
+Okay, but what does that imply about our coil?  Presumably we want its
+inductance to be high enough that, if the pipe weren’t conductive
+(maybe we replace it with laminated steel that blocks the eddy
+currents), it has a much higher impedance than 4 Ω at 20 kHz, maybe
+40 Ω, and we want its dc *resistance* to be much lower than 4 Ω, maybe
+0.2 Ω.  [AWG20 wire can reasonably carry 5 A and is 0.812 mm in
+diameter](https://en.wikipedia.org/wiki/American_wire_gauge) and
+33 mΩ/m, so you could reasonably use 6 m of it to get 0.2 Ω, which
+would be just about 6 turns around the outside of the kiln; this would
+make it a sort of 6× stepdown transformer to the steel pipe, so you’d
+see 36× the resistance of the (skin depth of the) steel at the
+induction-coil terminals.
+
+I’m going to hazard a guess, though, that even with 6000 mA going
+through it at 20 kHz, six turns of AWG20 wire isn’t going to be able
+to induce detectable heating in a 5-mm-thick steel pipe, especially
+once it passes its Curie temperature.  Let’s suppose we’re starting up
+and so our skin depth in the steel is 0.14 mm, and take that as a
+reasonable approximation of how much steel is actually on our one-turn
+transformer secondary dissipating the eddy currents (to avoid having
+to do the integral).  So we have a strip of steel 140 μm thick, maybe
+50 mm wide (half the height of the inner chamber), and 470 mm in
+circumference, with steel’s resistivity of 0.16 μΩm.  This comes out
+to 10.7 milliohms, so with only a 36× boost from the 6:1 turns ratio,
+we’re still at only 0.39 Ω.  So if we want to use only 50 volts ac on
+the inductor to heat up the steel, we are going to need more turns.
+
+Not as many more turns as you’d think, though — only about 19 turns,
+18.7 m of wire, for which we need less than 20 mΩ/m to hit 0.2 Ω, thus
+AWG17 or bigger.  But that’s for heating up the cold steel.  Once it
+warms up and the skin depth increases 15×, we’ll need more turns to
+hit the same resistance — though at 700° carbon steel’s resistivity
+has climbed from 0.16 μΩm to about 1.1 μΩm, so only 2½× more turns.
+These extra turns would be detrimental at lower temperatures if we’re
+using a constant-voltage power supply, since the higher impedance
+means lower current and thus lower power, but maybe it’s best to
+optimize for low power at low temperatures, where heat leakage is low,
+and high power at high temperature, so 40 or 60 turns might be
+worthwhile.  60 turns is 59 m of wire, so to keep the resistance below
+0.2 Ω, we need 3.4 mΩ/m, so AWG10 (2.6-mm diameter) or less.
+
+(Alternatively you could complicate things and use two separate
+coils or a variable frequency.)
+
+So at startup we have 10.7 mΩ in the skin layer of the steel, which
+looks like a 39 Ω resistance in the 60 turns of the winding at ac,
+although their dc resistance is 0.2 Ω.  We’re putting 50 volts across
+it, although it’s really only 25 volts rms (a square wave has the same
+p-t-p and rms), so we drive 640 mA rms through the winding, producing
+16 W, 99.5% of which gets dissipated in the steel inside the kiln.  So
+maybe 60 turns is going a bit overboard with favoring the higher
+temperatures, or maybe I calculated something wrong; the power is low
+by a factor of 20.
+
+Let’s try 30 turns: now we see 9.6 Ω in the winding at ac, so we drive
+2.6 A rms through the winding — 65 W, which is probably reasonable.
+If the skin depth increases so that we’re using all 5 mm of thickness
+of the steel, its resistance would drop to 0.3 mΩ, except that the
+compensating resistivity increase gets us to 2 mΩ or so, which looks
+like 1.8 Ω in the winding at ac, thus 28 A rms (!!) and 1400 W (!!!)
+of which 10% is dissipated in the winding itself if it’s still 0.2 Ω
+(!!!!).
+
+(Hmm, I think I’m still calculating something wrong, because the
+eddy-current EMF should be 30·50 V = 1500 V both when it’s cold and
+when it’s hot, so V²/R should only increase by a factor of 5.3, not
+22.)
+
+So we probably need to take some kind of measure against that.  Just
+using thinner steel might help some, but increasing the frequency is
+another possibility.  Also, you could adjust the duty cycle.
+
+The leakage inductance of the coil presumably also imposes significant
+high-frequency reactance, which will limit the current you can push
+into it.
