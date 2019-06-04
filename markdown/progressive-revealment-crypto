@@ -1,0 +1,30 @@
+If I encrypt a document with a symmetric key to which I give you all
+but the last 40 bits, and the decrypted document contains a way to
+verify that it’s the correct decrypted document (lower entropy, say,
+or a checksum), then you can decrypt it in about 2³⁹ work.  If this
+document contains all but the last 40 bits of the encryption key to
+another document, then once you've decrypted it, you can decrypt the
+second document in about another 2³⁹ operations, or 2⁴⁰ operations in
+total.  Such a chain of documents forms a sort of “time lock crypto”;
+it is difficult and perhaps infeasible to decrypt the documents
+further down the chain without first decrypting the earlier documents.
+
+It’s not a very good timelock, in that I (the puzzle-maker) must
+encrypt the documents serially as well, and my only advantage over you
+(the puzzle-solver) is that I only had to encrypt each document once,
+while you had to decrypt it 2³⁹ times.  But those decryptions can be
+carried out in parallel; in the limit of unbounded parallelism,
+decryption is as fast as encryption plus a bit of communication
+overhead.
+
+But, in the case where the puzzle-solver has limited parallelism, the
+puzzle can be made arbitrarily hard.  Suppose, for example, that the
+puzzle-solver only has a million-node cluster available to try keys
+with, each node being as powerful as my laptop.  Then, using the
+40-bit example above, a chain of documents that I needed one day to
+encrypt on my laptop will take them a million days — 3000 years — to
+decrypt.
+
+The downside of this is that, if they are decrypting it on their
+laptop instead of a million-node cluster, they will need 3 billion
+years instead.

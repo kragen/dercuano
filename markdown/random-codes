@@ -1,0 +1,149 @@
+Practically decodable random error correction codes with popcount
+=================================================================
+
+I tried designing a super-simple holographic ECC scheme, and although
+it does work, it bloats the message by an order of magnitude before it
+stops being an error-introduction code instead of an error-correction
+code.  The scheme is described below, in case someone wants to try to
+rescue it.
+
+RESCUE: MAKE THE MATRIX SPARSE AND COMPARE POPCOUNTS OF ZERO-DERIVED
+AND ONE-DERIVED CODEWORDS!  popcount(num & row) > popcount(~num & row).
+
+To encode a block of N (preferably N is odd) bits into a block of M
+bits, where normally M>N, use a M×N matrix of random bits defining the
+code.  Invert (NOT) each of the N columns that corresponds to a 1 bit,
+which is to say, XOR each of the M rows with the N bits you are
+attempting to encode.  The M-bit codeword is then the majority-rule of
+each of the M rows of the output matrix: if it contains more 1 bits
+than 0 bits, then the output is 1, and otherwise 0.  To decode, you
+apply the same process, but with the original matrix transposed.
+
+Why should we expect this to work?  The output bits are a holographic
+representation of the input bits.  Each bit in the matrix represents a
+coupling between the probability that a given output bit is 1 and the
+input.  If a column happened to be all 1s, then it would slightly
+increase the probability for each output bit to be 0 when the
+corresponding input bit was 1, or 1 when the corresponding input bit
+was zero.  If there are enough output bits, and the other columns are
+uncorrelated, then this will probably flip a few of them — enough that
+the majority of output bits will correctly reconstruct the original
+input bit.
+
+This can be implemented with somewhat reasonable efficiency (a few
+machine instructions per bit) on normal CPUs now that the NSA has
+finally pushed a POPCOUNT instruction into them; or at extremely high
+speed in hardware.
+
+This Python code, encoding and decoding a message, shows
+that this works in practice if M is large enough.  However, it seems
+that M needs to be almost always 8× and often 16× larger than N for it
+to work, so in practice this code is dramatically worse not only than
+Reed-Solomon codes, but in fact worse even than just repeating the
+message several times.
+
+    #!/usr/bin/python
+    from __future__ import division
+
+    import random
+
+    def main(N, M, message='This is a test message'):
+        print 'N =', N, 'M =', M
+        r = random.SystemRandom()
+        key = [r.randrange(2**N) for ii in range(M)]
+        print 'key', key
+        unkey = transpose(key, N)
+        print 'unkey', unkey
+        # If this fails, it means transposing has a bug, so nothing can
+        # work.
+        assert key == transpose(unkey, len(key))
+        print 'message', `message`
+        message_digits = to_base(2**N, bytestring_to_int(message))
+        print 'digits in base', 2**N, message_digits
+        encoded = [encode(digit, key, len(unkey)) for digit in message_digits]
+        print 'encoded', `encoded`
+        decoded = [encode(item, unkey, len(key)) for item in encoded]
+        print 'decoded', `decoded`
+        decoded_bytes = int_to_bytestring(from_base(2**N, decoded))
+        print 'decoded bytes', `decoded_bytes`
+        print 'matched' if decoded_bytes == message else 'mismatch', (
+            'N ='), N, 'M =', M, '+%.2f%%' % (100*(M/N-1))
+        corrupted = [item ^ (1 << r.randrange(128)) for item in encoded]
+        print 'corrupted', `corrupted`
+        decodedc = from_base(2**N, [encode(item, unkey, len(key))
+                                    for item in corrupted])
+        print 'corrected bytes', `int_to_bytestring(decodedc)`
+
+    def bytestring_to_int(s):
+        return from_base(256, (ord(b) for b in s))
+
+    def from_base(base, digits):
+        "Expects digits in big-endian order."
+        i = 0
+        for digit in digits:
+            i = i * base + digit
+        return i
+
+    def int_to_bytestring(i):
+        "Loses trailing NULs."
+        return ''.join(chr(b) for b in to_base(256, i))
+
+    def to_base(base, i):
+        "Returns digits in big-endian order."
+        digits = []
+        assert i >= 0
+        while i:
+            i, digit = divmod(i, base)
+            digits.append(digit)
+        digits.reverse()
+        return digits
+
+    assert int_to_bytestring(bytestring_to_int('hello')) == 'hello'
+
+    def popcount32(num):
+        assert num < 2**32
+        num = (num & 0x55555555) + ((num & 0xAaaaAaaa) >> 1)
+        num = (num & 0x33333333) + ((num & 0xCcccCccc) >> 2)
+        num = (num & 0x0f0f0f0f) + ((num & 0xf0f0f0f0) >> 4)
+        num = (num & 0x00ff00ff) + ((num & 0xff00ff00) >> 8)
+        num = (num & 0x0000ffff) + ((num & 0xffff0000) >> 16)
+        return num
+
+    def popcount(num):
+        n = 0
+        while num:
+            n += popcount32(num & 0xFfffFfff)
+            num >>= 32
+        return n
+
+    def encode(num, matrix, bitwidth):
+        threshold = bitwidth / 2
+        bits = [popcount(num ^ row) > threshold for row in matrix]
+        return int(''.join('1' if bit else '0' for bit in bits), 2)
+
+    def transpose(matrix, bitwidth):
+        return [int(''.join('1' if 2**ii & row else '0' for row in matrix), 2)
+                for ii in range(bitwidth-1, -1, -1)]
+
+    if __name__ == "__main__":
+        for N in [3, #5, 7, 11, 17, 31,
+                  63, 127, 255]:
+            for M in [7, # 15, 31, 63, 95, 127, 191, 255, 
+                      1023, 2047]:
+                main(N=N, M=M)
+
+I learned about codes like these from reading a paper of Pentti
+Kanerva’s on “Fully Distributed Representation” around 2000.
+
+Possible ways to rescue this scheme might include:
+
+- A smaller number of points in the output vector, but more than one
+  bit of information for these points?
+- Deploying the single bit of information per point more judiciously?
+  For example, maybe only set 1 when the population count exceeds some
+  threshold?  (This seems doomed to worsen the code rather than
+  improving it!)
+- Matrix columns that are exactly uncorrelated instead of
+  approximately uncorrelated?  For example, Hadamard words.
+- Actually working out the probability distributions for output bits
+  and thinking about that?

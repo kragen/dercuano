@@ -1,0 +1,59 @@
+In work with financial market data, I often want to do computations on
+time series data.  I’d like to be able to specify the computations in
+a way that isn’t, for example, coupled to a sampling rate.  I’d like
+to be able to specify a computation once and then efficiently perform
+it on any of the following, without editing the code:
+
+- Real-time data as it becomes available.
+- Regularly sampled historical data.
+- Irregularly sampled historical data on my laptop.
+- Irregularly sampled historical data on some Amazon EC2 nodes.
+- Conservatively approximated historical data.
+- Specific randomly generated data.
+- Specified mostly continuous (though not necessarily
+  piecewise-constant) functions.
+- Probability distributions of data.
+- An incremental variation of a previous dataset.
+
+Also, I want to be able to interactively create models and visualize
+the results.
+
+I’m not sure I will be able to achieve this, but I can achieve most of
+it.
+
+There are three main time-series data types I am dealing with:
+
+- Partial functions, which map some subset of the timeline to values
+  such as $301.50, Wednesday, false, or 3%, with at most a countable
+  number of discontinuities.
+- Finite mostly-continuous subsets of the timeline, which can be
+  thought of as boolean partial functions that happen to be defined
+  everywhere.
+- Events, which are countable numbers of points on the timeline.
+
+There are functions between these data types.  The discontinuities of
+a function or the beginnings and endings of a subset are events; given
+start events and end events you can create a subset; a boolean
+function can be converted to a subset of the timeline, and you can
+extract the domain of any function; you can restrict a function to be
+valid only within a subset; and you can discard events outside a
+subset.
+
+Operations on the values mapped to by partial functions can be lifted
+to operate pointwise over those functions, intersecting their domains.
+
+Finally, you can coalesce partial functions, SQL-style.
+
+All of the above operations are nearly memoryless.  However, there are
+also a set of *causal* operations available.  The simplest is simply a
+lag, applicable to functions, subsets, and events; but others are also
+available.  They are defined as a generalization of integration (in
+some sense numerical integration rather than symbolic integration),
+with an arbitrary semigroup operation used in place of addition, and
+another arbitrary lifting operation used in place of multiplication by
+a step size.  This permits, for example, computing a window of the
+last ten minutes of updates.
+
+Requiring the “multiplication” operation to be a semigroup operation
+(i.e. associative) permits efficient parallelization and
+incrementalization.

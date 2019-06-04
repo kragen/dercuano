@@ -1,0 +1,117 @@
+Smalltalk bytecode is super compact, partly because it doesn’t include
+literal constants, addresses, and method selectors in the bytecode
+itself; instead they’re stored in a separate per-method vector and
+referred to by index.  Java bytecode uses the same approach, but the
+result is that even though the bytecode itself is very compact, the
+.class files can easily be far from compact, more like huge and
+bloated.
+
+You could imagine sharing, say, a single constant pool over an entire
+static program, just as some Smalltalks have shared a single object
+table over an entire dynamic program.  Then, each constant would only
+be listed once in the pool.  But it would be a large pool, so an
+arbitrary index into it could occupy many bits, such as 16 or even
+more.  By contrast, Smalltalk bytecodes are only 8 bits, and typically
+only 3–5 of these are occupied in indexing into such a pool.  This
+static locality of reference gives us potentially very considerable
+compression, but at the cost of duplication among the “dictionaries”
+used for this compression.
+
+This is not the only possible compression mechanism for this
+information — you could also imagine things like move-to-front coding,
+and Smalltalk also has a fixed dictionary of special constants
+accessed by a separate opcode — but if that's the one we’re using, we
+can consider how to optimize it better.
+
+Function calls and returns are a kind of context switch: after the
+transfer of control, the variables and constants of interest to the
+new code are no longer the same as those of interest to the old code,
+much as in a switch between threads or processes.  In 1973, Carl
+Hewitt, Peter Bishop, and Richard Steiger suggested conceptualizing
+each function’s activation record as a separate “actor”, like a
+process; “actors [or, if you will, virtual processors, activation
+frames, …] … it is impossible to determine whether a given object is
+“really” represented as…a hash table, a function, or a process,” they
+said.
+
+Context switches can have widely varying costs.  Context switches that
+happen more often have a proportionally higher total cost, whatever
+other factors may be involved; and context switches that overwrite
+more state also have a proportionally higher cost.  In the context of
+function calls and returns, a return that need only restore a saved PC
+and SP is inexpensive; a return that must restore %eip, %esp, %ebx,
+%ebp, %esi, and %edi is more expensive; and a return that must
+additionally restore floating-point registers, vector registers, and
+some kind of dynamic exception handling context, is more expensive
+still.
+
+However, the alternative to overwriting more state is typically adding
+another level of indirection, and thus cost, to things that happen
+when you’re not context switching.  Bernie Greenberg’s [Multics Emacs
+paper] explains his choice of a heavyweight context-switch mechanism
+for switching buffers in Multics Emacs as follows:
+
+> The implementation of multiple buffers was viewed as a task of
+> multiplexing the extant function of the editor over several
+> buffers. The buffer being edited is defined by about two dozen Lisp
+> variables of the basic editor, identifying the current Editorline,
+> its current (open/closed) state, the first and last Editorlines of
+> the buffer, the list of marks, and so forth. Switching buffers
+> (i.e., switching the attention of the editor, as the user sees it)
+> need consist only of switching the values of all of these
+> variables. Neither the interactive driver nor the redisplay need be
+> cognizant of the existence of multiple buffers; the redisplay will
+> simply find that a different "current Editorline" exists if buffers
+> are switched between calls to it. What is more, the only functions
+> in the basic editor that have to be aware of the existence of
+> multiple buffers are those that deal with many buffers, switch them,
+> etc. All other code simply references the buffer state variables,
+> and operates upon the current buffer.
+> 
+> The function in the basic editor which implements the command that
+> switches buffers does so by saving up the values of all of the
+> relevant Lisp variables, that define the buffer, and placing a saved
+> image (a list of their values) as a property of the Lisp symbol
+> whose name is the current buffer's. The similarly saved list of the
+> target buffer's is retrieved, and the contained values of the buffer
+> state variables instated. A new buffer is created simply by
+> replacing the "instatement" step with initialization of the state
+> variables to default values for an empty buffer. Buffer destruction
+> is accomplished simply by removing the saved state embedded as a
+> property: all pointers to the buffer will vanish thereby, and the
+> MacLisp garbage collector will take care of the rest.
+> 
+> The alternate approach to multiple buffers would have been to have
+> the buffer state variables referenced indirectly through some
+> pointer which is simply replaced to change buffers. This approach,
+> in spite of not being feasible in Lisp, is less desirable than the
+> current approach, for it distributes cost at variable reference
+> time, not buffer-switching time, and the former is much more common.
+
+[Multics Emacs paper]: http://multicians.org/mepap.html
+
+This is also the reason shallow binding is usually preferred to deep
+binding in implementing dynamically-scoped languages: shallow binding
+makes function calls expensive, but variable access cheap.
+
+So suppose that, when we enter a function, we load a whole passel of
+values into the registers of the machine, virtual or otherwise;
+there’s a passel pointer before the beginning of the function code,
+and it is used to initialize the registers.  Some of these registers
+may contain “constants” that we want to be able to use, others contain
+initial values for local variables, and others still may be instance
+variables of an object, which will need to be saved back to the object
+when the function is done.
+
+The wide cache memory buses featured on modern high-performance
+processors can transfer 64 bytes at a time; wide 128-bit, 256-bit, and
+512-bit (16-, 32-, and 64-byte) SIMD registers can be loaded in a
+single cache access (right?).  Hardware designed slightly differently
+could
+
+fixed levels of hierarchy
+
+wide memory
+
+message queues
+

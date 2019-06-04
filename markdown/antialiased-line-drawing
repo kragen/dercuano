@@ -1,0 +1,46 @@
+In using matplotlib to do a series of plots, I’ve found a number of
+annoying aliasing phenomena.
+
+One phenomenon is that, although the edges of lines and markers are
+antialiased, the antialiasing is relatively soft.  So the lines still
+contain substantial energy above the Nyquist frequency of the display.
+When a single line is drawn, this is rarely important, but when many
+parallel lines are drawn, even if they are perfectly vertical and
+equally spaced at non-integer pixel spacing, the aliased frequencies
+can be visible and indeed produce a dominant moiré pattern over the
+whole area.
+
+Completely eliminating this phenomenon with even a single hatching
+pattern would require bandlimiting the line’s pixel image to strictly
+below the Nyquist frequency for the display, and of course a strictly
+bandlimited signal necessarily fills all of space — worse, a
+bandlimited impulse is a sinc, which drops off in intensity fairly
+slowly with distance, only inversely proportional to the distance.
+But it might be reasonable to touch, say, a swath of 8–16 pixels along
+each edge of the line, rather than 2.
+
+Eliminating moiré for *multiple* hatching patterns would require
+combining the patterns linearly, which is to say, without opacity.
+Although this departs from the historical practice developed from
+pen-and-ink graphics, experience shows that this is a very useful way
+to plot data on, for example, an oscilloscope display, but it may not
+be entirely practical for all kinds of data graphics.  However,
+there’s a whole range in between, easily accessible in a system that
+uses premultiplied alpha.  RGBA(0, 0, 128, 255) is pure opaque dark
+blue; RGBA(0, 0, 128, 0) is perfectly transparent luminous dark blue
+with no opacity; and RGBA(0, 0, 128, 128) can be viewed equally
+validly as half-transparent bright blue or as a partly luminous,
+partly opaque dark blue.  Indeed, that color is representable even in
+a system where alpha is not premultiplied (it’s RGBA(0, 0, 255, 128))
+but other, brighter colors are not.
+
+Note that in this case you want to be able to represent not only
+overunity brightnesses but also negative brightnesses if you want to
+plot dark lines on a light background.
+
+The other phenomenon is that, although my LCD uses RGB subpixel
+ordering, and my font rendering takes advantage of it, matplotlib does
+not.  This results in wasting something like half of my display’s
+horizontal resolution, two thirds for dim blue-tinted graphics.  This
+is really frustrating when I’m trading off legibility for data
+coverage.

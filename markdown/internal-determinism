@@ -1,0 +1,41 @@
+Guy Blelloch and others wrote a paper in 2012, “Internally
+Deterministic Parallel Algorithms Can Be Fast”.
+
+Their basic theory is that fork-join nested parallelism with no
+communication between concurrently running threads allows you to
+program efficient parallel algorithms relatively easily without
+introducing nondeterminism.
+
+Or wait, maybe their threads have “shared state” and consequently
+depend on “non-trivial commutative operations”.  If that’s true I
+don’t see how the stated properties of the dependency graph can be
+correct.  I guess those commutative operations on shared state don’t
+enter into the dependency graph except as a set.
+
+So for example they have an AtomicAdd operation to add a value to a
+shared variable, but it can’t return a value without violating
+internal determinism.
+
+They support four different kinds of memory objects supporting
+commuting operations:
+
+- memory cells, supporting the "priority write" operation x.pwrite(v),
+  which updates x to have the maximum of its old value and v, and a
+  read operation that returns its current value.
+- reservables, supporting the operations x.reserve(p), x.check(p), and
+  x.checkR(p) check-and-release.  Check and check-and-release commute,
+  I think?  Not entirely sure.  checkR sets the priority of the
+  reservable back to ⊥ and returns TRUE if it was currently reserved
+  with the specified priority.  None of the checks commute with
+  reserve(), but I think reserve() commutes with itself.
+- dicts, supporting d.insert(x) and d.elements(), which returns an
+  element for each key that has been inserted, eliminating duplicate
+  keys.  Both reads and writes commute among themselves but not with
+  each other.  Elements contain their keys within themselves.  A
+  user-specified priority resolves duplicates, and linear probing
+  evicts elements with lower-priority keys and moves them further down
+  to ensure that the final iteration order is not dependent on
+  insertion order.
+- disjoint sets, for spanning forests; f.find(x) returns the set
+  identifier containing x, and f.link(s, x) merges the sets of s and
+  x.  The criteria for commutativity are somewhat tricky.

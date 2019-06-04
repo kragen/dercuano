@@ -1,0 +1,83 @@
+A typical representation of a binary tree in memory might be something
+like this:
+
+    typedef struct node { char *key; struct node *left, *right; } node;
+    node qn = { "queer", NULL, NULL }
+       , rn = { "rude", qn, NULL }
+       , tn = { "the", NULL, NULL }
+       , sn = { "sad", rn, tn }
+    ;
+
+This is, as it happens, a binary search tree: the key of a node is
+always greater than any of the nodes in its left subtree and less than
+any of the nodes in its right subtree.  In this case we’re using it to
+store a set of words.
+
+You could write separate functions to do things like efficiently look
+up a word to see if it’s in the tree, print out all the words in the
+tree, hash all the words in a lexical range of the tree into a hash
+table.  Most of these functions, in C, will have this general form:
+
+    void process_tree(node *n, context *ctx) {
+        if (!n) return;
+        results r = process_node(n->key, ctx);
+        if (left_wanted(r)) process_tree(n->left, ctx);
+        if (right_wanted(r)) process_tree(n->right, ctx);
+    }
+
+Different `process_tree` functions will have different `results`,
+`process_node` `left_wanted`, and `right_wanted`, in some cases
+trivial ones, but all of the functions I mentioned above can be
+written in this way.
+
+An obvious thing to do then is to factor out the common `process_tree`
+logic into a function and pass in a `process_node` function to it with
+a defined interface; for example:
+
+    typedef struct { bool left, right; } wanted;
+    typedef struct { wanted (*f)(const char *, void *); void *ctx; } visitor;
+    void visit_tree(node *n, visitor v) {
+        if (!n) return;
+        wanted w = v.f(n->key, v.ctx);
+        if (w.left) visit_tree(n->left, v);
+        if (w.right) visit_tree(n->right, v);
+    }
+
+This definitely works, and it’s within a constant factor of optimal,
+but it is maybe a little bit inefficient.  In particular, it spends a
+lot of its time passing null pointers to itself, copying the two-word
+visitor struct, and consulting booleans to figure out whether to
+recurse on a null pointer.  Also, even though it will always visit the
+parts of the tree that it visits in the same order, it requires that
+order to be represented wastefully in memory with a bunch of pointers,
+and then it recovers that order from those pointers.
+
+So I was thinking about immediate-mode GUIs (“IMGUI”) and tree
+traversal, and it occurred to me that there’s an interesting
+alternative in many cases.
+
+Here’s an alternative representation of the tree above that works with
+the same `visitor` type:
+
+    void sad_tree(visitor v) {
+        wanted w = v.f("sad", v.ctx);
+        if (w.left) {
+            if (v.f("rude", v.ctx).left) v.f("queer", v.ctx);
+        }
+        if (w.right) v.f("the", v.ctx);
+    }
+
+In a sense, this is just a partially-evaluated version of `visit_tree`
+for the above tree; it will perform the same sequence of calls to
+`v.f` with the same arguments, given the same return values.  Since it
+can do all of the preorder visitor traversals described above, it is
+in some sense a fairly universal representation of the tree.
+
+Probably you wouldn’t really want to write `sad_tree` by hand, at
+least in this case.  But it might make sense to compile it from some
+other representation, either with run-time code generation or from
+some kind of source code.
+
+It might actually be worthwhile to write it by hand in some cases,
+because the visitor interface allows you to traverse kinds of trees
+other than trees entirely materialized in memory ahead of time.

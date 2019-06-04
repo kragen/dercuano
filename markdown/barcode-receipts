@@ -1,0 +1,116 @@
+So it's kind of a pain to track my supermarket purchases, in part
+because the receipt isn't really machine-readable.  The store often
+has all the data in machine-readable form in their cash register;
+could they give it to me in machine-readable form?
+
+It's Technically Feasible, Inexpensively
+----------------------------------------
+
+The bare minimum information for the receipt would be a little bit of
+header information (store location, date and time, currency of
+transaction), and for each item on the receipt, a UPC code, a
+quantity, and a price.  UPC codes seem to be 13 digits (abbreviatable
+to 8), quantities are usually either three digits (of weight) or one
+(of units), and prices are usually two to four digits, including
+price.  You could prefix prices and quantities with a length digit or
+terminated them with a non-digit code (say, if you're using BCD).
+(Say you bought 2.30 kilograms of avocados for $12.40; the
+quantity-and-price field would then read 323041240, and the UPC number
+would have to indicate that the unit of measure was 10 grams).  In
+this scheme, quantity 1 would be represented as "11"; you could
+special-case that as "0".
+
+So the typical item would have five digits of price and quantity data,
+for a total of 18 self-delimiting decimal digits.  In BCD that would
+be 72 bits, or 9 bytes.  The per-receipt header might be 30 bytes.  So
+a 30-item receipt might be 300 bytes.  (In binary instead of BCD, you
+would need about 60 bits per item, but that's probably not worth the
+extra complexity.)
+
+PDF-417 stacked barcodes hold up to 1108 bytes of binary data per
+symbol; DataMatrix/Semacode holds up to 1556 bytes per symbol; QR Code
+holds up to 2953 bytes per symbol (at 177x177 pixels, which is about
+one-third redundancy).  So 300 bytes is small enough that you could
+print a small barcode directly on the receipt, probably even with old
+dot-matrix receipt printers, given appropriate driver software.
+
+Minimally, with 1-bit pixels, you'd need 2400 pixels to represent 300
+bytes, which is about 50x50 pixels.  In traditional 5x9 dot-matrix
+fonts, that's less than 54 characters.  I don't know if existing
+barcodes are sufficiently robust against the kinds of errors
+dot-matrix printers add (round dots, row-to-row misregistration) but
+there's plenty of headroom here for error correction.  I vaguely seem
+to remember one of the matrix barcode systems recommending printing
+each pixel of the barcode symbol with at least 4x4 of the underlying
+pixels, so with that and the redundancy, you might need
+16 * 4/3 * 300 * 8 = 51200 dot-matrix dots, 226 pixels square, or 1137
+5x9 character cells.  By my count, my latest dot-matrix receipt is 34
+characters wide, so that would be 33 lines.  On the face of it that
+sounds like an impracticably large amount to add to a 30-item receipt,
+but I've seen much worse, so it might already be reasonable.  But you
+could presumably design a "barcode" whose overhead was close to a
+factor of 1.33 instead of a factor of 21, and then you'd be down to 72
+characters instead of 1137, which obviously adds only a trivial amount
+of cost to the receipt.
+
+So you could use a less obtuse data format, too, instead of the
+horrible all-decimal format suggested above, where "323041240" means
+"2.30kg $12.40".
+
+How Could It Be Bootstrapped?
+-----------------------------
+
+It may seem a little impractical to expect supermarkets and the like
+to upgrade their cash-register systems for the convenience of
+customers who want to itemize all their grocery purchases, which is
+something hardly any of them do.  But here's a slightly plausible
+deployment path.
+
+A few people, some of the time, have to itemize all their purchases
+and turn in receipts: businessmen, academics, and NGO workers on
+travel on expense accounts, mostly.  They already do this even though
+it's a pain, and a lot of them do it when they're on travel without
+their secretaries.  A lot of them would be delighted to avoid the
+hassle.
+
+So if a major retailer of some expense-account-able commodity
+announced this kind of barcoded-receipt program and shipped free
+software to import your receipts into a few of the most popular ways
+of tracking expense accounts, it would attract these travelers.  Maybe
+Ruth's Chris, or Avis, or Hyatt, or toward the lower end of the
+market, maybe T.G.I.Friday's, Chili's, Days Inn, and the like.
+
+It would have to offer some substantial advantage over monthly
+credit-card bills to get adopted, since that's what a lot of these
+folks use now.  I have a couple of ideas:
+- It costs the receipt issuer much less to print a barcoded receipt
+  than to process a credit-card transaction, so small-transaction
+  merchants who aren't willing to accept credit cards could therefore
+  become expense-account options.
+- Issuing a company credit card to someone puts the company at some
+  financial risk, and perhaps for this reason, academics on travel and
+  workers for small NGOs rarely use company credit cards.  Accepting
+  barcoded receipt entries does not entail any extra risk to the
+  company.
+- Credit-card bills lose any convenience advantage when only part of a
+  purchase is expensable.
+
+Similarly, self-employed USians who deduct business expenses on their
+federal tax returns are obligated to itemize those business expenses:
+travel expenses, raw materials, equipment, and the like.  This
+suggests a broader group of retailers: Home Depot, OfficeMax, CompUSA,
+Best Buy, Kinko's, Ace Hardware, FedEx, Ikea, the Gap, Borders.
+
+Once the receipt-importing software was out there, other companies
+could compete for these customers by barcoding their receipts too, if
+the software to do so is relatively easily available.
+
+The path from Hyatt to Carrefour is pretty dubious, though.  So is
+there anyone already in a position of routinely itemizing their
+supermarket purchases? Maybe servants who go grocery shopping for
+their masters?
+
+Thanks
+------
+
+To Beatrice, for very helpful discussions on the subject.

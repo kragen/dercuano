@@ -1,0 +1,47 @@
+Standard FM radio runs from like 87 MHz to like 107 MHz with channels
+every 800 kHz or so.  That’s 20 MHz divided into 800 kHz channels.  If
+an SDR is to pick up all of that 20 MHz at once, it needs to sample at
+10Msps, which is probably feasible with some work — I mean 640×480
+video at 60 fps is 18Msps per color channel, 55Msps in total.
+
+But then there’s the issue of how to analyze the channels.  You can of
+course run a PLL on each channel — say, 20/.4 = 80 PLLs in all.  You
+need something like 10–20kHz of audio out of each of those channels,
+so you need frequency information out of each of the PLLs at something
+like 20–40ksps.
+
+An alternative to using PLLs might be to use a phase vocoder.  This
+amounts to taking an STFT of the signal often enough to reliably
+unwrap the phase — at least three times per cycle of the beat
+frequency, say — with enough frequency resolution to have only one
+sinusoid at most in each frequency bin.
+
+If we use the same 400 kHz spacing, then we need at least the same 80
+frequency bins, so at least 160 samples in the STFT window, say 256;
+but the windows can overlap by as much as you want, and if we’re going
+to use such wide bins, I think we need 1’200’000 STFTs per second,
+which sounds sort of impractical.  60 Msps has 234'375 256-sample
+windows per second, though, so this only includes each sample in 5 or
+6 windows.
+
+I think that, roughly speaking, this involves (8 = lg 256) · 2 · 5.1
+multiplies per sample, which works out to 82, which means we need 4.9
+billion multiplications per second.  This sounds feasible but very
+challenging.
+
+(Intel and NASoftware reported in 2011 that a 256-point call to the
+VSIPL function `vsip_ccfftip_f`, which is probably not the fastest FFT
+function for this since its input is complex, takes 440ns using AVX on
+one core of a Core i7-2710QE when running at 2GHz, so it should in
+fact be feasible on a modern CPU, if not on my laptop.  In the same
+slide deck, they also report results on a Core i7-2715QE (?) as 23273
+megaflops, which I guess means each FFT is 10240 operations, or 40
+operations per sample, which is a lot more than the 16 multiplies I
+was guessing.)
+
+By contrast, the PLL approach requires about 15 operations per sample
+per PLL, which works out to some 1200 operations per sample.  That
+sounds more than an order of magnitude worse, but it’s possible to
+implement this without any multiplies at all.  So it might turn out
+that the approaches actually have similar efficiency in practice.
+

@@ -1,0 +1,40 @@
+An integral of a square wave is a spline approximation of a sine wave.
+The third integral is a cubic-spline approximation, which has very low
+harmonic distortion.  The amplitude of the approximated sine wave is
+the amplitude of the square wave scaled by the Nth power of the
+period; for a third-order spline, it’s scaled by the cube of the
+period.
+
+This is interesting because the discrete analog of integral, running
+sum, is linear, time-invariant, and very cheap indeed to compute (one
+accumulator and one addition per sample), and sine waves are useful
+primitives for composing many signals.
+
+In the case of audio synthesis, in particular, I’m thinking you can
+take some square waves (or envelope-shaped square waves), add them
+together, and take their running sum a few times, to get a mix of
+sinusoidal signals.
+
+To be concrete, suppose you’re synthesizing 16ksps audio, and you want
+to be able to cover the audible range down to 20Hz and up to the
+Nyquist frequency at 8kHz.  A 20Hz square wave has a period of
+16000/40 = 400 samples on both the top and bottom; this results in
+amplifying the original square wave by about 400³ for a third-order
+spline, or 64 million.  (This is not quite correct because of
+discretization; the actual number is 10.6 to 10.7 million.)  This
+means you need 32-bit integer math for your accumulators (and for the
+amplitudes of your higher frequencies), but that 32-bit math gives you
+a dynamic range at 20Hz of 10dB log₁₀((2³¹/10.6M)²) = 46dB, which is
+quite respectable.
+
+At higher frequencies, you have correspondingly more dynamic range; at
+Nyquist, you have 31 bits of dynamic range, since the square wave *is*
+the sine wave, or 187 dB.
+
+So you have square waves, which are more or less cheap to compute (at
+least as long as you’re far from Nyquist and can therefore disregard
+jitter), and which you sum; and then you integrate them (three times)
+to get a sum of (cubic) spline approximations of sine waves.  You have
+to scale the amplitudes of the square waves as mentioned above,
+proportional to the Nth power of the frequency.
+

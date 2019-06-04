@@ -1,0 +1,55 @@
+If f is a cubic k₀x³ + k₁x² + k₂x + k₃, then f(0) = k₃ is a linear
+function of f(-3), f(-1), f(1), and f(3).  Furthermore, the
+coefficients for f(-3) and f(3) are equal, as are the coefficients for
+f(-1) and f(1).  This means that we can cubic-spline interpolate the
+samples at the midpoints of existing sample intervals using only two
+multiplications per sample, plus some additions and subtractions.
+
+More specifically, f(1) = k₀ + k₁ + k₂ + k₃, and f(3) = 27k₀ + 9k₁ +
+3k₂ + k₃, and f(-1) and f(-3) are the same but with alternating signs.
+This gives us this matrix equation:
+
+    [-27 9 -3 1]      [f(-3)]
+    [ -1 1 -1 1] k⃗ = [f(-1)]
+    [  1 1  1 1]      [ f(1)]
+    [ 27 9  3 1]      [ f(3)]
+
+Inverting that matrix with `sympy.Matrix(...).inv()` gives us:
+
+    [-1/48  1/16 -1/16  1/48]
+    [ 1/16 -1/16 -1/16  1/16]
+    [ 1/48 -9/16  9/16 -1/48]
+    [-1/16  9/16  9/16 -1/16]
+
+Of that, the last row is the one we want, which gives us k₃ = f(0) =
+(-f(-3) + 9f(-1) + 9f(1) - f(3))/16.
+
+This means that in fact you don’t need much in the way of
+multiplication: you only ever need to multiply samples by 9 when
+you’re interpolating between them, which amounts to adding xᵢ<<3 to
+xᵢ.  And if you’re doing multiple iterations of interpolation, you
+only need to do the multiplication by 9 for the new samples on each
+iteration; you don’t need it for the ones you already multiplied by 9
+in the previous pass.
+
+Doing the same exercise for quintics, we get:
+
+    [-3125 625 -125 25 -5 1]
+    [ -243  81  -27  9 -3 1]
+    [   -1   1   -1  1 -1 1]
+    [    1   1    1  1  1 1]
+    [  243  81   27  9  3 1]
+    [ 3125 625  125 25  5 1]
+
+    [-1/3840   1/768  -1/384   1/384  -1/768 1/3840]
+    [  1/768  -1/256   1/384   1/384  -1/256  1/768]
+    [  1/384 -13/384  17/192 -17/192  13/384 -1/384]
+    [ -5/384  13/128 -17/192 -17/192  13/128 -5/384]
+    [-3/1280  25/768 -75/128  75/128 -25/768 3/1280]
+    [  3/256 -25/256  75/128  75/128 -25/256  3/256]
+
+So we get [3 -25 75 75 -25 3]/256, which requires 3 multiplications
+per input sample for a single pass, or 1½ in the limit for many
+passes.
+
+In two dimensions the situation is hairier.

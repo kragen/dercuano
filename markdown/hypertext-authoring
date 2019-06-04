@@ -1,0 +1,104 @@
+Writing hypertext is still a pain, and an autocomplete dropdown box
+from a statistically-ranked history of things you're likely to want to
+link to would improve the situation dramatically.
+
+Writing hypertext is still a pain, 26 years into the WWW project and
+71 years after the invention of hypertext.  Typically I navigate to a
+page, use ^L^C to copy the link, alt-tab to another window where I’m
+writing something in Emacs (God help me if it’s in another tab of the
+same browser) and type something like `<a href="^Y">some title</a>`.
+If I want some kind of indication of what the link is, like an image
+preview or something, I’m a bit out of luck in most environments,
+although at least Fecebutt and Twatter are helpful there if the page
+has OpenGraph metadata.
+
+Consider this item from org-mode’s help file, though:
+
+> org-store-link is an interactive compiled Lisp function in ‘org.el’.
+> 
+> It is bound to C-c l.
+> (org-store-link ARG)
+> 
+> Store an org-link to the current location.
+> This link is added to ‘org-stored-links’ and can later be inserted
+> into an org-buffer with C-c C-l.
+
+That sounds a bit saner, doesn’t it?  It’s kind of like what Flock was
+trying to do in 2005 with their “shelf”, where you would put things
+you were later going to link to or embed, later drag-and-dropping them
+onto any random textarea.
+
+Even Vannevar Bush’s 1945 UI design for linking in the “Memex” he
+proposes in “[As We May Think][0],” the very first proposed hypertext
+system, is far less cumbersome than what I usually use at present:
+
+> All this is conventional, except for the projection forward of
+> present-day mechanisms and gadgetry. It affords an immediate step,
+> however, to associative indexing, the basic idea of which is a
+> provision whereby any item may be caused at will to select
+> immediately and automatically another. This is the essential feature
+> of the memex. The process of tying two items together is the
+> important thing.
+> 
+> When the user is building a trail, he names it, inserts the name in
+> his code book, and taps it out on his keyboard. Before him are the
+> two items to be joined, projected onto adjacent viewing
+> positions. At the bottom of each there are a number of blank code
+> spaces, and a pointer is set to indicate one of these on each
+> item. The user taps a single key, and the items are permanently
+> joined. ...
+> 
+> Thereafter, at any time, when one of these items is in view, the
+> other can be instantly recalled merely by tapping a button below the
+> corresponding code space. Moreover, when numerous items have been
+> thus joined together to form a trail, they can be reviewed in turn,
+> rapidly or slowly, by deflecting a lever like that used for turning
+> the pages of a book. It is exactly as though the physical items had
+> been gathered together from widely separated sources and bound
+> together to form a new book. It is more than this, for any item can
+> be joined into numerous trails.
+
+[0]: http://www.theatlantic.com/magazine/archive/1945/07/as-we-may-think/303881/
+
+There is another, perhaps ignored design that is currently in use for
+writing hypertext documents that is substantially less clumsy:
+autocomplete.  This is what Fecebutt uses for tagging people or
+linking to Fecebutt pages in posts, and also what modern IDEs like
+Eclipse, Jupyter, or IDEA use to help you type long function names.
+You begin typing the name of an entity to link to, perhaps introduced
+with a magic character like @ or something, and the system instantly
+consults a dictionary of possible link targets, orders the possible
+completions (maybe including possible errors!) by likelihood, and
+displays the top few in a drop-down list right next to where you’re
+typing, each accompanied with some kind of preview.
+
+Of course you could use the same approach to actually navigate to
+possible link targets, and then use a Memex-style link-creation button
+to link one thing you’re looking at (or typing) to the thing you just
+navigated to.  But I think this is less fluid than the
+dropdown/autocomplete approach.
+
+Ideally, you wouldn’t need to explicitly add things one by one to the
+list of possible link targets; instead, merely visiting them or
+even seeing a link to them drift by on Twatter would add them to the
+set of relevant links.  You’d have to compensate for the large volume
+of possibly relevant links by having a reasonably accurate statistical
+ranking of which things are most likely to be linked to at any given
+time and for a given “search string”; also, searching through your
+own, perhaps private, commentary on a link, and that of your friends,
+should provide additional clues as to which tags are most relevant to
+a link.
+
+This isn’t quite enough for transclusion or quoting, because that is
+going to require some explicit user action to indicate the extent of
+the text, pixel data, etc., to be quoted.  I think that probably the
+right solution there is to use an annotation UI to attach marginal
+notes to highlighted passages, then use tags and titles included in
+the marginal notes, as well as the contents of the highlighted
+passage, to feed the search engine.  The persistent identity of a link
+target in this system might become a tricky question as existing
+works are modified.
+
+Note that a single web page might contain many possible link targets,
+even without transclusion — for example, one for each header in a long
+article.

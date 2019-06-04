@@ -1,0 +1,116 @@
+Reading _The Art of Electronics_ I was reminded of a rumored
+unpublished result I vaguely recall from somebody at Bell Labs in the
+1990s to the effect that you can build a universal computer if you
+have a single NAND gate.  Could you do something like this in practice
+using a big coil of coax?
+
+(Coaxial and fiber-optic delay lines are an existing commercial
+product.)
+
+Table 2.1, on p.74 (the 107th page) of the current edition of _The Art
+of Electronics_ is labeled, “Representative Bipolar Transistors”.
+Almost all of them can switch at 100 MHz; the 2N3904/2N3906
+“jellybean” is 300MHz.  But at c, an oscillation at 300MHz is 999mm.
+Typical coax propagates signals almost nondispersively (is this close
+enough?) at about half of c, so each meter of it could hold about four
+bits of storage.  My 32768-bit benchmark for a practical computer
+would then require about 16 kilometers of cable.  At 2.95mm (the
+diameter of RG58 instrumentation cables) that’s 109 liters of cable,
+which is a completely reasonable amount of cable to manage, but
+somewhat costly.  
+
+(Some RF-amplifier transistors in the table reach up to 4GHz, reducing
+all of this by an order of magnitude.)
+
+(With magnetostrictive torsion delay lines, you could reduce the size
+of all this stuff by many orders of magnitude; if your wire transmits
+shear waves at 2km/s, which I think is a reasonable ballpark, and is
+0.3mm wide, each bit takes up about 300μm×300μm×3.33μm, so 32767 bits
+is 109mm instead of 16km, nearly a milliliter of wire instead of
+nearly a cubic meter.  It should be practical to have megabytes of
+memory.  But nondispersive magnetostrictive delay lines require
+special stress-relieved spring wire and magnetostrictive transducers,
+both of which sound tricky to me.)
+
+<http://www.digikey.com/product-detail/en/tpi-test-products-int/58-1200-1M/290-1020-ND/268032>
+is a hundred-foot (30.5 m) length of 50Ω 30V RG58 coaxial cable with
+BNC connectors on the ends.  They sell it for US$57.49, which would
+set the price of the above quantity of cable at US$30200.  I hope it's
+cheaper in bulk!
+
+<http://articulo.mercadolibre.com.ar/MLA-610317920-cable-rg-58-cuerda-foam-nuevos-_JM>
+is a roll of 100m of 50Ω RG58 coaxial cable without connectors for
+AR$1583, which is just over US$100, so the cost would be about half of
+what I said above.
+
+If all of this cable were in a single length, the bit-circulation
+latency would be about 55 μs (32768 bits of 1.67 ns each), but in
+practice you would probably want to have at least some modest amount
+of parallelism; some sort of ideal compromise would be to have
+something like 128 cables each containing 256 bits with a circulation
+time of about 427 ns.  You probably also want to have some diversity
+of cable lengths; for example, if the main cycle time is 256 bits, you
+might want some cables of 255, 254, 252, 248, 240, 224, 192, 160, 96,
+and 32 bits delay times, allowing nonlocal interaction.
+
+Another reason for wanting shorter delay lines is that the lines are
+lossy; the cable I linked above is specced to attenuate at 138dB/km at
+100MHz.  That means that the 100-foot (200ns, say) cable attenuates by
+about 4.2dB.  Your jellybean transistor might have a β between 25 and
+150, which means that a single one of them can recover from over 30dB
+of signal loss and maybe up to 44dB.  So 200ns or 400ns of delay line
+at a time is fine, but if you get up over about 200 meters (700 ns)
+you might start to need a repeater.  At some point you're going to
+start having SNR problems.
+
+What would the logic design for such a machine look like?  I’m
+thinking of the delay line as containing a number of separate state
+machines (something like 128 to 4096 of them), each of whose has a
+state represented in a set of parallel bits in the different cables,
+one bit per cable; each of them goes through a single state transition
+every time it cycles through the state-transition active circuitry
+that they all share.  The circuitry is entirely capable of latching
+some amount of state from one machine to the next; this constitutes an
+output from the previous machine, and an input to the next.
+
+By itself, this is adequate to implement simple machines like the
+rule-33 or rule-110 cellular automata.  But we can surely build a
+machine that’s easier to program and more efficient than those are.
+The “nonlocal communication” strange-length links I mentioned above
+are one useful enhancement: they link these virtual state machines
+into a much more densely connected topology than the ring topology
+inherent in the temporal sequence of the delay lines.  (If you could
+only pick a single extra length, rather than the eight I suggested, it
+should be the square root of the total number; for example, if there
+are 1024 state machines, each with 32 bits of state, this extra
+network link should have a delay time of 32 or 992, enabling a message
+to be routed from any machine to any other in at most 64 hops with an
+average of 32.  The logarithmic network would cut this to a maximum of
+10, at the cost of needing ten odd-sized links instead of one.)
+
+(I should read about what Turing’s Pilot Ace and the LGP-31 were like,
+since they had some of this nature.)
+
+On the Pilot Ace:
+
+> The main store of the machine used ten delay lines each holding 32
+> words of 32 bits. There were also six temporary stores implemented
+> as short delay lines each capable of holding a 32-bit number.
+> 
+> The operations of the Pilot ACE allowed the programmer to specify
+> move operations from one delay line to another. This was achieved by
+> waiting for the number to come round and then "gating" it into the
+> data flow of another delay line. Because it was arranged so that the
+> numbers emerged from the delay lines at the same moment you could
+> only move the nth number in a delay line to become the nth number in
+> another delay line.
+> 
+> If you wanted to change the order of numbers in the long delay lines
+> you had to first transfer the number to a short delay line and then
+> wait for the position in the destination to come round. This made
+> programming more like juggling.
+
+(<http://www.i-programmer.info/history/9-machines/11-an-ace-of-a-machine.html?start=1>)
+
+32 to 128 bits is not enough space to program a very complicated state
+transition function.

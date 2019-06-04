@@ -1,0 +1,90 @@
+So I just upgraded to Emacs 22 in April, despite Debian Etch not
+supporting it.  It solves several of my daily annoyances with Emacs
+21:
+- It recognizes "Password: " as a password prompt, so ssh and sudo get
+  the benefit of me not having to manually type M-x send-invisible.
+- I can paste Unicode text into it from a web browser, including
+  asymmetrical quotes, real apostrophes, and em dashes, and have it
+  save them to a UTF-8 file without fuss.  (Although it still displays
+  the quotes in an obnoxious double-width fashion until the file has
+  been saved and reloaded.)
+- TRAMP works out of the box.
+- The documentation is included, unlike in Debian.  (There's a
+  licensing dispute over whether the GNU Free Documentation License is
+  free enough to satisfy the Debian Free Software Definition.)
+- comment-region now asks what comment syntax to use if it doesn't
+  know.
+- When I run e.g. "darcs" by itself in shell-mode, occasionally Emacs
+  used to take quite a while to display its output usage message,
+  because it was reading it one character at a time.  This has been
+  fixed.
+
+I also anticipate joy using MuMaMo, but I haven't actually tried that
+yet.
+
+There are some changelog/news entries that sounded pretty good:
+    ...if you set `set-mark-command-repeat-pop' to t.  I.e. C-u C-SPC           
+    C-SPC C-SPC ... cycles through the mark ring.  Use C-u C-u C-SPC
+    to set the mark immediately after a jump.  [Haven't tried this yet.]
+
+    ...M-% typed in isearch mode invokes `query-replace' or
+    `query-replace-regexp' (depending on search mode) with the current
+    search string used as the string to replace.  [Haven't tried this
+    yet.]
+
+    You can now customize the use of window fringes.  To control this
+    for all frames, use M-x fringe-mode or the Show/Hide submenu
+    of... [so now I can have two 80-column windows on my screen at
+    once, which is awesome]
+
+    A new minor mode `next-error-follow-minor-mode' ... In this mode,
+    cursor motion in the buffer causes automatic display in another
+    window of the corresponding matches, compilation errors,
+    etc. [Haven't tried this.]
+
+    The new command `multi-occur' is just like `occur', except it can
+    search multiple buffers. [Useful. Also I didn't know about
+    `occur`.]
+
+    The grep commands provide highlighting support. Hits are fontified
+    in green, and hits in binary files in orange.  Grep buffers can be
+    saved and automatically revisited.  [This is in fact extremely
+    awesome.]
+
+    In addition, when ending or calling a macro with C-x e, the macro
+    can be repeated immediately by typing just the `e'. [This sounds
+    nice, but the F3 and F4 macro keybindings are better.]
+
+    The new package longlines.el provides ... "soft word wrap" [like
+    actual word processors have since the 1970s.  Turns out to be
+    fantastic.]
+
+    SES mode (ses-mode) is a new major mode for creating and editing
+    spreadsheet files.  [Haven't tried this yet.]
+
+    The new package table.el implements editable, WYSIWYG, embedded
+    `text tables' in Emacs buffers  [Haven't tried this yet.]
+
+    The new package flymake.el does on-the-fly syntax checking of
+    program source files.  [Haven't tried this yet.]
+
+    savehist saves minibuffer histories between sessions.  [Haven't
+    tried this yet.]
+
+    isearch in Info uses Info-search and searches through multiple
+    nodes.  [This is fantastic.]
+
+    Atomic change groups: To perform some changes in the current
+    buffer "atomically" so that they either all succeed or are all
+    undone, use `atomic-change-group' around the code that makes
+    changes.  [Sounds like a fantastic idea, but I haven't tried it
+    either.]
+
+So far I've only noticed two new annoyances: one is that it uses its
+own python-mode that I don't like as well as the one that comes with
+Python, and the other is that C-x C-f RET no longer reverts the file
+to the version in the filesystem (assuming the buffer wasn't edited);
+now you actually have to type the filename.
+
+The stuff in the NEWS file (C-h N) looks pretty innocuous.  Nothing is
+terribly exciting, though.

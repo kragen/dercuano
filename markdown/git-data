@@ -1,0 +1,185 @@
+I looked at checking all the almost 400MB of crawl data into Git.
+Here’s what I learned:
+
+1. nobody on #git had experience doing anything like this, so it's not
+   terribly well-traveled ground.
+2. git's compressed index file format crunches the 389MB down to 110MB.
+3. despite this, doing a git clone on the same machine is more than
+   twice as slow as cp -a, despite occasional claims to the contrary
+   for other data sets.
+4. currently checkouts take less than a second, on the same machine.
+   This would make them take a couple of minutes.
+5. downloading the data over my Argentine cable modem connection takes
+   almost 45 minutes, as opposed to 13 seconds now.  git is about 10%
+   slower than rsync for the initial download.  rsync transfers only
+   about 101MB.  I suspect that git is slower primarily because my
+   laptop's disk is encrypted and painfully slow as a result.
+6. git is a lot quicker at subsequent small data updates than rsync,
+   but neither one is slow enough to make much of a difference.
+7. git is better at dealing with subsequent updates in the sense that
+   it can propagate them in either direction.
+
+Here’s what I concluded:
+
+1. checking the data into the main dev repository, which was my
+   initial thought, is probably a bad idea, because it makes initial
+   checkouts on a new machine take at least a couple of minutes, and
+   maybe more than an hour, if your connection is slower than mine.
+2. checking the data into a git repository, rather than syncing it
+   around using rsync, is probably a good idea.  (But probably not for
+   really large single files like the Freebase dump.)
+
+Creating and doing initial checkouts:
+
+    kragen@watchdog:~$ time cp -a /home/watchdog/web/data web-data-copy
+
+    real    0m50.081s
+    ...
+    kragen@watchdog:~$ cd web-data-copy/
+    kragen@watchdog:~/web-data-copy$ git init
+    Initialized empty Git repository in .git/
+    kragen@watchdog:~/web-data-copy$ git add .
+    ^C
+    kragen@watchdog:~/web-data-copy$ time git add .
+
+    real    0m32.319s
+
+(I’m sure it took longer than that the first time before I hit ^C.)
+
+    kragen@watchdog:~/web-data-copy$ git commit
+    ...
+     create mode 100644 votesmart/sigs.json
+     create mode 100644 votesmart/states.json
+     create mode 100644 votesmart/websites.json
+    kragen@watchdog:~/web-data-copy$
+    kragen@watchdog:~/web-data-copy$ du -h .git
+    ...
+    110M    .git
+    kragen@watchdog:~$ time git clone web-data-copy another-web-data-copy
+    Initialized empty Git repository in /home/kragen/another-web-data-copy/.git/
+    remote: Generating pack...
+    remote: Done counting 5334 objects.
+    remote: Deltifying 5334 objects...
+    ...
+    real    2m22.970s
+
+By contrast:
+
+    kragen@watchdog:~$ time git clone /home/watchdog/git/dev.git tmp.foo
+    Initialized empty Git repository in /home/kragen/tmp.foo/.git/
+    remote: Generating pack...
+    remote: Done counting 111 objects.
+    remote: Deltifying 111 objects...
+    remote:  100% (111/111) done
+    Indexing 111 objects...
+    remote: Total 111 (delta 38), reused 0 (delta 0)
+     100% (111/111) done
+    Resolving 38 deltas...
+     100% (38/38) done
+
+
+    real    0m0.822s
+    user    0m0.140s
+    sys     0m0.030s
+
+On my laptop:
+
+    kragen@thrifty:~/devel$ time git clone \
+        watchdog.notabug.com:/home/kragen/web-data-copy web-data-test
+    remote: Generating pack...
+    remote: Done counting 5334 objects.
+    remote: Deltifying 5334 objects...
+    remote:  100% (5334/5334) done
+    Indexing 5334 objects.
+    remote: Total 5334 (delta 3631), reused 0 (delta 0)
+     100% (5334/5334) done
+    Resolving 3631 deltas.
+     100% (3631/3631) done
+    Checking files out...
+     100% (5714/5714) done
+
+    real    43m43.731s
+    user    2m9.444s
+    sys     0m16.441s
+    kragen@thrifty:~/devel$ time rsync -Pavzz \
+        watchdog.notabug.com:/home/watchdog/web/data/ web-data-rsync-copy/
+    ...(12000 lines omitted)...
+    sent 127708 bytes  received 101644227 bytes  45668.36 bytes/sec
+    total size is 374634655  speedup is 3.68
+
+    real    37m9.568s
+
+An rsync with no changes is faster:
+
+    kragen@thrifty:~/devel$ time rsync -Pavzz \
+        watchdog.notabug.com:/home/watchdog/web/data/ web-data-rsync-copy/
+    receiving file list ...
+    6044 files to consider
+
+    sent 20 bytes  received 106850 bytes  6894.84 bytes/sec
+    total size is 374634655  speedup is 3505.52
+
+    real    0m16.043s
+    user    0m0.228s
+    sys     0m0.140s
+    kragen@thrifty:~/devel$
+
+Checking out the current dev git is much faster than downloading all
+that data:
+
+    kragen@thrifty:~/devel$ time git clone \
+        watchdog.notabug.com:/home/watchdog/git/dev.git
+    remote: Generating pack...
+    remote: Done counting 111 objects.
+    remote: Deltifying 111 objects...
+    remote:  100% (111/111) done
+    Indexing 111 objects.
+    remote: Total 111 (delta 38), reused 0 (delta 0)
+     100% (111/111) done
+    Resolving 38 deltas.
+     100% (38/38) done
+
+    real    0m13.494s
+    user    0m0.360s
+    sys     0m0.124s
+
+
+After adding a file on each end:
+
+    kragen@thrifty:~/devel/web-data-test$ time git pull
+    remote: Generating pack...
+    remote: Done counting 4 objects.
+    Result has 3 objects.
+    Deltifying 3 objects...
+     100% (3/3) done
+    remote: Total 3 (delta 0), reused 0 (delta 0)
+    Unpacking 3 objects
+     100% (3/3) done
+    * refs/heads/origin: fast forward to branch 'master' of 
+        watchdog.notabug.com:/home/kragen/web-data-copy
+      old..new: cab3ce4..15efdff
+    Trying really trivial in-index merge...
+    Wonderful.
+    In-index merge
+     foo |    1 +
+     1 files changed, 1 insertions(+), 0 deletions(-)
+     create mode 100644 foo
+
+    real    0m7.782s
+    ...
+    kragen@thrifty:~/devel/web-data-test$ time git push
+    updating 'refs/heads/master'
+      from 15efdfff9a666495af1a3de8e062f07177e8dbbf
+      to   062da7cf925ff4d7127c4a53d1698b0829a54ffd
+    Generating pack...
+    Done counting 7 objects.
+    Result has 5 objects.
+    Deltifying 5 objects.
+     100% (5/5) done
+    Writing 5 objects.
+     100% (5/5) done
+    Total 5, written 5 (delta 2), reused 0 (delta 0)
+    refs/heads/master: 15efdfff9a666495af1a3de8e062f07177e8dbbf -> 
+        062da7cf925ff4d7127c4a53d1698b0829a54ffd
+
+    real    0m4.806s

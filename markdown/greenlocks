@@ -1,0 +1,41 @@
+Low-cost green thread locks
+===========================
+
+(This idea is probably bad because we can’t eliminate the cost of lock
+acquisition completely; we still need to conditionally block if the
+lock is acquired.)
+
+Zero-overhead exception handling uses a map of executable code regions
+to analyze the stack trace at the time an exception is thrown to
+discover where to invoke the exception handler.  This way, a `try { }`
+statement, or in C++ the code to destruct a stack object during
+exception unwinding, has zero run-time overhead in the normal case; it
+just makes the executable a little bigger.  Throwin an exception is
+slower than using a `setjmp()/longjmp()` style of exception handling,
+but this is still a net win, because exceptions are very rare compared
+to entering and leaving contexts that add tasks to carry out during
+stack unwinding.
+
+Analogously, acquiring a lock is a very common operation in
+threads-and-locks programming, and typically a very expensive one.
+But we only care what locks you hold when another thread might contend
+them.  In a “green thread” or “fiber” environment, only one thread is
+actually running at a time, and context switches between threads are
+relatively uncommon.
+
+In a language like Java, locks are normally managed by entering and
+leaving `synchronized` statements and methods.  These can be
+discovered by walking the stack in the same way that exception
+handlers can.
+
+This suggests the following implementation technique for locks in a
+green-threads environment: don’t maintain the runtime state of which
+locks are held by the current thread at all, although of course you
+still need to test to see if a lock is held when entering a context
+that requires it.  Instead, when the thread yields to the scheduler,
+the scheduler walks its stack to reconstruct the set of locks it
+holds.  Then it marks those locks as “held” before choosing which next
+thread to run.
+
+This slows down context switching, but speeds up lock acquisition,
+making it affordable to acquire more locks.

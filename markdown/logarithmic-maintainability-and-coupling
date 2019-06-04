@@ -1,0 +1,120 @@
+In theory, with ideal design, the functionality of a piece of software
+grows exponentially with the amount of code in it: each new piece of
+code can take advantage of the entire existing set of capabilities,
+and so adding a line of code to a system adds capabilities
+proportional to those of the previous codebase.
+
+In practice, this never happens.  In a few hundred or a few thousand
+lines of code, we can write a hypertext system, or a ray tracer, or a
+full-text search engine, or a filesystem, or an operating-system
+kernel, or an interpreter or compiler for a high-level language, or a
+GUI, or a networking protocol, and so on.  Naively extrapolating, we
+would expect that in a hundred thousand lines of code, you could go
+far beyond these capabilities, into things that seem like utterly
+alien technology — let alone what you could do in a million or ten
+million lines of code.
+
+You could surely argue that this is somewhat ill-founded: it isn’t
+clear how to reduce “amount of functionality” to a scalar quantity.
+But in fact, regardless of how you choose to define it, it’s clear
+that this isn’t happening: our existing computing systems routinely
+contain millions of lines of code, and rather than seeming like alien
+technology from the future, they often fail to work at all, and when
+they do, they often barely work.
+
+Also in theory, the difficulty of writing a piece of software
+incrementally, piece by piece, should be proportional to the square of
+the amount of code in it, because the number of potential pairwise
+interactions between lines of code increases proportional to that
+square.  This is often cited when hackers try to convince one another
+of the merits of simplicity.
+
+In practice, however, the observed exponent seems to be around 1.05
+per thousand lines of code: the basic COCOMO model estimates
+development effort at 2.4 person-months per KSLOC**1.05.  So:
+
+* a thousand-line project should take 2.4 person-months (410 lines of
+  code per person-month), while
+* a ten-thousand-line project should take 27 person-months (370 lines
+  of code per person-month),
+* a hundred-thousand-line project should take 302 person-months
+  (330 lines of code per person-month),
+* a million-line project should take 3400 person-months (290 lines of
+  code per person-month),
+* a ten-million-line project should take 38k person-months (260 lines
+  of code per person-month), and
+* a hundred-million-line project should take 430k person-months
+  (230 lines of code per person-month).
+
+These two departures from theory are connected!  They have to do with
+the density of connectivity in the codebase.  To escape the trap of
+quadratic complexity, only a tiny fraction of the possible
+interactions in the codebase can exist — a line of code invoked by
+tens of thousands of callers probably cannot change its behavior, even
+for the better, without introducing bugs.  By the same token, a
+subroutine cannot depend on too much about the behavior of too many
+other subroutines: it becomes too likely to break when one of the
+others changes.
+
+So, just in order to be able to keep writing those 10 lines of code
+per day in that hundred-million-line project, you end up duplicating
+facilities that exist elsewhere, perhaps in a restricted or more
+efficient form.  You may not even know they exist; certainly you can’t
+depend on them to retain their existing behavior and performance, or
+not to have behavior or performance in corner cases that conflicts
+with your needs.  Even if not, they may be in a language you can’t
+invoke conveniently or contain subtle dependencies on control
+structure, runtime facilities, or resource usage that you can’t afford
+and perhaps don’t even know about.
+
+And thus it is that the promise of exponential growth in software
+capability with growing effort is lost.
+
+But what if we were to bite the bullet?  What if we were willing to
+accept that adding a line of code to a hundred-thousand-line system
+was going to take 100 times as long as adding it to a
+ten-thousand-line system?  If we could get back the exponential
+growth, would it be worth it?
+
+In terms of flexibility for experimentation, *no*.  If it takes you a
+month to write a piece of code that ends up being five lines, *and
+then you throw it away*, you surely would have been better served by
+writing that throwaway code in some other way.  Even if it worked out
+to be 200 lines of code instead of five, that would have been a much
+better bargain.
+
+But in terms of building the most powerful system, *yes*.  If a
+thousand-line fully-coupled system takes you, say, 100 days and has
+functionality of, say, One OTCC†, then we can predict the following:
+
+* a two-thousand-line system will take you 400 days and have a
+  functionality of, say, two OTCCs;
+* a five-thousand-line system will take you 2500 days (7 years) and
+  have 16 OTCCs of functionality (at which point you’re still behind
+  where you would have been by just writing 25 single-OTCC systems);
+* a ten-thousand-line system will take you 27 years and have 512 OTCCs
+  of functionality, at which point you are beating where you would
+  have been with 100 single-OTCC systems by a factor of five;
+* a twenty-thousand-line system will take you 110 years and have 500k
+  OTCCs of functionality, at which point you are beating where you
+  would have been by writing 400 single-OTCC systems by a factor of
+  11;
+* a fifty-thousand-line system will take you 680 years and have 560
+  tera-OTCCs of functionality, at which point you are beating where
+  you would have been by writing 2500 single-OTCC systems by a factor
+  of 200 billion.  Yet you have been writing, on average, about a line
+  of code per week.
+
+> † OTCC is a small C compiler written by Fabrice Bellard for the
+> IOCCC, and it’s an exemplar of powerful functionality condensed into
+> a small package.  In the absence of any kind of reasonable unit for
+> software power, it's my best approximation of the maximum amount you
+> can get done in a thousand lines of code.
+
+Even though I sort of pulled them out of my butt, these numbers are
+sort of discouraging, even though they suggest that we can do
+dramatically better at software development by improving reuse.  The
+problem is that this level of reuse has such a high price tag that,
+under these assumptions, you don’t start to break even for decades.
+It’s hard to imagine that the correct numbers will make this look much
+better.

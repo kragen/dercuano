@@ -1,0 +1,43 @@
+It’s straightforward for a Unix process to spawn a child and then
+clean up when the child exits — it can use the wait(2) system call to
+sleep until the child is done.  For things like changing the video
+mode, turning off cursor display and character echo in a Unix
+terminal, turning on power to a heating element, and so on, this is an
+improvement over the usual approach of doing the cleanup in the same
+process, because it happens even if the supervised process crashes,
+for example because of an OOM kill or a segfault.  This requires that
+the supervisor process be less likely to crash, but that is often easy
+to arrange; an effective supervisor for particular scenarios can be
+written in ten or twenty lines of C.
+
+This is such an effective way to handle errors that systems designed
+for high-reliability applications, such as Erlang, often use it as
+their only way to handle errors.
+
+However, it’s a problem for the adoptability of a C library if using
+it requires its users to launch their programs in a special way.  So
+another possible approach is to spawn a supervisor *child* which waits
+for the parent to die.  Unix doesn’t have a general way to wait for
+non-child processes to die, but this can be taken care of easily with
+a pipe from the supervised parent to the supervisor child — the parent
+can trigger a cleanup either by writing a byte to the child or by
+exiting, including by way of an OOM kill.
+
+The supervisor child is not entirely transparent to the application,
+for two reasons.
+
+First, if you have no children, wait(2) or waitpid(2) with a -1 PID
+will return immediately with ECHILD; the supervisor child would
+convert this into a deadlock, as each of the child and the parent are
+waiting for the other to exit.  This can be fixed with the double-fork
+trick usually used to spawn daemons.
+
+Second, and more seriously, POSIX threads are pretty aggressively
+incompatible with fork(); it’s unsafe, at least in theory, to call
+things like ioctl() in the forked child if the parent is
+multithreaded, presumably because ioctl() might try to acquire a lock
+that was held by another thread at fork time, a thread which doesn’t
+exist in the child and which therefore can’t unlock its lock.  To work
+around this — and also perhaps to reduce memory consumption and the
+likelihood of OOM kills — the supervisor child could exec() a
+special-purpose supervisor executable.

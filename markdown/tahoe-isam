@@ -1,0 +1,40 @@
+Tahoe-LAFS is, among other things, a content-hash-addressable store
+for use as a networked filesystem.
+<https://www.tahoe-lafs.org/trac/tahoe-lafs/wiki/FAQ> question 13
+describes a “medium distributed mutable file” facility for storing
+mutable files as balanced Merkle trees of 128-kilobyte chunks.
+There’s also a “large distributed mutable file” facility proposed but
+not yet implemented, which instead stores sequential logs of deltas
+like Mercurial’s revlog file format.
+
+In the Tahoe IR channel I wrote (edited for format):
+
+> <https://tahoe-lafs.org/pipermail/tahoe-dev/2012-October/007750.html>
+> is a fairly different proposal from the “Mercurial revlog”
+> proposal.  It seems to me like B-trees might be a better fit for
+> storage that has significant latency per random read, like disk or
+> network filesystems, which I guess is how MDMF works.  Has anybody
+> tried running some kind of ISAM implementation on top of MDMF?
+> 
+> It seems like there might be a somewhat higher cost to running some
+> kind of ISAM thing on top of something like MDMF than just
+> journaling your ISAM updates directly onto a write-once block store,
+> since journaling allows you to write just the updated records at
+> first.  Postponing the task of copying them together with the
+> unchanged records into a single new block (to restore locality of
+> reference) until less of the unchanged records are unchanged, but I
+> don’t have a good estimate for how large or small the cost of the
+> extra abstraction layer (which also serves to implement regular
+> mutable files) would be.  A log-structured filesystem scavenger can
+> choose to scavenge the segments with the smallest amount of
+> surviving data, thus optimizing the cost/benefit ratio of segment
+> scavenging.
+>
+> MDMF could do that too, though!  Is there more detailed performance
+> data somewhere?  The fact that SSD FTLs have a hard time with random
+> writes, though, makes me think that the cost of hiding nonsequential
+> writes at an MDMF-like low level is probably very significant.  So
+> what I’m suggesting is somewhere in between the “balanced Merkle
+> tree” and “Mercurial revlog” approach, since balanced Merkle trees
+> have potentially arbitrarily bad write performance, while Mercurial
+> revlogs have potentially arbitrarily bad read performance.

@@ -1,0 +1,43 @@
+I keep thinking about the explanation in the Art of Electronics† of how
+reading DRAM works.  Each column of the DRAM has a sense amplifier,
+which is kind of like a differential amplifier — it’s actually a latch
+consisting of two inverters in a loop.  Before reading, the loop is
+shorted to force the inverters into a metastable state; then the short
+is released and the appropriate row of capacitors is shorted to the
+sense amplifiers.
+
+This unbalances the previously metastable latches, which then fall
+into one of their two stable states.  In the process, they charge the
+capacitor all the way to the rail.
+
+This is very similar to Merkle’s buckling-spring logic, in which a
+gate begins in a stable state which is made metastable by the
+application of a buckling force, which amplifies the balance of forces
+applied to the spring into a large displacement driven by the buckling
+force itself.  Merkle proposed using these as majority-rule gates with
+a constant bias input to get AND and OR.
+
+I wonder if such circuits could be a productive way to design digital
+circuits even with current technology, integrating state and
+combinational logic rather than keeping them separate.  As one simple
+example, you could build a bidirectional shift register by using three
+latches per bit, energizing only ⅓ to ⅔ of the latches at any given
+time, passing the state along in the manner of a CCD or a Dekatron.
+Or you could build an image memory that directly supports not only
+shifting the image off the chip but also operations like dilation.
+
+My hunch is that this approach ends up being more or less equivalent
+to using master-slave flip-flops.
+
+† “The sense amplifiers are latching devices, here drawn notionally as
+fed-back noninverting amplifiers.  (In practice they are implemented
+as flip-flops that begin the cycle in a balanced state and become
+unbalanced by the bit-capacitor charge that is switched into
+them. ... In a further dose of reality, things are a bit more
+complicated: the sense amplifiers are *differential*, and the DRAM
+array is usually built in a “folded-bit” arrangement so that any given
+row line activates only the even or odd cells; the inactive (neutral)
+bit line floats at the precharge level (Vdd/2) and acts as a reference
+voltage by which the balanced sense amplifier compares the ΔV “bump”
+up or down from the capacitor's charge in the respective bit
+cell. ...”

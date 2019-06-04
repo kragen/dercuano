@@ -1,0 +1,148 @@
+Automatic dependency management
+===============================
+
+A variety of software systems have used some kind of automatic
+dependency graph tracking to automatically recompute things, from
+Lotus 1-2-3 (and derived spreadsheets) up to current JavaScript
+frameworks like ReactJS and current big-data frameworks like Apache
+Spark.  I’m thinking about some ideas related to this, especially
+inspired by Spark, and I thought I would look around and see what
+already exists.
+
+It turns out a lot of fucking things related to this already exist, so
+I thought I’d write down a summary of some of them.
+
+There are way too many for me to summarize, though.
+
+Candidates not yet noted below: make; React; Meteor; redo;
+materialized views in databases; STMs; git-annex; database indexes;
+tabled predicates in Prologs; Merkle trees; immediate-mode GUIs.
+
+Spreadsheet recalculation
+-------------------------
+
+[Bob Frankston said in March 2015][0] that VisiCalc, the original
+spreadsheet, didn’t include “natural order” (i.e. dependency-driven)
+recalculation, in order to fit into 16 kilobytes.  He was responding
+to a tweet from Mitch Kapor explaining that Rick Ross had implemented
+that for the first time, in 1982, in Lotus 1-2-3.  VisiCalc, instead,
+had an option to recalculate by rows or by columns.  Since 1-2-3,
+though, spreadsheets default to dependency-order recalculation.
+
+[0]: https://twitter.com/BobFrankston/status/576577770538545152
+
+Dependency-order recalculation is comparatively easy for spreadsheets
+(although infamous thieves Rene Pardo and Remy Landau still got a US
+patent on it in 1983; Pardo claims to have done it in an “electronic
+spreadsheet” called LANPAR in 1969, but his lawyer denied it in
+court), because the total number of things that could possibly be
+recalculated is human-scale, all of them can be recalculated in only a
+single way, and so you can simply enumerate them and do a topological
+sort.
+
+Nowadays, dependency-order recalculation is approximately unnecessary
+in spreadsheets; computers are so fast that human-scale spreadsheets
+could recalculate in milliseconds, so recalculating the whole
+spreadsheet after every keystroke would be reasonable.  (They don’t,
+but that’s another story.)
+
+ReactJS
+-------
+
+[ReactJS][2]
+
+[2]: 
+
+Deterministic builds
+-----
+
+Tor: <https://blog.torproject.org/category/tags/deterministic-builds>  
+Chromium: <https://www.chromium.org/developers/testing/isolated-testing/deterministic-builds>  
+Debian: <https://wiki.debian.org/ReproducibleBuilds>  
+Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=885777>  
+
+ccache
+----
+
+[ccache][1] is a build accelerator specific to C, C++, and
+Objective-C.  It hashes your source code, include files, compiler
+(well, typically just its size, mtime, and name), command-line
+options, etc., with MD4, and stores the compiler’s output (including
+e.g. warning messages) in an on-disk cache in, normally, your home
+directory; future recompilation attempts whose inputs haven’t changed
+will just reuse the previous compiler output.
+
+[1]: https://ccache.samba.org/manual.html
+
+In theory, this means that you could get most of the benefits of
+`make` for C and especially C++ programs by just wrapping your
+compiler in `ccache` inside your build script; rerunning the build
+script would rehash all your source files, copy the object files into
+your current directory, and then relink the executable.  Depending on
+what you’re compiling, this might be almost instantaneous, or it might
+be very slow.
+
+Because Unix provides `ccache` with no reliable way to get a secure
+hash of the source files from the filesystem, it has to read them in
+their entirety to figure out whether they have reverted to an old
+version.  I tried it just now on my netbook on a tiny three-kilobyte
+GLUT program, and it ended up reading about a megabyte of `.h` files
+in order to figure out that it could safely reuse the 2.7kB `.o` file
+from a previous compilation, taking 39 milliseconds in all, even
+though it made only about 365 system calls.
+
+Spark
+-----
+
+<https://www.cs.berkeley.edu/~matei/papers/2012/nsdi_spark.pdf>
+
+Spark Streaming
+---------------
+
+<https://spark.apache.org/docs/latest/streaming-programming-guide.html>
+
+Vesta
+-----
+
+<http://www.hpl.hp.com/techreports/Compaq-DEC/SRC-RR-177.pdf>
+<http://www.vestasys.org/>
+
+Bup
+---
+
+Avery Pennarun
+
+<https://github.com/apenwarr/bup/blob/89ac418d84e29ba482bbd21ebc1172c2d1ff5507/DESIGN>
+<https://github.com/bup/bup>
+<https://bup.github.io/>
+
+Truth maintenance systems
+-------------------------
+
+In [Stallman & Sussman 1976][4], describing their pre-SPICE circuit
+simulator, we find, “If a user changes some part of the circuit
+specification (a device parameter or an imposed voltage or current),
+only those facts depending on the changed fact need be ‘forgotten’ and
+re-deduced, so small changes in the circuit may need only a small
+amount of new analysis.”  They are describing their invention of
+“dependency-directed backtracking”, which later became known as a
+“[truth maintenance system][5]”, and it’s built with generalized
+constraint propagation, which is substantially more general than the
+unidirectional dependencies mentioned in the other systems above, and
+one that supports finding a contradiction and backtracking from it to
+undo the set of incorrect guesses that led to it, and avoid that set
+in the future.  You could use this kind of system, for example, to
+solve Sudoku puzzles rapidly.
+
+[4]: http://dspace.mit.edu/handle/1721.1/6255 "AIM-380: Forward Reasoning and Dependency-Directed Backtracking in a System for Computer-Aided Circuit Analysis, by Stallman and Sussman, 1976"
+[5]: http://aitopics.org/sites/default/files/classic/Webber-Nilsson-Readings/Rdgs-NW-Doyle.pdf "A Truth Maintenance System, by Doyle"
+
+A TMS, like the other systems above, remembers how every datum was
+deduced, but it does so not in order to promote computational
+efficiency by caching results, but rather to track the sources of
+problems — in this case, logical contradictions.
+
+Self-adjusting computation
+--------------------------
+
+<http://www.umut-acar.org/self-adjusting-computation>

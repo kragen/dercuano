@@ -1,0 +1,132 @@
+If you have a state machine with one-hot encoding, perhaps because
+you're computing your state transitions with non-inverting a logic
+family such as diode logic, then with two bits of output you have two
+states; with three bits of output you have three states, with four
+bits of output you have four states; and with five bits of output you
+can either have five states, or if you split your state into a two-bit
+output and a three-bit output, six states.  With six bits of output
+you can have six states, or three chunks of two bits giving you eight
+states, or two chunks of three bits giving you nine.
+
+This is an interesting thing; by using ternary instead of binary, your
+state machine gets the power to representation an extra state.  It's
+not much, but it's something.  And it compounds: with 24 lines of
+output split into 8 groups of 3, you get 3⁸ = 6561 states, while if
+you split it into 12 groups of 2, you get only 2¹² = 4096.  It's about
+5.7% extra information per bit: instead of getting 0.5 bits per bit,
+you get 0.53 bits per bit.
+
+That is, the optimal number of states per state-machine variable is
+three.
+
+***
+
+Suppose you're trying to factor a target finite-length comb FIR kernel
+into a set of sparse FIR kernels that convolve to produce your target
+kernel; you want to minimize the number of multiply-accumulates per
+sample.  If you convolve a comb with three unit impulses separated by
+eight empty points (zero samples) with another comb with three unit
+impulses separated by two, you get a comb with nine unit impulses
+separated by eight intervals of two empty points, at a cost of six
+multiply-accumulates.  By contrast, if you convolve three combs with
+two unit impulses each, separated by two, five, and seven empty
+samples, you do the same number of multiply-accumulates and get a comb
+with unit impulses separated by two empty points --- but only eight of
+them rather than nine.  The same is true if you replace two of those
+two-impulse combs with a four-impulse comb.  Things get worse as you
+move to less-sparse kernels with five, six, or more nonzero points.
+
+That is, the optimal number of impulses per kernel, in some sense, is
+three.
+
+***
+
+If you're building a balanced search tree and you want to minimize the
+number of keys you have to compare your probe key against, binary is
+the best branching factor: each comparison result gives you exactly
+one bit of information.  But consider, instead, a menu system user
+interface for an idealized user who makes no errors but must read each
+menu item before deciding, correctly, whether to select it or not, but
+who may be seeking an operation not present in the menu tree.  How do
+you minimize the number of menu items the user must read when
+successfully navigating the system?
+
+If there are two items in each menu, the user must read, on average,
+one of them before making a successful selection, so she will need to
+select lg N menu items to reach her final destination; say, 20 items
+if there are 1048576 total possibilities.  If there are four, she must
+read on average two items, but need only make half as many selections:
+10, while reading 20, just as before.  If there are three, she must
+read on average 1.5, while selecting about log₃ N times --- in this
+case, 12.6 selections, reading 1.5 items each time, for a total of
+about 18.9 menu items read.
+
+So it turns out that the optimal number of menu items, in some sense,
+is three.
+
+(Real menu systems, of course, have to deal with other cognitive
+issues: how do you organize hundreds or thousands of things in such a
+way that users can guess or even remember which category each thing is
+in?)
+
+***
+
+Suppose you want to make a program as debuggable as possible.  How big
+should your functions be?
+
+To be a little more concrete, suppose you're trying to track down an
+incorrect result from the execution of a program that runs for a
+hundred billion instructions, or about a minute.  If the program is
+built out of functions that call other functions and combine their
+results, and you can tell from looking at each result whether it's
+correct or not, maybe you can navigate to the result you want by
+expanding the execution history as an outline.
+
+If each function calls three other functions, then within 24 clicks,
+you can make your way from the top-level result to the particular
+incorrect result; at each step, you have to examine on average 1.5
+intermediate results, so you need to look at about 35 results.
+
+If each function calls only two other functions, you have to look at
+about 37 results, which is slightly worse; and the same is true if
+each function calls four other functions.
+
+So, in some simplified sense, the optimum branching factor for
+function-call graphs is three.
+
+***
+
+The number of nodes you have to traverse to reach one of N nodes with
+branching factor B is ceil(log N / log B), and if you're examining
+each of the B branches in the node to figure out which one to follow,
+you end up examining B ceil(log N / log B) branches.  If we remove the
+discretization, we get log N (B / log B), and it turns out that B /
+log B has a minimum at B = e, so in practice the optimal branching
+factor is 3.
+
+That's the phenomenon underlying the above simplified problems.  But,
+as you can see, B/log B is pretty flat over the 2 to 4 region.  It
+jumps up to infinity as you approach 1, and from e on, it grows
+slowly.  It's only 0.4% worse than optimal at B = 3, 6% worse (as seen
+above) at B = 2 or 4, 15% worse than optimal at B = 5, 60% worse at
+B = 10, twice as bad at B = 15, and 3.2 times as bad at B = 30.  So
+it's easy for the optimal factor in the real world to be anywhere
+between 2 and 10, depending on what other things you're trying to
+optimize.
+
+For example:
+
+* in the case of the state machine, your state-transition logic might
+  be simpler with one-hot encoding among six output lines rather than
+  some kind of conjunction over a group of two and a group of three,
+  and that might pay the cost of the extra line;
+* in the factored FIR filter, you might be trying to produce a comb
+  with eight or ten impulses, in which case convolving two impulses
+  with four or five works, and nothing involving three will;
+* in a menu system, you have to make the menu items reasonably
+  comprehensible, which usually requires a larger branching factor.
+* while debugging a program, changing stack frames has a cognitive
+  cost, where you have to orient yourself in your new surroundings,
+  and it can be practically very difficult to make a program in which
+  each function calls only three others.  The optimum for this is
+  maybe somewhere between 5 and 18.

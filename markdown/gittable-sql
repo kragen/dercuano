@@ -1,0 +1,124 @@
+Suppose you want to store a SQL database in Git.
+
+This occurred to me because I wanted to restore an old website from
+backups.  All the static text files in CVS were fine, but the database
+was stored in MySQL, and consequently had been lost, and so the CGI
+scripts didn’t work.  If we had stored the database in more static
+text files, we could have avoided this problem.  You could even have
+accessed the CSV files over HTTP from JS, since they didn’t contain
+any secret information.  I wished we’d used CSV instead of SQL,
+although of course this wouldn’t work for heavy update loads or
+certain kinds of atomic updates.
+
+The problem
+-----------
+
+We’d like to support the usual SQL operations (not just the DML
+INSERT, SELECT, UPDATE, DELETE but also the DDL CREATE TABLE, DROP
+TABLE, CREATE INDEX, foreign key constraints, etc.) with transaction
+rates, data sizes, query evaluation times similar to those of older
+SQL databases (say, up to 16 transactions per second (across the whole
+system, not on a single host)), on up to 64 gigabytes or 2 billion
+records of data, with simple queries answered in tens of
+milliseconds), but with the ability to replicate the database using
+Git to different hosts (say, up to 128), update any replica, and then
+synchronize that change to all the replicas using Git.
+
+Git’s decentralized model means you can’t guarantee most of the
+consistency constraints a regular SQL database would guarantee: if A.B
+references C.D, you can insert a record into A on one host and delete
+the record it references from C on another host, which respects the
+consistency constraint on each host, but violates it when they are
+merged.
+
+So you’ll have to settle for inconsistency detection and resolution in
+some cases, rather than prevention.  Still, it seems like it should be
+possible to do a reasonable job for many cases.
+
+Characteristics of the building materials
+-----------------------------------------
+
+Much of this applies to storing databases in text files in general,
+not just in Git.
+
+Git isn’t super great at merging binary data files or storing huge
+files (over, say, 1MB), so it would be better to avoid those.  But it
+uses xdelta compression and gzip, so formats with redundant data
+aren’t that costly, and might be easier to merge.  Most of the
+standard database algorithms apply pretty straightforwardly to text
+files, needing only a little bit of extra work.
+
+Git also doesn’t do well with repositories storing a large number of
+files, say, over 100,000; and its efficiency begins to suffer when
+individual directories are more than a few kilobytes (say, more than a
+few hundred files).  Also, Unix filesystems traditionally don’t work
+well with more than a few hundred files in a directory, although the
+modern ones scale up to 10,000 files in a directory without much pain.
+
+Git does provide atomic updates across multiple different files, which
+Unix filesystems do not.  If you are providing HTTP access to some
+mutable text files stored in a directory, that also doesn’t provide
+atomic updates across multiple files, but if you map Git’s data model
+into HTTP URL space, it would.  Git’s git-http-backend command already
+supports this via the “backwards-compatible dumb HTTP protocol”, which
+is also what you use when you clone a Git repository from the `.git`
+directory on a plain-Jane HTTP server serving up files.  This is
+achieved typically by updating `.git/refs/heads/master` to point to a
+new commit object (implicitly in `.git/objects` or possibly a pack;
+this could be mapped more cleanly into HTTP) that you have just
+finished creating.
+
+Ideally you wouldn’t store indices or materialized views in Git, just
+the data they were computed from (including the index creation
+specification).  And ideally you’d minimize unnecessary update
+conflicts by usually not updating the same files on different hosts.
+Also, it would be desirable to minimize the amount of work necessary
+when you pull new changes from somewhere else.
+
+In some cases, a table may have small contents but a large change
+history — where it’s kept small to keep access fast.  In other cases,
+a table may have contents that are nearly as large as its change
+history.  Generally, conflict resolution can work better if you have
+more information about history.  For example, in the
+A.B-references-C.D case above, you could undelete the deleted C record
+and perhaps roll back the transaction it was committed in and enqueue
+a post-hoc-rollback notification.
+
+(In still other cases, you may have a non-retention requirement to
+truly erase security-sensitive data, and in those cases you shouldn’t
+use Git at all.)
+
+Design
+------
+
+This suggests two different designs: one where you simply store
+source-segregated update logs, treating the actual table contents in
+some sense merely as a materialized view of the update log, and one
+where you store segmented actual table contents.
+
+### Storing source-segregated update logs ###
+
+In this design, what you version-control are unbounded-size logical
+logs of your database transactions, one log per host, separated into
+segments of some maximum size.  These logs might store the actual SQL
+statements, each associated with some transaction ID:
+
+    t150 begin
+    t150 delete from users where name = 'brett'
+    t151 update users where seen < '20150101' set seen = '20150101'
+    t151 rollback
+    t150 commit
+
+Or they might store individual record updates identified by some
+primary key:
+
+    t150 begin
+    t150 delete from users where id = 2804
+    t151 update users where id = 2018 set seen = '20150101'
+    t151 update users where id = 2021 set seen = '20150101'
+    t151 update users where id = 2029 set seen = '20150101'
+    t151 rollback
+    t150 commit
+
+You could store this data separately for each table, say in a
+subdirectory for each table, but you run the risk of 

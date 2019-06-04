@@ -11,7 +11,7 @@ Definition
 
 It’s sometimes defined as a function of five parameters:
 
-    lerp5(x₀, x₁, y₀, y₁, x) = y₀ + (x - x₀)·(y₁ - y₀)/(x₁ - x₀)
+> lerp5(x₀, x₁, y₀, y₁, x) = y₀ + (x - x₀)·(y₁ - y₀)/(x₁ - x₀)
 
 This gives you the interpolated value of y at x, given that it should
 be y₀ at x₀ and y₁ at x₁.
@@ -19,9 +19,9 @@ be y₀ at x₀ and y₁ at x₁.
 However, this can be productively decomposed into two functions of
 three arguments:
 
-    howfar(x₀, x₁, x) = (x - x₀)/(x₁ - x₀)
-    lerp(y₀, y₁, t) = y₀ + t·(y₁ - y₀)
-    lerp5(x₀, x₁, y₀, y₁, x) = lerp(y₀, y₁, howfar(x₀, x₁, x))
+> howfar(x₀, x₁, x) = (x - x₀)/(x₁ - x₀)  
+> lerp(y₀, y₁, t) = y₀ + t·(y₁ - y₀)  
+> lerp5(x₀, x₁, y₀, y₁, x) = lerp(y₀, y₁, howfar(x₀, x₁, x))
 
 
 And it is the lerp function defined in the middle there that we are
@@ -31,19 +31,19 @@ Given the usual algebraic identities, we can transform its formula
 into a different form that is sometimes easier to use.  Writing out
 the algebraic transformation in great detail, we have
 
-    y₀ + t·(y₁ - y₀) =
-    {distributivity}
-    y₀ + t·y₁ - t·y₀ =
-    {unity}
-    1y₀ + t·y₁ - t·y₀ =
-    {definition of subtraction in terms of adding negative}
-    1y₀ + t·y₁ + -t·y₀ =
-    {commutativity}
-    1y₀ + -t·y₀ + t·y₁ =
-    {distributivity}
-    (1 + -t)·y₀ + t·y₁
-    {definition of subtraction in terms of adding negative}
-    (1 - t)·y₀ + t·y₁.
+> y₀ + t·(y₁ - y₀) =  
+> {distributivity}  
+> y₀ + t·y₁ - t·y₀ =  
+> {unity}  
+> 1y₀ + t·y₁ - t·y₀ =  
+> {definition of subtraction in terms of adding negative}  
+> 1y₀ + t·y₁ + -t·y₀ =  
+> {commutativity}  
+> 1y₀ + -t·y₀ + t·y₁ =  
+> {distributivity}  
+> (1 + -t)·y₀ + t·y₁  
+> {definition of subtraction in terms of adding negative}  
+> (1 - t)·y₀ + t·y₁.
 
 I’m going to consider lerping in domains where some of these
 identities don’t apply, and (I assert) it will be interesting to
@@ -51,7 +51,7 @@ consider which ones.
 
 This leads to the definition
 
-    lerp2(y₀, y₁, t) = (1 - t)·y₀ + t·y₁
+> lerp2(y₀, y₁, t) = (1 - t)·y₀ + t·y₁
 
 I believe this was the computation Turing originally proposed to
 compute the definition of a conditional branch instruction in his
@@ -64,13 +64,13 @@ What are the types of the parameters and result of the lerp function
 given above?  They need not all be the same; in the fully general
 case, there are six of them:
 
-    lerp(y₀: T₀, y₁: T₁, t: T₂) = y₀ + (t · ((y₁ - y₀): T₃): T₄): T₅
+> lerp(y₀: T₀, y₁: T₁, t: T₂) = y₀ + (t · ((y₁ - y₀): T₃): T₄): T₅
 
 which gives us the type signatures for the component operations:
 
-    (x: T₁) - (y: T₀): T₃
-    (x: T₂) · (y: T₃): T₄
-    (x: T₀) + (y: T₄): T₅
+> (x: T₁) - (y: T₀): T₃  
+> (x: T₂) · (y: T₃): T₄  
+> (x: T₀) + (y: T₄): T₅
 
 So far, this is sort of vacuous.  But we only have to add a couple
 more constraints and it gets interesting!  The usual case in lerping
@@ -78,20 +78,20 @@ is that you want the result to be y₀ sometimes, y₁ other times, and
 somewhere in between at still other times.  For that to be a coherent
 wish, those three values need to have the same type:
 
-    T₀ = T₁ = T₅
+> T₀ = T₁ = T₅
 
 This reduces our component operation signatures to the following:
 
-    (x: T₀) - (y: T₀): T₃
-    (x: T₂) · (y: T₃): T₄
-    (x: T₀) + (y: T₄): T₀
+> (x: T₀) - (y: T₀): T₃  
+> (x: T₂) · (y: T₃): T₄  
+> (x: T₀) + (y: T₄): T₀
 
 If we arbitrarily add the additional constraint that T₃ = T₄, we have
 a simple algebraic structure that looks like an affine space:
 
-    (x: T₀) - (y: T₀): T₃
-    (x: T₂) · (y: T₃): T₃
-    (x: T₀) + (y: T₃): T₀
+> (x: T₀) - (y: T₀): T₃  
+> (x: T₂) · (y: T₃): T₃  
+> (x: T₀) + (y: T₃): T₀
 
 Here T₀ is the affine space, T₃ is its associated vector space, and T₂
 is the underlying scalar field of the vector space.  Computing lerp

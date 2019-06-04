@@ -4,30 +4,32 @@
 Next up:
 
 - maybe reify categories as a class?
-- add author name to pages
-- a more convenient way to query the triple store
-- maybe some metadata about word counts and time spans and unfinished
+- maybe some metadata about unfinished
   status?
 - maybe list categories on the link to the note?
-- maybe count notes in the category title?
 - A Bayesian classifier
 - add "INCOMPLETE UNVERIFIED DRAFT" to everything, and maybe
   SPECULATIVE to some things too
-- add 90 more notes
-- add Mathjax?  That’s not possible, is it?  Maybe it is, but the
-  package is 33MB.
+- add more notes
 
 """
 from __future__ import print_function, division
 import cgi
 import errno
 import os
+import string
 import re
 import urllib
-import urlparse
 import subprocess
 
+try:
+    from urllib.parse import quote_plus, unquote
+except ImportError:
+    from urllib import quote_plus, unquote
+
 import markdown
+
+import relation
 
 
 def ok(a, b):
@@ -36,51 +38,36 @@ def ok(a, b):
 class Bundle:
     def __init__(self, dirname):
         self.dirname = dirname
-        self._triples = list(load_triples(self.filename('triples')))
+        self._relations = as_relations(load_triples(self.filename('triples')))
         self.output_dir = 'dercuano-' + self.get_version()
         self.cached_titles = {}
-        self.note_list = list(self._notes())
+        self.notes = list(self._notes())
+        self.note_map = {note.notename: note for note in self.notes}
 
     def __repr__(self):
         return 'Bundle(%r)' % self.dirname
 
     def get_version(self):
-        for subj, verb, obj in self.triples():
-            if subj == 'dercuano' and verb == 'version':
-                return obj
-
-        return 'prerelease'
+        v = self.relation('version')['dercuano']
+        return 'prerelease' if not v else v[0]
 
     def get_title(self):
-        for subj, verb, obj in self.triples():
-            if subj == 'dercuano' and verb == 'bundle':
-                return obj
-
-        return 'Dercuano'
+        t = self.relation('bundle')['dercuano']
+        return 'Dercuano' if not t else t[0]
 
     def get_intro(self):
         with open(self.filename('intro.md')) as f:
             return RawHTML(markdown.markdown(f.read().decode('utf-8')))
-
-    def notes(self):
-        return self.note_list
 
     def _notes(self):
         dirname = self.filename('markdown')
         for notename in sorted(os.listdir(dirname)):
             if notename.endswith('~') or notename[0] in '.#':
                 continue
-            yield self.note(notename)
+            yield Note(self, notename, os.path.join(dirname, notename))
 
     def note(self, notename):
-        dirname = self.filename('markdown')
-        source_file = os.path.join(dirname, notename)
-        if ('/' in notename
-            or '\0' in notename
-            or notename.startswith('.')
-            or not os.path.exists(source_file)):
-            raise KeyError(notename)
-        return Note(self, notename, source_file)
+        return self.note_map[notename]
 
     def filename(self, *parts):
         return os.path.join(self.dirname, *parts)
@@ -106,9 +93,9 @@ class Bundle:
         return 'notes/' + as_filename(notename) + '.html'
 
     def note_title(self, notename):
-        for subj, verb, obj in self.triples():
-            if subj == notename and verb == 'titled':
-                return obj
+        t = self.relation('titled')[notename]
+        if t:
+            return t[0]
 
         internal_title = self.internal_title(notename)
         if internal_title is not None:
@@ -131,10 +118,8 @@ class Bundle:
             return None
 
     def category_title(self, category_name):
-        for subj, verb, obj in self.triples():
-            if subj == category_name and verb == 'category-titled':
-                return obj
-        return category_name.replace('-', ' ').capitalize()
+        t = self.relation('category-titled')[category_name]
+        return category_name.replace('-', ' ').capitalize() if not t else t[0]
 
     def category_link(self, category_name, level=1):
         return a(self.category_title(category_name),
@@ -145,15 +130,20 @@ class Bundle:
                    category_html(self, category))
 
     def categories(self):
-        return set(obj for subj, verb, obj in self.triples()
-                   if verb == 'concerns')
+        return set(~self.relation('concerns'))
 
     def notes_in_category(self, category_name):
-        return [note for note in self.notes()
-                if category_name in note.categories()]
+        return list(self._notes_in_category(category_name))
+
+    def _notes_in_category(self, category_name):
+        for notename in (~self.relation('concerns'))[category_name]:
+            try:
+                yield self.note_map[notename]
+            except KeyError:
+                print("erroneous category subject", notename)
 
     def category_size(self, category_name):
-        return len(self.notes_in_category(category_name))
+        return len((~self.relation('concerns'))[category_name])
 
     def generate_index(self):
         vomit_html(self.filename(self.output_dir, 'index.html'),
@@ -169,27 +159,46 @@ class Bundle:
             self.dirname, self.get_version(), self.output_dir),
                               shell=True)
 
-    def triples(self):
-        return self._triples
- 
+    def relation(self, verb):
+        try:
+            return self._relations[verb]
+        except KeyError:
+            return relation.Relation()
+
 
 def load_triples(filename):
     with open(filename) as f:
+        last_subj = None
         for line in f:
             if not line.strip():
                 continue
-            fields = tuple(urlparse.unquote(field.replace('+', '%20'))
+            fields = tuple(unquote(field.replace('+', '%20'))
                            for field in line.split())
+            if line[0] in string.whitespace:
+                fields = (last_subj,) + fields
             for fn in fields[2:]:
                 yield (fields[0], fields[1], fn)
+            last_subj = fields[0]
 
+
+def as_relations(triples):
+    relations = {}
+    for subj, verb, obj in triples:
+        if verb not in relations:
+            relations[verb] = relation.Relation()
+        relations[verb].put(subj, obj)
+
+    # Precompute inverse relations eagerly
+    for verb in relations:
+        ~relations[verb]
+
+    return relations
 
 class Note:
     def __init__(self, bundle, notename, source_file):
         self.bundle = bundle
         self.notename = notename
         self.source_file = source_file
-        self.category_set = self._categories()
         self._word_count = None
         self._date_string = None
 
@@ -205,21 +214,15 @@ class Note:
         return self._date_string
 
     def compute_date_string(self):
-        written = updated = None
-        for subj, verb, obj in self.bundle.triples():
-            if subj != self.notename:
-                continue
-            if verb == 'written':
-                written = obj
-            elif verb == 'updated':
-                updated = obj
+        written = self.bundle.relation('written')[self.notename]
+        updated = self.bundle.relation('updated')[self.notename]
 
-        if written is None and updated is None:
+        if not written and not updated:
             return ''
 
-        date = written or updated
-        if written != updated and updated is not None:
-            date += ' (updated ' + updated + ')'
+        date = (written or updated)[0]
+        if updated and written != updated:
+            date += ' (updated ' + updated[0] + ')'
 
         return date
 
@@ -242,9 +245,9 @@ class Note:
         return self._word_count
 
     def flavor(self):
-        for subj, verb, obj in self.bundle.triples():
-            if subj == self.notename and verb == 'flavor':
-                return markup_flavors[obj]
+        f = self.bundle.relation('flavor')[self.notename]
+        if f:
+            return markup_flavors[f[0]]
         return markdown_replacing_links(self.bundle)
 
     def render_if_outdated(self, print=lambda *args: None):
@@ -284,21 +287,12 @@ class Note:
         return html.replace('</h1>', '</h1>' + subtitle, 1)
 
     def author(self):
-        for subj, verb, obj in self.bundle.triples():
-            if subj == self.notename and verb == 'note-by':
-                return obj
-        for subj, verb, obj in self.bundle.triples():
-            if subj == 'dercuano' and verb == 'by':
-                return obj
-
-        return 'Anonymous'
+        return (self.bundle.relation('note-by')[self.notename]
+                or self.bundle.relation('by')['dercuano']
+                or ['Anonymous'])[0]
 
     def categories(self):
-        return self.category_set
-
-    def _categories(self):
-        return set(obj for subj, verb, obj in self.bundle.triples()
-                   if subj == self.notename and verb == 'concerns')
+        return set(self.bundle.relation('concerns')[self.notename])
 
     def is_outdated(self):
         source_stat = os.stat(self.source_file)
@@ -322,15 +316,6 @@ class Note:
 def pluralize(noun, number):
     return noun if number == 1 else noun + 's'
 
-def markdown_replacing_links(bundle):
-    def replace(s):
-        return replace_links(markdown.markdown(s.decode('utf-8')), bundle)
-    return replace
-
-markup_flavors = {
-    '<pre>': lambda s: ley(tag('pre')(s)),
-}
-
 def vomit_html(output_filename, html_contents):
     dirname, _ = os.path.split(output_filename)
     if not os.path.exists(dirname):
@@ -346,7 +331,7 @@ def vomit_html(output_filename, html_contents):
 
 def as_filename(candidate_filename):
     "Escape slashes, colons, NULs, etc., that break some filesystems."
-    return urllib.quote_plus(candidate_filename, safe='')
+    return quote_plus(candidate_filename, safe='')
 
 ok(as_filename('a/bad file\\name: this\0'),
    'a%2Fbad+file%5Cname%3A+this%00')
@@ -365,9 +350,7 @@ def note_date(note):
     return note.date_string()
 
 def index_html(bundle):
-    categories = sorted(bundle.categories())
-    bundle_title = bundle.get_title()
-    notes = sorted(bundle.notes(), key=note_date)
+    notes = sorted(bundle.notes, key=note_date)
     note_years = []
     last_year = None
     for note in notes:
@@ -383,6 +366,8 @@ def index_html(bundle):
     if last_year != None:
         note_years.append(ol(current_ol))
 
+    bundle_title = bundle.get_title()
+    categories = sorted(bundle.categories())
     return ley(html(title(bundle_title, ' version ', bundle.get_version()),
                     head_stuff(level=0),
                     h1(bundle_title),
@@ -465,15 +450,19 @@ def note_html(bundle, note_title, body, footers):
                     footers))
 
 ad_hoc_link_re = re.compile(r'(?:[fF]ile\s+)?<code>(.*?)</code>')
-def replace_links(html, bundle):
-    def repl(mo):
-        try:
-            note = bundle.note(mo.group(1))
-        except KeyError:
-            return mo.group(0)
-        return ley(note.link_ley())
+def markdown_replacing_links(bundle):
+    def replace(s):
+        def repl(mo):
+            note = bundle.note_map.get(mo.group(1))
+            return ley(note.link_ley()) if note else mo.group(0)
 
-    return ad_hoc_link_re.sub(repl, html)
+        return ad_hoc_link_re.sub(repl, markdown.markdown(s.decode('utf-8')))
+
+    return replace
+
+markup_flavors = {
+    '<pre>': lambda s: ley(tag('pre')(s)),
+}
 
 def head_stuff(level=1):
     stylesheet = '../' * level + 'liabilities/style.css'

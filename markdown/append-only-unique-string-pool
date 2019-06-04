@@ -1,0 +1,31 @@
+A couple of systems I’ve been dealing with recently involve reading in
+a bunch of strings (up to a few million) as fast as possible, storing
+them in minimal space, and then retrieving them by index.  It may turn
+out in these cases for space reasons to be advantageous to deduplicate
+the strings, but we can’t afford a lot of hashing or hash search time.
+
+The most space-efficient solution to the problem (without resorting to
+compression) is just to concatenate the strings with delimiters in
+between, or better, preceded by a variable-length count.  Then,
+retrieving string i requires iterating over the i preceding strings.
+
+That’s unacceptably slow both for indexing and for searching for
+duplicates.  If you store a separate array of the indices of the
+starts of the strings, you can quickly index, but on a 64-bit machine,
+that array may be rather large; it may be more practical to store the
+start index of, say, every 8th or 16th string, and then, in a separate
+array of 16-bit values, the lengths of all the strings.  These lengths
+only cost one more byte per string than inline delimiters, make the
+system 8-bit clean, and allow for strings up to 64KiB.  Now we have
+constant-time indexing.
+
+Finding duplicate strings requires some kind of additional index, of
+which a hash table is the simplest.  It has the problem that it
+potentially needs a lot of space if it’s full of pointers to strings,
+and I don't have any particularly clever solution to that, but it
+shouldn’t use much extra time if collisions can be kept low enough; in
+particular, you can compute the hash function as you’re copying the
+incoming string into the place it will be occupying in the
+concatenated strings if it turns out not to be a duplicate.  For very
+long duplicate strings, this copy will result in extra memory
+bandwidth, but for short strings and non-duplicate strings, it won’t.

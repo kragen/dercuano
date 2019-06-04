@@ -1,0 +1,61 @@
+Constant-space grep
+===================
+
+Grep reads an input file consisting of arbitrary-sized lines and
+outputs those lines which contain a given pattern.  Related utilities
+like mboxgrep and glimpse do a similar job.  One thing they all have
+in common is that when they reach the beginning of a new line (or
+other record), they do not yet know whether that line will be output
+or discarded; and they may not know until reaching the end of the
+line.
+
+Two simple approaches to this problem are to limit line length and to
+allocate memory dynamically.  Limiting line length is practical, but
+the arbitrary limit produces problems later on when you run into it.
+Allocating memory dynamically is also practical, but can use
+arbitrarily large amounts of memory.
+
+But the problem can be solved in constant space, for different kinds
+of constant space, with different degradations of the usual grep
+features.
+
+Sequential-access read-only rewindable input
+--------------------------------------------
+
+If your only writable memory is small, but the input file is stored
+and seekable, the best you can do is to keep track of how many bytes
+you are into the current line, and rewind the input back to the
+beginning of the line (“record”) when you find a match.  This
+requires, in the worst case, one seek for every record in the input
+file, and two reads of every byte.
+
+If the input file isn't even stored, grep is impossible, because
+computing the first output line can require an arbitrarily large
+amount of data to be stored.
+
+Two sequential-access bidirectional temporary files
+---------------------------------------------------
+
+With two tape drives, you can solve the grep problem as follows,
+although you lose grep's normal pipeline promptness.  Each record from
+the input is copied into a temporary file T1, followed by its length
+and a boolean carefully whether it contains a match or not.  Then, we
+read T1 backwards, copying the matching records (in reverse order)
+onto a second temporary file T2.  Since we're reading it backwards, we
+read the boolean before each record, so we know whether to copy it or
+not.  Finally, we read T2 backwards, copying its contents to the
+output.
+
+Under some circumstances, the file T2 itself (the backwards grep
+output) might be adequate as output to the next stage; in those cases,
+we can make do with a single sequential-access bidirectional temporary
+file.
+
+Two sequential-access unidirectional temporary files
+----------------------------------------------------
+
+In this case, we copy the input records into a temporary file T1,
+while writing match booleans to a second, much smaller, temporary file
+T2.  Then, we rewind both and read them sequentially and in parallel,
+using the match booleans from T2 to tell us which records to output
+from T1.

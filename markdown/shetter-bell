@@ -1,0 +1,26 @@
+A better shell might have some or all of the following properties:
+
+- Opens a new pty for each command and allows you to either include
+  the whole command output or a scrollable window on it in the overall
+  scroll.  Clearing the screen should, by default, fullscreen the
+  command output.
+- Displays which commands failed and which relied on now-changed
+  inputs.  (This requires tracking the inputs of every command.)
+- Optionally re-executes selected commands periodically
+- Displays per-command resource usage, such as CPU time and RAM usage.
+  By default runs commands with limits to prevent horking the whole
+  machine.
+- Provides notifications of finished, idle, and newly non-idle
+  commands in a way that doesn’t interfere with foreground tasks.
+  This requires at least some minimum UI for configuring it.
+- Copes with voluminous command output gracefully, at least up to
+  gigabytes.  Should have options to FIFO-discard, block (like ^S),
+  and increase the scrollback-retention limit.
+- Supports distributed operation, including running commands on remote
+  hosts, inside of Docker containers, and across multiple remote
+  hosts, as well as session recovery from network disconnection and
+  even machine restart.
+- Options for fancifying command output; for example, hyperlinking
+  `ls` and `ps` output, or colorizing and relayouting other commands’
+  output.
+- Programmable autocomplete, of course.

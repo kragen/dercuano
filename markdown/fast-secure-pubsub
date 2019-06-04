@@ -1,0 +1,38 @@
+Suppose you want to implement a fast, secure publish-subscribe
+service.  What if you package your message transformation and
+filtering code into individual processes that run and produce a
+result?
+
+The idea is that Turing-complete rules provided by the sender, the
+receiver, and possibly intermediate routing entities run in
+very-short-lived ephemeral processes which have relevant information
+mapped into their memory space.  Even on Linux, it’s possible to spawn
+off 7000 processes per second; we should be able to do better with a
+custom kernel.  Processes that exceed their CPU allocation are
+ruthlessly killed.
+
+Processes running sender-supplied code can be run with access to
+information about potential recipients to prevent insensitive
+recipients from seeing sensitive information, and then they can be
+killed to prevent them leaking information about the potential
+recipients either to the sender or to other recipients.  Processes
+running receiver-supplied code can inspect relevant aspects of the
+message to decide whether or not to pass the message along — either
+whole or in some summarized form.
+
+If access to the message is provided not via memory-mapping but via
+some kind of recordable API, a recipient-provided Turing-complete
+selection function that is careful not to inspect more message fields
+than needed can implicitly produce a memoized filter rule in a
+supervisory process.  For example, if the filter function inspects a
+“newsgroup” field, finds that its value is “alt.sex”, and then rejects
+the message without inspecting further fields, then the supervisory
+process can memoize a filter rule: `[{"newsgroup": "alt.sex"},
+"reject"]`.  Perhaps it can construct a trie on known values of
+“newsgroup” and only actually invoke filter functions whose results
+are not already recorded in the trie — perhaps they inspected an
+additional field, for example, or perhaps there are values of
+“newsgroup” that have not previously been seen.
+
+I think this is a particular application of Umut Acar’s
+“self-adjusting computation”.

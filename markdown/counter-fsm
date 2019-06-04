@@ -1,0 +1,30 @@
+Suppose you have an FSM connected to a delay line.  There should be a
+pretty simple transition table to make it into a counter; it just
+needs to somehow set its carry bit when it wraps around to the
+beginning again.  One solution is for the FSM’s initial state to be
+such that it emits a “start mark” or “framing mark” which doesn’t
+otherwise appear in the initial state of the delay line.
+
+Probably the simplest such scheme is the Internet-0 encoding scheme:
+11 is the framing mark, 01 represents a binary 1, and 10 represents a
+binary 0 (or vice versa), and 00 is unused (“blank tape” or no
+transmission).  This particular scheme can even work with odd-length
+delay lines, since once the counter sees a correctly-framed 00, it can
+go into a mode where it searches for the framing mark even at odd
+bits.
+
+This FSM, as a Mealy machine, has seven states: carrying, waiting to
+carry, copying, waiting to copy, searching, framing mark 1 (the
+initial state), and framing mark 2.  Its transition and output table
+is as follows:
+
+(XXX TODO)
+
+    |                     | 0 | 1 |
+    | A: carrying         |   |   |
+    | B: waiting to carry |   |   |
+    | C: copying          |   |   |
+    | D: waiting to copy  |   |   |
+    | E: searching        |   |   |
+    | F: framing mark 1   |   |   |
+    | G: framing mark 2   |   |   |

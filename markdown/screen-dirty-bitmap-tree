@@ -1,0 +1,21 @@
+Suppose we build up dirty bitmaps of screen areas starting from some
+leaf size?
+
+If we use the 8×8 pixel tile used in JPEG as our basic unit, and the
+64-bit size of an amd64 register as our treenode size, then the next
+level up the tree is 64×64 pixels, then 512×512.  My screen is
+1920x1080 pixels, so to fill it, you need just under four such tiles
+from left to right and just over two from top to bottom.
+
+So to describe a screen update, you could use twelve 64-bit words to
+list which parts of the screen you want to update, then another 64-bit
+word for each of those up-to-768 areas of 64×64 pixels you want to
+update, and then probably just pixel data for each 8×8 area.  The
+worst case for small updates is 13 64-bit words of overhead plus an
+entire 8×8 area (128, 192, or 256 bytes); for large updates, the 6240
+bytes of 1 bits at the beginning don’t amount to much, one bit for
+every 41 pixels.  (And in RAM of course you can keep those 6240 bytes
+always allocated.)
+
+I’m not sure how useful this is now that we’re often repainting the
+whole screen every frame.

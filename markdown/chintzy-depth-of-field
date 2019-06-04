@@ -1,0 +1,24 @@
+How do you render images with realistic depth-of-field defocus?
+
+You can do a kind of reasonable out-of-focus blur with a Gaussian
+blur, although the actual OTF of an out-of-focus camera is more like a
+circular box filter.  And you can do a pretty good approximation of a
+Gaussian blur with three (ordinary, non-circular) box filters.  But
+the diameter of the blur changes according to how far things are from
+the focal plane.
+
+It occurs to me that maybe you can adjust the width of those box
+filters dynamically as you move over the image, and that maybe this
+will give you a reasonable-looking approximation of depth-of-field
+blur for many images, though not all.  I’m thinking that you could
+have a “weight” factor for each pixel that is highest at the focal
+point and decreases as you move further from the focal point, and you
+maintain a constant “weight” within the moving-average sliding window
+as you slide it, sliding one or the other edge faster as necessary to
+keep the weight inside the window constant.  This way, the window is
+very narrow when it's at the focal plane, and very wide when it's far
+away.
+
+(This still results in computing far too many pixels for the
+out-of-focus stuff, and doesn't help with blurring of reflected
+images.)

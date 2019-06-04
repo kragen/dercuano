@@ -1,0 +1,22 @@
+Linear FM chirp sonar is cool.
+
+If you emit a sound chirping linearly from 6 kHz to 10 kHz over the
+course of two seconds, and it bounces off some object 1.72 meters away
+through air, the 10-ms-delayed echo signal will be 20 Hz lower than
+the outgoing signal; if the amplitudes are within an order of
+magnitude or so, this will result in audible 20 Hz beating between the
+outgoing signal and the echo.  If you jump back down to 6 kHz at the
+end of the two seconds, you’ll have a 10-ms length of time where the
+beating sound disappears, but that’s still a 99.5% duty cycle.
+
+(This is a chirp rate of 2 kHz/s; 343 m/s is 172 m/s in round-trip
+meters, so this works out to about 11.66 Hz/m.)
+
+You should probably be able to distinguish by ear a difference of ½ Hz
+as long as it’s more than about 10%; this would limit you to 10%
+distance resolution at far distances and 43 mm distance resolution at
+near distances.  A higher chirp rate would give you tighter distance
+resolution, but you would also run out of audible frequencies sooner.
+
+Writing a C program to generate such a chirp took a few minutes, and
+in practice I don’t seem to be able to do this by ear.

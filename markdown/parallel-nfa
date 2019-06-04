@@ -1,0 +1,125 @@
+Parallel NFA evaluation
+=======================
+
+Background
+----------
+
+All of this is well known; it’s included in [Blelloch’s 1993 review of
+parallel prefix sum computation][2] but was almost published by Ladner
+and Fischer in 1980, and then was published by Hillis and Steele in
+1986.
+
+[2]: https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf
+
+Explanation
+-----------
+
+How can you parallelize or incrementalize the evaluation of a finite
+state machine?  Although this has been considered in the past in the
+context of parallelizing text search queries like WAIS across Thinking
+Machines, this is a particularly important problem right now, because
+tokenization is almost always the performance bottleneck of simple
+compilers and parsers, and parallelization is the key to performance
+on modern computers.
+
+A simple and general approach which yields logarithmic running time
+for an NFA on a sufficiently large parallel machine is as follows.
+Assume WOLOG that the text length n is a power of 2.  Begin with an
+ε-free NFA.  For each character c[i] for i from 0 to n-1 of the input
+text, in parallel, compute a relation t[i, i+1] as the set of edges in
+the NFA that transition on c[i].  Then, in lg n parallel steps,
+coalesce adjacent intervals in t into larger intervals with this
+compose operation: compose(a, b), where a and b are relations, is the
+relation (s[j], e[j]) for the maximal set of s[j], e[j] such that for
+each j there is at least one m such that (s[j], m) is in a, and (m,
+e[j]) is in b.  (This is the ordinary relational composition
+operation.)  In each parallel step h, we are coalescing intervals of
+size 2ʰ with this composition operation.
+
+That is, in step h > 0, for each i divisible by 2ʰ, we compute
+
+    t[i, i+2ʰ] = compose(t[i, i+2ʰ⁺¹], t[i+2ʰ⁺¹, i+2ʰ])
+
+using the values we computed in step h - 1.
+
+The size of the relation for any given interval of any size is capped
+at the square of the number of states in the NFA, so in the worst
+case, it does not increase with the length of the text, so for a given
+NFA, this takes Ω(lg n) runtime in the worst case.  Average-case
+analysis is trickier, in part because it depends both on what an
+“average” NFA is and on what an “average” text is, but my intuition is
+that, in practical cases, the relation size for a text span of any
+length more than a few characters will be under, say, 10.
+
+Sooner or later you need to constrain the leftmost state to be the
+NFA’s initial state; it is probably best to do this by a special case
+in computing t[0], since that will save work in all the nodes that
+include it.
+
+Having done this, you can propagate the results back down the tree of
+intervals in another lg n steps, providing you with the exact
+reachable set of NFA states at each character boundary in the initial
+input.
+
+This is the standard Blelloch prefix-sum algorithm, merely using the
+relational composition operator as the reduction operation rather than
+numerical addition.  (Apparently Kogge-Stone is more common in current
+codebases?)
+
+In theory, you can get about a 5% improvement in total runtime by
+coalescing triples of adjacent intervals in each step rather than
+pairs.  In practice, depending on the relative costs of communication
+and computation, the optimal branching factor may be something
+different from 2, 3, or 4.  For example, if communication has high
+latency, it may be 32 or 1024.  (This also depends on the
+characteristics of the NFA: a higher branching factor may reduce the
+size of the intermediate-result relations substantially.)
+
+Reducing an NFA to a DFA is useful for many computational models, but
+in this case, the larger number of states in the DFA is likely to be a
+handicap.  You probably want to be coalescing your intervals using the
+smallest alphabet of states you can get away with.
+
+In practice, you probably want to do most of the computation serially;
+if you have 8192 cores, the best you can do is an 8192× speedup
+(ignoring superlinear speedups from caching and the like) so you might
+as well start out generating 8192 t[i, i+m] values on the 8192 cores
+by linearly running the finite automaton over each of 8192 chunks
+(probably as a lazily-materialized DFA rather than as an NFA),
+followed by, say, 13 steps of alternating communication and
+coalescence.
+
+Applications
+------------
+
+Using Bjoern Hoehrmann’s new parsing algorithm “[parselov][0]”, which
+conservatively approximates the language of a context-free grammar by
+compiling a stack-limited conservative approximation of its PDA into a
+finite automaton, it should be possible to perform nearly all of the
+work of parsing in parallel using this algorithm.  However, I’m not
+entirely sure how big parselov’s finite automaton is, and if it has a
+sufficiently large set of intermediate states, this might not work.
+
+[0]: https://github.com/hoehrmann/demo-parselov
+
+Google Code Search used to provide a public regular expression search
+over all public code.  For normal kinds of regular expression
+searches, where you aren’t interested in matches bigger than a few
+megabytes, parallelization on a cluster is probably not useful.  If
+you do need larger matches, for example on genome or proteome
+searches, parallelism may be useful.
+
+Using [Levenshtein automata][1], you can generate reasonable-sized
+NFAs to find strings within a small Levenshtein distance of a given
+string.  (Baeza-Yates and Gonnet, I think, came up with a different
+way to do this that takes advantage of bit-parallelism in modern CPUs
+and is therefore usually faster in the serial case.)  However, if the
+text being searched is static enough to be indexed, it is probably
+faster to run Levenshtein automata on a suffix array of the text,
+especially now that we have compressed indexing and practical
+linear-time suffix-array construction algorithms.
+
+[1]: http://julesjacobs.github.io/2015/06/17/disqus-levenshtein-simple-and-fast.html
+
+You can use a variant of this algorithm to incrementally update
+finite-state-machine results

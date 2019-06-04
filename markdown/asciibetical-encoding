@@ -1,0 +1,31 @@
+I thought I had written some notes about this previously, but I can’t
+find them right now.  I want a serialization for relatively general
+data structures (say, at least the S-expression or JSON data model)
+that possesses a useful homomorphism between some kind of natural
+ordering on the original data structures and the lexicographical
+ordering of the byte strings they serialize to.  That is, if E is the
+serialization encoding, I want E(X) < E(Y) iff X < Y.
+
+This is for five reasons:
+
+- LevelDB: LevelDB can iterate over the keys that are ASCIIbetically
+  within a certain range.  In fact, that’s the *only* kind of
+  iteration it supports.
+- 0MQ: ZeroMQ and Nanomsg can efficiently filter messages from a
+  pub-sub topic that begin with a given substring.
+- Compressed indexing: Patricia and related trie structures, as well
+  as FM-indices and related data structures, can efficiently retrieve
+  and even compress data — but they only support retrieval by
+  lexicographical prefixes, not by other arbitrary orderings.
+- Suffix arrays: suffix arrays can efficiently find all the
+  occurrences of a substring in a large file, and now there are simple
+  O(N) suffix-array construction algorithms.
+- Radix sorting: while comparison sorting is O(N log N), radix sorting
+  is O(N).
+
+To take advantage of these properties, I often end up writing some
+kind of simple ad-hoc serialization code for the data at hand, which
+often turns out to have bugs in it, and almost never generalizes to
+other kinds of data that aren’t in the data I’m looking at.  (For
+example, if I separate fields with spaces, I run into ordering errors
+once I have data containing ASCII control characters or spaces.)

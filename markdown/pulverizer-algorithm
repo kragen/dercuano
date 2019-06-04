@@ -1,0 +1,56 @@
+Aryabhata’s presentation of Euclid’s algorithm explains how to find
+the coefficients s and t such that sa + tb = gcd(a, b).  Except I
+don’t understand the explanation, so I am going to try to work through
+an example.
+
+Given 1247 and 1624.
+
+1624 - 1247 = 377  ∴ 377 + 1247 = 1624
+1247 - 3·377 = 116 ∴ 116 + 3·377 = 1247
+377 - 3·116 = 29   ∴ 29 + 3·116 = 377
+116 - 4·29 = 0     ∴ 4·29 + 0 = 116 ∧ gcd(1624, 1247) = 29
+
+So now I can try to express 29, the GCD, as linear combinations of the
+values on the other lines.  The first one is already done:
+29 = 1·377 - 3·116.  The previous pair was (1247, 377).  How can we
+get 29 as a linear combination of those?  We know that
+1247 = 116 + 3·377, but how does that help?
+
+Oh!  The thing that helps is actually the other direction:
+116 = 1247 - 3·377, which we can use to eliminate the 116 from
+377 - 3·116 = 29, rewriting it as
+377 - 3·(1247 - 3·377) = 29; 377 - 3·1247 + 9·377 = 29;
+10·377 - 3·1247 = 29.
+
+Then we can do the same thing again to re-express 29 from a (1247,
+377) basis to a (1624, 1247) basis, because 1624 - 1247 = 377.
+10·(1624 - 1247) - 3·1247 = 29; 10·1624 - 10·1247 - 3·1247 = 29;
+10·1624 - 13·1247 = 29.
+
+This is useful for finding multiplicative inverses, which only exist
+in the multiplicative group modulo n for numbers relatively prime to
+n.  In this case, if we divide by 29, we find that 10·56 - 13·43 = 1,
+so modulo 56, -13 (=43) and 43 are multiplicative inverses, and modulo
+43, 10 and 56 are.
+
+So after all these years I understand how to find multiplicative
+inverses efficiently in a Galois field.
+
+If the group is modulo a prime, then you can also find the
+multiplicative inverse by taking to the power n-2, by Fermat’s Little
+Theorem.  But that doesn’t work in general for multiplicative groups
+of any order: 56⁴² % 43 = 1, not 10; 43⁵⁵ % 56 does equal 43, but that
+is sort of a coincidence, since it’s its own multiplicative inverse,
+so half of its powers are 1.
+
+Can I formalize this?  If I’m looking for sa + tb = gcd(a, b), going
+backwards, the substitution into the 377 equation which gives me
+10·377 - 13·1247 = 29 sets s=-13 and t=10, because a was 1247 and b
+was 377 on that step.  These values of s and t come from a quotient of
+3 (-3) in that step and a previous expression for 29, 377 - 3·116,
+which had s=1 and t=-3, and where the remainder was in fact the gcd
+itself.  The new values were computed as (s, t) = (t, s+qt), I think?
+Does that work for the next step, where we re-express in the (1624,
+1247) basis, where the quotient was 1?  Here t=10, s=-13, and q=1, so
+that is (10, -13+10=-3), suggesting that 10·1624 - 3·1247 = 29, which
+is obviously wrong.

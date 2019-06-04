@@ -1,0 +1,29 @@
+810 amps at 3.7 volts is 3000 watts, which is 150 amps at 20 volts,
+plenty for arc-welding; different 18650 lithium-ion (Li-ion) cells are rated at 10–35 amps,
+with most being 20 or 30 amps in theory; being cautious and only
+expecting 5–10 amps out of each cell, you’d need 80–160 cells, quite a
+reasonable quantity really.  I mean a 9×9 array of cells would be 81
+cells.
+
+Charge and discharge rates are rated in “C”; 1C is a current that
+would yield the battery’s rated capacity over one hour.  2C and 3C are
+typical charge rates, but discharge rates range from 2C to [15C][3],
+depending on application.  Typical capacities range from 1000 to 3000
+milliamp hours.
+
+[Dimensions are 18.5 mm diameter, 65 mm length, 47 g][2], so an 11×11
+array of 2000 mAh 15C 3.7V cells would weigh 5687 g and deliver 3.6 kA.
+So uh I guess you could probably go with a quarter of that: a 6×6
+array of 2000 mAh 15C 3.7V cells, or [using a hexagonal array⁰][1], 37
+cells in a 7-across-the-corners hexagon (130 mm).  This weighs 1700 g
+and can deliver 1100 amps at 3.7 volts, 4100 watts.  An appropriate
+output circuit could convert this to 70 amps at striking voltage of 60
+volts, then 200 amps at arc-sustaining voltage of 20 volts.
+
+⁰ N.concatenate(([1,], 6 * N.arange(1, 10))).cumsum() # [1, 7, 19, 37, 61, 91, 127, 169, 217, 271]
+[1]: https://oeis.org/A003215
+[2]: https://lygte-info.dk/review/batteries2012/Common18650Summary%20UK.html
+[3]: https://www.rcgroups.com/forums/showthread.php?1908926-c-rate-n-a-18650-batteries
+
+These cells cost about US$10 each, so the whole battery pack would
+cost about US$370.

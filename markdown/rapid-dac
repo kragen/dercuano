@@ -1,0 +1,35 @@
+A 16MHz AVR like the one in an Arduino can read an 8-bit port fairly
+frequently, in theory every 4 cycles or so (4MHz), though I think in a
+real program you’d be lucky to get every 15 cycles (1MHz).  It
+occurred to me that you could maybe do a quasi-equivalent of an R-2R
+DAC to get some kind of sample at that frequency: by running different
+voltage dividers from a voltage source across the different pins, the
+digital level thresholding can maybe give you some approximate idea of
+how high a signal is: a 3-bit idea of it, to be exact.
+
+This sounds kind of useless, but I was thinking you could use it in
+combination with the ADC, which on the ATMega328 runs at up to 76.9
+ksps or up to 15 ksps at maximum resolution.  Each conversion takes 13
+ADC clock cycles, where the ADC clock runs at between 1/128 and 1/2
+the system clock, thus 125kHz to 8MHz at a 16MHz system clock speed;
+this gives us 9.6 ksps to 615 ksps, although I’m guessing that running
+the ADC clock at over 1MHz won’t produce useful results.
+
+I was thinking that you could run the normal ADC at its 15 ksps speed,
+thus providing an absolute 10-bit measurement of the input voltage,
+but then sample a high-pass-filtered version of the input voltage at
+about 1MHz and only three bits per sample.  This would give you about
+64 3-bit relative samples for each 10-bit absolute sample, gathering
+information about frequency components up to 500kHz.  If there is
+significant overlap in the frequency responses of the two parts of the
+system, you can use the slow, absolute, high-precision ADC to
+calibrate the fast, relative, low-precision ADC.
+
+You probably want to buffer the input voltage on its way into the
+high-pass filter and voltage dividers in some way — at least an
+emitter follower or source follower, maybe a whole op-amp buffer or
+something.
+
+This seems like it might be capable of converting an ATMega328 into a
+500kHz-bandwidth “oscilloscope”, which is like 2½% of a real
+oscilloscope.

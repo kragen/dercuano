@@ -1,0 +1,80 @@
+Some folks at the Fabricicleta were asking me a few years back about
+making high-efficiency amplifiers for audio from bicycles, so that you
+can really blast music driven by a five-watt hub generator I guess.
+
+Suppose you use, say, a 180MHz Cortex M3 LPC1830 as your processor,
+and suppose that you can only output one bit every two CPU cycles, or
+90MHz.  A simple pulse-density modulation scheme that swings from
+100010001000... to 111011101110... should limit the artifactual
+waveform from the PDM modulation to one fourth of the bit rate, or
+22½MHz; it can approximate waveforms of up to -6dB.  Then you can feed
+this bitstream into a Darlington or a power FET or whatever, then
+filter its output reactively to avoid power dissipation.
+
+(There may actually some lower frequencies that show up from
+dithering: 10101101010110..., for example, has an oscillation whose
+period is seven bit times.)
+
+This 22½MHz is three decades or ten octaves above anything we need to
+reproduce for audio purposes.  Even with just a single-pole 6dB/octave
+LR or LC filter, you get 60dB of attenuation as long as the cutoff
+frequency is at or below 20kHz; I think that with two stages of LC
+filter, you’ll get 24dB/octave, which would give you 240dB of
+attenuation.  You should be able to use fairly small-value inductors
+and capacitors for this, because the total amount of energy stored for
+half a cycle of a 22MHz wave is very small.
+
+Supposing we’re driving an 8Ω speaker, we’d probably like the output
+impedance of the final-stage filter to be a lot smaller than that at
+20kHz.  This actually means that the entire signal path from the
+amplifier through the two inductors to the speaker needs to have a lot
+less than 8Ω impedance, say, 0.8Ω.
+
+Capacitive reactance is 1/ωC, while inductive reactance is ωL.  This
+suggests that our maximum total inductance is when ωL = 0.8Ω, which
+happens when the inductors total 6.4μH.  And we’d like the second one
+to have most of that, so, say, 0.6μH in the first inductor, and 5.8μH
+in the second one, thus 75 milliohms of reactance in the first and 730
+in the second.
+
+Now we want our capacitors to ground to have the same reactance as the
+inductors at our 20kHz cutoff frequency.  So, for the first one, 75 mΩ
+= 1/(2π 20kHz)C, ∴ 2π 20kHz C = 1/75mΩ, ∴ C = 1/(2π 20kHz 75mΩ) =
+106 μF.  That’s a reasonably attainable value, though it has to be
+electrolytic.  The second one need only be 11μF.
+
+Digi-Key’s most popular inductor, with 1,077,238 in stock at the
+moment, is a 10¢ TDK 82nH 150mA inductor, the MLK1005S82NJT000.
+Sadly, its DC resistance is 1.8Ω, because it’s in an 0402 package (1mm
+× 0.5mm), so it can’t serve as a high-efficiency reactive filter for
+an 8Ω speaker unless we put a bunch of them together.  Which is
+actually a reasonable thing to do.
+
+Digi-Key's most popular inductor in the right range of inductance and
+DC resistance is Murata’s LQM2HPN1R0MG0L, a 34¢ 1μH (±20%) 1.6 amp
+55mΩ ferrite-core inductor in a 2520 (2.5mm × 2.0mm) package.  Its
+minimum self-resonant frequency is 60MHz, which suggests that it may
+actually not be a great choice here; it might capacitively couple
+through the exact high-frequency energy we want to stop.
+
+If I restrict to only inductors with a self-resonant frequency over
+180MHz, the most popular is the TDK MLZ1005MR47WT000, a 28¢ 470nH
+500mA 200mΩ multilayer ferrite-core inductor with a 260MHz
+self-resonant frequency, in the same 0402 package as the most popular
+one.  It's marketed as an “inductor for decoupling circuits”.  Its
+saturation current is 120mA, which I guess means that above 120mA it
+doesn’t induct any more.  120mA on an 8Ω load would be 115 milliwatts,
+but I guess you could use several of these inductors.
+
+I don’t know, I guess I have a lot more to learn about reactive
+filters.
+
+Could you just wind the inductor yourself?
+
+L = μ n² A / l, where μ is the permeability, n is the number of turns,
+A is the cross-sectional area, and l is the length.  So if I want an
+inductor of 6 μH or so, 12 turns with a radius of 1 cm and a length of
+1 cm and no core would be about right; or 39 turns with a radius of 1
+cm and a length of 10 cm and no core.  I feel like you could probably
+keep the parasitic capacitance and resistance down to trivial levels
+with that approach.

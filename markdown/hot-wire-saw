@@ -1,10 +1,13 @@
-An idea based on watching Grant Thompson's description and demo video
-of his "Styro-Slicer" hobby hot wire cutter.
+An idea based on watching Grant Thompson’s description and demo video
+of his “Styro-Slicer” hobby hot wire cutter.
 
 As an alternative to laser-cutting wood or MDF, you could cut it with
 a hot wire, like the one in a hot-wire styrofoam cutter.  Some
 hot-wire styrofoam cutters are already capable of cutting soft woods
 with some difficulty.
+
+The conductive wire bandsaw
+---------------------------
 
 I am envisioning a sort of bandsaw in which an endless loop of thin
 wire is run through the kerf, heating up on its way into the kerf and
@@ -14,11 +17,11 @@ electricity through it; the distance between the rollers is so much
 shorter than the distance around the other part of the loop that the
 other part of the wire is not dangerously heated.
 
-To be concrete, let's consider 80-micron-thick (40 AWG is 79 microns)
+To be concrete, let’s consider 80-micron-thick (40 AWG is 79 microns)
 nichrome wire cutting 3mm MDF with 50 watts of power, leaving, say, a
 100-micron-wide kerf, with the two electrical-feed rollers at a
 distance of 45mm between them and an additional 900mm in the loop.
-[Nichrome's resistivity is about a μΩm][0] and apparently 800 mA is
+[Nichrome’s resistivity is about a μΩm][0] and apparently 800 mA is
 enough to keep an 80-micron wire radiating at 1100°, which is plenty
 hot enough.  In this case the resistance of the 45mm should be about
 1 μΩm * 45mm/((80μm/2)²π) or about 9 ohms, so you need about 2400 mA
@@ -45,10 +48,10 @@ This machine seems nearly feasible, but a problem with this is that
 the exposed 45mm of wire is going to be not only radiating like a
 motherfucker, perhaps losing most of its energy into the void, but
 also possibly getting rather hotter than the 1400° that it can in fact
-withstand before melting.  And don't forget that the MDF needs to have
+withstand before melting.  And don’t forget that the MDF needs to have
 air blowing on it the whole time to keep it from catching on fire,
 which is also going to cool off the wire, although maybe this problem
-can be limited by careful management of the air blowing, so that it's
+can be limited by careful management of the air blowing, so that it’s
 only blowing in a very thin layer.
 
 So consider a revision: 127-micron-diameter (36-AWG) wire cutting a
@@ -57,16 +60,16 @@ between the conductive rollers.  This drops the resistance per mm by
 2.5 and the distance by 4x, getting us down to about 930mΩ, which
 means that we now need 7 amps running through the wire, powered by
 about 7 volts, and a power-supply output impedance of below an ohm or
-so to keep efficiencies reasonable.  That's still hot enough to melt
-the wire if there's no thermal load on it, but I feel that it's
+so to keep efficiencies reasonable.  That’s still hot enough to melt
+the wire if there’s no thermal load on it, but I feel that it’s
 possible to keep it running through the rollers fast enough to keep it
 passively safe, even without rapid-response electronic control to keep
-it from burning.  And it's mechanically strong enough that it might
+it from burning.  And it’s mechanically strong enough that it might
 survive encounters with things that unexpectedly fail to burn on
 contact with it.
 
 (180-micron (33-AWG) nichrome wire is commonly used for
-styrofoam-cutting machines like the popular Argentine brand "Segelin".
+styrofoam-cutting machines like the popular Argentine brand “Segelin”.
 Thicker gauges are common; thinner gauges are somewhat exotic.  One
 Aldo Vignolo sells them on Mercado Libre here in Buenos Aires.)
 
@@ -77,22 +80,22 @@ comes, maybe turning off power to let the wire cool in between.
 How much thermal energy can be stored in the gap before the wire
 melts?  Nichrome has a specific heat of 450 J/kg/K and a density of
 8.4 kg/liter, which works out to 3.8 kJ/liter/K.  At 127 microns,
-that's 48 microjoules per millimeter per kelvin, or 67 millijoules per
+that’s 48 microjoules per millimeter per kelvin, or 67 millijoules per
 millimeter, or about 800 millijoules in all, to melt the wire in the
-gap.  The situation is slightly worse because nichrome's resistance
+gap.  The situation is slightly worse because nichrome’s resistance
 increases slightly with temperature, so it can experience a kind of
 thermal runaway where hotspots heat up faster, and also slightly
 better because the hottest spots are also radiating away energy most
 rapidly.  Disregarding these, this means that keeping it passively
-safe at 50 watts involves feeding a gap's worth of wire onto a quench
+safe at 50 watts involves feeding a gap’s worth of wire onto a quench
 roller about every 16 milliseconds, a speed of about 750 mm per
-second.  But that's just to barely keep the wire from melting.
+second.  But that’s just to barely keep the wire from melting.
 
-I'm not sure that shortening the gap was a big improvement.  It does
+I’m not sure that shortening the gap was a big improvement.  It does
 lower the amount lost in the other part of the loop, but it also
 reduces the heat capacity of the wire in the gap, thus requiring
 faster response if we decide to use active feedback for safety, and so
-it doesn't actually affect the necessary passive-safety wire speed.
+it doesn’t actually affect the necessary passive-safety wire speed.
 And, because it lowers the resistance, it requires a higher-quality
 power supply and heavier wiring.  And, because it raises the required
 current, it also increases the possibility of melting the wire ---
@@ -110,9 +113,10 @@ This is low enough that it is *almost* passively safe even for copper,
 which melts at 1084°, even without the quench rollers.  The resistance
 in the gap is up to 2Ω, which means you need 9 volts, a very
 convenient number indeed.  You no longer need quite such big hairy
-power cables or a high-quality power supply; Duracell's spec for their
+power cables or a high-quality power supply; Duracell’s spec for their
 [MN1604 nine-volt battery][1] lists a 1.7Ω impedance, so even that
-would be almost good enough; a dozen or so in parallel would do.  The
+would be almost good enough; a dozen or so in parallel would do,
+though obviously a line-powered power supply would be more cost-effective.  The
 gap can now hold 1.7 J of thermal energy before melting:
 
     You have: 450 J/kg/K * 8.4 kg/liter * ((127 microns/2)^2 pi) * 25 mm * 1400 K
@@ -139,12 +143,12 @@ kerf of .035 inches in US folk units (890 microns), losing six times
 as much material and thus with six times as much opportunity for
 imprecision.
 
-I don't know if it will work as well as a 40-watt laser cutter at
+I don’t know if it will work as well as a 40-watt laser cutter at
 cutting wood, even if you blow air down the wire.  I think the laser
 cutter is usually heating up a tiny point rather than a whole contact
 surface, so it might heat the wood or MDF to a higher temperature.
 But maybe this will instead work better, since it has some mechanical
-sliding action and won't be impeded by smoke.
+sliding action and won’t be impeded by smoke.
 
 [CNC foam cutters commonly use inconel][3] rather than nichrome.
 
@@ -155,7 +159,22 @@ sufficient for cutting wood, and suggests using either a reciprocating
 or an endless wire.  It says the wood itself need only heat up to 240°
 to 270°, and that irregularities in the wood pretty much require
 closed-loop temperature control, and claims 10 to 21 mm/sec of cutting
-speed.  Unfortunately it doesn't go into any detail about power usage,
+speed.  Unfortunately it doesn’t go into any detail about power usage,
 preheat gap size, wire speed, or wire diameter.
 
 [2]: http://www.freepatentsonline.com/5429163.html
+
+Induction heating
+-----------------
+
+As an alternative to heating the wire by running electricity through
+it lengthwise, you could run it through a high-frequency induction
+heater and thus induce eddy currents in it, particularly if it’s
+ferromagnetic.  Rudnev et al.’s _Handbook of Induction Heating, Second
+Edition_ tells us on p. 38, in §2.2.4, that induction heating of wire
+is commonplace, using frequencies from 10 to 800 kHz and wire speeds
+through the inductor around 2 m/s.  They cite a particular system they
+built for Radyne that heat-treats 1060 carbon-steel spring wire in the
+4–8-mm diameter range with a 400 kW, 10 kHz inverter for heating up to
+its Curie temperature, then a 420 kW, 200 kHz for heating above its
+Curie temperature; but they don’t give a wire speed.

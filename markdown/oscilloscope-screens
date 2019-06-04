@@ -1,0 +1,33 @@
+I was thinking it would be pretty nifty to rig up something like the
+displays in Brazil using a big Fresnel lens and an old analog
+oscilloscope tube.  The benchmark here is maybe the TX-2 display used
+to develop Sketchpad and GENESYS in the 1960s: 1024×1024 with a single
+brightness, a limited range of color (blue initially, yellow
+afterglow), typically less than 32768 points lit, and I think 100 000
+points per second (?).
+
+If we were to drive a 20MHz oscilloscope with the analog VGA signal
+from a modern video card, we could probably actually do better than
+that.  The video card can produce about 72 *million* points per
+second, about 720 times greater than the TX-2, and has memory for a
+bit over a million of them, about 32 times greater.  The tube becomes
+the limiting factor — if we figure that it can be persuaded to go to
+an arbitrary spot on the display 40 million times a second, perhaps
+with a bit of filtering to compensate for the 3dB attenuation and
+phase shift at that point, that’s one limitation.  But that still
+means we could paint every point on the display 40 times a
+second — the slow phosphor becomes an even bigger limitation.  And it
+probably doesn’t have 1024×1024 faceplate resolution, maybe more like
+512×512 if we’re lucky.
+
+A possibly more entertaining approach is to allocate, say, 100k points
+to each of many oscilloscopes, and refresh them each at, say,
+10 Hz — with a fast enough switch you could multiplex one pixel to
+each display and thus drive 72 oscilloscopes off a single video card,
+but it’s probably easier to switch a 20MHz signal to each display for
+the requisite 2.5 milliseconds out of every 100, limiting you to 40
+oscilloscopes but allowing you to use a 4kHz multiplexing switch.
+
+If you wanted to drive them all from a single frame — so you didn’t
+have to synchronize your page flips with the switch — you could still
+drive about 10 oscilloscopes.

@@ -1,0 +1,34 @@
+I was thinking about how to make a vocoder on the way to the office
+today, and it occurred to me that a fairly simple approach might be to
+use CIC filters.
+
+Essentially the idea is that, for a single band, you use a
+moving-average filter (or more than one) over past samples to get a
+decimated (and thus low-pass-filtered) version of the signal; then you
+use a recurrent comb filter fed with, say, a subtraction between
+adjacent decimated samples, to estimate how much it’s oscillating at
+harmonics of the comb filter’s fundamental.  Because the signal is
+decimated, you have very little frequency precision, which is what you
+want for vocoder band detection.
+
+In particular, most human voice energy is between 64 Hz and 2048 Hz,
+which is a range of only five octaves; Wikipedia says, “There are
+usually between eight and 20 bands,” so something like half-octave
+resolution is called for.  Dudley’s original 1939 Voder used 10 filter
+bands.  I think it might be necessary to subtract amplitude signals
+from overlapping bands to get such high frequency precision with
+simple decimated signals.
+
+Then you can use a similar process in reverse to apply the band
+coefficients to the carrier signal you want to vocode.
+
+I’m thinking that it might be possible to get a working vocoder in
+about ten or twenty lines of C with this approach.
+
+...having tried it in Numpy, I’m no longer as optimistic, although
+maybe there’s a way.  The issue is that you need really good
+attenuation in the stopband, and to be able to invert by subtracting,
+you need really, really precise zero-phase response — one milliradian
+of phase error is already a limit of -60dB on your stopband
+attenuation, and 10 milliradians is -40dB.  I think it might still be
+possible.
