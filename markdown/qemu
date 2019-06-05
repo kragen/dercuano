@@ -1,0 +1,75 @@
+I'm running QEMU with kqemu on my old 700MHz laptop.
+
+User-mode stuff is slowed down only slightly.  This command line:
+
+    time for x in $(seq 10000); do :; :; :; :; done
+
+takes 1.17 1.19 1.20 1.22 user seconds in emulation and 1.13 1.13 1.14
+1.14 user seconds outside QEMU.
+
+However, it takes about 100ms of system time in place of about 10ms.
+(The `-kernel-kqemu` flag may solve this; haven't measured.)
+
+I had some kind of keyboard problem when I ran QEMU 0.8.2-4etch1 with
+`-snapshot`.  Like, the keyboard just didn't work.  That problem went
+away when I built QEMU 0.9.1 from source and started using that, but I
+still can't use `-snapshot` and `-loadvm` together.
+
+Networking: `tap`
+-----------------
+
+This was a bad idea (for me).
+
+By default, QEMU uses `user` networking, which proxies network
+connections through normal sockets, like `slipknot` or `slirp` or
+`term`.  (In fact, it uses `slirp`.)  I thought this didn't give me a
+way to talk to it over the network (for example, if I'm running a web
+server on it).
+
+So I thought `-net tap` could help with this, but it has some
+drawbacks.  It requires running QEMU as root, and then the network
+interface on the emulated machine needs to be configured statically,
+e.g. in `/etc/network/interfaces`, since `-net tap` doesn't provide
+DHCP by default.  And then you have to set up IP masquerading, more or
+less as follows:
+
+    qemu -net nic -net tap,script=ifup "$image"
+
+In file `ifup`:
+
+    set -e
+    /sbin/ifconfig "$1" 172.20.0.1
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    /sbin/iptables -t nat -A POSTROUTING --source 172.20.0.0/24 -j MASQUERADE
+
+This does actually work, but you have to configure the network stuff
+inside of QEMU: IP address, netmask, default gateway, and worst of
+all, DNS server.  And I think it might allow other people on your LAN
+to masquerade through you.
+
+What would be ideal would be bridging the virtual interface to my real
+Ethernet interface, but I never got around to doing this.
+
+Networking: `-redir`
+--------------------
+
+It turns out there's an easier way.  I can use the default `user`
+networking, and if I have a web server on the emulated host on port
+8080, I can say
+
+    qemu -redir tcp:8000::8080 "$image"
+
+and connect my web browser to <http://localhost:8000/>.
+
+This works beautifully.  The one downside I've found is that if you're
+using `qemu -loadvm`, the inner virtual machine has to re-request DHCP
+before the redirection works.
+
+Startup: `-loadvm`
+------------------
+
+Bootup takes an annoyingly long time.  But, if you don't regularly
+have any permanent changes you want to save, you can use the `savevm`
+command to save an image of the virtual machine state after a boot,
+and then use `qemu -loadvm` to start QEMU in the already-booted state.
+

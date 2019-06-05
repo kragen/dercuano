@@ -1,0 +1,51 @@
+I tried 3D-printing a mechanical LUT on Julian Cerruti's Prusa Mendel
+the other day.  The idea is that you position a probe in X and Y to
+set the input, then drop it down to see how far down it can fall
+before hitting the LUT to get the output.
+
+It didn't go well, for several reasons.
+
+First, I was trying to print at high resolution, both horizontally and
+vertically.
+
+Vertically: my model had a 1/32 solid part at the bottom, and rose to
+a max height of 15/64 above that; these units were scaled to √2
+centimeters, so the minimum thickness was √2 cm/32 = 0.044 cm = 0.44
+mm, which worked okay (the first layer thickness was set to 0.35 mm,
+and subsequent layers 0.2 mm); the total thickness then would have
+been 17 √2 cm/32 = 3.76 mm.  But note that 3.76mm is only 18 layers of
+plastic, which is close enough to the nominal LUT's desired resolution
+of 16 thicknesses that there could be aliasing problems.  It would be
+better to double the thickness and align it precisely with the layers:
+two layers of solid, plus two layers per LUT level, for a total of 34
+layers: (+ .15 (* 34 .2)) = 6.95 mm.
+
+Horizontally: across the √2 cm width of the model, I had 15 intervals
+between grid lines, or 0.94 mm per interval.  While the Mendel is
+perfectly capable of positioning the print head with precision well
+below a millimeter, the extruded plastic is substantially wider.
+Measurement of the infill lines on the bottom surface shows them to be
+spaced about 1mm to 1.5mm apart.  Corner radius seems to be about
+0.5mm.  This means you can't practically make a positive feature with
+a total width below 1mm, with the software stack Julian's using,
+anyway (slic3r and pronterface, I think).
+
+I think it's possible to achieve this with 1mm to 1.5mm horizontal
+spacing.  It should be possible to make *holes* much narrower than
+1mm, as long as they don't have to be too close together.
+
+This brings me to the second problem: discontinuous layers.  FDM
+machines typically print in horizontal slices to avoid crashing the
+print head into already-printed stuff, but they have various kinds of
+trouble when those horizontal slices contain discontinuities.  At a
+minimum, they pull threads of plastic between the different places
+they visit; but also, the process of switching the pinch wheel between
+forward and reverse seems to be fairly undependable.  So it might be
+desirable to add material *in between* grid points so that each layer
+is a single continuous piece.  If the object is still a heightfield,
+this continuous-piece constraint simplifies to "no local maxima".
+
+A third potential problem — which didn't show up in this case, but did
+in previous prints — is horizontal surfaces over infill.  This
+requires the infill to be nice and solid to support the surface well;
+otherwise it can end up with holes in it.  

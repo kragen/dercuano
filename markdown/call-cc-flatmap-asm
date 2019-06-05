@@ -1,0 +1,63 @@
+I think you can write `flatMap` and thus `map` and `filter` as
+higher-order functions in the backtracking monad if you have
+`call/cc`.  The iterator just takes a next-continuation and a
+fail-continuation (or end-continuation) as arguments.  `flatMap` then
+takes a function f and an iterator i and invokes the iterator i with a
+next-continuation it makes up, and the same end-continuation.  The new
+next-continuation invokes f with the item to get an iterator j and
+then invokes j with the original next-continuation and a new
+end-continuation it makes up, which returns from the made-up
+next-continuation.  Then `map` and `filter` are simply invocations of
+this `flatMap` with slightly modified functions.
+
+This structure allows you to do flatMap (and Python generator
+expressions) without arbitrary intermediate storage and therefore
+without a heap.  In fact, I suspect you can do it quite easily without
+a heap in assembly language, piling up the various stack frames of the
+dynamic nesting structure of iterators by pushing the stack pointer
+lower and lower, resuming back and forth between the various
+coroutines by storing and restoring PC and BP and whatever other
+callee-saved registers your ABI requires.
+
+Normally, I suppose, the fail continuation would just be the regular
+return path.
+
+This idea turns out to be central to [Raph Levien’s Io
+language](http://canonical.org/~kragen/raph-io); although `flatMap` is
+not in the Io material I've seen (which does not include the original
+paper) it is very short to define, though to my mind somewhat tricky:
+
+    flat-map: -> f items k1;
+        k1 -> return yield;
+        items return -> item next;
+        f item -> transformed-items;
+        transformed-items next -> transformed-item next-transformed-item;
+        yield transformed-item;
+        next-transformed-item.
+
+Here I have omitted as extraneous (and possibly ambiguous) the parens
+around action-valued variables as arguments that are used in the
+original paper; and I am using the convention from the paper that
+streams take as arguments first the return-continuation and then the
+yield-continuation.  So, for example, the return-continuation for
+transformed-items is the resumption continuation for the items stream.
+
+You can write `map` and `filter` in terms of `flat-map`, but you can
+also write them from scratch; we can use Levien’s convention that a
+boolean function takes if-true and if-false continuation parameters.
+
+    map: -> f items k1;
+        k1 -> return yield;
+        items return -> item next;
+        f item -> transformed-item;
+        yield item;
+        next.
+
+    filter: -> f items k1;
+        k1 -> return yield;
+        items return -> item next;
+        f item (yield item; next) next.
+
+(Oh dude!  Raph put the paper online at
+<http://www.levien.com/pubs/io_a_new_programming_notation.pdf>!  That
+clears up a couple of my confusions.)
