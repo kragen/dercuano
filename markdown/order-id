@@ -1,0 +1,81 @@
+In a Java system I'm working on where we simulate trading, we end up
+with order IDs in the logfiles.  Unfortunately, Java's default is to
+use randomized memory addresses or something for object hash codes,
+which vary randomly from run to run.  This means we can't usefully
+diff our logfiles.  Also, the IDs are 6 hexadecimal bytes.
+
+I think a more useful way to assign order IDs would be with dates:
+represent the most useful aspects of the date in a short string.  In
+particular, I'm thinking the last digit of the year (since our
+backtesting simulations cross years), some uniquish ID for the day
+inside the year (a bit over 8 bits of data, so we can expect a minimum
+of two characters for this), and then a serial number inside the day.
+
+There's a standard notation for something close to this in the futures
+markets: ESZ4 is the ES contract with delivery in December 2014, with
+the letter Z identifying the month, in some sense identifying the
+fortnight within the year.  If we use letters for fortnights in this
+way, we have 14 or 15 days to discriminate among with an additional
+letter or number to get to the day, which is entirely doable.  Ideally
+this second letter will be lowercase, and avoid easily misread letters
+like l, i, and o.  Then we can number the orders inside the day with
+digits.
+
+This gives us IDs like Z4d3, for the third order on 2014-12-04.  This
+is a huge improvement over the current situation: it's a third
+shorter, human-readable, and consistent from run to run.
+
+From <http://www.cmegroup.com/product-codes-listing/month-codes.html>:
+
+    January     F
+    February    G
+    March       H
+    April       J
+    May         K
+    June        M
+    July        N
+    August      Q
+    September   U
+    October     V
+    November    X
+    December    Z
+
+If we wanted to assign two letters per month, sequentially, consistent
+with the above, we could almost do it:
+
+    January     E F
+    February    G ???
+    March       H I
+    April       J ???
+    May         K L
+    June        M ???
+    July        N P
+    August      Q R
+    September   S T
+    October     U V
+    November    W X
+    December    Y Z
+
+If we add B for the second half of February, A for the second have of
+April, and C for the second half of July, then we can do it, at some
+cost to consistency.  If we're willing to accept that kind of
+inconsistency, then at the cost of a little more of it, we could
+eliminate another one: in the above chart, the CME letter is sometimes
+the first half of the month and sometimes the second.  If we make it
+always the first half, and use out-of-sequence letters for the others,
+then we end up with this (the six out-of-sequence letters marked with
+`*`):
+
+    January     F B *
+    February    G C *
+    March       H I
+    April       J D *
+    May         K L
+    June        M E *
+    July        N O
+    August      Q R
+    September   U P *
+    October     V W
+    November    X Y
+    December    Z A *
+

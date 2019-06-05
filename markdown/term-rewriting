@@ -1,0 +1,85 @@
+Typical term-rewriting patterns are of the form
+
+    x(?y, z) -> foo(?y, ?y)
+
+where the “?” identifies the `y` as a variable (or, we might say, a
+metavariable).  This poses a certain amount of difficulty for
+metacircularity, such as a program to determine whether a set of
+rewrite rules is confluent (normalizing); you might want to look for
+the literal pattern `?y` or especially `??y` for any `?y` in some
+rewrite rule you are trying to manipulate.
+
+Prolog, where all this originally came from, is even trickier along
+this axis, since it spells `foo` and `?foo` as `foo` and `Foo`,
+respectively.
+
+One possible solution to this problem is to declare the metavariables
+out-of-line:
+
+    (rewrite (y) (x y z) (foo y y))
+
+or
+
+    metavariable y;
+    x(y, z) -> foo(y, y)
+
+-----
+
+Another aspect of term-rewriting languages is that they don’t
+accommodate extensible data structures very easily.  Suppose you have
+a bunch of rules of the following form:
+
+    ?x + constant(0) -> ?x
+
+Now, you decide that constants should additionally include the line
+and column number where they were found, thus improving your debugging
+information.  This forces you to modify the above rule as follows:
+
+    ?x + constant(0, ?_) -> ?x
+
+And you must do the same thing for all similar rules.
+
+Suppose instead that the nodes of your graph instead have arbitrary
+sets of named properties, perhaps namespaced to avoid unfortunate
+property collisions, and with the proviso that extra properties not
+mentioned never cause a match failure.  Then we can write the above
+instead as follows:
+
+    {addend1: ?x, addend2: {constant_value: 0}} -> ?x
+
+This version will survive such an augmentation without modification.
+
+-----
+
+This is the same data model as Binate, and suggests that you should be
+able to write such rewrite systems as Binate relations, making them
+point-free (and solving the above problem of metacircularity in a
+different way): the transitive closure of some rewrite relation,
+perhaps.  That is, the above algebraic rewrite rule would be part of a
+relation called something like `algebraically_simplifies_to`, so we
+could ask whether
+
+    (4 + 0) algebraically_simplifies_to 4.
+
+or indeed what a given expression simplifies to.  The
+`algebraically_simplifies_to` arc or arcs from that expression would
+be in some sense on equal standing with the `addend1` node from it to
+4.  We can take the transitive closure of that relation and subtract a
+version of its own converse from it to exclude results that can be
+algebraically simplified further.
+
+I am not sure if this is in practice a feasible thing to do with
+Binate, or what would be needed to make it feasible, or whether it
+would be practical, but it is a very appealing simplification and
+unification!
+
+It also avoids the ugly ad-hoc extension to term-rewriting
+pattern-matching in Leler’s Bertrand (p.53 of his book)
+where `aNumber` matches any number, etc.
+
+I think one big problem here is that in Binate, equality is (I think)
+necessarily defined by identity rather than content: two point objects
+with the same `x` and `y` properties are not equal, because one of
+them might have some other property (such as `z`) which is not
+supposed to affect the behavior of queries that don’t mention that
+property.

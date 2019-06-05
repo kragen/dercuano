@@ -1,0 +1,79 @@
+There’s this thing called “immediate-mode GUIs” floating around which
+is kind of related to immediate- versus retained-mode drawing systems.
+But it’s not really.  In an immediate-mode GUI, you supply the library
+with a function which draws your UI, and it invokes it when necessary,
+influencing its execution as needed.
+
+A real drawing equivalent of immediate-mode GUIs might be how you
+would draw if you only had a single scan line of framebuffer.  You
+could have a function that represented the image you wanted to draw,
+invoked with a drawing context object of type `dctx`, once every scan
+line:
+
+    void draw_stuff(dctx *c)
+    {
+        draw_rect(c, 10, 10, 100, 100, DC_GREY);
+        draw_circle(c, 10, 10, 100, 100, DC_BLACK);
+        int baseline = 55;
+        if (bbox(c, baseline - font_height, 0, baseline, 100)) {
+            char *s = "Welcome";
+            int text_width = text_escapement(s);  // for centering
+            show_text(c, 55 - text_width/2, baseline, s, DC_RED, DC_BLACK);
+        }
+    }
+
+Note that this is almost entirely abstract over the question of
+whether you’re drawing a scanline at a time or what.
+
+The `bbox` function determines whether or not part of the
+currently-being-drawn area impinges on that bounding box.  If not, the
+user-provided function above skips the potentially expensive
+calculations within.  This is the same approach IMGUI libraries use to
+handle buttons being clicked, menus being open, and so on.
+
+Serious IMGUI libraries do stuff to help you divide your GUI-drawing
+function into separately memoized parts, but I’m not going to touch on
+that here.  Instead I’m going to focus on the idea of using this to
+make it usable to draw graphics scanline by scanline.
+
+Let’s consider what `show_text` has to do.  It’s being invoked with a
+`dctx`, a start point, some text, a foreground, and a background:
+
+    // in the dctx library:
+    void show_text(dctx *c, int x, int y, char *s, color fg, color bg)
+    {
+        <<show_text implementation>>
+    }
+
+Let’s suppose for the moment that we only have one font, and it’s a
+proportional bitmap font; and that this function in particular only
+has to draw a single line.
+
+First, we ought to check to see if our bounding-box is being drawn,
+which means we have to compute it.
+
+    // in show_text implementation:
+    int width = text_escapement(s), max_x = x + width, min_y = y - font_height;
+    if (!bbox(c, x, min_y, max_x, y)) return;
+
+Now, though, we need to copy the appropriate chunks of pixels into the
+scan line, in the appropriate color.  This part inevitably depends on
+the fact that we’re drawing a single scanline, rather than half a
+scanline or four scanlines.
+
+    int font_line = c->y - min_y;
+    char k;
+    for (char *p = s; (k = *p) != '\0'; p++) {
+        short pixels = get_font_pixel_slice(k, font_line);
+        char width = get_font_pixel_width(k);
+        for (int i = 0; i < width; i++) {
+            c->buf[x] = pixels & 1 ? fg : bg;
+            x++;
+            pixels >>= 1;
+        }
+    }
+    
+And that’s it, aside from some relatively mundane details about
+`get_font_pixel_width` and `get_font_pixel_slice`.  That gives you the
+software equivalent of an old-style character generator, permitting
+color framebufferless rendering at arbitrary pixel offsets.

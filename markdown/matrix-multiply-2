@@ -1,0 +1,75 @@
+Here's a second whack at the problem of designing a Lisp dialect that
+lets you write array operations in terms of pointwise transformations,
+by means of static dependent type inference, in order to avoid
+run-time type and bounds checks.
+
+First, array indexing.  Arrays are a kind of function, but unlike
+other functions, you can find their bounds with the expression (bounds
+anArray).  Arrays always take only a single argument, which can be
+either an integer within their bounds, or a vector of integers within
+their bounds.
+
+Second, because vectors are so fundamental, there's a special syntax
+to construct zero-based vectors: [a b c d ...], which kind of looks
+like Scheme's #(...)  syntax but doesn't quote, so it's semantically
+more like Python's list syntax or Squeak's { a. b. c } syntax.
+
+So if you have a vector x and you want its fourth element, you can
+write (x 3) or (x [3]).  As special syntactic sugar, if you leave out
+the space before the [, you get an extra layer of list wrapped around:
+x[3] is equivalent to (x [3]).
+
+The (define ...) form from Scheme supports an extra feature not found
+in R5RS, which is already in MzScheme --- the thing being defined can
+be arbitrarily deeply nested on the left side.  So all three of these
+definitions are equivalent:
+
+    (define x (lambda (y) (lambda (z) (+ y z))))
+    (define (x y) (lambda (z) (+ y z)))
+    (define ((x y) z) (+ y z))
+
+This is so that you can define array-valued functions conveniently:
+
+    (define (matrix-multiply m n)[i j] (sum k (* m[k j] n[i k])))
+syntactic sugar for
+    (define ((matrix-multiply m n) [i j]) (sum k (* m[k j] n[i k])))
+
+(bounds anArray) returns the bounds of the array as a vector of
+2-element vectors, each indicating the minimal valid index and one
+more than the maximal valid index.  So a 2x3 array that's all
+zero-based would have a bounds of [[0 2] [0 3]].
+
+It is an error to construct non-rectangular matrices, because they
+don't have bounds that can be expressed in the above form.
+
+For each array-valued function, the compiler infers a function that
+constructs the bounds of the resulting array from the bounds of its
+arguments.  The bounds of the result are the widest possible bounds
+that the compiler can guarantee will not result in out-of-bounds
+accesses to any other array.  Some arrays constructed by functions may
+be infinite, such as the generalized identity matrix (or Kronecker
+delta?):
+
+    (define identity[i j] (if (= i j) 1 0))
+
+There's a (narrow newbounds array) form that can be used to
+artificially narrow the bounds of some array.  It ensures that the new
+bounds don't include any values excluded by the old ones.
+
+    (define (nidentity n) (narrow [[0 n] [0 n]] identity))
+
+Of the matrix-multiply function earlier, we can infer:
+
+- m and n must both be two-dimensional;
+- the first dimension of m must have the same range as the second
+  dimension of n;
+- the first dimension of the result has the same range as the first
+  dimension of n;
+- the second dimension of the results has the same range as the second
+  dimension of m.
+
+There's a (valid? expr) form which checks whether expr would cause a
+bounds error, without actually evaluating expr; the compiler can
+use this to infer bounds-construction functions.
+
+...

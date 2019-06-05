@@ -1,0 +1,85 @@
+It's often more convenient in practice to use feet and yards than
+meters because you can divide them evenly into three, four, six, or
+nine equal units, with a convenient whole number of inches.  For the
+same reason, the Babylonian sexagesimal system remains in use today
+for angles (360 degrees, each subdivided into 60 minutes of 60
+seconds).  In some sense, both 10 and 12 are composite numbers, but 12
+seems much "more composite", and 60 is "more composite" still, much
+more so than 100.
+
+What are the "most composite" numbers, the ones that can be evenly
+divided in the most different ways?  Of course you can always get more
+factors if you go to a larger number, but some numbers have more
+factors than any number smaller than themselves; there's a definite
+sequence of these "most composite" numbers, and there aren't really
+very many of them.  You might think that you'd just go with the
+products of the primes: 2, 2·3 = 6, 2·3·5 = 30, 2·3·5·7 = 210, and so
+on; but it turns out that 30 only has six proper divisors greater than
+1 (2, 3, 5, 6, 10, and 15), but 24 beats it by having the same number
+of factors and being smaller.  It substitutes a versatile, lightweight
+extra couple of 2s for 30's 5, thus getting the same number of factors
+sooner.
+
+It turns out our old friends 12, 36, 60, and 360 are in this sequence,
+along with 4 and 6.  However, 360·60 = 21600 is not, because once you
+get past 720, it behooves you to start throwing a 7 in there.  The
+champion that beats poor old Babylonian 21600, with its mere 70
+divisors, is 10080 (2⁵·3²·5·7) with 70 divisors, or alternatively
+20160 (2⁶·3²·5·7) with a whopping 82 divisors!  (I'm still leaving out
+1 and the number itself, here.)
+
+Here's what I've computed so far:
+
+    >>> nfactors = lambda n: len([x for x in range(2, n) if n % x == 0])
+    >>> i = 1
+    >>> best_nfactors = 0
+    >>> while True:
+    ...  i += 1
+    ...  n = nfactors(i)
+    ...  if n > best_nfactors:
+    ...   print i, n
+    ...   best_nfactors = n
+    ... 
+    4 1
+    6 2
+    12 4
+    24 6
+    36 7
+    48 8
+    60 10
+    120 14
+    180 16
+    240 18
+    360 22
+    720 28
+    840 30
+    1260 34
+    1680 38
+    2520 46
+    5040 58
+    7560 62
+    10080 70
+    15120 78
+    20160 82
+    25200 88
+    27720 94
+    45360 98
+    50400 106
+    55440 118
+    83160 126
+    110880 142
+
+Unsurprisingly, I'm not the first person to discover this; the
+standard term is "highly composite number", and it's sequence A002182
+in OEIS.
+
+If, on the other hand, you're looking for a base for a positional
+numbering system that will give you maximum divisibility, 30 beats 24,
+and 210 is better still.  True enough, in base 24, an eighth is simply
+0.3, while in base 30, it's 0.3,22,15, which is more awkward; but in
+base 30, a fifth is 0.6, while in base 24, it's an infinite sequence:
+0.4,0,19,4,0,19,...!  Infinite sequences are far more awkward to
+calculate with.  Base 210 gives you perfect divisibility --- in a
+finite number of fractional positions, but maybe more than one --- for
+any number of portions up to 10, and any composite number up to 21,
+plus of course many other numbers.

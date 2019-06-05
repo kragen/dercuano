@@ -1,0 +1,52 @@
+Suppose that you wanted to preserve some textual library and ensure
+that it remained available.  Perhaps you could ensure that by enticing
+people to comment and contribute, but requiring them to publicly
+self-host a replica in order to do so.
+
+In particular, you could do this by requiring them to comment by
+adding the comment in their own local fork of the library and sending
+a pull request.  They could self-host privately, or read without
+commenting, and remain private; but in order to comment, they would
+need to host a copy themselves and keep it online long enough for the
+author to pull from it.
+
+This would ensure that many copies of this library would exist.
+
+Ideally, downloading a replica of the library wouldn’t take any more
+bandwidth than downloading a regular web page.  But how much is that?
+
+Right now, 2015-10-15, loading without cache:
+
+    | what                                                             | how much | reqs |
+    |------------------------------------------------------------------+----------+------|
+    | Hacker News front page                                           | 7.5kB    |    5 |
+    | a Hacker News comment page                                       | 31kB     |    1 |
+    | “Life” on English Wikipedia                                      | 570kB    |   47 |
+    | Alexa.com's “top 500 global sites” page                          | 1.1MB    |   69 |
+    | the “videos” page for HolaSoyGerman on YouTube (without a video) | 1.4MB    |      |
+    | my timeline on Twitter                                           | 1.9MB    |   80 |
+    | a NY Times editorial from March                                  | 2.6MB    |  179 |
+    | consumer electronics salesman's LinkedIn page                    | 3.1MB    |  101 |
+    | my TL within a few minutes                                       | 4.6MB    |  466 |
+    | Amazon page for a deep-cycle lead-acid battery                   | 5.0MB    |  193 |
+
+Watching a high-resolution YouTube video can easily use 12 megabytes
+per minute.
+
+So a median web page now is about 2MB of data in the initial load, and
+another several megs per minute.  So it probably isn’t useful any more
+to keep the initial load below, say, ¼MB, and you can probably use 16
+to 64 megs of data transfer to do the whole replication if the user
+doesn’t have to wait for all of that, but you probably don’t want to
+cost them 128 or 256 megs.  I say this even though finding all of the
+above sites frustratingly slow, except for Hacker News, because
+apparently people use them anyway.
+
+([Chris Zacharias’s famous “Page Weight
+Matters”](http://blog.chriszacharias.com/page-weight-matters) tells
+about how he made YouTube much more useful in 2009 by reducing the
+Youtube watch page’s weight from 1.2MB to 98kB, enabling its use in
+areas in Siberia and Southeast Asia where 98kB still took two minutes
+to load.  I think that probably in 2015 the number has gotten
+substantially higher.)
+

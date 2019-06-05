@@ -1,0 +1,65 @@
+Here are the top few things I learned about Git, mostly in the first
+few hours I used it.  This is the document I wished I had had, on top
+of the various introductions floating around.  Maybe it will be useful
+to somebody else.
+
+0.  Git handles 400MB of HTML crawl data less gracefully than it
+    handles 700K of Python.  But it handles that data more gracefully
+    than `cp` and `rsync` do.
+
+1.  Don't `git push` to a repository that actually has a work area.
+    Always use `git pull` instead.  `git push` doesn't update the
+    associated working area, or the index either, so if you try to `git
+    commit` in that repository, you will commit a patch that undoes all
+    the stuff you just did.  See
+    <http://utsl.gen.nz/talks/git-svn/intro.html> section "Push changes
+    and the working copy".  You can solve this with `git reset --mixed
+    HEAD`, or eventually `git reset --hard HEAD` to throw away any
+    changes in the working area.
+
+        23:05 < johnw> $ rsync -av .git/ server:/tmp/foo.git/ ; cd /tmp ; git clone ssh://server/tmp/foo.git
+        23:06 < johnw> that's all you need to setup a remote repository, and to start using it right away
+
+2.  `git repack -a -d -f` can achieve some truly astonishing
+    compression ratios.  This is how you make git checkouts faster than
+    `cp -a` or `rsync`.  In my case, three times faster than `rsync`
+    over a slow network, due to a 7:1 compression ratio.
+
+3.  You have to `git add` changed files before you can `git commit`
+    them, or use `git commit -a`, because `git commit` commits things
+    from the index, not your work area.  In older versions of Git, you
+    used `git update-index` instead of `git add` on changed files.
+
+4.  `git commit` takes an option `--amend` which lets you amend the
+    previous commit.  `git rebase --interactive` lets you amend
+    previous commits in general.  Both of these don't really work if
+    you've shared the commits with someone else.
+
+5.  `git clone -l` makes a hardlinked clone.  (This is default in newer
+    versions of Git.  It's another factor in making git checkouts fast.)
+
+6.  git has early-stage support for something called "submodules" in
+    recent versions, similar to `svn:externals`.  And there's an
+    in-development `git hunk-commit` command that might end up in git
+    someday that should add most of Darcs's UI niceness to git,
+    although `git gui` or `git add --interactive` get you partway
+    there already.
+    <http://raphael.slinckx.net/files/git-darcs-record>
+
+    > 02:38 < twb> I found git commit --interactive pretty confusing.  
+    > 02:39 < andreaja> twb: I prefer to use git add -p
+
+7.  If you try to `git pull` when you have un-checked-in changes,
+    `git` will complain with an unhelpful error message.  Check in the
+    changes or `git stash` them before you pull.
+
+I took the first 125 563 056 bytes of my mailbox and compressed them
+into 59M with git.  However, git (1.4) doesn't seem to work very well
+with multi-gigabyte quantities.
+
+If you're using the Git 1.4 from Debian Stable, you'll want to know to
+use `init-db` instead of `init`, `repo-config` instead of `config`,
+and often `update-index` instead of `add`.
+
+<http://cheat.errtheblog.com/s/git>
+<http://www-cs-students.stanford.edu/~blynn/gitmagic/>
