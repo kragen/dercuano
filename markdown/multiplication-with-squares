@@ -1,0 +1,59 @@
+This is a table-lookup-based multiplication algorithm I wrote about
+some years ago which is not in much current use, even though it’s much
+less computationally expensive than the standard algorithms.
+
+    (a + b)² = a² + 2ab + b²  
+    (a - b)² = a² - 2ab + b²  
+    (a + b)² - (a - b)² = 4ab  
+    ab = ((a + b)² - (a - b)²)/4
+
+    def mul(a, b):
+        c, d = a + b, a - b
+        csq, dsq = c**2, d**2
+        e = csq - dsq
+        prod = e/4
+        print 'c=%s, d=%s, c²=%s, d²=%s, c²-d²=%s, so %s·%s = %s' % (c, d, csq, dsq, e, a, b, prod)
+
+For example, to multiply 7984839 by 11859552, first find their sum and
+(unsigned) difference: 19844391 and 3874713.  Find the square of each:
+393799854160881 and 15013400832369.  Now find the difference of these
+squares: 378786453328512.  Now divide this by 4 (an easy operation on
+a binary computer; somewhat trickier in decimal): 94696613332128.  And
+that is indeed the product of these numbers.
+
+If you have a table of squares to do lookups in, this involves a sum,
+two differences, two table lookups, and a division by 4 (a shift right
+by two bits, in binary).  These all involve a number of bit operations
+that grows linearly with the number of bits in the input numbers, but
+require a square table whose size is exponential in the size of the
+input numbers.
+
+All known bounded-space multiplication algorithms take a number of bit
+operations that grows superlinearly in the number of bits in the input
+numbers: multiplying by partial products takes O(n²) operations (which
+was conjectured to be optimal from 1952 until 1960), Karatsuba
+multiplication takes O(n¹·⁵⁹) operations, Toom-Cook multiplication
+takes O(n¹·⁴⁷) operations, Schönhage-Strassen multiplication takes
+O(n log n log log n) operations, and Fürer’s algorithm and the
+De-Saha-Kurur-Saptharishi multiplication algorithm take time that is
+still superlinear, but only barely.
+
+However, for numbers of under about 100 decimal digits, multiplying by
+partial products is the fastest of the above-listed algorithms in
+practice.  But this square-table algorithm is faster than multiplying
+by partial products even for numbers of moderate size.
+
+For example, the above calculation involved calculating 44 decimal
+digits of results; doing the calculation by summing seven eight-digit
+partial sums into the 14-digit result would have involved calculating
+60 decimal digits of results.  So this is an efficiency improvement.
+However, it presupposes a table of over eleven million squares, which
+would be several volumes if printed on paper.
+
+The crossover point where this algorithm uses fewer bit operations is
+probably around 16 bits.  The square table becomes impractical in size
+somewhere between 8 bits and 50 bits, depending in part on how long
+you can wait to get the results.  If you’re multiplying a lot of pairs
+of numbers, it might actually make sense to pipeline a millisecond’s
+worth of products while you're waiting for the square table lookup
+results to come back from a highly parallel, distributed square table.

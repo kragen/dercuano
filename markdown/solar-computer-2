@@ -1,0 +1,63 @@
+Solar panels are now down below US$1 per watt; some of them are 22%
+efficient, which works out to about 220W/m² in full sunlight.  The
+Dell Inspiron Mini 10 netbook I'm typing this on is 26.8cm × 19.7cm,
+or about 0.05 m²; a solar panel occupying that space would yield
+almost 12 W in full sunlight.  The keyboard is big enough to type on
+comfortably.
+
+Suppose you wanted to design a computer in this form factor that could
+run off such a solar panel, without a battery.  If you covered one
+side of it with a US$10 solar cell, then at times it might have up to
+10 watts available, but often it would need to run on 1W or less, and
+it would have to handle the loss of power well: ideally without the
+screen going blank or losing data or anything.  Even 1W is a lot
+better than you can reasonably provide with a handcrank, and it’s
+solid state.
+
+Probably you need an E-Ink screen (so you can keep reading without
+using energy), a couple of different processors, a physical keyboard,
+some capacitors, and Flash storage would be in order (although FRAM,
+MRAM, or PCM might also work; I suspect MRAM has longer retention; but
+NAND Flash is huge compared to the others.  Any kind of HTML5 site is
+going to suck shit at best.
+
+E-Ink screens
+-------------
+
+<https://www.digikey.com/product-detail/en/EA%20EPA20-A/1481-1130-ND/4896769>
+is a 172×72 pixel SPI e-paper display
+<http://www.lcd-module.com/fileadmin/eng/pdf/grafik/epa20-ae.pdf> of
+59.2mm × 29.2mm for US$46.28; it runs on 3.3 volts.  This is
+unacceptably lame compared to a Swindle screen.
+
+<http://www.aliexpress.com/item/Best-quality-6-0-eink-screen-ED060SC3-for-ebook-reader-eink-display/544963786.html>
+is a US$50 E-ink display which is supposedly 6", 1280×1024, 5ms
+response time, and 16.7 million colors, which I don’t trust one word
+of except that they’ll take your US$50.
+
+<http://www.aliexpress.com/item/Original-ED060SC4-ED060SC4-LF-6-e-ink-ebook-LCD-screen-for-Amazon-kindle-2-for-PocketBook/32242651648.html>
+is a "100% Original ED060SC4 ED060SC4(LF) 6” E-link EBook LCD screen
+for Amazon kindle 2 for PocketBook 301 plus for Sony PRS500 600”.  For
+US$14.  I think I believe this one.  The PocketBook 301+, from 2009,
+has an 800×600 16-level grayscale display, and this does seem to be
+it.
+
+A datasheet at <http://essentialscrap.com/eink/ED060SC4V2.pdf> reveals
+details.  It's 122.4mm × 90.6mm (or 137.9mm × 104.1mm around the
+outside), about 21% of the size of this netbook, so using two might be
+good: 1200×800 total pixels for US$28.  (Or maybe three.)  800 pixels
+over 122.4mm is 153μm/pixel, so a 12-point letter is about 28px tall
+by 14px wide.  It has a 39-pin interface, needs negative and positive
+20 volts or so to run it, updates in 1000ms, and uses 600–1250mW while
+it’s doing so, so about 1 J per screen update, or about 2μJ per pixel
+update, 48 μJ per tiny 4×6 letter displayed, 80 μJ per small 5×8
+letter displayed, or 784 μJ per 12-point letter.
+
+That datasheet does not reveal the protocols to use to control it, but
+those should be available from somewhere, or for some similar display.
+They’re clearly parallel, so you need about 25 GPIOs to control it.
+
+784μJ per letter is 4.7 mJ per 6-character word, so reading at 350wpm
+would consume 1.6 joules per minute, or an average of 27mW.
+
+(Hmm, somewhere else I was thinking 

@@ -1,0 +1,80 @@
+Notes on the value restriction and Modula-3
+===========================================
+
+<link rel="stylesheet" href="style.css" />
+
+(Warning, this note is kind of rambling with no real point.)
+
+[Finkel](http://www.nondot.org/sabre/Mirrored/AdvProgLangDesign/)
+says, describing Modula-3's subtyping rules:
+
+> If every value of one type is a value of the second, then the first
+> type is a called a 'subtype' of the second. For example, a record
+> type TypeA is a subtype of another record type TypeB only if their
+> fields have the same names and the same order, and all of the types
+> of the fields of TypeA are subtypes of their counterparts in TypeB.
+
+Initially, this struck me as violating ML's "value restriction" and
+therefore being unsafe, but I was wrong.  Suppose we say
+
+    type Ushort = 0..65535;
+         Long = -2147483648..2147483647;
+         TypeB = record
+           Data: Long;
+         end;
+         TypeA = record
+           Data: Ushort;
+         end;
+
+Now it seems that `Ushort` is a subtype of `Long`, because every value
+of type `Ushort` is a value of type `Long`.  So it is safe to assign a
+value of type `Ushort` to a variable of type `Long`.  `TypeA` and
+`TypeB` have fields of the same names in the same order, and the
+single field in `TypeA` has a type that is a subtype of the single
+field in `TypeB`.
+
+However, I guess if you're passing by value, you can safely copy a
+record of type `TypeA` into a variable declared as a record of type
+`TypeB`, and you're still safe with no run-time type checks.  
+
+Mutable Aliases Introduce Problems
+----------------------------------
+
+It's only once you get into aliasing that you start running into
+problems; if you have a record that is mutably accessible through both
+`TypeA` and `TypeB` pointers, you can set its `Data` to `-1` through
+the `TypeB` pointer and then access it through the `TypeA` pointer.
+
+It seems that if you could ensure that the `TypeB` pointer were
+`const` --- that is, didn't allow modification of the pointed-to value
+--- you could avoid this.  That would allow the following subtyping
+rule:
+
+    if                    TypeA is a subtype of TypeB
+            -------------------------------------------------------
+    then    pointer to TypeA is a subtype of pointer to const TypeB
+
+That allows you to copy a pointer to `TypeA` into a variable declared as
+pointer to const `TypeB`.  Which is pretty much equivalent to copying a
+`TypeA` into a variable declared as `TypeB`, but more efficient.
+
+Arrays
+------
+
+When it comes to arrays of the same element type but varying sizes,
+the definition of "A is a subtype of B" that works in the above
+subtyping rule is "A's indices are a superset of B's indices".  That
+is, if you have an `int[100]` array, it's perfectly OK to copy a
+pointer to it someplace that is expecting a pointer to a `const
+int[10]` array; no run-time type checks will be needed.  Actually,
+though, that's true even if that pointer isn't `const` --- which I
+guess is Finkel's point when he distinguishes "extensions" from
+"subtypes".
+
+Lack of Conclusions
+-------------------
+
+Anyway, just some interesting things I hadn't realized before about
+safe static typing.  There's a subtyping relation that still applies
+after you take mutable references, and another one that doesn't, and
+the one that doesn't can be pretty broad.

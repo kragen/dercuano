@@ -100,7 +100,7 @@ about 11.2 kg of fired clay (and 13 kg of used yerba or coffee grounds
 or sawdust or whatever) if we assume 0.6 g/cc.
 
 It’s probably worthwhile to put 5 mm or so of solid clay on the top of
-the plate to make it resist impacts and abrasion. a little better.
+the plate to make it resist impacts and abrasion a little better.
 
 Although you would clearly get better results if you fired the kiln in
 a larger kiln before using it, I think it will probably be usable even
@@ -287,3 +287,43 @@ another possibility.  Also, you could adjust the duty cycle.
 The leakage inductance of the coil presumably also imposes significant
 high-frequency reactance, which will limit the current you can push
 into it.
+
+(Because of skin effect, it might be necessary to use thinner wire,
+perhaps two or more parallel windings.)
+
+(15× may be understating it — this skin depth is atypically shallow
+because we’re using an atypically weak field and thus have atypically
+high permeability, so we will have an atypically extreme increase in
+skin depth when we smash into Curie.)
+
+Scaling laws
+------------
+
+What scaling laws govern the dimensions of such a kiln?
+
+Well, at a fixed inner volume, the necessary wall thickness is
+inversely proportional to the power.  So if we could increase the
+power from 300 W to 600 W, we could use 41 mm of refractory instead of
+82 mm of refractory, reducing the weight of the thing by more than
+half and its volume by a third.  Voltages and currents would increase.
+Lower powers would require using proportionally thicker walls (and,
+perhaps, proportionally smaller inner chambers) which would eventually
+make the pipe too short to pick up much current.
+
+The inner volume is proportional to the cube of the characteristic
+dimension, and the leakage surface area to its square.  So, for
+example, a 10% increase in width, height, and depth would increase
+leakage surface by 21% and volume by 33%.  Maintaining the same power
+would thus require increasing the wall thickness by that same 21%,
+which very quickly gets us to absurd dimensions.  It might be more
+reasonable to increase the wall thickness proportionally (by 10%) and
+the power proportionally (by 10%) as well.
+
+Electrical efficiency ηₑₗ stays the same as long as the wall thickness
+and inner diameter increase proportionally.  Using the proportionally
+thicker metal we could accommodate more easily in a larger chamber
+would permit proportionally lower frequencies due to proportionally
+thicker skin depths.
+
+So a small prototype, like the sake-cup-sized thing suggested in file
+`electric-micro-kiln`, might be a good thing to start with.

@@ -1,0 +1,61 @@
+I use a sort of log-structured filesystem for my notebooks.  I fill
+the notebooks in chronological order (more or less) from the second
+page to the last page.  (The first page is left blank at first.)
+Everything is under some heading; the current heading is repeated at
+the top of every page, with the date, but sometimes there are several
+headings on a single page.  The headings are underlined so they're
+easy to see looking at the page.
+
+So I can find things by paging through the recent pages and looking at
+the headings.  When that gets to be too much, I append a new "table of
+previous contents" section, under a heading just like everything else;
+it lists all the headings, with dates, since the last "table of
+previous contents".  The first page contains a list of tables of
+previous contents, with their dates, so that I can find them
+relatively quickly.  This allows me to find my notes more quickly by
+reading through the few pages that are full of tables of previous
+contents, rather than leafing through all the pages in the book
+looking for headings.
+
+If I were a disk, which I'm not, this would be a reasonably efficient
+scheme for writes: regardless of how much stuff I have to write, I
+could append it all in a single write to the end of the
+currently-written data, possibly including a new table of previous
+contents, then update the "superblock" on the first page with a
+pointer to the new table.  So writing any amount of data less than a
+notebookfull requires a seek to the end of the previous ToC, possibly
+a read of data following it, a write of the new data, and possibly a
+second seek and a second write to the superblock.  Two seeks.  Finding
+something in a notebook with three ToCs requires at most four seeks:
+one to each ToC, then another one to the data; if it's not listed in
+any ToC, you can sequentially scan for it after the last ToC.
+
+With this scheme, there's a tradeoff (for either humans or for disks)
+between the amount of sequential scanning you may have to do (due to
+still-unrubricated items) and the number of ToCs you may have to seek
+to and read.
+
+Beatrice pointed out the other day that it would be easier for a human
+to write the notes sequentially from the beginning of the book, while
+writing the ToC entries sequentially from the end of the book.  This
+way, all the ToC entries are in a single sequential chunk, the
+tradeoff between maximum sequential scan length and ToC fragmentation
+is eliminated, and writing still requires only two seeks.
+
+Of course she is correct, and this might be a reasonable strategy for
+log-structured filesystems too, although there are usually more levels
+of indirection: from superblock, through various levels of inodes and
+directories, to the actual file extents on disk.  You could probably
+do a reasonable job by putting a B-tree of pathnames at a fixed
+location of the disk, and putting the inodes and data extents
+contiguously somewhere else.  `/var/cache/locate/locatedb` is a
+reasonable approximation of the contents of this B-tree; on my current
+laptop, it's 5.3MB, indexing 95GB of files using 596 662 inodes
+(i.e. 596 662 files, although `sudo locate / | wc -l` only finds 
+494 488 files.).
+
+Repacking a 5-20MB B-tree when it got too large and loose would take a
+significant fraction of a second on a modern disk, but on my laptop
+would take perhaps 10-20 seconds, due to the slowness of on-CPU disk
+encryption.  So it might be better to defragment the tree incrementally.
+

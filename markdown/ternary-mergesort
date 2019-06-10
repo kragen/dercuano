@@ -1,0 +1,69 @@
+Ternary divide-and-conquer algorithms are usually more efficient than
+their classical binary cousins.
+
+A few years back Java switched to Yaroslavskiy's ternary or dual-pivot
+quicksort; it turns out that quicksort is marginally more efficient if
+you partition into three parts in the partitioning stage rather than
+two, but it's a marginal difference that grows with the dataset size.
+
+Ternary numbers
+---------------
+
+Similarly, if you represent numbers in N-ary with unary digits, such
+that 1 is "|," and 0 is just ",", then the optimal value for N is 3,
+which is marginally better than 2 or 4, which are equivalent.  That's
+because a number M needs ceil(log(M)/log(N)) N-ary digits to represent
+it, but each of the digits is of size N/2 on average, so the number as
+a whole is O(N/log N) digits.  It turns out that 2/log 2 is equal to
+4/log 4, and about 5% larger than 3/log 3; N/log N has its minimum at
+N = e.
+
+For example, 32808328602 is, represented with unary digits of various
+bases:
+
+     2 |,|,|,|,,|,,,,|,|,|,,,,,|,|,|,,|,,|,|,|,,|,|,,,|,|,,|,,
+     3 |,,,|,,||,,,|,|,,|,||,||,||,,||,||,||,||,|,||,,
+     4 |,|||,||,||,,|||,||,,|,|||,|,|,|||,|,||,|,||,||,
+     5 |,,|,||||,|,||||,||,||||,|,|||,,,|||,||||,,||,
+     6 ||,|||,,||,|||,|||,|,||,||,,||,|,|,,
+     7 ||,||,||||,|,,|,,|,||,||,|||||,||||,,
+     8 |||,||||||,||||,|||,||||,|,||||||,|||||,||||||,||||||,|||,||,
+     9 |,,|||,||||||,|,|||,|||||,||||||||,||,||||||||,|||||||,||||||,
+
+And here's 8308233280877:
+
+     2 |,|,|,|,,,,|,|,|,,,|,|,,|,,,|,,|,,,|,,|,|,,,,|,|,|,,|,,|,|,,|,|,,|,
+     3 |,,,||,|,,||,,||,|,,,,,,|,||,,,|,,||,||,,|,,|,||,
+     4 |,|||,||,,|||,||,|,||,||,|,|,,||,|||,,|,|||,|,|,||,|||,|,
+     5 ||,,||||,||,|,|,,||,|||,,||,,||||,||||,||||,||,,,||,
+     6 ||,|||||,||||,,,||||,||,|||||,|||||,|||,||,|||||,|||||,|||||,,,|||||,
+     7 |,|||||,|,|||||,|,|||||,|,|||||,||,|||,||||,|||||,|,|,||,|||||,
+     8 |,|||||||,,|||||||,|,|||||,|,||,||,||||||,|,||||||,|||||,|||||,|||||,
+     9 |||,||,|||,||||||,|||||||,,,|,||||||,|,||,||||||,|||,|||||,
+
+And here's 9237528032:
+
+     2 |,,,,|,,,|,|,,|,,,|,|,,,|,,|,|,|,|,|,,|,|,|,|,,,,,,
+     3 ||,|,||,||,|,|,||,|,,,,|,,,|,,|,||,||,|,||,
+     4 ||,,||,|,||,||,|,||,|,|,|||,|||,|,|||,||,,,
+     5 |,||,||,||||,,||||,|||,,|,|||,||||,||||,|,|,||,
+     6 ||||,|,||,||||,|||,||||,||||,|,||||,|,||,|||||,||,
+     7 ||||,||||,||||,||||||,||,|||||,||||,|||||,||||||,||||,|,|||||,
+     8 |,,||||,||||||,||||,||||||,||,|||||||,||||||,|||||||,||||,,
+     9 ||,|||||,|||||||,|||||,|||,,|||,|,|,||||||||,|||||,
+
+You can see that the number size is generally minimum at N=3, but
+higher bases can have progressively greater variances.
+
+Following this logic, there were a few ternary computers built in the
+1950s (?) with three vacuum tubes per three-state "flip-flop" instead
+of the usual two tubes per two-state flip-flop.
+
+Ternary mergesort
+-----------------
+
+M-ary mergesort of N elements takes ceil(log N / log M) passes over
+the data; each pass merges M runs at a time, making (in the simple
+case) M-1 comparisons for each of N elements, for a total of
+
+N (M-1) ceil(log N / log M) 

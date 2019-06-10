@@ -1,0 +1,56 @@
+If you're compressing a numerical sequence, such as a digitized sound
+wave, you only rarely see exact repetition of sample number sequences;
+the smallest noise or varying DC offset (i.e. low-frequency noise)
+will cause all the samples in the sequence to be different.  As a
+result, schemes like LZ77 don't do well at compressing digital
+signals.
+
+Even the very simplest numerical signals fail in this way.  For
+example, if you have a series of 16-bit samples, each being 258 times
+the sample number, it will repeat every 131072 bytes; but `gzip -9`
+can only compress it by 1.4%.  (bzip2 -9 does better, compressing 8:1,
+partly because of its bigger block size; bzip2 -1 only compresses
+2:1.)
+
+But if you take the second-order finite forward differences of this
+sequence, they will be 0 258 0 0 0 0... which is very highly
+compressible.  In fact, even memoryless schemes like Elias gamma
+coding will work somewhat well at this point, about as well as bzip2.
+But applying gzip to the above sequence gives you 961-fold
+compression, while bzip2 gives you 10280-fold compression.
+
+In general, we should expect this to be the case for mostly continuous
+functions of time: the first and second-order forward differences
+should be much more highly compressible than the original sequence.
+
+From a Fourier perspective, the finite-forward-differences operation
+is a single-pole high-pass filter with no knee: it just keeps
+attenuating at 6dB per octave all the way to DC.  Two iterations of it
+give you 12dB per octave, strongly attenuating the low-frequency
+content and leaving you only the high-frequency content to encode.
+
+You could ask why only second-order rather than higher orders: if a
+second-order predictor is good, wouldn't a fifth-order or
+twentieth-order predictor be better?  It might be, depending on your
+data.  The order multiplies discontinuities: a single impulse becomes
+two opposite impulses in first-order differences, three impulses in
+second-order differences, and twenty-one in twentieth-order
+differences.  This kind of effect might outweigh the improved
+compression from removing higher-order regularities from the data.
+
+The Fourier-analysis viewpoint might suggest that this is a lossy
+scheme, concerned with numerical approximation, but applied to a group
+(such as N-bit integers under mod-2**N addition) it is perfectly
+lossless.  If you apply it to IEEE-488 floating-point numbers it will
+indeed be lossy, I think, because floating-point numbers are not a
+group.  (Right?)
+
+This is somehow related to linear predictive coding, in the sense that
+the finite differences at a given timestep are a linear function of
+the sample value at previous timesteps, and their "predictions" at
+future timesteps are also linear functions of them, and the Nth-order
+difference somehow represents a "residual" from that "prediction".
+
+Various lossless audio compression codecs (Shorten, AudioPaK, and
+FLAC, for example) use linear prediction in this way to decorrelate
+the samples they are compressing.

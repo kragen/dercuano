@@ -1,0 +1,67 @@
+I was reading about the Z-machine and playing around with “Lists and
+Lists”, which is a Lisp tutorial interactive-fiction game running on
+the Z-machine, playable online in Parchment at
+<http://eblong.com/zarf/zweb/lists/>.
+
+I was struck by the fact that the basic Z-machine memory model has a
+combination of two properties very rarely found together: it has no
+dynamic allocation (and thus no possibility of out-of-memory errors
+and no need for a garbage collector), but it supports flexible
+collections and relationships of objects, like Lisp.  Also, the basic
+operations on its memory model are constant-time.
+
+The basic memory model of the Z-machine is a fixed set of objects
+(“Things”, originally) which are referenceable by integer IDs,
+arranged into an ordered tree.  (Or, really, a forest, since there can
+be any number of separate roots.)
+
+Mutating the tree structure is normally done with this single
+Z-machine opcode (from
+<http://inform-fiction.org/zmachine/standards/z1point1/sect15.html>):
+
+> insert_obj: Moves object O to become the first child of the
+> destination object D. (Thus, after the operation the child of D is
+> O, and the sibling of O is whatever was previously the child of D.)
+> All children of O move with it. (Initially O can be at any point in
+> the object tree; it may legally have parent zero.)
+
+Navigating the tree structure is done with three opcodes:
+
+> get_child: Get first object contained in given object, branching if
+> this exists, i.e. is not nothing (i.e., is not 0).
+> 
+> get_parent: Get parent object (note that this has no “branch if
+> exists” clause).
+> 
+> get_sibling: Get next object in tree, branching if this exists,
+> i.e. is not 0.
+
+(In addition to the tree structure, the objects have arbitrary mutable
+fields (“properties”) drawn from a small set of 64 field IDs, with
+values containing a variable amount of data up to 64 bytes, but
+usually 1 or 2 bytes; they also have 48 boolean “attributes”.  And
+they have a “short name” too.  Each of the 64 possible properties has
+defined a “default value” in a “property defaults table” which is
+returned when you try to read that property from an object that
+doesn’t have it.  These aspects of the object memory are somewhat
+incidental, but without some way of associating other data with the
+objects, the whole tree thing would be almost pointless.  Also, you
+can access memory as an array of bytes.)
+
+In order to make get_parent and insert_obj constant-time and fast,
+each object has a redundant parent pointer.
+
+The typical kinds of interactions in text adventure games involve
+doing things like listing the objects in a room, or searching through
+the objects in a room to see which one the player is referring to, and
+whether that might be ambiguous; they aren't sensitive to the ordering
+of the objects in the room.
+
+So I was wondering what kind of Lispy generic functions you could
+write on top of this ruthlessly-side-effect-filled structure.  Clearly
+you can write a constant-space function that visits every object in a
+subtree, for example, or moves all the objects in a subtree, or all
+the children, to a given other object.  But can you write
+general-purpose utilities to raise the level of abstraction at which
+you program?  It seems like CLU-style coroutine iterators might be the
+best you can do in many cases.

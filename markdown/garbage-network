@@ -1,0 +1,62 @@
+Buenos Aires is about 300 km from Rosario.  There's a train that runs
+twice a day, taking seven hours.  The Flutter embedded wireless
+device, due to ship in 2014 for US$20 with a few kilobits per second
+and about a 1km radius of communication, could conceivably be thrown
+out the window of the train at regular intervals to provide a
+low-bandwidth, low-power communications relay line between the two
+cities; you would need perhaps 500 of the devices, for a total cost of
+US$10 000.  This sounds like a lot of money but actually I think it's
+orders of magnitude cheaper than running a conventional communication
+line over such a distance; and it ought to decrease by another factor
+of two or three in the near future.
+
+The remaining problems, then, would be to power the devices and to
+protect them from sabotage.  
+
+First, power.  Nonrechargeable batteries will only last a year or two,
+maybe less in the sun.  Small nickel-cadmium or nickel-metal-hydride
+cells might last five or ten years; but the problem remains to harvest
+sufficient power from the environment to supply the communication
+line.  The device might use 2W in operation, so 2mW of photovoltaic
+power per device, with adequately efficient power harvesting, might be
+sufficient.
+
+Second, protection.  It's probably not practical to harden 500 such
+devices to make them impractical to break, but you could probably make
+them hard to find by concealing them inside of pieces of garbage.
+This also suggests a way to deploy them from the train without
+arousing suspicion: every 50 seconds, on average, one member of the
+planting team throws a piece of garbage (say, a food package)
+containing a wireless transceiver out the window.  The train ticket
+costs US$2.50, so you could buy 4000 trips (2000 round trips) for the
+cost of the needed devices; so one person could do this in a practical
+fashion over some 50 to 100 trips, so two or three months.  Ten people
+could do it in five or ten trips each.
+
+You still need to prevent the devices from being detected by their
+radio emissions and destroyed, which is difficult if they're basically
+stationary.  The best defense against this, other than spread-spectrum
+and using legal frequencies (the Flutter devices use a 915MHz
+frequency that's legal for unlicensed use in the US only) is very low
+duty cycle and very long periods of time between transmissions — days
+to weeks.  This suggests that all the devices should wake up their
+receivers periodically at a synchronized time to see if they're being
+activated, say a few times a day, but not transmit anything unless a
+circuit is opened.
+
+(Alternatively you could use store-and-forward transmission, but this
+would result in message latency of months.)
+
+The desire to support solar power, combined with the desire to look
+like garbage, poses the problem of how to have solar cells that are
+not exposed to sunlight.  This seems impossible, but keep in mind that
+we only need about 2mW.  At the 5% efficiency typical of cheap
+thin-film cells used for solar calculators and the like, this is
+1 cm²; it could be 4 or 5 cm² that's not directly exposed to sun, for
+example behind a layer of paper.
+
+A perhaps more useful project would connect an off-the-grid location
+rather than a major city, and could be deployed by bicycle rather than
+train.  There are locations in the Tigre delta, for example, that have
+electrical power but no broadband internet access.
+

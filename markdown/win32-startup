@@ -1,0 +1,68 @@
+So how does a process get started in Win32?
+
+I compiled a program `fract.exe` with a WinMain with MinGW.  Callers:
+
+    _WinMain@16:
+        _main:
+            # (which seems to call _GetModuleHandleA and _GetCommandLineA etc.)
+            ___mingw_CRTStartup:
+                # (which seems to call _ExitProcess@4)
+                _mainCRTStartup: 
+                    # 0x401210, offset 0x0210
+                    no callers
+                _WinMainCRTStartup:
+                    # 0x401230
+                    no callers
+
+This made me suspect that those bottom two are the actual entry
+points, and that they have magic names looked for by the COFF loader
+or something.  But those strings don't appear in the Wine source code,
+so that must not be it.  But neither their addresses nor their offsets
+appear in the output of `objdump --full-contents` or `xxd` on the
+stripped binary.
+
+The top few levels of the stack in a crash look like this:
+
+      3 0x0040155a WinMain+0x9d(hInstance=0x400000, hPrevInstance=0x0, lpCmdLine=0x1157f1, nCmdShow=0xa) [/home/kragen/devel/w32dry/fract.c:87] in fract (0x0069fe38)
+      4 0x00401867 in fract (+0x1867) (0x0069feb8)
+      5 0x004011d9 __mingw_CRTStartup+0xc9 [/home/ron/devel/debian/mingw32-runtime/mingw32-runtime-3.9/build_dir/src/mingw-runtime-3.9/crt1.c:226] in fract (0x0069fee8)
+      6 0x00401223 in fract (+0x1223) (0x0069ff08)
+      7 0x7b86eeab in kernel32 (+0x4eeab) (0x0069ffe8)
+      8 0xb7e0b7a7 wine_switch_to_stack+0x17 in libwine.so.1 (0x00000000)
+
+The address +0x1223 is right after the call from _mainCRTStartup to
+___mingw_CRTStartup.
+
+Looking in the WINE source, in kernel32/process.c I find "static void
+start_process", which has this code:
+
+        LPTHREAD_START_ROUTINE entry;
+
+        LdrInitializeThunk( 0, 0, 0, 0 );
+
+        nt = RtlImageNtHeader( peb->ImageBaseAddress );
+        entry = (LPTHREAD_START_ROUTINE)((char *)peb->ImageBaseAddress +
+                                         nt->OptionalHeader.AddressOfEntryPoint);
+
+AddressOfEntryPoint is in struct _IMAGE_OPTIONAL_HEADER... but I can't
+find where it gets initialized for executables loaded from the
+filesystem.
+
+HOWEVER!  `winedump dump fract.exe` lists, among other things:
+
+    Optional Header (32bit)
+      Magic                              0x10B          267
+      linker version                     2.56
+      size of code                       0x1000         4096
+      size of initialized data           0x1a00         6656
+      size of uninitialized data         0x200          512
+      entrypoint RVA                     0x1210         4624
+      base of code                       0x1000         4096
+      base of data                       0x2000         8192
+      image base                         0x400000       4194304
+
+Which corresponds to most of this data from `xxd`:
+
+    0000090: 0000 0000 e000 0f03 0b01 0238 0010 0000  ...........8....
+    00000a0: 001a 0000 0002 0000 1012 0000 0010 0000  ................
+
