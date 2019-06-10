@@ -1,0 +1,45 @@
+So I want to make a Gaim (um, I mean Pidgin) extension for group
+activities such as games.  The first activity, of course, is group
+chat.  So here are some thoughts on how to achieve that.
+
+People on the channel are connected in some sort of connected graph
+and relay broadcast messages to each other.  The graph doesn't need to
+be acyclic; every message has a unique ID and everyone's client
+remembers the unique IDs of the messages they've seen recently, and
+only forwards on or displays new messages.  Eventually, every message
+should traverse every link that is live at the time in one direction
+or the other.
+
+The first question is how much the people should be allowed to know
+about each other.  Of course since they can send broadcast messages
+visible to one another, they can establish communications if they
+want; if my client colludes with someone, they can snoop on the
+channel without anyone else being able to find out that they are
+there; and if my client colludes with someone, my client can tell them
+all the people I'm talking to.  So, in the framework above, there's no
+way to enforce either a policy of anonymity or the opposite in the
+protocol; the question is just what the default and advertised policy
+should be.
+
+I think I will start with revealing the truenames of everyone on the
+channel --- truenames being something like "ksitaker on AOL" ---
+because it has four advantages.  It makes it difficult to censor or
+falsify the utterances of a particular person when others can contact
+them directly; it can allow the channel to heal when somebody goes
+offline unexpectedly; it facilitates side-channel conversations; and
+it reduces the probability of accidentally saying something in front
+of the wrong person.
+
+The conversations ought to be private, in the sense that the default
+should be that chat lines aren't transmitted unencrypted and aren't
+forwarded to unannounced third parties.
+
+The encryption is a bit tricky.  There are three straightforward
+possibilities:
+
+1. Encrypt point-to-point between connected clients;
+2. Encrypt each message with a fresh "session key" and include copies
+   of the "session key" encrypted with the public key of each
+   participating client;
+3. Negotiate a shared "session key" periodically (at least every time
+   group membership changes) and encrypt all messages with that.
