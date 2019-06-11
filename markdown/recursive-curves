@@ -1,0 +1,76 @@
+Thinking about the issues in file `dercuano-drawings`, I came up with
+some ideas that I think will be pretty interesting for interactive
+drawing.  As usual, they are (sort of) algebraic and recursive.
+
+The fundamental *spatial* element of the system is a curve, what you
+might call a path or a polyline.  A curve is a continuous function
+from some interval of *t* points in time to (*x*, *y*) points in
+space, so it has direction and potentially variable velocity and
+duration as well as positions.  (Maybe it also has a continuously
+varying pressure.)  All curves start at time *t*=0, but they may have
+different end points.
+
+The easiest way to create a new curve is to draw one with the mouse
+(which, in file `fitts-law-musings`, I found had a bandwidth of about
+6 bits per second) or a multitouch touchscreen (which I haven’t really
+tested yet but am hoping to find will have better bandwidth; it does
+have pressure).  But you can also create curves that are straight
+lines or circles.
+
+Each curve also has some kind of visual attributes, like width, color,
+transparency, blurriness, and some kind of noise texture, for each of
+stroke and fill.  For right now, though, I’m less interested in those
+than about the purely positional ones.
+
+Given a curve C, there are several unary operations that give new
+curves: C.reversed, which is the same positions in reverse order;
+C.normalized, which is the same positions with their time interval
+compressed or stretched to *t* ∈ [0, 1]; C.closed, which adds an
+instant straight-line jump back to the start; and C.constant, which
+makes the velocity along the curve constant, but doesn’t change its
+duration.  If curves also carry pressure information, there’s also
+C.monoline, which sets the pressure to unity; C.brush, which sets the
+pressure to the reciprocal of the velocity; and C.invbrush, which sets
+the velocity to the reciprocal of the pressure.  I want on-screen
+buttons of some kind to select these operations.
+
+There are also operations to combine a curve, or set of curves, with a
+point: C + P translates the curve by the (x, y) coordinates in P,
+while P·C rotates and scales the curve (around its start point?) by
+the parameters in the point.  I want interactive operations for
+invoking these with a point I specify interactively using the mouse or
+using pinch-zoom with two fingers.  These two operations P₀·C + P₁
+form a “frame of reference”.
+
+Each point along a curve can be associated with a frame of reference
+in different ways, and another curve can be transformed by that frame
+of reference.  First, there’s a translated frame of reference, where
+the rotate-and-scale part of the transformation is the identity.
+Second, there’s a translated-and-rotated frame of reference, where the
+rotate-and-scale part of the transformation scales by unity but
+rotates so that the tangent forward along the curve is always in the
+same direction, or in some arbitrary direction when the tangent
+doesn’t exist.  Third, there are translated-and-rotated frames of
+reference where the scale is taken from the velocity or pressure of
+the curve.
+
+The operation C₀.interpolate(C₁, C₂, N) produces a set of N curves.
+The first curve is C₁ translated and rotated to the beginning of C₀,
+and the last curve is C₂ translated and rotated to the end of C₀.  The
+curves in between interpolate smoothly between them.  Another similar
+operation does the same thing without the rotation.  These operations
+are invocable in a direct-manipulation kind of way; initially C₁ and
+C₂ are the same, and N can be interactively adjusted up and down.
+
+(Hmm, maybe this is the wrong formulation?  Maybe I actually want to
+add C₁ and C₂ to the definition of C₀?  In that case the objects
+become drawings rather than curves?  Maybe I want to be able to
+interactively see the interpolated curves as I’m drawing C₀?  Maybe
+drawing C₀ is, at least normally, a context-menu operation on C₁?
+What about adding noise to the interpolated curves?)
+
+The idea is that a variety of visual repetition with variability,
+including things like grids, hatching on one side of a line, wood
+textures, starbursts, and tree branches, becomes straightforward and
+easy to express and to adapt, while capturing the real Kolmogorov
+complexity of the drawing in the data structure that is built up.
