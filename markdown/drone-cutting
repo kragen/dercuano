@@ -1,0 +1,209 @@
+Squirrel-cage induction motors are obsolete except in environments
+where weight and size is of no concern; BLDC motors are now superior
+in every way, often by two orders of magnitude.
+
+The old motor
+-------------
+
+I have a ¼-horsepower 1430-rpm electric motor here, adequate for
+running a grinding wheel or something through the V-pulley it’s got
+stuck on it.  I think it’s originally out of a washing machine; I
+bought it used.  It’s got a big capacitor wart on the side, because
+it’s a single-phase motor, and that’s a much less inefficient way to
+get a single-phase motors to start up than the hack in a shaded-pole
+motor.  I haven’t opened it up, but I’m pretty sure it’s a
+squirrel-cage induction type, because it says “1430 rpm”, and does
+seem to run at a pretty fixed speed.  It’s got cooling slots in the
+ends so you can blow dust into it.
+
+It’s rated for 2.4 amps at 220 volts, which works out to 530 W.  ¼ hp
+is only 186 W, so presumably 2.4 A is the current it draws if the
+spindle stalls; these motors aren’t that inefficient.  I haven’t
+measured either its power input or its power output.
+
+I don’t have a scale handy, but I feel like it weighs about 10 kg, and
+it’s 150 mm in diameter and about 200 mm long.
+
+The thing I want to point out here is that this is not a very good
+power density, on the order of 20 W/kg and 50 W/ℓ.
+
+Milling machines
+----------------
+
+I was just watching a YouTube video by Stuart de Haro entitled
+“Milling machine anatomy”, which is largely about the Bridgeport Model
+J head for Bridgeport milling machines, the most popular milling head
+for hobbyist metal milling in the US.  We’re talking about a
+floor-mounted mill with an X–Y table a couple of meters long, capable
+of precision on the order of 25 or 50 microns.  (In this case it’s
+equipped with a DRO that reads in microns, or 2.5-micron units in
+medieval-unit mode.)  It’s got this big honking motor on the back,
+hooked up to a variable-frequency drive, bigger than the motor I’ve
+got here, and my man Stuart explains that the Model R ½-horsepower
+milling head is “relatively light duty” (and for that reason he’s
+never actually seen one, though he teaches machining at a college).
+
+So we can deduce that, for Stuart and other Bridgeport machinists, one
+horsepower (746 watts in modern units) is adequate for the meter-scale
+workpieces they like to chew on, but half a horsepower (373 W) is
+“light duty” and would slow them down.  And that, I suppose, is why
+they’re willing to deal with these heavy honking motors on their
+milling machines.
+
+Quadcopter motors
+-----------------
+
+Modern electric quadcopter drones result from truly astounding
+progress in battery and motor technology.  On MercadoLibre here in
+Argentina, I find a Turnigy BC2836-8 motor designed for quadcopters
+for AR$2090 today (at AR$44.50/US$, that’s US$47.)  This motor weighs
+70 g, measures 28×28×36 mm, wants to be driven with a 30-amp or 40-amp
+“ESC” (the kind of VFD you use for a BLDC motor), is rated at 1100
+“K<sub>V</sub>” (rpm per volt), and is rated at 336 W, intended to be
+driven from 2–4 LiPo batteries.  (A Singaporean vendor lists the same
+motor at US$13.)
+
+That is, this motor is almost *twice the power* of the big honking
+10-kg beast I have here in my living room.  But it weighs a bit under
+1% of what the big motor does.  I’m guessing it costs about 10%, too.
+
+Four 3.7-volt LiPo batteries in series would be 14.8 volts, and
+336 watts at that voltage would be 22.7 amps, so the volts and amps
+pretty much check out.  At 1100 “K<sub>V</sub>”, its maximum speed
+should be a bit over 16000 rpm, which is pretty plausible.
+
+So this works out to 4800 W/kg and 15000 W/kg, about 200–300 times
+better than this big motor.
+
+In part this is made possible just by running the thing eleven times
+faster, which is made possible by having much better bearings and
+designing the thing to depend on an ESC.  At a given torque, running
+the motor eleven times faster is going to give you eleven times the
+power.  Permanent-magnet brushless “DC” motors like this one (“BLDC
+motors”) also use rare-earth magnets, typically NdFeB, which gives
+them higher field strength and thus higher torque — although in theory
+it’s possible to achieve similarly-high flux densities in induction
+motors.  (The “electrical steel” used in squirrel-cage cores
+[saturates at 1.6–2.2 T][0], while [NdFeB’s remanence][1] is “only”
+1–1.3 T.)  Another significant factor may be cooling: the drone motor
+is of course designed to operate in the propeller downwash, which is a
+wonderful level of air-cooling.  Finally, the drone motors are
+presumably designed for an MTBF of tens of hours, while the ¼-hp motor
+is designed for an MTBF of tens of thousands of hours.
+
+[BLDC motors][3] can also maintain the optimal phase relationship
+between the rotating magnetic field applied to the stator and the
+magnetic field of the rotating rotor, enabling them to maintain the
+same torque at any speed; induction motors, by contrast, have a fixed
+torque–speed relationship which reaches zero torque at their natural
+or unloaded speed.
+
+[0]: https://en.wikipedia.org/wiki/Saturation_(magnetic)
+[1]: https://en.wikipedia.org/wiki/Neodymium_magnet
+[3]: https://en.wikipedia.org/wiki/Brushless_DC_electric_motor
+
+Permanent magnets are much smaller than field windings, which exist in
+the induction motor in the form of the copper “squirrel cage” within
+the rotor.  This may account for a substantial fraction of the mass
+and volume of the motor, though far from 99%.
+
+Neodymium magnets also have about an order of magnitude greater
+resistivity than iron does (1.1–1.7 μΩm, compared to [iron’s 0.1][2],
+though electrical steel’s resistivity is higher than that), which
+might diminish eddy-current losses, and of course there are no
+hysteresis losses; although these are more properly efficiency
+concerns rather than power-density concerns, they do have some effect
+in that more power losses result in more necessary cooling.
+
+[2]: https://en.wikipedia.org/wiki/Resistivity#Resistivity_of_various_materials
+
+Sometimes the low Curie temperature is cited as a disadvantage of
+neodymium magnet motors — it’s only 310–400°, so the magnets will be
+destroyed if the motor ever overheats that much.  However, I think the
+solder joints and winding insulation will fail at a lower temperature
+than that.
+
+Milling with drone motors
+-------------------------
+
+So how could you build a milling machine or engine lathe with these
+little motors?  Well, you probably need several of them, such as ten
+of them.  (You don’t want to be running the motors at their maximum
+power if you want them to last; as I said above, they aren’t designed
+to last.)  You’d need to gear them down.  Our homeboy de Haro tells us
+that the spindle speeds in his classroom range from 50 rpm to 5000
+rpm; trying to run that off this wimpy ¼-horsepower squirrel-cage
+motor I have here could require gearing it *up* by a factor of up to
+3.5, or down by a factor of almost 30, although in actual fact you
+would probably use a VFD.
+
+By contrast, you’d probably want to run the drone motors faster and
+gear them down.  Maybe you could run them at 2000–6000 rpm, for
+example, although that difference in speed is less than I expected:
+you’d be gearing them down by factors of only 1.17 to 40, probably.
+You could imagine, though, that you’d want to take advantage of the
+drone motors’ higher speeds to support higher milling speeds for small
+cutters.
+
+### Dremel-style cutting ###
+
+Dremel-style small-cutter milling is potentially really interesting,
+especially coupled with the larger number of axes of control that
+smaller, cheaper, higher-power motors and control systems make
+possible.  The conventional CNC way to mill weird shapes — shapes that
+are far from the shape of the stock they’re milled from — is to
+convert most of the stock into chips, a slow and expensive process
+that becomes somewhat faster if you apply a large roughing milling
+cutter and a high-powered motor to the task.  Smart machinists, and
+all but the most stubborn manual metalworkers, often use slitting saws
+and bandsaws to quickly, but imprecisely, remove much of the material
+ahead of time, thus avoiding much or all of the milling.  With a
+six-axis machine, though, you could do this step under CNC control,
+using not only slitting saws but also narrow endmills or even drill
+bits or wire saws.  Narrow endmills demand potentially much higher
+spindle speeds to reach the same surface speed, which is necessary for
+optimal tooth life.
+
+Narrow endmills suffer from extremely low rigidity, resulting in
+chatter, imprecision, and potential breakage inside the part.  Tapered
+endmills improve this situation dramatically; they already exist and
+are occasionally used in CNC milling even on three-axis machines.
+ConicalEndMills.com suggests using them for “draft angle & chamfer
+machining in all materials,” for example.  But maybe they could be
+much more widely applicable with high-speed motors and five- or
+six-axis control.
+
+Fluid-cooling of stators
+-------------------------
+
+Wikipedia tellls me that the obstacle to even higher power densities
+in small BLDC motors is commonly heat dissipation: the motor must be
+small to spin fast, but this limits its available cooling surface
+area.  Permanent-magnet BLDC motors put the windings, which are the
+primary heat-generating part of the motor, on the stator, which has a
+solid connection to the outside world — this facilitates getting the
+heat generated within them out, as well as getting the prodigious
+amount of current they use in.  However, most of them still rely on
+air cooling at this point, especially in the realm of quadcopters,
+where unobstructed high-speed airflow is not only guaranteed by
+construction but kind of the whole point.
+
+Heat pipes are one possible way to improve the situation: you can run
+heat pipes through the stator to get heat out quicker.  Heat pipes,
+unlike thermal conduction, can transfer heat at a rate that does not
+diminish with distance.
+
+Another alternative, though, is forced-fluid cooling, in which a
+coolant fluid is pumped through channels in the stator to transfer
+heat out.  Air is one common coolant (and, as I said above, in common
+use for these motors) with many advantages but also some
+drawbacks — its heat capacity is orders of magnitude lower than other
+viable fluids.  (See file `coolants` for a survey.)
+
+One of air's key advantages as a coolant is its low viscosity, which
+enables it to cool even long, thin channels effectively.  But, by
+adopting a fractal geometry for the cooling channels similar to that
+of vertebrate circulatory systems, we can enable the rapid, efficient
+circulation of even fairly viscous coolants.  See file
+`capillary-heat-exchanger` for more details and further applications.
+
