@@ -1,0 +1,268 @@
+Traditional mechanical analog “computers” represented quantities only
+as displacements (sometimes linear, sometimes angular), but perhaps by
+using other quantities such as strain (tensile and shear) and
+velocity, we could construct simpler flexure computing devices that
+compute faster.
+
+Needless to say, such devices ought to be as small as possible given
+the precision that is required; no advantage accrues to a calculating
+device from requiring lots of power and weighing a lot.
+
+It’s unfortunate that we’re stuck with the misleading term “computer”
+for such analog devices, because in the digital realm, we do not call
+an adder, multiplier, or decoder a “computer”; we reserve that term
+for essentially Turing-complete digital systems.  But it is not even
+clear what the analog equivalent of Turing-completeness would even be;
+an “analog computer” is a set of building blocks that can be
+reconfigured and connected together in different ways to perform
+different calculations.
+
+Linear and nonlinear springs
+----------------------------
+
+The equilibrium or steady-state configuration of a damped sprung mass
+with a given force applied is a displacement that depends on the
+force, but not the mass.  In some nonlinear cases, like Euler columns,
+there may be more than one possible equilibrium configuration, even
+without inelastic deformation.  (Merkle’s buckling-spring logic
+depends on this for its memory; see file `mechanical-computers` for
+depth on such systems, and file `elastic-metamaterials` and
+`snap-logic` for some more related stuff.)
+
+Hookean springs make this equilibrium displacement a linear function of
+the applied force, or to look at it the other way, they make the force
+a linear function of the displacement.  This means that if you have a
+few different linear springs pushing on a single lumped mass, its
+equilibrium displacement is going to be a weighted sum of the
+displacements of the other ends of those springs.
+
+Once any nonlinearity enters the picture, which can happen through
+rotation (as in Euler columns), contact (as a plucked ruler hanging
+off the edge of a table rattles against the tabletop), or maybe even
+fluid dynamics, the equilibrium displacement–force relation becomes
+not only nonlinear, but also potentially nonmonotonic, discontinuous,
+and multivalued (i.e., not a function).
+
+Considering continuous cases, though, let’s think about a cantilevered
+beam of constant width tangent to a cylinder.  If you press it toward
+the cylinder, it starts to wrap around the cylinder, shortening the
+lever arm and increasing its Hooke constant.  By using a varying
+curve, the increase of the Hooke constant can be tailored to the
+integral of some arbitrary nonegative function.  You can thus get a
+nearly arbitrary continuous displacement difference between two
+parallel rulers wrapping around different-shaped curves under the
+influence of two parallel coil springs from some remote source.
+
+Additionally, Euler-column-style rotations can provide nonmonotonic
+force–displacement relationships, though even without stiction, this
+can result in memory.
+
+Linearly converting a force to a displacement or vice versa can be
+done with linear springs; computing an arbitrary nonlinear function of
+a force as a displacement, or vice versa, can be done by the methods
+described above.  Adding forces can be done by connecting multiple
+springs to the same object.  In particular, it should be possible to
+use two cylinder-wrapped rulers to compute the logarithms of two input
+forces as positions, convert these positions back to forces through
+much lighter linear springs which push on another object, and convert
+its position to an exponentially increasing force by attaching it to a
+third even lighter cylinder-wrapped ruler, which thus at equilibrium
+computes the product of the input forces.
+
+This suggests the ability to compute arbitrarily complex continuous
+numerical functions, although clearly some kind of energy
+amplification is necessary to prevent output “circuits” from unduly
+loading the inputs and to permit chains of more than three or four
+levels of depth.
+
+These spring systems, like flexures in general (see file `flexures`),
+have no backlash as long as the material is perfectly elastic,
+eliminating one of the major sources of error in mechanical analog
+computation.
+
+Integrators and non-equilibrium systems
+---------------------------------------
+
+In general, though, sprung-mass behavior does in fact depend on the
+mass.  The net force on the mass, due to the curves of the various
+springs acting on it and its current displacement with respect to
+those springs, produces an acceleration inversely proportional to the
+mass; the mass’s displacement is the integral of its velocity from its
+initial position, and its velocity is the integral of its acceleration
+from its initial velocity.
+
+This suggests a much more appealing way of building a time-domain
+integrator than the disc-on-plate and ball-on-plate devices used by
+Bush’s differential analyzer: represent the time-domain quantity you
+want to integrate as a force, and then the velocity of some mass gives
+you its integral!
+
+This has a couple of major disadvantages, though.  How do you convert
+the velocity back into a force?  The usual mechanisms for this involve
+either viscous fluid friction (which is notoriously tricky due to the
+laminar–turbulent transition), or electrical generation, like old car
+speedometers or eddy-current magnet braking.  And how do you exert a
+controllable force on an object whose position is not an input to your
+computation?
+
+I propose that we represent the integral not merely as a velocity but
+as a *harmonic oscillation amplitude*.  A tapered, cantilevered bar
+will vibrate at some natural frequency, and its current oscillation
+amplitude is roughly the integral of the oscillatory forces that have
+been applied to it in the past.  The oscillations decay over time in
+accordance with its Q factor, but Q>100 routinely happens by accident
+in oscillatory mechanical systems; I suspect this may provide
+sufficient time to perform a useful calculation to the precision
+afforded by the rest of the system.
+
+If the cantilever is vibrating only in a single dimension, there are
+times during its motion that all of its energy is elastic, and other
+times when it’s all kinetic.  This seems like it could complicate the
+process of continuously feeding energy into it from the quantity you
+want to integrate; you need to feed in that energy in different frms
+at different times.
+
+A possible solution to this is to make it vibrate circularly in two
+dimensions around its natural position.  With this approach, you can
+always apply a displacement or force to it to add or subtract energy;
+only the necessary direction of the displacement or force varies.
+(And if you’re adding force, you need to add it in a direction that is
+90° from the direction you’d need to add a displacement in.)
+
+This has the possibility that you’ll end up with a non-circular
+oscillation, because the signal you were adding had a periodic or
+near-periodic component at or near the frequency you chose for the
+oscillation.  To remove that effect, you can add the squares of the X
+and Y component amplitudes.
+
+To convert this oscillating integral value to a single-ended
+displacement, you probably need to rectify it, ideally a tiny fraction
+of it so as not to spoil the Q too much.  Rectification can be
+achieved by the earlier-described kinds of nonlinear elastic systems
+or more simply by banging shit together or trying to push on a rope.
+
+Speaking of pushing on ropes, that may be a way to get the necessary
+amplification.
+
+Amplification through Euler columns and loose string
+----------------------------------------------------
+
+The crucial invention of Bush that made the differential analyzer
+practical was not the integrator itself — that dated back
+decades — but the “torque amplifier”, a negative-feedback friction
+device that strongly drove an output shaft to the same position as a
+weakly-driven input shaft.  How can we do something similar without
+friction, backlash, wear, lubrication, and the other headaches of
+sliding-contact machinery?
+
+If you have a power-supply block that is being driven back and forth,
+by your power supply, with some fixed displacement, and it is
+connected to another block through a straight slender rod, it will
+tend to drive that other block back and forth, unless the force needed
+to drive the other block is so large that the rod approaches
+Euler-column instability:
+
+    _____       _____
+    |   |   ↔   |   |
+    | ↔ |-------| ↔ |
+    |___|       |___|
+
+However, a relatively small force pushing on the side of the rod can
+get it to buckle when it otherwise wouldn’t, greatly reducing the
+force transmitted to the driven block:
+    _____       _____
+    |   |   ↓   |   |
+    | ↔ |--___--|   |
+    |___|       |___|
+
+The transverse displacement is relatively large (much larger than the
+displacement that would have been transmitted to the driven block) and
+oscillating, but the transverse force need do no net work over time.
+Consequently you want to apply this displacement through a spring with
+high compliance.
+
+The column is shortened by this process, so I think the driven block
+must also have relatively large compliance, at least at DC; if it’s
+stiffly, I think it won’t work.
+
+This provides a locally-continuous mechanism both for controlling a
+large force with a small force and for controlling an arbitrarily
+large amount of power with an arbitrarily small amount, like a MOSFET.
+
+Possibly this can be generalized to adding slack to string by pulling
+it sideways.  While the vertical “control string” is slack, as long as
+the “drive string” is under some DC tension, it faithfully transmits
+AC movements with high stiffness:
+
+    __|__
+    ↔   ↔
+
+But if a little DC tension is applied to the control string, adding
+some slack to the drive string, the effective stiffness of the string
+drops greatly, and much less of the AC signal is transmitted:
+
+      |
+     / \
+    /   \
+    ↔
+
+(For frequencies sufficiently high to require a transmission-line
+model of acoustic propagation in the string, you also have to account
+for reflection from the knot and the conversion of longitudinal waves
+in the drive string into transverse waves in the control string.)
+
+I think this may be the thread-based amplification construct I was
+looking for when I wrote about computing with thread in file
+`mechanical-computers`.  What I had come up with at the time was the
+idea of frictionally clamping a thread running lengthwise down a dowel
+by tightening another thread that ran around the dowel several times,
+but I’m not totally convinced that’s a workable mechanism.  I’m more
+optimistic about this new design.
+
+I’ve rigged this up on the back of a chair with a couple of meters of
+my knitting yarn, and pulling the control string certainly does
+dramatically attenuate the AC *displacement* that gets transmitted
+down the yarn.  However, it also adds tension to the yarn, so it’s
+hard to tell whether it results in less energy being transmitted than
+before; I don’t have a quantitative measurement of the force.  It also
+has the effect of making my bedroom look slightly more like _A
+Beautiful Mind_, and not the positive achievement parts.
+
+Since this really only allows a DC signal to control an AC signal, you
+need a rectification step to produce a fully composable analog
+computation system made out of thread.  Thread is fantastic at
+rectifying signals — as I said above, it’s a cliché that you can’t
+push on a rope — but it’s even worse than electricity at having
+memory, so you’re going to have a lot of ripple in your rectification
+output.  For digital computation, you can probably deal with ripple in
+a brute-force way if it comes to that — for example, separately switch
+two phases of a quadrature signal and full-wave rectify both of them
+into a single junction — but for analog “computation” it seems
+like a big problem.
+
+Stick-slip violin amplification
+-------------------------------
+
+Bowing a violin string tends to amplify existing vibrations in it;
+when a transverse wave movement reaches the bow, it rips the string
+free of the bow hair, causing it to slip, and when a peak or valley of
+the transverse wave is at the bow, the string can stick to the hair,
+which pulls it along and stretches it, adding energy that will be
+released at the next slip.  This form of amplification is extremely
+nonlinear, but might work.
+
+Amplification through multipliers
+---------------------------------
+
+As described above, a force multiplier flexure — where the output
+force is proportional to the product of the input forces — is fairly
+easy to rig up, although to avoid enormous imprecision, the vast
+majority of the input energy remains as elastic energy within the
+device, with only a tiny fraction reaching the output.  But that might
+be okay if you’re multiplying a weak input *signal* by a high-power
+power supply; it’s not really a problem if most of the energy in the
+amplifier is resonating back and forth between the multiplier and the
+power supply, or even just being burned up as heat, as long as the
+output signal is stronger than the input signal.
+
+I’m not sure if this will work.
