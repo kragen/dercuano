@@ -1,0 +1,204 @@
+I was reading about Observablehq last night.  They’ve layered a
+dependency and auto-recalculation system on top of JS, so that any
+cell of your code is re-executed when its dependencies change, without
+requiring you to explicitly reinvoke it.
+
+I should probably dig into what Observable can do, or actually I
+should work on some DSP code I’ve been procrastinating on, but instead
+I am going to go off and natter about vaguely related stuff.
+
+By executing the sequence of code in a cell, such a system can
+discover which inputs it’s currently reading from and which outputs
+it’s currently writing to, although both of these could change
+depending on the values of those inputs.  Observable in particular
+determines the outputs statically and doesn’t let different cells
+write to the same variable.
+
+Suppose in such a system you have a cell that computes
+
+    r = (x**2 + y**2)**0.5
+
+You can interpret this in the standard way, as a “statement”, which is
+to say an instruction, which, when executed, reads single values from
+`x` and `y`, do a computation, and write the single result to `r`.
+Numpy extends this, following APL, by allowing `x`, `y`, or both, to
+contain *values* which are arrays of *numbers*.  For example:
+
+    >>> x
+    array([-1.  , -0.75, -0.5 , -0.25,  0.  ,  0.25,  0.5 ,  0.75,  1.  ])
+    >>> y
+    array([ 1.73205081,  1.85404962,  1.93649167,  1.98431348,  2.        ,
+            1.98431348,  1.93649167,  1.85404962,  1.73205081])
+    >>> r = (x**2 + y**2)**0.5
+    >>> r
+    array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2.,  2.])
+    >>> y = 1
+    >>> r = (x**2 + y**2)**0.5
+    >>> r
+    array([ 1.41421356,  1.25      ,  1.11803399,  1.03077641,  1.        ,
+            1.03077641,  1.11803399,  1.25      ,  1.41421356])
+
+In addition to allowing `x` and `y` to either not vary or to vary
+*together*, we can also have them vary *independently*, producing a
+*matrix* of results for `r`:
+
+    >>> y = x.reshape((9, 1))
+    >>> y
+    array([[-1.  ],
+           [-0.75],
+           [-0.5 ],
+           [-0.25],
+           [ 0.  ],
+           [ 0.25],
+           [ 0.5 ],
+           [ 0.75],
+           [ 1.  ]])
+    >>> r = (x**2 + y**2)**0.5
+    >>> r
+    array([[ 1.41421356,  1.25      ,  1.11803399,  1.03077641,  1.        ,
+             1.03077641,  1.11803399,  1.25      ,  1.41421356],
+           [ 1.25      ,  1.06066017,  0.90138782,  0.79056942,  0.75      ,
+             0.79056942,  0.90138782,  1.06066017,  1.25      ],
+           [ 1.11803399,  0.90138782,  0.70710678,  0.55901699,  0.5       ,
+             0.55901699,  0.70710678,  0.90138782,  1.11803399],
+           [ 1.03077641,  0.79056942,  0.55901699,  0.35355339,  0.25      ,
+             0.35355339,  0.55901699,  0.79056942,  1.03077641],
+           [ 1.        ,  0.75      ,  0.5       ,  0.25      ,  0.        ,
+             0.25      ,  0.5       ,  0.75      ,  1.        ],
+           [ 1.03077641,  0.79056942,  0.55901699,  0.35355339,  0.25      ,
+             0.35355339,  0.55901699,  0.79056942,  1.03077641],
+           [ 1.11803399,  0.90138782,  0.70710678,  0.55901699,  0.5       ,
+             0.55901699,  0.70710678,  0.90138782,  1.11803399],
+           [ 1.25      ,  1.06066017,  0.90138782,  0.79056942,  0.75      ,
+             0.79056942,  0.90138782,  1.06066017,  1.25      ],
+           [ 1.41421356,  1.25      ,  1.11803399,  1.03077641,  1.        ,
+             1.03077641,  1.11803399,  1.25      ,  1.41421356]])
+
+As I wrote in `principled-apl` and `matrix-multiply`, you could think
+of the broadcasting rule for these simple elementwise operators as a
+logical interpretation: *if* x = -0.75 *and* y = -1, *in that case* r
+= 1.25; but *if* y = 0, *in that case* r = 0.75; and so on.  And given
+a reactive observable dataflow transaction system like Observablehq,
+you could in fact evaluate it that way — if you change the value of
+`y` from -1 to 0 without changing `x`, `r` will react by changing its
+value from 1.25 to 0.75.
+
+A FIR filter example
+--------------------
+
+How about a FIR filter?
+
+    y = sum(w[i] * x[-i] for i in range(len(w)))
+
+This is a valid Python statement, applying the time-domain FIR kernel
+`w` to the last few values of the list or array `x`.  If you run it
+every time you append a new value to `x`, it will put successive
+samples of the FIR filter result into `y`.  You have to be careful to
+not run it before `x` has enough values in it, and you probably want
+to do something with the result in `y` before it gets overwritten by
+the next execution, because the result is a function of a time-varying
+state of the system.
+
+Suppose instead that you want to compute the entire FIR-filtered
+signal rather than just a point on it.  You can do such a computation
+in Numpy in at least four different ways.  The way you would actually
+use in practice is the `convolve` function:
+
+    y = numpy.convolve(w, x, 'valid')
+
+Unfortunately this doesn’t throw any light on how to solve the
+problem; it just delegates it to a library function, which, as it
+turns out, delegates to the `multiarray.correlate` function, which is
+written in C and presumably does a nested loop.
+
+The other two straightforward ways involve an interpreted loop in
+Python (which is why you wouldn’t want to use them in practice) which
+invokes an inner loop via a Numpy SIMD operation.  You could have the
+implicit inner loop compute a single point of `y`:
+
+    y = [(w[::-1] * x[i:i+len(w)]).sum() for i in range(len(x) - len(w) + 1)]
+
+Or you could have the implicit inner loop calculate the contribution
+of a single sample of `x` to all the samples of `y`:
+
+    y = numpy.zeros(len(x) + len(w))
+    for i in range(len(x)):
+        y[i:i+len(w)] += x[i] * w
+    y = y[len(w)-1:1-len(w)]
+
+The fourth approach is to transform both `x` and `w` into the complex
+Fourier domain, multiply the complex phasors there elementwise, and
+transform back into the spatial domain.  This involves some subtle
+issues of numerical precision, and it’s profoundly nonobvious, but for
+large signal vectors, it is by far the fastest method.  Implicitly in
+the above, `w` is not longer than `x`, and in that case it looks like
+this:
+
+    wf = numpy.fft.fft(numpy.concatenate((w, numpy.zeros(len(x) - len(w)))))
+    y = numpy.fft.ifft(wf * numpy.fft.fft(x))[len(w)-1:]
+
+How about in the “logical” view?  `w * x` is a perfectly reasonable
+expression; if `w` has 5 possible values and `x` has 11, then it `w *
+x` has 55 possibilities, reasonably represented as a matrix (the outer
+product of `w` and `x`, considered as vectors).  It’s indexed by the
+Cartesian product of `w`’s index set and `x`’s index set.  The `y`
+computed above is just a sum over some of those values; the summation
+introduces a dummy variable that ranges over the valid indices of `w`.
+
+The conventional mathematical notation for this is
+
+> *yₙ* = Σ*ᵢwᵢxₙ₋ᵢ*
+
+where the dummy variable *i* implicitly takes all the values that it
+would be coherent for it to take.  This is somewhat ambiguous and
+often disambiguated by contextual information: if *xᵢ* only exists
+when *i* ≥ 0, for example, does *y*₀ exist, being simply *w*₀*x*₀?
+And resolving that ambiguity is what the `'valid'` in the above Numpy
+expression is for.
+
+Typically we think of *x* and *y* here as being indexed by
+(discretized) time, but of course nothing in the math requires that;
+for math, the time is just another meaningless variable.
+
+In the “logical” view, this introduction of the dummy variable *i*
+means that *any* value of *y* depends on *every* value of *w*.  In the
+sort of ambient-indexing environment I was thinking of there, Σ
+considers a multiplicity of possible worlds with different values of
+*w*; in this case, we also want to use the *index* into *w* to reindex
+*time itself* (ominous music with minor chords!) so we can access
+values of *x* from other points in time.  A reasonable way to write
+this in ASCII might look something like this:
+
+    y = sum(w.i, w * x[t = t-w.i])
+
+Here `sum` takes two arguments: the index to sum over and the
+expression to evaluate in a possible world for *all* of the possible
+values of the index.  `w.i` is the index set of `w`; as `sum`’s first
+argument, it’s being used as *a reference to an index* that needs to
+have its index set inspected and iterated over, while within the
+expression, it’s being used as *a reference to a particular value of
+that index*, a mere rvalue.  `x` is being indexed by the specification
+`[t = t-w.i]`; this indexing creates another possible world in which
+to evaluate `x`, in which the index `t` (which, perhaps, might be
+`x.i` or a part of `x.i`) has a different value from its value in the
+outer environment.  The expression `t-w.i` is evaluated in that outer
+environment, taking the ambient value of `t` and subtracting the
+current value of `w.i` from it.  The indexing expression hides the
+outer ambient value of `t` from `x`, replacing it with the fake value.
+
+This implies that `t` and `w.i` are of some types such that it makes
+sense to subtract them; they are not, for example, merely categorical
+or ordinal.  They could, however, be vectors of the same
+dimensionality, such as 2-vectors, in which case the same expression
+above serves for convolving images as well as time-series signals.
+
+However, the fact that we’re iterating over all the possible values of
+`w.i` means that it cannot be a *continuous* dimension, although its
+values could be values of a continuous type.  It must be discrete so
+that it can have a finite number of possible values!
+
+The same ambiguity about out-of-range values is present.  If one of
+the `x[t = t-w.i]` values happens to not exist, for a given ambient
+value of `t`, does that mean the entire sum fails to exist, and thus
+`y` has no value at that point?  Or does it merely mean we sum over a
+smaller number of values?
