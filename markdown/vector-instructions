@@ -1,0 +1,44 @@
+Old Crays had vector instructions.  These used a “vector length”
+register and a “vector mask” register to specify which items in the
+vector to process.
+
+On the Cray Y-MP C90, there were eight vector registers, V0 to V7,
+each containing a 128-element vector of 64-bit values; a vector
+instruction would process corresponding elements of two of these
+registers, two at a time, and deposit the results in another vector
+register.  But you didn’t have to process all 128; the “vector length”
+register could terminate the process early if you didn’t have that
+many.
+
+These vector instructions could be pipelined in the sense that the
+result from one could be fed incrementally to another, as long as they
+used different functional units.
+
+Vector registers were loaded from and stored to central memory using a
+“block transfer” with a first word address, an increment or decrement
+(stride), and a vector length; and this could participate in the
+pipelining.  Thus a sequence of vector instructions could construct a
+flow graph that loaded some sequences of values from main memory,
+processed them, and wrote them back to main memory, all in a pipeline,
+but the viewpoint of the assembly program was that it was conducting a
+series of in-order operations on large vectors.  As the manual says,
+“The CRAY Y-MP C90 computer system allows a vector register reserved
+for results to become the operand register of a succeeding
+instruction.”
+
+There were also scalar registers, which could be used with vector
+instructions as arithmetic operands.
+
+The only vector integer operations provided were sum, difference, and,
+or, xor, and leading zero count.  In floating-point, you had the usual
+operations, except that instead of division, you had only reciprocal.
+
+The “vector mask” register could be used to select elements from one
+vector or another, or to replace selected elements with zero or a
+scalar register.  (In related selection operations, you had a
+“register shift” group which I don’t understand.)  The vector mask
+could be set by numerical tests on a vector register: [<=>≤≥≠]0.
+There was also a variant of the VM-setting instruction that puts the
+indices of the matching elements into another vector register,
+although I don’t think there was a way to use those indices except one
+at a time.

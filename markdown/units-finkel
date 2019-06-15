@@ -1,0 +1,46 @@
+I was reading Raphael Finkel’s book “Advanced Programming Language
+Design”, and he mentions a language somebody named Finkel invented in
+the 1970s called AL.  AL had dimensional analysis built in, with four
+base dimensions: ‘time’, ‘distance’, ‘angle’, and ‘mass’.
+
+(As Finkel says, this is the kind of “type safety” that’s really
+needed in everyday calculations.  His language did it statically, but
+you can do it dynamically too, as units(1) does.)
+
+He points out that ‘angle’ really shouldn’t be included since radians
+are really dimensionless, which leaves us with ‘time’, ‘distance’, and
+‘mass’.  But no ‘speed’, ‘force’ or ‘energy’.
+
+However, they can be derived from the base units; speed is a ratio
+distance/time — e.g., m/s.  Acceleration is speed/time, or m/s², and
+force can be thought of as mass \* acceleration, or kg\*m/s².  Finally,
+energy is force \* distance, so you can express it in units of
+kg\*m²/s².  This is in fact how units(1) represents it.
+
+But do we really need all three of ‘time’, ‘distance’, and ‘mass’?
+The speed of light provides a natural conversion factor between time
+and distance, and mass can be equivalently measured as energy,
+according to the well-known formula E = mc².  So speed is really just
+a dimensionless quantity, and acceleration is the reciprocal of a time
+interval, namely the time to reach the speed of light at that constant
+acceleration; so its units are really 1/s.  So force can really be
+measured merely with kg/s.
+
+Unfortunately this doesn’t really help us get rid of mass: energy is
+now expressed in kg\*s/s, or merely kg.  So our two relativity-based
+equivalences (mass as energy, and time as distance) turned out to be
+merely two facets of the same equivalence.
+
+But I suspect that in everyday calculations, the equivalence of mass
+and energy is rarely useful; it’s far more likely to hide errors than
+to reduce the amount of work necessary.  With time, distance, and
+mass, the only incommensurable quantities I commonly run into with
+commensurable units are:
+
+- torque and energy;
+- various dimensionless quantities;
+- perhaps pressure and stress;
+- stress and young’s modulus.
+
+Collapsing mass with energy and time with distance creates many more
+“units collisions”.

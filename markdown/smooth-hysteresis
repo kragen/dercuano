@@ -1,0 +1,220 @@
+I was looking at my example code for `bleep` and came across a mention
+of hysteresis, which triggered the following thoughts in me.
+
+> Hysteresis in the Schmitt-trigger sense is deeply discontinuous, and
+> maybe it would work better if it were more continuous.
+
+And also:
+
+> How would you parallelize the computation of hysteresis over a long
+> signal?
+
+Continuification
+----------------
+
+In digital electronics, hysteresis on digital inputs — Schmitt
+triggers — is used to prevent noise on a slow transition from
+converting that transition into multiple transitions.  Without
+hysteresis, you set the 1/0 threshold at some level, like 1300 mV (the
+TTL level), and consider anything above that level a 0, and anything
+above it a 1.  This means that, if the voltage level being impressed
+on the wire by the gate you’re connected to is 1295 mV during some
+interval, noise of anything over 5 mV can in theory result in many,
+many transitions between 0 and 1 and back again.  You could imagine
+that a transition from 0 V to 5 V with a roughly linear ramp over
+10 ns would result in being in the 1295–1305 mV range for about
+20 picoseconds, and so you might see hundreds or thousands of glitch
+transitions between 0 and 1 during those 20 ps, which would be fine
+for combinational logic that ultimately feeds into a
+synchronously-clocked flip-flop, but potentially disastrous for logic
+intended to do something like gate a pulse train into a divide-by-10
+counter.
+
+Of course, this doesn’t normally happen, because if the gate sending
+the signal takes 10 nanoseconds to transition, the gate receiving it
+normally isn’t going to be able to transition in 20 picoseconds, much
+less 20 femtoseconds.  But it can happen sometimes; for example, if
+there’s a heavy capacitive load on the line, if the input signal
+doesn’t come from a logic gate, if the input signal is from a much
+slower logic family, or if your noise situation is just totally off
+the hook.
+
+So, in those situations, we use a Schmitt trigger, which moves the
+threshold once you cross it.  Say the input is initially low and the
+threshold is initially at 1350 mV; once the rising voltage gets past
+1350 mV, the input reads as a 1 and the input threshold snaps down to
+1250 mV, and it won’t read a transition back to 0 unless the voltage
+moves back down by those 100 mV.  This means that as long as your
+noise voltage never quite exceeds that 100 mV of hysteresis (peak to
+peak), your input voltage can transition as slowly as you like without
+turning the noise into multiple transitions.  The only thing noise
+will do is make the transition happen a little sooner and with a
+little more jitter.
+
+So how high should you set the hysteresis so that this never happens,
+so your circuit will work reliably?  Suppose your signal suffers from
+interfering additive white Gaussian noise, and the noise’s bandwidth
+(in theory infinite, but not in practice) that includes some
+frequencies considerably faster than your signal transitions.
+
+Trick question!  Gaussian noise will occasionally exceed any given
+limit (with probability exponentially small in the square of that
+limit), and white Gaussian noise will occasionally exceed it twice, in
+opposite directions, during any given interval size.  Given that all
+circuits are subject to non-band-limited additive white Gaussian noise
+(from Johnson noise and from antenna pickup of thermal radiation, if
+nothing else) why does this work so well, even with the 100-mV
+hysteresis common on the inputs of things like the STM32
+microcontroller line (200-mV for 3.3-volt inputs; see file `stm32`)?
+
+Again, we are saved by the limited speed of our circuits.  A
+sufficiently short pulse of 100 millivolts or even 10 volts won’t trip
+the Schmitt trigger because even the Schmitt trigger, though fast,
+can’t respond instantly.  Its output is a continuously-changing signal
+(in the sense that over a sufficiently short time interval, the change
+to the output is arbitrarily small) whose response to input changes is
+also continuous (in the sense that an arbitrarily small change to the
+output can be achieved with a sufficiently-small change to the input).
+So it isn’t enough for the input voltage to jump randomly to 10 volts
+for a femtosecond; it needs to stay there long enough to overcome the
+small but finite time delays inside the circuit.
+
+This is aided by the local linearity of the responses: if the input
+jumps by 1 volt for a picosecond, the output changes about five times
+as fast as if it jumps by only 200 millivolts for that picosecond,
+assuming a picosecond is fast enough to mostly avoid nonlinear
+effects.  Since a one-volt jump is much less likely to happen due to
+noise than a 200-mV jump, it provides much more information if it
+happens.
+
+Contrast this with what I’m doing in my Bleep prototype code:
+
+    def _schmitt(diff, size):
+        val = 0  # presume diff starts negative
+        for item in diff:
+            threshold = size/2 if val == 0 else -size/2
+            val = 1 if item > threshold else 0
+            yield val
+
+There’s no continuous output transition time here that happens faster
+if the input is stronger.  And, I suspect, this makes the code more
+susceptible to noise.
+
+But does it really?  The signal being processed there is a linear
+function of several neighboring input samples, which means that in
+some sense it’s an average of the signal over that window.  (Hopefully
+of the signal, that is, rather than of something else.)  Although the
+*transition* isn’t continuous, the *probability* that a given noise
+sample *causes* a transition *is* continuous in its amplitude, because
+the average of its neighboring samples is a continuously distributed
+random variable.  So, perhaps the smaller response to smaller signals
+is already sufficiently present.
+
+And, beyond some limiting frequency — Nyquist if nothing
+else — high-frequency noise is increasingly filtered out before it
+gets to the Schmitt trigger routine.  So a totally lazy way of
+reducing the probability of noise-induced glitches is to decimate the
+signal a lot, ideally after low-pass filtering it.  If you decimate it
+to, say, four samples per expected transition time, then at most you
+can only get four glitches per expected transition.  This introduces
+more jitter, of course.
+
+### Bistable and Schmitt-trigger systems as continuous differential equations ###
+
+Suppose that, instead of thinking in digital space, we think in
+continuous space for a while.  What’s the simplest system that
+exhibits the kind of bistable behavior we’d like to see from a logic
+gate, say, a buffer?
+
+#### Functions ####
+
+First, let’s consider memoryless systems — functions — before moving
+on to Schmitt triggers, which are by necessity stateful.
+
+Simply *y* = *x*, like an idealized buffer op-amp, won’t quite cut it,
+because that doesn’t have any signal restoration — any noise on the
+input will be faithfully reproduced on the output.  We want something
+that restores signal levels somewhat, so that at least if we hook up a
+chain of them in series, the signal will approach the discontinuous
+threshold behavior we expect from logic buffers — values close to 0 or
+1 should converge to 0 or 1, while values close to 0.5 should be
+repelled from 0.5.
+
+We can do this as a piecewise-linear system: x < 0.25 ? 0 : x > 0.75 ?
+1 : 2\*x - 1.  We can do it as a trigonometric system: ½ - ½cos(πx).
+Or we can do it as a polynomial: -2*x*² + 3*x*².  Wait, where did that
+come from?
+
+Well, our function must have attractive fixed points at *x*=0 and
+*x*=1, and we'd like one around *x*=½, too.  That the fixpoints are
+*attractive* is to say that the absolute value of the derivative there
+should be less than 1; and we’d like the fixpoint at ½ to be
+repulsive.  The smallest polynomial (other than just *f*(*x*) = *x*)
+that’s going to be able to give us three fixpoints is going to be a
+cubic, *ax*³ + *bx*² + *cx* + *d*.  If we use Hermite interpolation,
+we can arbitrarily choose values and derivatives at two points of a
+cubic; let’s choose *f*(0) = 0, *f'*(0) = 0, *f*(1) = 1, *f'*(1) = 0.
+This is a simple enough case of Hermite interpolation that we can do
+it directly: *f*(0) = *d* = 0, and *f'*(0) = *c* = 0, so we have just
+*ax*³ + *bx*², whose derivative is 3*ax*² + 2*bx*; so we have *f*(1) =
+1 = *a* + *b*, so *b* = 1 - *a*, and *f'*(1) = 0 = 3*a* + 2*b* = 3*a*
++ 2(1 - *a*) = *a* + 2, so *a* = -2, and *b* = 3.
+
+So we have -2*x*³ + 3*x*², with the derivative -6*x*² + 6*x*.  As it
+happens, this function *does* have a fixpoint at *x*=½, and its
+derivative there is 3/2, which makes it a repulsive fixpoint.  This is
+fortunate, but if that weren’t the case, we could use Hermite
+interpolation with *f*(½) = 0 and some arbitrary value for *f'*(½),
+deriving a quintic.
+
+We can’t do two attractive fixpoints at 0 and 1 with just a quadratic
+*ax*² + *bx* + *c*, because its derivative (a linear function 2*ax* +
+*b*) must average 1 over that interval to hit the fixpoints, so if it
+isn’t identically 1, it must be less than 1 at one fixpoint and
+greater than 1 at the other.
+
+#### Ordinary differential equations ####
+
+So suppose that our output, instead of being a pure function of the
+input, is instead some quantity *y* that varies over time in a
+continuous way: d*y*/d*t* always exists, though it might depend on
+different things.
+
+In particular, if we want it to be attracted to some target value *v*,
+the simplest thing to do is to set *y'* = (*v* - *y*)/τ, where τ is
+some positive time constant, which is necessary for the units to be
+consistent.  This causes *y*’s distance from *v* to exponentially
+decay, regardless of its initial state, if *v* is constant.  So, for
+example, *y'* = (-2*x*³ + 3*x*² - *y*)/τ would be a reasonable
+description of this logic-buffer system.  (It’s a terrible
+approximation of the behavior of real-world TTL or CMOS logic gate
+inputs, but it has some key characteristics in common with them.)
+
+Even if *v* is not constant, *y* will move toward it, but the rate of
+convergence may not be exponential.  Consider, for example, *y'* =
+(-2*y*³ + 3*y*² - *y*)/τ.  If you start it somewhere in the interval
+[0, 1], it will converge to whichever endpoint of the interval was
+initially closest.
+
+Now suppose we combine this with a tendency for *y* to move toward
+*x*, the input: *y'* = (α(-2*y*³ + 3*y*²) + (1 - α)*x* - *y*)/τ.  When
+α = 0, *y* exponentially decays toward *x*, and when α = 1, it
+exponentially decays toward whichever of 1 or 0 is closer to its
+initial state, as before.  For intermediate values of α, this
+single-equation system displays a kind of Schmitt-trigger-like
+behavior (XXX verify this) in which *y* follows *x*, but tends toward
+the endpoints; for any given constant value of *x*, *y* may have
+either one or two attractors (XXX verify this).  For α > 0, *y* has
+two attractors at *x* = ½, but (XXX I think) for α < 1, sufficiently
+extreme values of *x* will force it to have only a single attractor.
+
+If this equation describes a single “logic gate” and its *x* input is
+an affine function *x* = Σ*ᵢaᵢyᵢ* + *b* of some other gates’ outputs,
+this can be made to converge to an arbitrary logic function, provided
+the Schmitt-trigger behavior isn’t too overwhelming.  If the *aᵢ* are
+nonnegative, it can only compute a noninverting logic function.  (This
+is reminiscent of the universal-approximator theorems for neural
+networks, and in fact it might be a special case of them.)  See file
+`snap-logic` for more details on such logic.  XXX in this case we
+might as well use the aᵢ for the feedback path too and dispense with
+the separate α and the unnecessarily linear feedthrough.

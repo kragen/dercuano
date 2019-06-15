@@ -74,6 +74,9 @@ with the objective of selectively increasing compliance rather than
 decreasing it.  The work-hardening of the metal obviously works
 against you here.
 
+Electrotyping and molding
+-------------------------
+
 Electrotyping may be a particularly appealing next process step to
 apply, allowing the soft, easily melted aluminum to give its
 precisely-dimensioned form to metals like copper, brass, bronze,
@@ -98,7 +101,8 @@ in the time before it cools at the surface of the mold.
 
 Copper doesn’t melt until 1084°, and nickel doesn’t melt until 1455°,
 meaning that in theory you could fill shells of them with materials of
-much higher melting points — including, in the case of nickel, cast
+much higher melting points
+than the aluminum itself can survive — including, in the case of nickel, cast
 iron (see file `glass-fluxing-3d-printing`), which will definitely
 dissolve it.  Dimensional precision may suffer from thermal
 contraction, although I seem to recall that cast iron in particular
@@ -114,3 +118,117 @@ expensive than cast iron, though.
 
 [Zamak]: https://en.wikipedia.org/wiki/Zamak
 [A36 steel]: https://en.wikipedia.org/wiki/A36_steel
+
+Alternatively, you might be able to cast directly into the aluminum
+foil, as long as the pressure isn’t too high.  According to file
+`filled-fdm`, pure aluminum doesn’t melt until 660°, and the alloy
+used for aluminum foil isn’t too much below that.  Casting will
+clearly involve some pressure that can deform the aluminum, but this
+may be small enough not to matter.  Solder, type metal, ABS, PLA,
+lead, hard candy (sugar syrup), paraffin wax, thermoset resins such as
+silicone or PMMA, and Zamak should all be moldable directly in
+aluminum foil; some of these will stick permanently to it, but
+probably all of them will stick to it well enough to require deforming
+the aluminum foil irreversibly (plastically) for demolding.
+
+Casting crystalline materials involves substantial loss of surface
+detail from crystallization, both from crystal grain growth directly
+distorting the surface and from the contraction or expansion that
+usually accompanies the phase transition.  Glasses such as hard candy
+avoid this problem.
+
+Promising qualitative results from a simple manual casting experiment
+---------------------------------------------------------------------
+
+I deformed some aluminum foil (thin, about 10 μm†, times or divided by 2)
+with a ballpoint pen on top of some paper by drawing a sort of face on
+it, washed it with 96% ethanol, laid it on a glazed porcelain floor,
+and then melted some 60–40 tin–lead solder (183°–190°) on top of it,
+using a shitty non-temperature-controlled soldering iron.  The solder
+was able to pick up most of the contours of the drawing accurately,
+but something black matter was stuck to the bottom of the solder and
+screwed up the impression.  I think it came from rosin contamination
+of the tool that carbonized instead of boiling off, but it could also
+be a chunk of metal oxide from the tool, either copper or iron.  The
+foil peeled easily off the solidified solder.  The solder surface
+showed solder’s usual dull finish, despite the bright finish of the
+aluminum foil that had molded it; I think this is probably due to
+wrinkling as the surface cooled before the interior and would be
+eliminated by adding antimony, as in type metal.
+
+An earlier attempt using the same blob of solder was much less
+successful, because the bottom of the solder blob was full of bubbles,
+obliterating most of the submillimeter-scale contours I was trying to
+pick up.  These might have resulted from oil contamination of the
+aluminum foil (e.g., from my hands) or from the rosin in the solder,
+which does volatilize significantly at the temperatures needed to melt
+the solder, let alone the higher temperatures the tool was presumably
+reaching.
+
+Specks of the black material were also evident on the upper surface of
+the solder, and upon breaking it with pliers, apparently also in its
+interior.  I was hoping to draw some sort of conclusion about its
+density or solder-wettability, but I don’t know what to make of this.
+
+The solder blob was about 1.5 mm thick.  If the solder’s density is
+9 g/cc, which I haven’t measured but should be about right (see file
+`phase-change-soldering-iron`) this works out to about 130 Pa of
+pressure on the aluminum, or 0.02 psi in folk units, which should put
+fairly small forces on the aluminum foil, not deforming it much except
+in very flat areas; the total weight of the solder over a square
+centimeter would be about 1.4 grams.  However, I melted the solder
+directly on the surface by resting the soldering iron on top of it, so
+in this case the aluminum foil experienced much greater forces than
+the weight of the solder.  Pouring already molten solder would avoid
+this problem
+
+† I folded a piece of it in half 8 times and measured it at almost
+2 mm with my caliper.  If I knew where to find the battery for the
+caliper I’d be able to give a more precise measurement, but I don’t
+think it’s that critical — I’d expect anything from 10 μm to 125 μm (a
+Coke can I had lying around, though that includes the epoxy and paint)
+to give roughly similar results.
+
+Exponential typing and Gutenberg
+--------------------------------
+
+Suppose you use SPIF to cast some simple stamps in, say, solder,
+Zamak, or type metal, some 100 times thicker than the aluminum foil,
+and thus 100 to 10'000 times as rigid, depending on the deformation
+mode you’re considering.  (Well, before you account for the difference
+in moduli of rigidity between the aluminum and the other materials,
+but those are small by comparison.)  You can then use these stamps to
+stamp or incrementally form more foil, which you can then use to cast
+or electroform further shapes, either in positive or in negative.
+
+To take a simple example, you could use the SPIF process to form
+stems, serifs, and bowls of letterforms in foil, which you can then
+cast into stamps, which you can then stamp into an aluminum foil
+matrix to form letters, which you can then cast or electrotype into a
+font; the additional step of making up a stereotype for a page of text
+allows you to reuse the same letters for each page without losing the
+ability to reprint previous pages.  A recent analysis of Gutenberg’s
+books suggests he probably used such a process, although of course he
+wasn’t using aluminum foil for the expendable soft matrix.  (Likely
+materials that occur to me include clay bodies, plaster of Paris, and
+gold foil; I think papier-mâché, as used for stereotypes, wouldn’t
+have worked for reasons of temperature limitations.  Later printers
+used a thick, durable, work-hardening copper matrix instead, cutting a
+single punch from steel for each letter.)
+
+But other shapes might also work reasonably.  For example, you could
+use a tiny spherical SPIF tool to make a mold for a larger spherical
+SPIF tool; you could quite reasonably make stamping dies (at least for
+soft metals and slow stamping) to put ribs in things, stamping the
+ribs themselves with a series of stamps from torus-shaped rib positive
+and negative dies; and even features like countersunk holes to cast
+into thin sheets might be feasible.  To cast half of a screw thread,
+you could possibly use a stamp with the form of a single turn of the
+screw thread, repeatedly; two such molds clamped together could cast
+an entire screw.
+
+In cases where the cast material releases easily from the
+aluminum-foil matrix, you may be able to cast both a positive and a
+negative die simultaneously from the same sheet, thus ensuring a
+fairly close fit even if the sheet deforms significantly during
+molding.

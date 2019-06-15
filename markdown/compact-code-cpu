@@ -1,0 +1,53 @@
+Suppose we have a non-stack-oriented VM intended for dense code; now
+maybe we can afford 16-bit instruction words (instead of Smalltalk’s
+8) because we don’t need to spend half our words on stack manipulation
+and fetching local variables.  We can avoid three-address instruction
+formats in a few different ways; the most appealing is to use
+something like the Mill’s Belt for instruction results.
+
+In particular, I think that the usual instruction format could
+probably have two operands, and I think that part of the namespace of
+operands should be devoted to the belt, while another part should be
+devoted to a traditional set of normal registers, handled perhaps in
+the usual way; perhaps you’d have 8 belt registers and 8 normal
+registers.  As an alternative to handling them in the usual way, each
+function could have its own set of registers, or you could use
+rotating windows like the SPARC.
+
+The Smalltalk VM additionally has a bunch of implicit context that
+goes with a method execution: you implicitly have the object’s
+instance variables mapped into your bytecode namespace, and the method
+is associated with a vector of method selectors that it can invoke
+with its bytecodes.  This may save space in the bytecode, although for
+the indirection to pay for itself, you probably need several methods
+to share the same vector.
+
+If we take a more traditional approach, we could pack two 12-bit
+instructions into a 24-bit word in the usual case, or three 11-bit
+instructions into a 32-bit word (with one bit omitted).  This gives us
+three or four bits of opcode plus 4 bits per operand.  A special tag
+bit could indicate a 23-bit or 31-bit literal, at the cost of making
+half the opcodes (or operands) illegal in a given position.  (Literals
+go onto the belt.)
+
+If we estimate that each of these VM instructions are roughly
+equivalent to two stack-bytecode instructions, then we are getting 1⅓
+to 1½ times the standard Smalltalk bytecode density, which is already
+world-beating.  Then there’s just the issue of what those 8 or 16
+opcodes should do, exactly.
+
+(Alternatively, we could pack two 16-bit instructions into a 32-bit
+word, leaving us a very generous 6 bits for the opcode and 5 for each
+operand, or 4 bits for the opcode and an even more generous 6 for each
+operand.  This is just the same instruction density as Smalltalk.)
+
+We at least need to be able to do arithmetic, load and store values
+into registers, and do conditional jumps, or at least conditional
+returns.
+
+Probably at least one of the opcodes would do well to invoke a
+method/“send a message”.  Smalltalk lumps arithmetic and array access
+into this, too: if the object you’re sending the message to happens to
+be a number, and the message is an arithmetic message, then it does
+arithmetic; if it’s an array, and the message is an array element
+access message, then it accesses array elements.

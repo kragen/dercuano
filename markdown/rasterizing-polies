@@ -1,0 +1,52 @@
+I was thinking about the problem of rasterizing a set of polylines
+filled with colors; for example, for rendering text from an outline
+font after some arbitrary geometric transformation.  It occurred to me
+that it’s probably reasonable to approximate each smooth segment of
+the polyline with a quadratic or cubic spline providing a fractional
+X-coordinate given the Y-coordinate; this explicit spline may need to
+have more knots than the parametric spline defining the original
+polyline in order to achieve adequate precision.
+
+Note that computing the X-coordinate as a function of the Y-coordinate
+is transposed from the usual convention for graphing functions,
+established I suppose by Descartes from, probably, the Greeks’
+convention of writing their letters from left to right.
+
+It should be possible to use interval arithmetic to conservatively
+approximate how precisely you need to approximate the parametric
+spline with the explicit spline.
+
+Anyway, once you have a bunch of explicit splines, the inner loop of
+updating all of the X-coordinates for a new raster is just this:
+
+    x += Δx;
+    Δx += ΔΔx;
+    // and if they’re cubic splines:
+    ΔΔx += ΔΔΔx;
+
+These vector-addition operations can be carried out in SIMD or SPMD
+fashion, which can be up to 512 bits per instruction on modern
+computing hardware.
+
+When we encounter a knot in the spline, we just need to update an
+element of the ΔΔx or ΔΔΔx vector with the new value.  If we instead
+encounter a corner in the polyline, we also update Δx.  A top edge,
+corner, or curve involves adding two new items; a bottom one involves
+removing them.
+
+This gives us a vector of x-coordinates; if we sort that vector, we
+get partitions dividing the scan line into regions alternating inside
+and outside.  (It may be worthwhile to keep all of the vectors sorted,
+since most of the time the order won’t change from one scan line to
+the next.)
+
+To keep the knots at least 16 scanlines apart without the errors
+getting over some size, I think we need an extra 4 fraction bits per
+order of polynomial; that is, for quadratic splines, we need 8 more
+fraction bits for ΔΔx than we would need for our desired precision of
+x, and for cubic splines, we need 12 more fraction bits for ΔΔΔx.
+This probably means that 32-bit fixed point with 16 fraction bits is
+adequate for most purposes, providing 16 levels of antialiasing with
+cubic splines, while 16-bit fixed or floating point is not, which
+means that a 512-bit vector is only 16 elements.  But that’s still
+enough to give a dramatic speedup.

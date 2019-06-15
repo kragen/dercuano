@@ -1,0 +1,37 @@
+What’s the simplest instruction set for a compiler that can compile
+itself?  I think you probably need some kind of looping construct,
+some kind of way to read in bytes, some kind of way to output bytes,
+and probably sequencing of statements.  You can probably avoid much
+parsing by making the input instructions be single bytes, but you
+probably still need some kind of arithmetic to calculate the jump
+offsets.
+
+Mats Linander’s Awib is a multi-target optimizing BF compiler written
+in BF, with six backends (it can output Linux i386 ELF executables, C,
+Tcl, Golang, Ruby, and Java), so BF is clearly a sufficiently powerful
+language to write a self-compiling compiler in.  (It also contains an
+ASCII-art portrait of Meriday in the morning and can be compiled as
+Tcl, bash, or C, as well as BF.  Truly impressive.)  It’s about 43
+kilobytes, and it would presumably run under Urban Müller’s original
+240-byte AmigaOS BF compiler or Brian Raiter’s 199-byte Linux version:
+<http://www.muppetlabs.com/~breadbox/software/tiny/bf.asm.txt>
+
+Daniel B. Cristofani has written a much more minimal BF self-compiler,
+targeting C; I found a copy at
+<http://esoteric.sange.fi/brainfuck/impl/compilers/dbf2c.b>, and he
+has a copy on his own web site at
+<http://www.hevanet.com/cristofd/brainfuck/dbf2c.b>.  It seems to
+work; anyway, I compiled it with itself, verified that it produced the
+same output when compiled with the self-compiled version of itself,
+compiled Linus Åkesson’s Game of Life with it, and played Life
+successfully on the result.  Cristofani’s self-compiler for BF is 1183
+bytes, but running Erik Bosman’s bfstrip utility from
+<http://esoteric.sange.fi/brainfuck/utils/bf-tools/bfstrip.c> on it
+reduces it to 904 bytes.
+
+So, one approach to bootstrapping things from BF would be to compile
+programs from other languages into BF, and then run them with one of
+these BF interpreters.  But I think there’s a much more interesting
+approach available, which is to add some instructions to a
+self-compiling BF implementation, recompile it with itself, and then
+update it to use the new instructions.

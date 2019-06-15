@@ -1,0 +1,52 @@
+Learning Erlang for the first time.  A few notes --- mostly the
+language and especially the runtime system are lovely, so to keep
+these notes short, I haven't listed the many things I like about them.
+
+The syntax for tuples and records is just too bad.  Maybe the record
+syntax was unavoidable, but the tuple syntax is bad.
+
+Selective receive seems like it could lead to deadlock.
+
+It seems like client-server responses ought to be tagged with a
+request-ID, not the server's PID.
+
+It's kind of bizarre that the ugly "registered process" mechanism,
+which introduces a mutable global namespace into an Erlang node, is
+built into the message-sending machinery, but you must build at
+user-level the machinery to include your PID in a request if you want
+a response and figuring out which of your pending responses
+corresponds to which request.
+
+Distributed performance isn't particularly good.  Ping-pong time
+between processes in a single OS process is on the order of 12-15us on
+my machine, but between processes in different OS processes, it's
+about 1000-3000us.
+
+It seems like the system tries to hide a lot of the crucial issues
+related to distribution: fault-tolerance, tolerance for partitions,
+security.  There's a magic "epmd" process ("Erlang portmapper daemon")
+that gets started on a node by the first guy who starts a distributed
+Erlang process, and then the other Erlang processes connect to it (on
+TCP port 4369 --- what, was 4269 taken?  4369 is 0x1111.) and use it
+to figure out how to talk to each other.  Even if another user stars
+running Erlang processes later on on the same node, they will use this
+same "epmd" for their nameservice.
+
+I used Wireshark to see what they're saying to each other.  None of
+the conversations are encrypted, but they all use some ugly binary
+protocol that makes them a bit hard to read.  (Not sure why they
+bother with a binary protocol if it's going to take on the order of a
+millisecond each way to do a simple RPC containing a timestamp
+anyway.)  The "epmd" conversations are pretty concise, but the "RPC"
+conversation between the two Erlang processes is a bit more verbose.
+
+Apparently there's some kind of shared-secret authentication involved
+as well...
+
+It seems like it would be better to just layer on top of some other
+system for actually making, authenticating, and encrypting the
+connections in the first place --- ssh, named pipes in the filesystem,
+HTTPS, or whatever.
+
+There also doesn't seem to be any documentation for the security
+properties of binary_to_term/1.

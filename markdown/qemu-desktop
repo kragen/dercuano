@@ -1,0 +1,51 @@
+So I've been playing with QEMU, which lets you run a virtual computer
+inside your normal computer.  At the moment I'm using it to create a
+reproducible development environment on a project I'm working on.
+
+Among QEMU's features is the ability to save a virtual machine
+snapshot, which includes the entire state of the virtual computer:
+memory, CPU, even disk.  This seems similar to KeyKOS's checkpointing
+facility, although it seems to be a bit slower, maybe to the point of
+being less useful.  (It seems to do all of its I/O before continuing
+to run, rather than doing some kind of copy-on-write.  It seems like
+fork() might be sufficient to get good copy-on-write performance.)
+
+(In one case, a VM snapshot of a 128MB VM took 53MB of space.)
+
+But suppose you ran your normal GUI session inside of QEMU.  Maybe
+every few minutes, you could do a backup of your live session to a
+server somewhere nearby.
+
+Benefits
+--------
+
+If you do this, you can transport your GUI session from one machine to
+another --- something the term "VNC", an abbreviation for "Virtual
+Network Computer", promised but never delivered.  If your machine ever
+crashes or gets stolen, you can restore from the previous checkpoint;
+sometimes this might be worth doing even if only a single application
+within it has crashed.  And you can have a large number of GUI
+sessions for different users in suspended animation on your disk.
+
+This kind of thing could give users in, for example, an internet cafe,
+the freedom to really customize their environment.  Rather than
+storing all of their state on a web site, they could store much of it
+on the servers at the internet cafe itself, as if they owned it.  They
+could install software, keep their files, and so on; and whenever they
+came into the cafe, their session would be waiting for them, just as
+it was when they left it.
+
+Problems
+--------
+
+There are a lot of times these days where you'll want to run
+stuff that doesn't run very well inside QEMU: MPlayer, Art of
+Illusion, anything with SSE, MMX, or 3-D acceleration.  I think that's
+kind of a minor problem, since the data involved in that part of the
+system (the latest frame of a movie, say) is usually quite transient
+and easy to recreate.
+
+Also, it's not uncommon these days for a GUI session to fill up
+gigabytes of RAM, and all of that RAM could in theory change its
+contents about once a second.  So you still might end up copying all
+or the vast majority of the memory pages during a snapshot.

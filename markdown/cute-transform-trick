@@ -1,0 +1,52 @@
+There's a trick I think I saw originally in REXX, and which I think
+originally comes from the IBM mainframe world.
+
+Suppose you have a record with some fixed format and you want to
+reformat it.  For example, you have this:
+
+    199712100036325SITTLER   KRAGEN    
+
+And you want to reformat it to this:
+
+    KRAGEN    SITTLER    $00363.25  10/12/1997
+
+The thing that would make this easy would be if you could write a
+couple of "picture" lines showing the desired input and output, and
+have software apply the transformation automatically:
+
+    199712100036325SITTLER   KRAGEN    
+    19YyMmDd2345678OPQRSTUVWXopqrstuvwx
+    opqrstuvwxOPQRSTUVWX $23456.78  Dd/Mm/19Yy
+    KRAGEN    SITTLER    $00363.25  10/12/1997
+
+So far that's nothing terribly special.  You use the correspondence of
+the characters in the before-and-after picture to show where to move
+the input characters around to in the output.
+
+The special part is that it turns out you can implement this with a
+simple character substitution, the same kind of thing you would use to
+transform uppercase to lowercase or vice versa, or remove accents from
+ISO-8859-1 text for accent-insensitive comparison, or translate
+between EBCDIC and ASCII.  Here's what it looks like in Python.
+
+    >>> import string
+    >>> the_input = '199712100036325SITTLER   KRAGEN    '
+    >>> beforepic = '19YyMmDd2345678OPQRSTUVWXopqrstuvwx'
+    >>> afterpic  = 'opqrstuvwxOPQRSTUVWX $23456.78  Dd/Mm/19Yy'
+    >>> cipher = string.maketrans(beforepic, the_input)
+    >>> string.translate(afterpic, cipher)
+    'KRAGEN    SITTLER    $00363.25  10/12/1997'
+
+So first we compute a character substitution that would convert
+`beforepic` into `the_input`.  Then we apply that substitution to
+`afterpic`, and we get the desired output.
+
+It's not a very versatile trick --- all the characters in `beforepic`
+have to be distinct, so it can't work in this form for anything over
+256 bytes, it only handles fixed-width fields, and you can see I had a
+hard time coming up with reasonable-looking characters to use in the
+templates even in this small example.  But the clever thing about it
+is that, given the existing ability to translate a string of
+characters according to such a table of correspondences, and the
+ability to construct such a table from a before and after string, it
+only takes a couple of lines of code.

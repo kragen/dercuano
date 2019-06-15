@@ -1,0 +1,67 @@
+Here's a simple network protocol that provides a reasonably secure and
+reasonably efficient content-addressable storage system.
+
+Basic operations
+----------------
+
+The fundamental operations provided by the protocol are PUT and GET.
+PUT has a single argument, which is an arbitrary blob — although in
+this case I am limiting blob sizes to those that can be passed in a
+single internet datagram; GET also has a single argument, which is the
+cryptographic hash of a single blob.
+
+(If you have several servers providing this service, you can arrange
+them into a DHT as you see fit; the servers don't have to know about
+it.)
+
+Adding security
+---------------
+
+Both of these are, in some sense, unauthenticated operations: if your
+data isn't public, you can encrypt it with a secret key before you
+store it in the public content-addressable store, and so attackers
+will gain no useful information by retrieving it.  However, they are
+subject to denial-of-service attacks.  First, since the server
+presumably has limited storage, the amount of data that can be
+successfully PUT to it and GETted back later is finite; second, since
+the server has limited bandwidth, the amount of data that can be PUT
+or GETted from it in a second is finite.  Finally, GET could
+potentially be a tool in a source-spoofed DoS amplification attack on
+someone else: if the GET request is 20 bytes, but the resulting blob
+is 20000 bytes, you can multiply your bandwidth by 1000 by sending a
+stream of source-IP-spoofed GET requests to an innocent server, which
+will faithfully direct a firehose of traffic at your chosen victim.
+
+I think we can add DoS-resistance to the protocol with hashcash (or
+other forms of making requests expensive — reciprocity IOUs, Bitcoin
+payments, etc.), and amplification-resistance with mandatory request
+padding.
+
+Protocol proposal
+-----------------
+
+So I propose an additional NO answer, and reusing the PUT packet to
+send answers.  A typical PUT dialog looks like this:
+
+client: PUT nonce=b, blob=a
+
+server: NO nonce=c, difficulty=n
+
+client: PUT nonce=d, blob=a (such that HMAC(c, a || d)[0:n] == 0)
+
+server: PUT nonce=d, blob=a
+
+And a typical GET dialog:
+
+client: GET hash=e, nonce=f
+
+server: NO nonce=c, difficulty=n, length=m (m = length(a))
+
+client: GET hash=e, nonce=g, pad=h (such that HMAC(c, e || g)[0:n] == 0, and length(h) >= m)
+
+server: PUT nonce=g, blob=a
+
+The server is free to share the nonce between clients, or not, and
+change it as often as it likes (potentially requiring slow clients to
+retry requests).
+
