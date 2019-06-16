@@ -74,3 +74,8 @@ license](liabilities/LICENSE.ETBook).  This doesn’t impede you from
 redistributing or modifying Dercuano but does prohibit you from
 removing the font’s copyright notice and license (unless you also
 remove the font).
+
+### Gitlab ###
+
+At this writing, there’s [a replica of this repo on
+Gitlab](https://gitlab.com/kragen/dercuano).
