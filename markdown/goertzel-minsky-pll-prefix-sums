@@ -1,0 +1,240 @@
+Using the Goertzel algorithm, the Minsky algorithm, PLLs, and prefix sums for frequency detection
+=================================================================================================
+
+Windowing the results of the Goertzel algorithm, or the Minsky circle
+algorithm applied as a frequency detector, over different size
+windows, can provide frequency detection with variable levels of
+precision.  Some kinds of PLLs can be used in the same way, and you
+can adapt the Goertzel algorithm or the Minsky algorithm into a PLL.
+
+The Goertzel algorithm and windowing it with prefix sums
+--------------------------------------------------------
+
+The Goertzel algorithm, as explained in `cheap-frequency-detection`,
+accumulates a sequence of values with a resonant frequency: *sₙ* =
+(2 cos ω) *sₙ*₋₁ - *sₙ*₋₂ + *xₙ*.  You can verify that, if *xₙ* = 0,
+this holds true of the sequence *sₙ* = *a* sin (ω*n* + φ) for any *a*
+and φ.  First, consider the case *a* = 1, φ = 0:
+
+> *sₙ* = (2 cos ω)(sin (ω(*n* - 1))) - sin (ω(*n* - 2))
+
+The formula above is a little more symmetrical if we rewrite it with
+*m* = *n* - 1:
+
+> *sₘ*₊₁ = (2 cos ω)(sin (ω*m*)) - sin (ω(*m* - 1))
+
+If you were forced to memorize horrible angle-sum formulas in
+high-school trigonometry and have since forgotten them, you can
+trivially rederive them from Euler’s formula *eⁱᵗ* = cos *t* + *i* sin
+*t*; if *t* = *h* + *j*, this becomes *eⁱʰeⁱʲ* = (cos *h* + *i* sin
+*h*)(cos *j* + *i* sin *j*) = (cos *h* cos *j* - sin *h* sin *j* + *i*
+(cos *h* sin *j* + sin *h* cos *j*)), so cos *h* + *j* = cos *h* cos
+*j* - sin *h* sin *j*, and sin *h* + *j* = cos *h* sin *j* + sin *h*
+cos *j*.
+
+Here, we’re interested in these identities:
+
+> sin (ω(*m* + 1)) = sin (ω*m* + ω) = sin (ω*m*) cos ω + cos (ω*m*) sin ω  
+> sin (ω(*m* - 1)) = sin (ω*m* - ω) = sin (ω*m*) cos ω - cos (ω*m*) sin ω
+
+The second one gives us
+
+> *sₘ*₊₁ = (2 cos ω)(sin (ω*m*)) - sin (ω*m*) cos ω + cos (ω*m*) sin ω  
+> = (2 cos ω)(sin (ω*m*)) - cos ω sin (ω*m*) + cos (ω*m*) sin ω  
+> = cos ω sin (ω*m*) + cos (ω*m*) sin ω
+
+which above is established as the value of sin (ω(*m* + 1)), so *sₘ*₊₁
+= sin (ω(*m* + 1)).
+
+To establish that this is true for all values of *a* and φ, we can
+simply note that this is a linear time-invariant recurrence:
+
+> *sₙ* = (2 cos ω) *sₙ*₋₁ - *sₙ*₋₂ + *xₙ*
+
+*m* or *n* does not enter into it except as an index, and the output
+on the left is linear in all the inputs on the right.
+
+This is the unique way to get a sine wave of a fixed angular frequency
+ω as such a linear recurrence on the two previous terms, sin (ω*n*) =
+*sₙ* = *asₙ*₋₁ + *bsₙ*₋₂; that is, if you solve that equation for *a*
+and *b*, the only possible values for *a* and *b* are 2 cos ω and -1.
+
+I think it’s somewhat trickier to show is that, if *s*₀ = *s*₁ = 0,
+*sₙ* and *sₙ*₋₁ form a linear encoding of Σ*ⱼxⱼ*cis (ω*j*) for *j* ∈
+[2, n].  But it’s true; unless I’m confusing something,
+Σ*ⱼxⱼ*cis (ω(*n*-*j*)) = *yₖ* = *sₖ* - exp(-*i* ω) *sₖ*₋₁.  *sₖ* is,
+of course, a linear function of any such previous sequence of *sₙ*,
+*sₙ*₋₁ and the *xⱼ* since that point, since it’s a linear function of
+*xₖ* and *sₖ*₋₁ and *sₖ*₋₂, which themselves are such a linear
+function.
+
+So at any point along the accumulation of this sequence, we can
+extract the dot product between the complex exponential *eⁱʲ* and the
+*x* samples so far.  In effect, the Goertzel algorithm computes the
+prefix sum of a particular frequency component of our signal, just in
+a slightly obtusely-encoded form.
+
+(Note that this is precisely one of the components of the Fourier
+transform of the signal over that interval.)
+
+### Using *sₖ* as a prefix sum to rectangularly window a frequency component ###
+
+This means that, if we want to know how much of a particular frequency
+was present during a given time interval, and we’ve saved off the *sₖ*
+values for that time interval, we can just do the *yₖ* calculation for
+the two points above, perhaps apply a rotation to bring them into
+phase (if they aren’t separated by an integer number of cycles), and
+take the difference.  (This assumes that we aren’t getting rounding
+errors, but since we’re essentially computing a sum table here, our
+*s* values will grow without bound if the signal *x* contains a
+nonzero frequency component at the frequency of interest.  As with
+Hogenauer filters, it might be wise to do the calculation in purely
+integer math to avoid this.)
+
+This subtraction amounts to temporally windowing the signal with a
+rectangular window.  So it convolves the spectral response of the
+filter with the Fourier transform of that rectangular window, which is
+a sinc.  So, by using different widths of window on *the same sₖ
+signal*, we can get different levels of frequency selectivity.  And in
+fact we can do this with only a single multiply-subtract and addition
+per sample (since the factor 2 cos ω is fixed as long as we don’t
+change the frequency), even though we’re pulling out a number of
+different window widths from that single resonator.
+
+### Goertzel without multiplies ###
+
+The multiply-subtract (2 cos ω)*sₙ*₋₁ - *sₙ*₋₂ can, for some angles,
+be done with a couple of subtracts and bit shifts: (*sₙ*₋₁ << 1) -
+(*sₙ*₋₁ >> p) - *sₙ*₋₂.  This works when 2 cos ω = 2 - (1 >> p) and
+thus ω = cos⁻¹ (1 - (1 >> (p + 1))).  This gives the following
+periods for shift lengths from 0 to 20 bits:
+
+    >>> 360/(numpy.arccos(1-2**-(1 + numpy.arange(20.0)))*180/numpy.pi)
+    array([    6.        ,     8.69363162,    12.43307536,    17.67813872,
+              25.06699928,    35.49668062,    50.23272124,    71.06297418,
+             100.51459792,   142.16068241,   201.05374803,   284.33872284,
+             402.11976897,   568.68612356,   804.245674  ,  1137.37658591,
+            1608.49441598,  2274.75534121,  3216.99036595,  4549.51176711])
+
+For the particular case of 44.1-ksps audio, these work out to the
+following frequencies in Hz:
+
+    >>> 44100/(360/(numpy.arccos(1-2**-(1 + numpy.arange(20.0)))*180/numpy.pi))
+    array([ 7350.        ,  5072.67870839,  3546.99048555,  2494.60651377,
+            1759.28516646,  1242.3696873 ,   877.91381613,   620.57633403,
+             438.74224154,   310.21235444,   219.34433171,   155.09670846,
+             109.6688186 ,    77.54717088,    54.83399094,    38.77343753,
+              27.41694317,    19.38670028,    13.70846505,     9.69334783])
+
+These are far closer to A440 musical note frequencies than we would
+have any right to expect; 438.7 Hz is about 5 cents flat of A₄ (A
+above middle C), and 877.9 is only about 4.1 cents flat of A₅, and the
+frequencies that are not As are even-tempered D♯/E♭ notes.  It crosses
+over from being sharp to being flat in between 2494 and 3546 Hz,
+precisely where the human ear is most perceptive.
+
+### Better windows through Nth-order prefix sums ###
+
+Usually we don’t think of sinc as being a very good filter frequency
+response, because well into the stopbands, you keep getting these
+response peaks where an odd number of half-waves fit into your window.
+The Hogenauer-filter approach to solving this problem is to use N
+levels of sum tables to get an Nth-order approximation of a Gaussian
+window, which in theory has the optimal tradeoff between frequency
+precision and temporal precision — the minimal joint uncertainty,
+according to the uncertainty principle.  If we consider the *yₖ* given
+above as representing values in a complex-valued sum table, we could
+compute running sums (prefix sums) of them to get Nth-order prefix
+sums, which we can then differentiate N times in the usual CIC-filter
+way to get a given frequency component with that window.
+
+But calculating the *yₖ* is considerably more expensive than
+calculating the *sₖ*: *yₖ* = *sₖ* - exp(-*i* ω) *sₖ*₋₁, so while
+calculating *sₖ* required a single *real* multiply, addition, and
+subtraction (presuming all real *xⱼ*), calculating *yₖ* requires a
+*complex*–real multiply and then a complex-real subtraction: two real
+multiplies and a real subtraction, which is twice the multiplies.
+Normally we sweep this under the rug by presuming that we only
+calculate *y* values occasionally, so this expense doesn’t matter, but
+to compute the prefix sum (+\\*y*, in APL notation) we would need to
+do those multiplications for every sample, and then it would matter.
+Also, computing complex prefix sums would involve twice as many real
+additions as computing real prefix sums.
+
+But in fact we can avoid this hassle; Σ*ₖyₖ* = Σ*ₖ*(*sₖ* - exp(-*i* ω)
+*sₖ*₋₁) = Σ*ₖsₖ* - exp(-*i* ω)Σ*ₖsₖ*₋₁, so we can do that whole
+computation using a sum table for *s* which we use twice, instead of
+computing separate real and imaginary Nth-order sums.  Then we can
+compute a *y* value windowed with an Nth-order approximation to a
+Gaussian window using N real subtractions, a complex–real multiply,
+and a real subtraction.  The same Nth-order sum table will serve for
+any window size.  XXX is this right?  Or do we need to either do N
+subtractions per sample or N(N-1)/2 subtractions per output?  Or maybe
+decimate by the window width M and then do the N subtractions once
+every M samples?
+
+### Roundoff ###
+
+However, this surely requires special measures to avoid roundoff for
+the Hogenauer-filter part of the computation; the values in a
+third-order sum table, over an interval where the signal is roughly
+constant, will grow proportional to the cube of the constant value.
+The standard approach is to implement Hogenauer filters using integer
+arithmetic with wraparound, thus entirely eliminating rounding error.
+Maybe an alternative exists, representing the sum tables using the
+tree constructed in the standard parallel prefix-sum algorithm, so
+that the values being added at each tree node are of comparable size
+and roundoff lossage is insignificant; but I suspect you need to
+traverse the tree at subtraction time, adding a logarithmic slowdown,
+and I’m not sure how this generalizes to second-order and higher sum
+tables.
+
+### Frequency detection ###
+
+So you could imagine using this approach to narrow down the frequency
+range where a particular signal might be in your input: first use very
+short windows to see if there’s anything in the frequency range at
+all, then use longer windows at a larger number of frequencies (some
+of which might be the same frequency — just using the same prefix sums
+with a longer window width) to figure out where the signal or signals
+might be inside that window.
+
+Alternatively, if your signal is sparse enough in frequency space, you
+can use a temporal window size long enough that only one significant
+frequency component will be within the corresponding frequency window.
+This 
+
+The Minsky algorithm
+--------------------
+
+One way to think of the Goertzel algorithm’s oscillator is by linearly
+extrapolating to the current sample, then subtracting a correction to
+make it curve back towards zero at the desired frequency.
+
+> *sₙ* = (2 cos ω) *sₙ*₋₁ - *sₙ*₋₂  
+> = *sₙ*₋₁ + (*sₙ*₋₁ - *sₙ*₋₂) - 2(1 - cos ω)*sₙ*₋₁
+
+In essence, it’s calculating the desired second derivative by
+multiplying a small negative number, -2(1 - cos ω), by the latest
+sample.  While this is in theory exactly correct, it’s easy to see
+that it could give rise to significant roundoff errors for
+sufficiently low frequencies.  In the limit, where cos ω rounds to 1,
+it will stop oscillating entirely and merely linearly extrapolate.
+For angular velocities ω approaching 0, 1 - cos ω = ½ω² + O(ω⁴), which
+is why changing this correction by factors of 2 in the above note
+about multiplication-free Goertzel resulted in changing the frequency
+by roughly half an octave.
+
+The Minsky algorithm is similar to the Goertzel algorithm, but while
+the Goertzel algorithm effectively calculates the current derivative
+of the oscillation from the difference between the last two samples,
+the Minsky algorithm reifies the derivative as a separate variable:
+
+> *sₙ* = *sₙ*₋₁ + *mcₙ*-₁ + *xₙ*  
+> *cₙ* = *cₙ*₋₁ - *msₙ*
+
+This requires two multiplications per input sample instead of
+Goertzel’s one, but I hypothesize that it should have a smaller
+roundoff error; *m* ≈ sin ω, which means that for small angular
+velocities, it’s proportional to the angular velocity rather than the
+square of the angular velocity, so you can 
