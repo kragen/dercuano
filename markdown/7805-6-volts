@@ -1,0 +1,128 @@
+How to get 6 volts out of a 7805, and why you shouldn’t
+=======================================================
+
+Lots of discarded electronics has things like 7805s and white LEDs in
+it.  White LEDs need about 3 volts to light, and the bright
+illumination ones have a substantially less exponential V–I curve than
+ordinary indicator LEDs (because of a larger ohmic resistance
+component and special magic I don’t understand to prevent thermal
+runaway) so it’s typical to hook two of them in series up to a 6-volt
+power supply.  But they’re not *so* ohmic that it’s a good idea to
+hook them up to, say, a 9-volt or 12-volt supply, or that they’ll work
+on a 5-volt supply.  (8 volts — 4 volts per LED — does seem to work
+with the 6-volt lighting panels I picked up off the sidewalk.  At
+12 volts — 6 volts per LED — my 12-volt 500-mA switching power supply
+detects an overload and turns off before burning out any LEDs.)
+
+There *is* a 7806 6-volt voltage regulator, but it’s much less common
+than the 7805 and the 7812.  But it’s not actually that hard to get a
+regulated 6 volts out of a 7805.
+
+The 7805
+--------
+
+The 7805 is a three-pin regulator which reduces, according to
+Fairchild’s datasheet, 7–35 Vdc to 5 Vdc ±4% at up to 1 A (1.5 A from
+TI) as long as it’s below 125° (150° from TI), with 5°/W of thermal
+resistance from the junction to the case (3°/W from TI), and so with
+adequate heatsinking it can dissipate 20 watts or more.  It regulates
+its output pin to 5 V above its ground pin, which sources up to 8 mA.
+Bypassing with 0.33μF on input and 0.1μF on output is suggested but
+not generally needed.
+
+The hack
+--------
+
+The idea is that you float the 7805’s “ground” pin 1 V above the real
+ground, using a 5:1 voltage divider.  This is shown on p. 23 of
+Fairchild’s datasheet.  If we’re satisfied for the 8 mA regulator
+current through the voltage divider to produce an error of 0.2 V,
+which is comparable to the 4% error of the regulator itself, the
+divider circuit needs to be fairly low resistance: 25 Ω down to real
+ground and 125 Ω up to the output pin.  The 125-Ω resistor will be
+dissipating 200 mW, so you need to use at least a ¼-watt resistor.
+(Alternatively, you can use an op-amp buffer to set the “ground”
+voltage for lower power consumption and error, as shown on p. 24.)
+
+In this case, though, you could probably tolerate a larger error and
+use, say, a 100-Ω resistor and a 330-Ω resistor.  15 mA through the
+330-Ω resistor plus 4–8 mA of bias current through the ground pin put
+19–23 mA and thus 1.9–2.3 V of offset on the 100-Ω resistor, giving
+6.9–7.3 V on the output, or 6.7–7.5 V if we include the 7805’s own
+error too.
+
+Power dissipation
+-----------------
+
+If 500 mA (a guess) is running through the 6-volt LED strings, they’ll
+be dissipating 3 watts, which is not a big problem since they’re
+spread out over a large area.  If the 7805 is dropping 12 volts (-1)
+down to 5 volts, it will also be dissipating 3 watts.  Though it’s
+specced to operate at 125°, I’d kind of want to keep it below 70° so
+it will last longer and I’m not at risk of burning my hand on it, and
+in environmental temperatures up to 35° here in Buenos Aires, that
+only leaves ΔT = 35°, so we only have a thermal resistance budget of
+11.7°/W, of which the junction-to-case resistance already eats up
+5°/W.  So we need 6.7°/W or less between the heatsink and its coupling
+to the TO-220 case.
+
+The heatsink tab is, for better or for worse, connected to the
+package’s ground pin, since that’s the most negative voltage in the
+circuit.
+
+In 2019, you should probably just use PWM for multi-watt loads, though
+----------------------------------------------------------------------
+
+A transistor switch (maybe controlled with a second transistor), a
+small inductor and a small capacitor for an LC filter, a
+microcontroller, and possibly a resistor or two for analog feedback
+from the output is a better solution.  You can totally run the
+microcontroller off your 7805, and you get 95+% efficiency (instead of
+the 50% described here).  The ±4% precision of the 7805 may or may not
+be available from a microcontroller without trimming, but it’s plenty
+good enough for this.  For example, the ATMega328P datasheet specifies
+its internal bandgap voltage reference as 1 V ±10%, and its ADC
+contributes about an additional ±1% error; the STM32F103xx is
+specified to be better with only ±3% error on its reference and ±0.3%
+ADC error.
+
+Additionally, this gives you programmability and dimming up to a few
+hundred kHz for free.  The dimming is only voltage dimming, and so
+highly nonlinear for LED illumination.
+
+The downside of this is that you lose the overheating,
+current-limiting, and foldback protections built into the “virtually
+indestructible” 7805.
+
+LEDs can general tolerate higher pulsed power than constant power, so
+the LC filter might seem unnecessary.  But if you’re running off a
+12-volt or 19-volt DC supply, I’m not confident that even short
+current pulses through the LEDs won’t destroy the LEDs or the
+switching transistor, and of course the shortness of the pulses is a
+function of the microcontroller software.
+
+### Power dissipated by PWM ###
+
+If you’re dimming at 200 kHz via a IRLML6402 (a 40¢ P-channel power
+MOSFET rated for 20 V and 3.7 A; see file `jellybeans`), you’re
+dumping 12 nC from its gate to ground every time you turn it on; that
+might be about 12 volts.  That’s 2.4 mA of gate switching losses at
+12 V: 30 mW, about 100× less than the linear 7805.  Its 65 mΩ
+on-resistance will dissipate another 16 mW at 500 mA.  So you don’t
+gain much from using a substantially lower frequency like 20 kHz,
+right?
+
+No, wait — the datasheet also lists a 48 ns rise time and a 381 ns
+fall time, so each 5-μs-period pulse includes an 0.43-μs transition
+time during which the on-resistance is significant.  If we simplify
+its behavior to a linear ramp up of current from 0 to 500 mA during
+that time, while its drain–source voltage linearly drops from 12 V to
+0, its linear power consumption follows a parabola from 0 to 0 during
+that time, with a peak at 1.5 W in the middle.  So it might also have
+some 90 mW or so of switching losses just from being slow.  (Its real
+behavior is somewhat more complex, but that toy model is probably
+adequate for our purposes here.)
+
+So, although power consumption is acceptable at around 125 mW, you
+actually might improve it substantially by dropping to 100 kHz or
+50 kHz or something, or using a beefier MOSFET.
