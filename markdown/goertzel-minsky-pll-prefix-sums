@@ -9,10 +9,18 @@ can adapt the Goertzel algorithm or the Minsky algorithm into a PLL.
 The Hogenauer-filter approach can provide very nice windows very
 cheaply.
 
+The Minsky algorithm applied as a frequency detector in the most
+obvious way turns out to be precisely equivalent to the Goertzel
+algorithm applied to the backward differences of the input signal.
+
+This is a continuation of the exploration I began in file
+`cheap-frequency-detection`, but this note stands on its own, which is
+to say that it duplicates a lot of the material in that other note.
+
 The Goertzel algorithm and windowing it with prefix sums
 --------------------------------------------------------
 
-The Goertzel algorithm, as explained in `cheap-frequency-detection`,
+The Goertzel algorithm
 accumulates a sequence of values with a resonant frequency: *sₙ* =
 (2 cos ω) *sₙ*₋₁ - *sₙ*₋₂ + *xₙ*.  You can verify that, if *xₙ* = 0,
 this holds true of the sequence *sₙ* = *a* sin (ω*n* + φ) for any *a*
@@ -225,11 +233,27 @@ tried this yet.
 (18375 Hz is 2.6180 radians or 150° per sample, so the Goertzel
 recurrence becomes roughly *sₙ* = -1.732 *sₙ*₋₁ - *sₙ*₋₂.)
 
+### In one line of C ###
+
+Here’s a one-line obfuscated C program from file
+`cheap-frequency-detection` that generates a sine wave using
+Goertzel’s algorithm:
+
+    main(s,t,u){for(t=32;u=s,1+putchar(128+(s-=t-s+s/8));t=u);}
+
+If you compile it to an executable called `goertzel` on a Linux
+machine with ALSA or an ALSA emulation, you can run it with the
+command `./goertzel | aplay`.
+
+(`arecord` and `aplay` default to 8000 unsigned 8-bit samples per
+second, which is convenient since it means we can use `getchar()` and
+`putchar()` to read and write samples.)
+
 The Minsky algorithm
 --------------------
 
 One way to think of the Goertzel algorithm’s oscillator is by linearly
-extrapolating to the current sample, then subtracting a correction to
+extrapolating to the current sample, then subtracting a second-order correction to
 make it curve back towards zero at the desired frequency.
 
 > *sₙ* = (2 cos ω) *sₙ*₋₁ - *sₙ*₋₂  
@@ -246,17 +270,21 @@ is why changing this correction by factors of 2 in the above note
 about multiplication-free Goertzel resulted in changing the frequency
 by roughly half an octave.
 
-(However, don’t be mislead into thinking that this means it’s merely a
+(However, don’t be mislead into thinking that this means Goertzel is merely a
 quadratic approximation that will fail at high frequencies.  As shown
-earlier, it’s exact.)
+earlier, if performed with exact arithmetic, it’s exact.)
 
 The Minsky algorithm is similar to the Goertzel algorithm, but while
 the Goertzel algorithm effectively calculates the current derivative
 of the oscillation from the difference between the last two samples,
-the Minsky algorithm reifies the derivative as a separate variable:
+the Minsky algorithm reifies the first derivative as a separate
+variable:
 
 > *sₙ* = *sₙ*₋₁ + ε*cₙ*-₁ + *xₙ*  
 > *cₙ* = *cₙ*₋₁ - ε*sₙ*
+
+XXX why does LaTeX give you a lunate epsilon ϵ by default, reserving
+normal epsilon for \\varepsilon?  Should I be using ϵ here?
 
 This requires two real multiplications per input sample instead of
 Goertzel’s one multiplication, but I hypothesize that it should have a
@@ -264,6 +292,30 @@ smaller roundoff error; ε ≈ sin ω, which means that for small angular
 velocities, it’s proportional to the angular velocity rather than (as
 in Goertzel) the square of the angular velocity.  So sometimes you can
 get more accurate results with Minsky.
+
+ε is not precisely sin ω; more precisely, ω = 2 sin⁻¹(½ε), so ε =
+2 sin(½ω), as explained in `cheap-frequency-detection` and _[Minskys
+and Trinskys]_ and roughly in HAKMEM.  For small angles, the
+approximation is very close.
+
+One reason for roundoff error in Goertzel is that the energy of the
+resonator *s* alternates between being in the (square root of the)
+velocity — that is, the difference from one sample to the next — and
+being in the (square root of the) displacement — that is, the value of
+the latest sample.  When the frequency is in the neighborhood of one
+radian per second, this doesn’t cause much error, but for very low
+frequencies, the velocities, measured from one sample to the next, can
+be very small compared to the sample values.  For one milliradian per
+sample, for example, at angles π/4 + nπ/2, the velocity and the
+displacement are both at √2̄ of their maximum value, but the velocity
+there is 1000 times smaller than the displacement.  So if you have
+eight decimal digits of precision, like a 32-bit IEEE-488 float, your
+velocity only has about five decimal digits of that precision, which
+means that every half cycle your signal has been rounded to five
+decimal digits.  The Minsky algorithm doesn’t have this problem in
+this form, since *s* and *c* are of similar magnitude, but it might
+have a similar problem in that the increments being added to *s* and
+*c* are potentially very small compared to their magnitude.
 
 Both Minsky and Goertzel are stable, in the limited sense that they
 don’t go to infinity over an infinite interval when the input is zero,
@@ -283,12 +335,15 @@ The determinant of that matrix is precisely 1.  (XXX but its
 **L**<sup>∞</sup> norm is 1+ε; what’s up with that?)
 
 In a sense, *sₙ* and *cₙ* are temporally offset from one another by
-half a sample, and we are thus doing leapfrog integration of the
+half a sample, and we are thus doing [leapfrog integration] of the
 harmonic-oscillator ODE *s̈* = -ε*s*.  For slow oscillators, this is a
 small difference, so *sₙ*² + *cₙ*² is a fairly precise estimate of the
 energy in the system, but for fast oscillators it can be a large one.
-I think “Minsky’s and Trinsky’s” has calculated the exact expression
+I think _[Minskys and Trinskys]_ has calculated the exact expression
 for the correction, but I can’t remember.
+
+[leapfrog integration]: https://en.wikipedia.org/wiki/Leapfrog_integration
+[Minskys and Trinskys]: http://au.blurb.com/b/2172660-minskys-trinskys-3rd-edition
 
 (It’s easy enough to add an exponential decay to either Goertzel or
 Minsky, which results in the system state at any given time being an
@@ -296,11 +351,101 @@ exponentially-windowed filter of the frequency of interest, but here
 I’m focusing on the prefix-sum-based approaches because I think they
 can produce nicer windows almost as cheaply.)
 
+### The Minsky algorithm in one line of C ###
+
+Here’s a [one-liner obfuscated C Minsky-algorithm audio oscillator I
+wrote in 2017]:
+
+    main(x,y){for(y=100;1+putchar(x+128);x-=y/4,y+=x/4);}
+
+[0]: http://canonical.org/~kragen/sw/dev3/minsky.c
+
+You can pipe it to `aplay` just as with the above Goertzel program.
+The tone is agreeable.
+
+### Varying ε, and efficiency ###
+
+The canonical form of Minsky’s algorithm above uses the same ε in both
+steps, but as is done in _Minskys and Trinskys_, you can scale *c* up
+and down relative to *s* by using a separate δ:
+
+> *sₙ* = *sₙ*₋₁ + ε*cₙ*-₁ + *xₙ*  
+> *cₙ* = *cₙ*₋₁ - δ*sₙ*
+
+(Here I have the ε and δ backwards from the use in
+`cheap-frequency-detection`.)
+
+If we’re only interested in how *s* behaves, and *c*₀ = 0, then it
+turns out that only the product δε matters; if we vary δ while holding
+δε constant, the *cₙ* values get scaled up or down by δ, but the
+sequence of *sₙ* remains constant, barring roundoff errors.  In
+particular, as explained in `cheap-frequency-detection`, we can choose
+δ = 1 or ε = 1.  Say we choose δ = 1; to get the same angular velocity
+of ω radians per sample, ε = 4 sin²(½ω).  So our new equations are:
+
+> *sₙ* = *sₙ*₋₁ + (4 sin²(½ω))*cₙ*-₁ + *xₙ*  
+> *cₙ* = *cₙ*₋₁ - *sₙ*
+
+So now we need one subtraction, two additions, and a multiplication
+per sample.  The Goertzel algorithm requires one subtraction, one
+addition, and a multiplication.  So our multiplication penalty has
+disappeared, but I think the rounding-error advantage has disappeared
+with it: *c* can now have peak values much larger or smaller than *s*,
+so we can lose precision when energy moves from one to the other.
+
+If we instead choose ε = 1, we get this equivalent version:
+
+> *sₙ* = *sₙ*₋₁ + *cₙ*-₁ + *xₙ*  
+> *cₙ* = *cₙ*₋₁ - (4 sin²(½ω))*sₙ*
+
+We can reverse the order of the updates, as is usually done, which
+shifts the indices of *c* by 1:
+
+> *cₙ* = *cₙ*₋₁ - (4 sin²(½ω))*sₙ*₋₁  
+> *sₙ* = *sₙ*₋₁ + *cₙ* + *xₙ*
+
+We can expand this out a bit:
+
+> *cₙ* = *cₙ*₋₁ - (4 sin²(½ω))*sₙ*₋₁  
+> *sₙ* = (1 - (4 sin²(½ω)))*sₙ*₋₁ + *cₙ*₋₁ + *xₙ*
+
+This is looking suspiciously familiar!  What is 4 sin²(½ω), anyway?
+Well, sin(½ω) = ±√(½(1 - cos ω)), so it ends up being 2 - 2 cos ω.
+Which means that this is actually:
+
+> *sₙ* = (-1 + 2 cos ω)*sₙ*₋₁ + *cₙ*₋₁ + *xₙ*
+
+If we want to express this purely in terms of *s*, we need to
+eliminate *cₙ*₋₁.  Since *sₙ* = *sₙ*₋₁ + *cₙ* + *xₙ*, *sₙ*₋₁ = *sₙ*₋₂
++ *cₙ*₋₁ + *xₙ*₋₁, so *cₙ*₋₁ = *sₙ*₋₁ - *sₙ*₋₂ - *xₙ*₋₁.  So we have
+
+> *sₙ* = (-1 + 2 cos ω)*sₙ*₋₁ + *sₙ*₋₁ - *sₙ*₋₂ - *xₙ*₋₁ + *xₙ*  
+> *sₙ* = (2 cos ω)*sₙ*₋₁ - *sₙ*₋₂ + *xₙ* - *xₙ*₋₁
+
+We have the not entirely unexpected result that using Minsky’s
+algorithm in this way as a signal filter is equivalent to using
+Goertzel’s algorithm on *the backward differences of* the input
+signal, which in this context can be understood as a high-pass
+prefilter introducing a 90° phase shift.
+
+Since the tricks we were playing with scaling *c* up and down don’t
+affect the sequence of values in *s*, this result applies to using the
+vanilla form of Minsky’s algorithm, too.
+
+This means that if we want to precisely reproduce the results of
+Goertzel’s algorithm using Minsky’s algorithm in the straightforward
+way, we need to run Minsky’s algorithm on *the prefix sum of* the
+signal.  This may be a practical problem in situations where using a
+prefix sum may result in roundoff errors.  Perhaps adding the input
+samples into *c* instead, while still reading the output from *s*
+(updated after *c*) would solve that problem?  XXX investigate
+further.
+
 A PLL in one line of C
 ----------------------
 
 In 2012, after struggling with software PLLs (“SPLLs”) for a while, I
-wrote [this obfuscated one-line first-order PLL][1]:
+wrote [this obfuscated one-line first-order PLL in C][1]:
 
     main(a,b){for(;;)putchar(b+=16+(a+=(b&256?1:-1)*getchar()-a/512)/1024);}
 
@@ -312,10 +457,6 @@ with ALSA or an ALSA emulation, you can run it with the command
 pitch of your voice, but one octave higher.  This works better with
 headphones, so that the microphone isn’t picking up the tone it’s
 emitting.
-
-(`arecord` and `aplay` default to 8000 unsigned 8-bit samples per
-second, which is convenient since it means we can use `getchar()` and
-`putchar()` to read and write samples.)
 
 This isn’t a very good PLL, but I think it’s an excellent way to show
 the anatomy of a PLL.  It contains two continuously-varying state
@@ -521,8 +662,8 @@ to the system, but won’t always — it depends on what part of the
 oscillation *s* is in.  (I don’t know if it can also rob energy from
 it.)  Presumably we can work out how to correct these errors.
 
-Related work
-------------
+Related work; contributions?
+----------------------------
 
 I ran across a 2015 paper by Sridharan, Chitti Babu, MuthuKannana, and
 Krithika entitled “Modelling of Sliding Goertzel DFT (SGDFT)…” which
@@ -542,15 +683,18 @@ to get variable tradeoffs between precision in the frequency domain
 and in the time domain without having to redo the multiplications,
 about using the Goertzel or Minsky algorithm as a combination
 phase-detector and oscillator in a PLL, or about the fortuitously
-nearly-A440 Goertzel frequencies we get with just a bit shift.  I've
+nearly-A440 Goertzel frequencies we get with just a bit shift.  I’ve
 never seen anybody talk about doing the Goertzel algorithm in wrapping
 integer math to avoid roundoff error (though, admittedly, it probably
-only makes sense in the context of Hogenauer-style windowing).  I've
+only makes sense in the context of Hogenauer-style windowing).  I’ve
 never seen a discussion of using the Goertzel algorithm to detect a
 frequency *near* the target frequency and precisely identify it by
 unwrapping the phase.  But it’s possible that that’s just because I’m
 just not that familiar with the literature.  Or that the ideas are
 wrong.
 
-However, all the PLL and Minsky-algorithm and Goertzel-algorithm stuff
-is very well known.
+However, most of the PLL and Minsky-algorithm and Goertzel-algorithm
+stuff is very well known.  As far as I can tell, the relationship
+between the Minsky algorithm and the Goertzel algorithm hasn’t been
+published, but quite possibly it’s just too obvious to those skilled
+in the art to be considered novel.

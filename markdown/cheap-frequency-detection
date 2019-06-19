@@ -296,8 +296,8 @@ The shower algorithm
 
 Let’s suppose you want to detect some fixed frequency f and you’ve
 already resampled your signal to a sampling rate of 4f.  Two
-orthogonal sinusoids at frequency f then are [-1, -1, 1, 1] and [-1,
--1, 1, 1]; two others are [0, 1, 0, -1] and [1, 0, -1, 0].  If you can
+orthogonal sinusoids at frequency f then are [-1, -1, 1, 1] and [1,
+-1, -1, 1]; two others are [0, 1, 0, -1] and [1, 0, -1, 0].  If you can
 find the dot product of your signal with a pair of these sinusoids,
 then you can use their Pythagorean sum to precisely compute the energy
 in that frequency component of the signal.
@@ -618,7 +618,7 @@ actually older than Minsky’s formulation, dating from 1958.  At its
 heart is the oscillator s[n] = (2 cos ω) s[n-1] - s[n-2], which
 oscillates with an angular frequency of ω per sample; to look at it
 another way, it’s the state transition function (s, t) ← ((2 cos ω) s
-- t, s).  To this you just add each input samples x: (s, t) ← (x + (2
+- t, s).  To this you just add each input sample x: (s, t) ← (x + (2
 cos ω) s - t, s); in this way, the energy in the desired frequency
 accumulates in s and t, and at the end of the accumulation process,
 you can measure it.
