@@ -155,6 +155,8 @@ weakly-driven input shaft.  How can we do something similar without
 friction, backlash, wear, lubrication, and the other headaches of
 sliding-contact machinery?
 
+### Euler columns ###
+
 If you have a power-supply block that is being driven back and forth,
 by your power supply, with some fixed displacement, and it is
 connected to another block through a straight slender rod, it will
@@ -188,6 +190,8 @@ stiffly, I think it won’t work.
 This provides a locally-continuous mechanism both for controlling a
 large force with a small force and for controlling an arbitrarily
 large amount of power with an arbitrarily small amount, like a MOSFET.
+
+### Making straight string crooked and thus “loose” ###
 
 Possibly this can be generalized to adding slack to string by pulling
 it sideways.  While the vertical “control string” is slack, as long as
@@ -239,6 +243,99 @@ a brute-force way if it comes to that — for example, separately switch
 two phases of a quadrature signal and full-wave rectify both of them
 into a single junction — but for analog “computation” it seems
 like a big problem.
+
+### Making loose string tight ###
+
+Much larger and clearer amplification is available easily with string,
+though.  Although the above contrivance can possibly be made to work,
+it has the major difficulty that it is trying to “loosen” string by
+adding tension to it, so as to make it no longer straight and thus
+less “stiff” to a power supply that’s trying to drive it.  Going at
+the problem backwards, there’s a much simpler solution: try
+transmitting a displacement signal by moving one end of a loose
+string, and you will find that it doesn’t reach the other end, unless
+the signal is so large as to pull all of the slack out; here `#` is
+used to indicate fixed, solid material:
+
+    #######
+     |   |
+    _|   |_
+    ↔|\ /|
+     | v |
+     |   |
+    #######
+
+The slack string can attenuate an “ac power supply” by at least
+several orders of magnitude.  (Here the vertical strings are “leaf
+springs” whose tension provides a restoring force for the two knots
+implicit in the diagram.)
+
+But if something takes up the slack in the string, for example by
+pulling it at right angles, the string suddenly begins to transmit
+movement, although imperfectly:
+
+    #######
+     |   |
+    _|   |_
+    ↔|\ /|↔
+     | v |
+     | |↓|
+    ###|###
+
+Some of the energy from the power supply is also transmitted to the
+“gate string”, but I think it is possible to choose the angles and
+compliances involved such that that energy is very small.  In
+particular, if the slack “channel” string is nearly straight in its
+slack state, the force applied to the “gate” string will be much
+smaller than the force transmitted from the “drain” to the “source”
+through the channel — say, ten times less — so if the gate and source
+are of similar compliance, the interference energy backfed to the gate
+could be around 1% of the energy successfully transmitted to the
+source.  I am not sure about the energy needed to pull on the gate
+string.
+
+An even simpler nonlinear string mechanism is an “OR gate” consisting
+of two input strings that can pull on a common knot, pulling an output
+string if either of the two input strings is pulled:
+
+    =====-----
+      ↔
+
+Direction change for a limited range of displacements is easily
+achieved with a knot that can swing in a circular arc because it is
+anchored to a fixed point:
+
+    #
+     \
+      \______
+      |   ↔
+      |↕
+
+Different parts of the arc provide different mechanical advantages
+between the string chosen as input and that chosen as output; if the
+arc is large compared to the expected displacements, this mechanical
+advantage will be relatively constant.
+
+“Negation” of displacements, when necessary, is available through a
+sort of pulley mechanism made from two or three such direction-change
+arrangements:
+
+    #
+     \
+      \______
+      |   ←
+      |↓
+      |______
+      /    →
+     /
+    #
+
+But I think that, although these “OR” and “NOT” arrangements might
+seem logically universal, they might lack some necessary kind of
+amplification for full combinational logic, petering out somehow after
+a few stages.  I think the right-angled-slack-string approach
+described above, coupled with a power supply, should provide all the
+amplification you could need.
 
 Stick-slip violin amplification
 -------------------------------

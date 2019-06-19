@@ -24,7 +24,8 @@ The Goertzel algorithm
 accumulates a sequence of values with a resonant frequency: *sₙ* =
 (2 cos ω) *sₙ*₋₁ - *sₙ*₋₂ + *xₙ*.  You can verify that, if *xₙ* = 0,
 this holds true of the sequence *sₙ* = *a* sin (ω*n* + φ) for any *a*
-and φ.  First, consider the case *a* = 1, φ = 0:
+and φ.  First, consider the case *a* = 1, φ = 0, and suppose that it’s
+true of *sⱼ* for all *j* < *n*; does it then hold true at *n*?
 
 > *sₙ* = (2 cos ω)(sin (ω(*n* - 1))) - sin (ω(*n* - 2))
 
@@ -33,8 +34,8 @@ The formula above is a little more symmetrical if we rewrite it with
 
 > *sₘ*₊₁ = (2 cos ω)(sin (ω*m*)) - sin (ω(*m* - 1))
 
-If you were forced to memorize horrible angle-sum formulas in
-high-school trigonometry and have since forgotten them, you can
+If you don’t remember angle-sum formulas from
+high-school trigonometry, you can
 trivially rederive them from Euler’s formula *eⁱᵗ* = cos *t* + *i* sin
 *t*; if *t* = *h* + *j*, this becomes *eⁱʰeⁱʲ* = (cos *h* + *i* sin
 *h*)(cos *j* + *i* sin *j*) = (cos *h* cos *j* - sin *h* sin *j* + *i*
@@ -49,7 +50,7 @@ Here, we’re interested in these identities:
 
 The second one gives us
 
-> *sₘ*₊₁ = (2 cos ω)(sin (ω*m*)) - sin (ω*m*) cos ω + cos (ω*m*) sin ω  
+> *sₘ*₋₁ = (2 cos ω)(sin (ω*m*)) - sin (ω*m*) cos ω + cos (ω*m*) sin ω  
 > = (2 cos ω)(sin (ω*m*)) - cos ω sin (ω*m*) + cos (ω*m*) sin ω  
 > = cos ω sin (ω*m*) + cos (ω*m*) sin ω
 
@@ -270,7 +271,7 @@ is why changing this correction by factors of 2 in the above note
 about multiplication-free Goertzel resulted in changing the frequency
 by roughly half an octave.
 
-(However, don’t be mislead into thinking that this means Goertzel is merely a
+(However, don’t be misled into thinking that this means Goertzel is merely a
 quadratic approximation that will fail at high frequencies.  As shown
 earlier, if performed with exact arithmetic, it’s exact.)
 
@@ -354,7 +355,7 @@ can produce nicer windows almost as cheaply.)
 ### The Minsky algorithm in one line of C ###
 
 Here’s a [one-liner obfuscated C Minsky-algorithm audio oscillator I
-wrote in 2017]:
+wrote in 2017][0]:
 
     main(x,y){for(y=100;1+putchar(x+128);x-=y/4,y+=x/4);}
 
