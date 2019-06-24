@@ -53,6 +53,34 @@ or revised for readability.  So, beware.
 
 Many of the dates are only approximate.
 
+### Dercuano is not a scholarly work ###
+
+One of the distinguishing features of scholarly work, as currently
+understood, is that it is consciously situated with regard to the
+existing state of knowledge: it is aware of the state of the art;
+builds on its successes (rather than falling victim to known
+pitfalls); it explicitly describes how it relates to that existing
+knowledge, declaring which pieces of its foundation are sourced from
+existing work and what its novel contributions are; and it gives
+credit to existing scholarly work.
+
+By and large, I appreciate these values, and I would like to do work
+that practices them.  Sometimes, in the past, I have.  Dercuano is not
+that work.  It is full of cases where I rediscovered known ideas
+(sometimes incorrectly) and cases where I think something is true, due
+to other people’s previous work, but I don’t remember who demonstrated
+it, or in many cases, precisely what they demonstrated.  In many cases
+there’s existing work in a field that I haven’t done the work to
+understand; often I find that attempting to rederive such work from
+first principles is the best way for me to understand it, and much of
+Dercuano consists of such attempts.  This is not due to malice, but
+simply because doing scholarly work properly is a lot of effort, and I
+haven’t done that work, and in fact I’ve given up on ever doing it for
+most of the notes in Dercuano.  From a scholarly perspective, Dercuano
+is best understood as a collection of unfinished notes on ideas that
+seem promising and merit further investigation, which could lead to
+scholarly work, rather than scholarly work itself.
+
 ### Size and public-domain dedication ###
 
 On 2019-06-10 as I write this, the Dercuano tarball is 2.8 megabytes
