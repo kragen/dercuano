@@ -1,0 +1,44 @@
+Relative links are great; they let you move your whole tree of HTML
+files from one place to another and still retain the internal link
+structure.  However, they start to suffer when you have multiple
+levels of directory structure: is that `href="../../style.css"` or
+`href="../../../style.css"`?  It's a bit confusing, and even if you
+don't get confused, you still have to modify links when you copy them
+from one file to another.
+
+What would be more helpful would be the ability to say "up to a
+directory named foo".  Suppose you have this setup:
+
+    kragen/
+      index.html
+      resume.html
+      style/style.css
+      images/
+        kragenlogo.png
+        headshot.jpg
+      blog/
+        1.html
+        2.html
+        archive/
+          2008-03.html
+
+Now, suppose there's some text in `2008-03.html` that was originally
+in `2.html` or one of its siblings.  It would be nice if that text
+didn't have to be changed from `<a href="1.html">` to `<a
+href="../1.html">`.  You can write `<a href="/kragen/blog/1.html">`,
+but in addition to being verbose, that makes it hard to use a tree of
+HTML that you've downloaded with `wget -r` or something similar.
+
+Suppose you could instead write `<a href="$blog/1.html">`, meaning "go
+up until you find an ancestor directory named `blog`, then use its
+children".  Now you can write things like `<img
+src="$kragen/headshot.jpg">` freely, and copy and paste them among all
+the files.
+
+By itself, this would be a backwards-incompatible change to browsers
+and the URL spec, but it could degrade gracefully.  You could program
+your web server to generate redirects for backwards-compatibility,
+while implementing the change in newer browsers.  Compatibility
+problems would only arise if someone had a relative link to a
+directory whose name began with "$" whose name otherwise duplicated
+that of a directory higher up in the hierarchy.

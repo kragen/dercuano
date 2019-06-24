@@ -1,0 +1,36 @@
+The whole tagged-token dataflow thing explains how to do something I'd
+been wondering about for a long time.  It's too bad I didn't find out
+about it earlier!
+
+One of the big problems in these tagged-token machines seems to be how
+to avoid filling up your memory.  It occurs to me that some node types
+never increase the number of outstanding messages, others never
+decrease them, and a few may do one or the other according to some
+conditional.
+
+If there is a scheduling executive in charge of deciding which pair to
+next consume from memory, it can use this node type characteristic to
+manage the size of memory at run-time, and thus perhaps the available
+parallelism.  When it has available memory, it can run node types that
+won't decrease the outstanding messages, as long as there are any
+pairs of those types; and when it doesn't have available memory, it
+can run node types that won't increase the outstanding messages, as
+long as there are any pairs of those types.
+
+The tricky node types can be handled by splitting them into three node
+types.  Given an original node type T, we create TD, which does the
+same thing as T in the cases where it decreases the number of
+outstanding messages; TI, does the same thing as T in all other cases;
+and TC, which evaluates the conditional to decide which path would be
+taken, and then creates a pair invoking either TD or TI with the same
+arguments.
+
+I think we can still end up with cases where one execution order
+results in filling up memory with unmatched messages, while a
+different execution order would chug along indefinitely inside some
+constant space bound.  I don't know how to avoid that inside the
+dataflow paradigm.
+
+XXX update with eeprom/tinycpu/fpga ideas (you can reduce
+code-switching overhead in a machine with small code memory by
+processing a lot of nodes of the same type all at once)

@@ -1,0 +1,30 @@
+A problem I’ve been wrestling with for a while is how to legibly plot
+spatial densities with wide dynamic range.  Ink on paper is okay for
+about 10 dB of dynamic range; reversing the video and plotting white
+on black on a computer screen gives you about 20 dB; and by blooming
+high-density regions outward at the cost of spatial resolution, which
+is often an acceptable tradeoff, I think you can do 30 dB.  But how
+can we efficiently calculate a bloom whose area accurately represents
+the total magnitude within?
+
+In 3-D rendering, convolution surfaces are implicit surfaces of a
+function defined by convolving a “field function” with a “geometry
+function”, a generalization of metaballs.  McCormack and Sherstyuk
+1997 chose the field function 1/(1 + s²r²)² as an approximation of a
+Gaussian that is more tractable to solve in closed form.
+
+Metaballs (implicit curves of Σᵢdᵢ²/rᵢ², where rᵢ is the distance to
+center point i) in 2-D have the advantage that if you put two of them
+on top of each other, the total area is twice the total area they
+would have if they were far apart.  There's a transition region in the
+middle where they're nearly joined and a bridge joining them adds
+about 20% to their total area.  Unfortunately, they are difficult to
+calculate efficiently.
+
+Is there perhaps an efficient way to convolve metaballs, or an
+approximation thereof, with the points you want to plot, in order to
+get the size of the total area to fill with light?
+
+(A different approach would be to use a vector CRT or laser-light
+display, which can natively reach 30dB of dynamic range without
+sacrificing spatial resolution — indeed, improving it.)

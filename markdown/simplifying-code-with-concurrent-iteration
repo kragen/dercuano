@@ -1,0 +1,37 @@
+An observation from Unix is that it's often more convenient to
+structure a computation as a set of concurrent processes, each
+applying some simple transformation to one or more data streams, than
+to force everything into a single thread.
+
+I'm observing this right now in a $work project that is scraping data
+from a server, respecting API rate limits, where the explicit state
+machine that handles API errors is gradually getting more and more
+complicated.  In a well-structured program, this state machine would
+be written as a composition of primitive actions using sequences,
+conditionals, and iteration, with the state of the state machine
+encoded in the program counter; but since each API response from the
+server is handled by a callback function, this is not straightforward.
+
+A simple way to handle this is to spawn off a separate thread that has
+a blocking proxy object for the API.  When it calls a method on the
+blocking proxy object, this sends a message to the server (via the
+callback thread if necessary) and waits until the callback thread gets
+a response, either success, error, or if necessary, a timeout.  Then I
+can write my retry and looping logic in this other thread using normal
+structured control flow and block-structured local variables, instead
+of a passel of boolean variables and suchlike.
+
+This would work well on this project, where I have just one thread —
+although I'm probably not going to do it, because I don't expect to
+modify that code enough more to justify such a rewrite — but there are
+some practical memory difficulties with large numbers of threads.
+
+OUTLINE
+-------
+
+* fixed-size stacks (ref to previous thingy)
+* Io language
+* ref to previous thingy about low-level iteration
+* threading to avoid buffering (connection to SAX)
+* variable-size thread contexts
+* merging with CPS sequence push

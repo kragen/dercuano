@@ -1,0 +1,34 @@
+From [“Scalable Extensibility via Nested Inheritance”, by Nathaniel
+Nystrom, Stephen Chong, and Andrew C. Myers][0]:
+
+[0]: http://www.cs.cornell.edu/andru/papers/ncm04.pdf
+
+> In our work on the Polyglot extensible compiler framework [27], we
+> found that ordinary object-oriented inheritance and method
+> dispatch do not adequately support extensibility. Because
+> inheritance operates on one class at a time, some kinds of code
+> reuse are difficult or impossible. For example, inheritance does
+> not support extension of an existing class library by adding a
+> given field or method to all subclasses of a given
+> class. Inheritance is also inadequate for extending a set of
+> classes whose objects interact according to some protocol, a
+> pattern that occurs in many domains ranging from compilers to user
+> interface toolkits. It can be difficult to use inheritance to
+> reuse and extend interdependent classes.
+
+> Nested inheritance is a language mechanism designed to support
+> scalable extensibility. Nested inheritance creates an interaction
+> between containment and inheritance. When a container (a namespace
+> such as a class or package) is inherited, all of its
+> components — even nested containers — are inherited too. In
+> addition, inheritance and subtyping relationships among these
+> components are preserved in the derived container. By deriving one
+> container from another, inheritance relationships may be concisely
+> constructed among many contained classes.
+
+I’ve thought for a while that one of the advantages of Bicicleta’s
+language is that it supports this kind of extensibility.  However,
+their approach causes a class that “overrides” a class from another
+container to inherit from that other class, unlike Bicicleta’s
+approach, which seems to be more similar to the “virtual class”
+mechanism of BETA and “Genericity in Java with virtual types”.

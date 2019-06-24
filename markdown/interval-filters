@@ -1,0 +1,35 @@
+What if we consider the particle-filtering problem from the
+perspective of interval arithmetic?  Instead of approximating a
+multidimensional prior probability distribution using an exponential
+number of particles, we could approximate it with an exponential
+number of irregular partitions of the multidimensional space, and then
+subdivide the high-probability partitions and fuse the low-probability
+ones in order to give each partition equal probability, then do a
+Bayesian update.  It seems like this could work and might be more
+broadly applicable (and rigorously justifiable) than the Monte-Carlo
+approach.
+
+Like raw particle filters, this won’t work well on high-dimensionality
+spaces, but perhaps it can, like them, be extended to work on such
+spaces.
+
+Interval arithmetic can be used to efficiently calculate that the
+posterior probability of being inside a large region of the space is
+negligible.
+
+Often, divide-and-conquer algorithms are more efficient when the
+division is by three instead of by two — dual-partition Quicksort
+being one notable example — and I suspect that might be the case here
+too.  If combined with random rather than optimal positioning of the
+partition, in particular, it would help with the case where we really
+do kind of need particles — where there is a tiny local maximum
+probability lost in a large, low-probability partition.  Eventually,
+random choice of three-way partitioning will happen to snag the tiny
+local maximum between its pincers, and have a chance to track it down
+further.
+
+You could store for each partition not only the total probability (or,
+equivalently, average probability density) of the partition, but also
+the average slope or derivative of the probability density inside of
+it.  This would dramatically reduce the error in the estimate of the
+PDF that all the intervals comprise together.
