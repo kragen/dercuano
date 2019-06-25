@@ -1,0 +1,16 @@
+Fixed-point math is a case where you'd really benefit a lot from a
+rich type system.  Instead of "This is an integer," or "This is a
+floating-point number," you'd like to be able to say, "This is a
+32-bit fixed-point number with 2 decimal digits of fraction," or
+perhaps more commonly, "This is a 16-bit fixed-point number with 8
+bits of fraction".  This allows you to do something like
+floating-point math, but with all the manipulation of the exponent
+done at compile time, leaving only mantissas to run-time.  Especially
+for addition, subtraction, and comparisons, this is a huge savings on
+processors without floating-point hardware, such a huge savings that
+it's often worth it to do it by hand, without compiler support.
+
+Type systems like C's can't cope with types like that.  C++'s template
+system can do surprising things sometimes, but I don't think it can do
+it either.  But you could certainly imagine a language whose type
+system was rich enough to let you do it.
