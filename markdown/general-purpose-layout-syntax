@@ -450,3 +450,161 @@ aside from cursor forward and back, is probably with escape sequences
 to push, pop, search, and move-to-end.  Then you can insert text by
 sending it, or delete text with the DEL character, say.
 
+Simplifying by dropping row/column transposition
+------------------------------------------------
+
+All of the above ideas are complicated by the conflicting desires to
+support HT as an unambiguously horizontal separator and LF as an
+unambiguously vertical separator, on one hand, and on the other to
+conceptually have only three kinds of delimiter `{|}`; and also to
+simply be made of nested hboxes and boxes, on one hand, and on the
+other to support tabular layout.
+
+Suppose that we resign ourselves to having four kinds of delimiter
+instead of three, and to making things out of nested tables instead of
+nested boxes.  Let’s say our tables do use HT and LF as horizontal and
+vertical separators, respectively, and we use two other characters for
+table nesting; let’s say DC2 and DC4, ^R and ^T.  The requested height
+of a table is the sum of the requested heights of its rows, and the
+requested height of a row is the maximum of the requested heights of
+its cells, and *mutatis mutandis* for width and columns.  In a very
+simple model where cells can only contain either a table or a string,
+the width and height of the cell is just the width and height of the
+table or of the string; if a cell can contain a sequence of characters
+and tables in some way, then we need some kind of layout rule; several
+adequate possibilities occur to me.
+
+(VT, ^K, and FF, ^L, are obvious choices for table *separators* but
+not so obvious for table beginner-and-enders — should they begin
+nested tables, terminate them, or begin one and start a sibling?
+Perhaps better to use characters without so much baggage.)
+
+This seems like it will be simpler to implement and to use, at least
+until we add rowspan and colspan and partial termination back in.
+
+With these rules, there is the possibility that table cells receive a
+size that is different from what they requested, at least by being
+larger in either or both dimensions, and there are a variety of
+options as to how to handle that: left/top alignment, right/bottom
+alignment, centering, and stretching.  You could extend this principle
+to the top-level document as well, enabling it to fill a larger window
+than it has explicitly requested.
+
+A trickier question is how to handle canvases that are *smaller* than
+requested, for example to fit the entire canvas on the screen or to
+fit a column or row of the table into that entire canvas.  The CSS2
+`overflow` options here are `visible` (like T<sub>E</sub>X with
+overfull hboxes), `hidden` (discard, mostly like a terminal with
+line-wrap turned off), `scroll` (display scrollbars), and `auto`
+(which is `scroll` but hides the scrollbars when unnecessary); to this
+CSS3 (I think) adds `unset`.  But this omits the choice of whether and
+how to do line-wrapping, which in CSS is socked away in the
+`white-space` and `hyphens` properties, and doesn’t offer the
+traditional terminal option of wrapping per character rather than per
+word.  An additional option used in, for example, Android’s keyboard
+autocomplete suggestions, is to squish or stretch the contents on the
+relevant axis, to fill the box (such approaches to filling lines,
+impossible in the hot-lead era, are sometimes called
+“microtypography”), and the obvious other alternative is to repeat it,
+as in dot leaders for tables of contents.
+
+(HTML layout doesn’t normally deal with a *vertical* box becoming
+full, but this is a thing we might want in order to take advantage of
+modern big displays with multicolumn layouts, and it’s necessary for
+rendering to paper.)
+
+The usual way to handle overflow in ASCII terminal applications is to
+rely on applications that painted the screen to insert hard line
+breaks and extra spaces to wrap and justify paragraphs as desired,
+which clearly has drawbacks when you’re using ASCII as a document
+format rather than an interactive screen-painting protocol, and
+accounts for the near-unreadability of most ASCII text documents on
+modern hand computers.  So, having overflow-handling options would be
+pretty useful.
+
+In particular, being able to flow table rows from the bottom of one
+page onto the top of another is pretty important.
+
+T<sub>E</sub>X glue has a three-level stretchiness hierarchy — any
+amount of elasticity at a higher level of the hierarchy is infinite as
+seen from any lower level — and also separate stretchiness and
+shrinkiness quantities at each of these levels.  Despite this level of
+complexity (I hesitate to say “expressiveness”) the layout engine,
+except for paragraph filling, is a simple solver of a system of linear
+equations.  (Not to undersell that — closed-form linear solvers use
+things like QR factorization which take O(N³) time, while iterative
+linear-solver algorithms like successive over-relaxation, though only
+O(N²), have complicated convergence characteristics.)
+
+A remaining lacuna is how to handle ragged tables; above I suggested
+that each column should end when it reaches a row that doesn’t contain
+a cell for it, but perhaps there should be a special case that ends
+all the columns when there’s a blank line (without even a space).
+Without such a special case, there’s no way to end the first column
+other than ending the entire table with, perhaps, an additional ^T.
+The result would be that single-column lines of text would either tend
+to be outrageously squished by other columns, or would push those
+other columns over outrageously, even if they occurred far earlier in
+the text.
+
+### Layout properties ###
+
+T<sub>E</sub>X has a zillion layout properties it stores in
+“registers”, which are automatically restored to their previous value
+on the exit from the nesting level where they were defined.  CSS does
+something similar: most properties are inherited from the parent node
+if they are not locally overridden, but properties set in a child node
+never bubble up to a parent node, much less just the part of the
+parent node following the child node.  This is considerably saner than
+the approach that results implicitly from the state-machine model
+described by ANSI escape sequences and their more diverse
+predecessors.
+
+Traditional terminals quantize layout and colors to character-cell
+boundaries, as well as abjuring texture and quantizing colors to a
+small number of primary or near-primary colors, with aesthetically
+unpleasant results.  (You could argue that *traditional* terminals are
+black-and-white, or print on paper, but those aren’t the ones we
+emulate nowadays.)  On a bitmapped screen, just as on a
+phototypesetter, there’s no need to quantize in this way, and on
+modern computers, even quantizing coordinates to pixels is no longer a
+problem.  (Many computers nowadays have screens near 300 dpi, or 900
+dpi horizontally with subpixel rendering, and antialiasing
+subpixel-positioned text is no longer the performance nightmare it
+once was.)
+
+From HTML we know that a little bit of extra space around text before
+running into a color change can make an enormous difference to
+readability and aesthetics.  Compare <i style="display: inline-block;
+color: white; background-color: black">this, with no padding,</i> to
+<i style="display: inline-block; color: white; background-color:
+black; padding: 0.2em">this, with 0.2em padding.</i> (As of this
+writing, the ET Book font I’m using has substantial extra
+leading (vertical blank space) built into it, which shows up as
+built-in “padding” above and below, and building extra leading and
+letter spacing into your font in this way may be a reasonable hack to
+improve appearance in these situations.)  Similarly, when text is
+<span style="color: #966">highlighted in</span>
+<span style="color: #99c" >pastel colors</span>, it’s more readable
+and less visually noisy than when it’s <span style="color:
+red">highlighted in</span> <span style="color: blue">primary
+colors</span>.  And a <span style="background-color: #fef; padding:
+3px">pastel background box</span> is much more clearly visible <span
+style="background-color: #fef; padding: 2px; border: solid
+1px #dcd">with a thin border of the same color, but slightly
+darker</span>.
+
+In less Tufte-approved and more brochure-like directions, <span
+style="text-shadow: .1em .1em .05em rgba(0,0,0,.2)">text drop
+shadows</span> and <span style="padding: .2em; background-image:
+linear-gradient(rgba(255,255,255,.1) 0, rgba(0,0,0,.1))">background
+gradients</span> are also often nice-looking effects, especially when
+used as accents rather than for running text, or on top of a visually
+noisy background that could interfere with text readability.
+
+Supporting all of these in a general-purpose layout syntax would be
+entirely reasonable, even without the complexities of the HTML box
+model.  You could quite reasonably have escape sequences that set such
+properties for the current table or (for character-level markup) for
+the span of text following the escape sequence, without importing all
+the complexities of the CSS box model and text-flow algorithms.

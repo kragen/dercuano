@@ -1,0 +1,42 @@
+One of the approaches the STEPS program wanted to try was to “separate
+implementation from optimization”.  I don’t know that they ever got
+anywhere with that (certainly I never saw anything in their public
+reports that could be described that way) but I think it’s a really
+interesting idea.
+
+Conventional programming practice unashamedly mixes together the
+specification of what your program does with a lot of implementation
+choices about how to do it efficiently.  Of the languages I’ve used,
+the one that is purest at describing just the semantics of the desired
+computation is perhaps Scheme, though it’s in no sense the theoretical
+limit in that sense.
+
+Scheme and its discontents
+--------------------------
+
+In Scheme you don’t explicitly specify what type your variables are,
+when to deallocate things, how to represent enumerated choices in
+machine registers, whether you’re calling a function or invoking a
+macro.  You don’t specify whether a call to a function will return to
+the callsite, through a saved continuation somewhere up the stack from
+the callsite, or through a saved continuation to somewhere on another
+stack.  Iteration uses the same syntax as recursion.  If you use lists
+or vectors for your records, you never have to declare record types,
+and you never have to say which record type a list or vector
+represents, although the built-in field accessors have names like
+`cadddr`.
+
+But Scheme is relentlessly monomorphic, at least outside the numerical
+tower — the standard procedures for lists, for example, work only on
+lists, not arbitrary sequences.  To index into a string or to index
+into a list, you use different procedures.  It’s unapologetically
+eager (although continuations provide some escape from this, in that
+they allow a procedure to suspend evaluation until a result is ready),
+and your record types must be explicitly defined (if your system
+implements SRFI 9 so that you have record types).
+
+By contrast, in Lua or JS, you can implicitly define a record type,
+with reasonable accessor syntax, just by using it:
+
+    dragStart = {x=ev.p.x, y=ev.p.y}
+
