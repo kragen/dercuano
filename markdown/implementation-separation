@@ -14,6 +14,8 @@ limit in that sense.
 Scheme and its discontents
 --------------------------
 
+Scheme is pretty abstract.
+
 In Scheme you don’t explicitly specify what type your variables are,
 when to deallocate things, how to represent enumerated choices in
 machine registers, whether you’re calling a function or invoking a
@@ -29,14 +31,651 @@ represents, although the built-in field accessors have names like
 But Scheme is relentlessly monomorphic, at least outside the numerical
 tower — the standard procedures for lists, for example, work only on
 lists, not arbitrary sequences.  To index into a string or to index
-into a list, you use different procedures.  It’s unapologetically
+into a list, you use different procedures, so you can’t write a
+procedure that works implicitly on either one.  It’s unapologetically
 eager (although continuations provide some escape from this, in that
-they allow a procedure to suspend evaluation until a result is ready),
-and your record types must be explicitly defined (if your system
-implements SRFI 9 so that you have record types).
+they allow a procedure to suspend evaluation until a result is ready;
+because it has the implicit variable capture semantics later adopted
+by nearly all modern programming languages, its closures also provide
+an escape valve, though also a rather syntactically clumsy one.  Your
+record types must be explicitly defined (if your system implements
+SRFI 9 so that you have record types).  And if you need both a
+function and its inverse, you must define them separately — more
+generally, given an n-ary relation, there exist 2ⁿ functions from
+subsets of its columns to sets of values for the other columns, and in
+Scheme each of these must generally be reified as a separate
+procedure.
 
-By contrast, in Lua or JS, you can implicitly define a record type,
-with reasonable accessor syntax, just by using it:
+### Schemaless records ###
+
+By contrast, in Lua or JS, you can implicitly (“schemalessly”) define
+a record type, with reasonable accessor syntax, just by using it; in
+Lua syntax:
 
     dragStart = {x=ev.p.x, y=ev.p.y}
 
+The schemaless Scheme equivalent is something like
+
+    (let ((drag-start (cons (x (p ev)) (y (p ev)))))
+         …)
+
+but then you have to access the `x` and `y` fields of `drag-start`
+with `car` and `cdr`, or define functions wrapping them (which might
+have to have longer names than `x` and `y`).
+
+If you use a SRFI-9 declaration like this one in Scheme:
+
+    (define-record-type :point (make-point x y) point? (x get-x) (y get-y))
+
+then you can instead write
+
+    (let ((drag-start (make-point (x (p ev)) (y (p ev)))))
+         …)
+
+and then you have `(get-x drag-start)` and `(get-y drag-start)` as you
+would want.  But you still can't use the same accessors `x` and `y`
+for your new record type that were used for the fields of `(p ev)`;
+this is a specific case of a larger issue, which is that Scheme makes
+polymorphism cumbersome and often impossible.
+
+### Object-orientation or polymorphism ###
+
+In Python, Smalltalk, or Ruby, you can generally define a new type
+that can be used in place of an existing type as an argument to a
+function or method, simply by implementing the interface that the
+function or method expects of that argument.  Consider this very
+simple Python function from Dercuano:
+
+    def pluralize(noun, number):
+        return noun if number == 1 else noun + 's'
+
+This is intended for use with a string and an integer, returning a
+string, as you’d expect.  A Scheme equivalent:
+
+    (define (pluralize noun number)
+      (if (= number 1)
+          noun
+          (string-concatenate (list noun "s"))))
+
+But all the Python version demands of the “integer” is that it be
+usefully comparable to 1, and all it demands of the “string” is that
+you can concatenate a string to it and get a value of the same type.
+So, for example, you can partially evaluate `pluralize` (and a class
+of similar functions) with respect to the `number` argument by passing
+the following `Template` object as an argument instead of the string:
+
+    class Template:
+        def __radd__(self, other):
+            return Template_cat(templatify(other), self)
+
+        def __add__(self, other):
+            return Template_cat(self, templatify(other))
+
+        def of(self, value):
+            return value
+
+    class Template_cat(Template):
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+        def of(self, value):
+            return self.a.of(value) + self.b.of(value)
+
+    class Template_k(Template):
+        def __init__(self, value):
+            self.value = value
+
+        def of(self, value):
+            return self.value
+
+    def templatify(val):
+        return val if isinstance(val, Template) else Template_k(val)
+
+This amounts to partial evaluation by way of abstract interpretation
+with an non-standard semantics, but it’s done entirely at the level of
+ordinary code by passing an argument that implements an interface.  To
+do something like this with Scheme, you have to step up to a metalevel
+and write a sort of compiler rather than just implementing
+metamethods.
+
+So you could reasonably argue that the Python `pluralize` is a more
+abstract specification of a computation than the Scheme version.
+
+### Laziness ###
+
+As many of us learned from SICP, although Scheme is eager, you can
+define lazy streams in Scheme by delaying evaluation with `lambda`:
+
+    (define (ints-from n) (lambda () (cons n (ints-from (+ n 1)))))
+
+Or by using `delay`:
+
+    (define (ints-from-delay n) (delay (cons n (ints-from-delay (+ n 1)))))
+
+But — related to the above issue about polymorphism — in standard
+Scheme, you cannot pass these lazy streams to things that expect
+regular lists.  (A Scheme that provides implicit `force` would allow
+this; as I understand it, supporting this possibility is the reason
+`delay` and `force` are in the standard, but neither of the Schemes I
+tried it on has implicit `force`.)  So a caller that expects a regular
+list as a return value is constraining the callee to produce it
+entirely before returning.  And a callee that expects a regular list
+as an argument is constraining the caller to produce it entirely
+before the callee begins.
+
+This kind of thing frequently results in dual implementations: an
+eager implementation for when all the results are needed (more
+convenient to handle in Scheme and in most languages) and a lazy one
+for when it’s important to produce results lazily.  Usually these are
+provided through separate operations (functions, methods, or
+operators), though in some cases, it’s just different options to the
+same operation; for example, in the perlop documentation for the
+pattern-match operator `m//`:
+
+> The “/g” modifier specifies global pattern matching — that is,
+> matching as many times as possible within the string.  How it
+> behaves depends on the context.  In list context, it returns a list
+> of the substrings matched by any capturing parentheses in the
+> regular expression.  If there are no parentheses, it returns a list
+> of all the matched strings, as if there were parentheses around the
+> whole pattern.
+> 
+> In scalar context, each execution of “m//g” finds the next match,
+> returning true if it matches, and false if there is no further
+> match.  The position after the last match can be read or set using
+> the “pos()” function; see “pos” in perlfunc.
+
+By contrast, in Python, you can write a generator function, which
+creates a generator object when initially invoked; both the generator
+object and the builtin list object implement the builtin iterator
+protocol, so things that just use the iterator protocol (by, for
+example, iterating or converting to a tuple) will not notice the
+difference between a list and a generator.
+
+In Dercuano, for example, this method is a generator; it generates a
+lazy sequence of (subject, verb, object) triples that form the main
+data store of the Dercuano application:
+
+    def load_triples(filename):
+        with open(filename) as f:
+            last_subj = None
+            for line in f:
+                if not line.strip():
+                    continue
+                fields = tuple(unquote(field.replace('+', '%20'))
+                               for field in line.split())
+                if line[0] in string.whitespace:
+                    fields = (last_subj,) + fields
+                for fn in fields[2:]:
+                    yield (fields[0], fields[1], fn)
+                last_subj = fields[0]
+
+This parses some vaguely RDF-N3-like text saying things like this:
+
+    7805-6-volts written 2019-06-08
+        updated 2019-06-10
+        concerns electronics pricing
+
+    array-intervals written 2019-06-23
+        concerns math intervals arrays apl python c programming algorithms numpy
+
+Its return value is passed to this function, which generates some
+in-memory hash tables for quick access:
+
+    def as_relations(triples):
+        relations = {}
+        for subj, verb, obj in triples:
+            if verb not in relations:
+                relations[verb] = relation.Relation()
+            relations[verb].put(subj, obj)
+
+        # Precompute inverse relations eagerly
+        for verb in relations:
+            ~relations[verb]
+
+        return relations
+
+Right now, the execution of `as_relations` is interleaved with that of
+`load_triples`.  If `load_triples` is changed to build up a list of
+3-tuples and return it, or if `load_triples`’s caller does so by
+invoking `list()` on its return value before passing it to
+`as_relations`, the code of `as_relations` continues to produce the
+same results, but the file access is no longer interleaved with the
+hashing, and an additional big temporary data list is built up in
+memory.  As it turns out, this makes it run slightly faster.  (So I
+made the change.)
+
+The ability to hide optimization decisions behind interfaces like this
+is powerful, but I’m kind of overselling Python’s implementation of
+the iterator interface here.  If you iterate over a list a second
+time, you get the same items, unless you’ve changed it; but iterators
+in Python are single-pass, and so you cannot iterate over a generator
+a second time.  Worse, if you attempt to do so, you silently get no
+items, rather than an error message.  And, because Python’s semantics
+have pervasive mutability, it’s easy to write a generator that
+unintentionally produces a different sequence of values depending on
+exactly when the iteration happens.  (In the above example, this could
+happen if the contents of the file changed, which is a problem that
+goes beyond Python; see file `immutable-filesystem`.)
+
+Laziness is useful for a few different reasons: to avoid building up
+big in-memory temporary data structures that will just be thrown away
+again; to do computations in finite time involving infinite sequences
+like the continued-fraction expansion of φ or π; and to provide
+partial results sooner from things that can take a long time to
+finish, including jobs that use heavy computation, I/O, and remote
+procedure calls, which are a sort of I/O.
+
+(Haskell is the champion of laziness, avoiding both Python’s
+repeated-iteration problem and Python’s implicit-mutation-dependency
+problem, but I don’t know Haskell, so I don’t have a good example to
+hand.)
+
+### N-ary relations and relational programming ###
+
+Consider this Prolog “predicate”, which is to say, n-ary relation:
+
+    x(7805-6-volts, written, 2019-06-08).
+    x(7805-6-volts, updated, 2019-06-10).
+    x(7805-6-volts, concerns, electronics).
+    x(7805-6-volts, concerns, pricing).
+    x(array-intervals, written, 2019-06-23).
+    x(array-intervals, updated, 2019-06-10).
+    x(array-intervals, concerns, math).
+    x(array-intervals, concerns, electronics).
+
+We can interactively query the topics covered by file `7805-6-volts`
+as follows:
+
+    ?- x(7805-6-volts, concerns, Topic).
+    Topic = electronics ;
+    Topic = pricing
+
+So we can think of `x` as a function which, when executed, gives the
+topics for file `7805-6-volts`.  But we could make the note name an
+input variable and think of it as a function from note names to (sets
+of) topics:
+
+    ?- Note = 7805-6-volts, x(Note, concerns, Topic).
+    Note = 7805-6-volts,
+    Topic = electronics ;
+    Note = 7805-6-volts,
+    Topic = pricing ;
+    false.
+
+(Calling back to the previous topic, this sequence is lazy; you can
+say `Note = 7805-6-volts, findall(Topic, x(Note, concerns, Topic),
+L).` to get the whole list at once.)
+
+Also, though, `x` is the inverse function, from topics to note names:
+
+    ?- Topic = electronics, x(Note, concerns, Topic).
+    Topic = electronics,
+    Note = 7805-6-volts ;
+    Topic = electronics,
+    Note = array-intervals.
+
+But we can also invoke `x` as a function to return a list of all
+note–topic pairs:
+
+    ?- x(Note, concerns, Topic).
+    Note = 7805-6-volts,
+    Topic = electronics ;
+    Note = 7805-6-volts,
+    Topic = pricing ;
+    Note = array-intervals,
+    Topic = math ;
+    Note = array-intervals,
+    Topic = electronics.
+
+Or a function from note names to last-updated dates:
+
+    ?- Note = array-intervals, x(Note, updated, Date).
+    Note = array-intervals,
+    Date = 2019-6-10.
+
+If we compose `x` with itself, we can even, for example, find all the
+pairs of notes last updated on the same date:
+
+    ?- x(Note1, updated, Date), x(Note2, updated, Date).
+    Note1 = Note2, Note2 = 7805-6-volts,
+    Date = 2019-6-10 ;
+    Note1 = 7805-6-volts,
+    Date = 2019-6-10,
+    Note2 = array-intervals ;
+    Note1 = array-intervals,
+    Date = 2019-6-10,
+    Note2 = 7805-6-volts ;
+    Note1 = Note2, Note2 = array-intervals,
+    Date = 2019-6-10.
+
+But even without composing `x` with itself or selecting from it, we
+can construct eight different functions from it by declaring some of
+its columns to be inputs and others to be outputs; by currying or
+partially evaluating those functions with respect to some subset of
+their input arguments (in the relational view, selecting a subset of
+rows from the relation), we can get a much larger set of functions out
+of it.  As written, there are four functions with the first column
+fixed to `7805-6-volts` and four more with it fixed to
+`array-intervals`; four each with the second column fixed to each of
+its three values; and four each (much less interesting) functions with
+the third column fixed to each of its six values.  This is 44 more
+functions, plus the 8 uncurried ones, for a total of 52, plus the
+functions with more than one curried argument (which are less
+interesting).
+
+Defining 52+ functions is not too bad for 8 lines of code, and you
+won’t have to go searching through a many-page API document to figure
+out how to use these 52+ functions, either.
+
+As I said before, though, Prolog hardwires a depth-first search
+strategy, which fails to terminate for many searches, and is
+exponentially inefficient for many others.  So the extent to which you
+can do this kind of thing in Prolog directly is fairly limited.  The
+usual example is `append`, which is a built-in Prolog function; we can
+ask SWI-Prolog for a listing of it as follows:
+
+    ?- listing(append/3).
+    lists:append([], A, A).
+    lists:append([A|B], C, [A|D]) :-
+            append(B, C, D).
+
+    true.
+
+These two or three lines of code define the list-append relation among
+lists; thinking of it in the usual way as a way to append two lists,
+we can call it to append two lists:
+
+    ?- append([h,e,l,l,o], [v,e,n,u,s], L).
+    L = [h, e, l, l, o, v, e, n, u|...].
+
+But these two lines of code define eight functions, just like the
+`x/3` predicate defined above.  We can ask for all pairs of lists that
+append to another list:
+
+    ?- append(A, B, C).
+    A = [],
+    B = C ;
+    A = [_G249],
+    C = [_G249|B] ;
+    A = [_G249, _G255],
+    C = [_G249, _G255|B] 
+
+We can ask for every pair of lists that can be appended to form a
+given list:
+
+    ?- append(A, B, [v,e,n,u,s]).
+    A = [],
+    B = [v, e, n, u, s] ;
+    A = [v],
+    B = [e, n, u, s] ;
+    A = [v, e],
+    B = [n, u, s] ;
+    A = [v, e, n],
+    B = [u, s] ;
+    A = [v, e, n, u],
+    B = [s] ;
+    A = [v, e, n, u, s],
+    B = [] ;
+    false.
+
+We can ask if one list is a prefix of another list (and, implicitly,
+what’s left over):
+
+    ?- append([h,e,l,l], X, [h,e,l,l,o]).
+    X = [o].
+
+    ?- append([h,e,l,l], X, [v,e,n,u,s]).
+    false.
+
+Or, more interestingly, a suffix:
+
+    ?- append(Hello, [n,u,s], [v,e,n,u,s]).
+    Hello = [v, e] ;
+    false.
+
+That’s a lot of functionality for two lines of code!
+
+You can define Scheme’s standard `append` function in a precisely
+analogous way:
+
+    (define (append a b)
+      (if (null? a)
+          b
+          (cons (car a) (append (cdr a) b))))
+
+But you can’t run a Scheme procedure “backwards” in the way the above
+Prolog predicates are being used, so if you want starts-with and
+ends-with predicates, much less lists of sublists, you need to program
+those separately.
+
+This kind of thing is a really tempting pointer to what Will Byrd
+calls “relational programming”, where instead of programming
+*procedures* or *functions* (or, as _Total Functional Programming_
+points out, partial functions) we program *relations*.  Modern Prolog
+systems are doing some work with tabling and integer programming to
+expand the scope of this kind of thing, but they’re incurably
+handicapped by Prolog’s depth-first evaluation model.  Byrd and
+Kiselyov’s system miniKANREN is, like the database query mini-language
+in SICP, an exploration of making this kind of thing much more general
+than it is in Prolog.  Its second most impressive feat is that, given
+a relational specification of an interpreter, it was able to deduce a
+self-reproducing program, a quine, for that interpreter.  (Its most
+impressive feat is that Chung-Chieh Shan and Oleg Kiselyov extended it
+to support probabilistic programming five years before anyone else
+realized probabilistic programming was a useful thing to do.)
+
+As I understand it — and I may have this part wrong — miniKANREN uses
+a sort of breadth-first search strategy which is guaranteed to find a
+solution if one exists, but, like Prolog’s strategy, is not guaranteed
+to terminate.  My intuition is that this means that for many
+problems — in some sense, most problems — it will take exponentially
+longer than a program that always knows the right choice to make, or
+even a version of miniKANREN that knows the right choice to make more
+often, or gets to it sooner.  This suggests that some kind of
+optimization-hint information could yield an exponential speedup, so
+adding some kind of optimization to your miniKANREN program (whether
+separated or, as is traditional, mixed into it) could yield big wins.
+
+Naturally, Byrd and Kiselyov implemented miniKANREN in Scheme,
+although Clojure also includes a version of it.
+
+Mixing together optimization, implementation, and proof
+-------------------------------------------------------
+
+Consider this Golang code from [my maze program][0]:
+
+    func (m Maze) Show(output io.Writer) {
+            h, v := m.Horizontal, m.Vertical
+
+            for r := 0; r < len(h); r++ {
+                    s := []byte{}
+                    for c := 0; c < len(v[0]); c++ {
+                            k := context{
+                                    up:    v[r][c],
+                                    down:  v[r+1][c],
+                                    left:  h[r][c],
+                                    right: h[r][c+1],
+                            }
+                            s = append(s, glyphs[k]...)
+                    }
+                    output.Write(append(s, '\n'))
+            }
+    }
+
+[0]: http://canonical.org/~kragen/sw/dev3/unimaze.go
+
+Using a maze previously generated by the rest of the program with
+Kruskal's algorithm, this produces output like the following maze,
+which has one path through it:
+
+    ╻╺━┳┳━━━━┳┳━┳━━┳┳┳━━━┳┳━━━━━┳━━┳━┳┳━┳━━━━━━━━┳━━┳━━┳┳┳┳━┳━┳┳┳━┳━┳━━━━┳━━┳━┳━┳━━┓
+    ┃╺━┫┗┳━╸┏┫┗┓┗┓┏┫╹┗━━╸┃┣━╸╺━━┻╸╺╋┓╹┃╺┻┳━┓┏┳╸┏┓┣━┓┣╸┏┫┃╹╹┏╋╸┃╹╹╻┗╸┗╸┏┳┳┛╻┏┛╻┃╺┻┓╻┃
+    ┣╸╺┫┏┻━╸╹┗┓┗╸╹┃┗━╸╺━┓╹┗━┓┏╸╺┓╺┳┛┃╻┃╺┳┫╺╋┛┃╻╹┗┛╺┫┗┓╹┃┗━┓╹╹╻┗┳━╋╸╻╺┓╹╹┗┳┛┗╸┗╋╸╺┛┣┫
+    ┃╺┓┃╹┏╸┏┓╺┫┏╸╺╋━╸┏┓╻┣╸╺┳┻┫╺┓┣┳╋╸┗┫┣╸┃┗╸┗╸┃┣╸╺━┓╹┏┫┏┛╺┳┛┏━┻┓┣╸╹╻┃╻┃╺┳━╋┓╻┏╸┗┓╺━┛┃
+    ┃╻┣┛╻┗┓┃┃╺┻┛┏┓┗┳━┛┗┻╋━┓┣┓┃╺┫╹╹┣╸╻┃┗╸┃╻┏━━┫┗┳━┳┛╻╹┃┃┏┳╋╸┗━┓╹╹╻╺┫┃┗╋┓┗┓╹┗┛┗━┓┃┏━╸┃
+    ┃┣┫┏┛╻┗┛┗┓╻╻╹┗┳┛╻┏┳━┫╺┫╹┃╹╻┣╸╻┗╸┣┛┏╸╹┗╋╸╻┗┓┗┓┗━┫╺┛┃╹╹┗╸╺┓┃╺┓┣╸┃┃╻┃┃╺┛┏╸╻╻┏┻┛┗┳┓┃
+    ┃╹╹┗┳┻┓┏┓┃┗╋╸╺┻╸┃┃╹╻╹┏┻┓┗┓┣┻━┛┏┓┗┓┣━┓╺╋━┫╺┛┏┫╺━┫╺┳┫┏╸╻┏┓┗┻┳┫┣┓┣┫┗┫┗━━┻┓┗┫┣┓┏━┫┗┫
+    ┣┳┳━┻╸┗┫┗┻┳┛╻┏━╸┗╋━┛┏┛╺╋┓╹┣┳╸╻╹┃┏┛╹╺╋┓╹╺╋┳╸╹┣╸╻┣┓┃┗╋━┛╹┣━╸┃┣┛┃┃┗┳┻━╸╻┏┛╻┗┛╹╹╻╹┏┫
+    ┃╹┗╸┏┓┏┛╺┓┣━╋┛╻╺━┛╻╻┃╻┏┛┣╸┃┣╸┣━┛┣━┓╻┃┣━┓┃┃╻╺┻┳┛╹┣┛╻┃┏╸╺╋┓╺┛┗┓┗┻╸┗┓┏╸┗╋━┻┳┓╺┳┛╻╹┃
+    ┣━┳┓╹┃┃╺┳┫┣╸┣╸┃┏┳┓┗┫┗┫┃╺┻━┛╹╺╋┓╻┗╸╹┗┫┗╸┃┃╹┣┓╻┗┓╻┗┓┗┻┫┏╸┃┗╸╻╺┫╺━┓╺┻┻╸╺┫╻╺┛┣━┫╻┃╻┃
+    ┃┏┫┗┓┃╹╻╹┃┣╸┣┳┫┃╹┗┓┃╺┫╹┏━╸╻╺━┛┗┻┓╻┏╸┃┏╸┗┻╸╹┗╋━┻┛┏┻┓┏┫┣╸┗━┓┣╸┃┏┳╋╸╻╻╻╺┛┃╺━┫╺╋┫┣┫┃
+    ┃╹┃╺╋┻┳┛╺┻┛╺┛╹┗┛╻╺┻┫╺┛╻┣━┓┗━┳┳┓╻┣┻┻╸┃┣┳┳┳┳╸╻┗┳━╸╹╻╹╹┃┣┳╸┏┻┻┳╋┛╹┗╸┣┻┛╻╻┗━━╋┓╹╹┃┗┫
+    ┣╸┣┓┃╻┃╺┳┳╸╻┏┓╺┓┃╻╺┫╺━┫╹┏┫╺━┛┃┣┛┃╻┏╸┗┫╹╹╹┃┏┛╺┫╻╻╺┫╻┏┻┫┗┓┃╻╻╹┃┏┓╺┳┛┏╸┗╋━━┳┛╹╻╺┫╺┫
+    ┃╺┛╹┃┃┣━┫╹╺┫╹┣━┛┗┻┳┫╺┓┣╸╹┗┓╺┓┃┣━┫┣┻╸╻┃┏┳╸┣┻┓╻┗┫┗┳┫┗┻╸╹╺┛┃┣╋━┫┃┗┳┻━┫╺┓┗╸╺┛╺┓┣━┫╺┫
+    ┣┳┓╻┣┫╹╻╹╻╺┫┏┻╸╺┳╸╹╹╺┻╋━┓╺┫╺╋┫┣┓╹┗┓╻┃┗┫┗┓╹╺┫┗┓╹╺┫┗━┓┏┳╸╻╹╹╹╺╋┻┓┗━╸┃╻┃╻┏┓┏┳┛┗┓╹╻┃
+    ┃┃╹┃╹┗╸┣━╋┳┻┻┳┓╺┫╻╻┏━━┛┏┫┏┻━┫┃╹┗╸┏┻┻┫╻┃┏┻━┓┗━┻╸╺┫╺━┛╹┣╸┣╸╻╻╻╹╻┃╺┓╻┗╋┻┛╹┣┛┣━┓┗╸┃┃
+    ┃╹╻┗━┓╺┫┏┫┣╸╺┛┗╸┣┫┃┃┏╸╺┛┗┫┏╸┃╹╺┳━┛╺┳┫┃╹┗╸╺┻┓╻╻┏╸┃╺┳╸╻┗━┫┏┫┣┻━┫╹┏╋┻╸┃┏┳┳╋┓╹╻┃╻╻┣┫
+    ┃╻┃┏━┛╻╹┃┃┣━━━┓╻┃╹┗┛┣┳╸╺┓┣┻╸┗━╸┗╸┏┓╹┗╋━━╸╺━┻┛┣┻╸┣┓┃╺┫┏╸┗┛┃┗╸╻┗━┫┃╺━┫╹┃╹╹╹╺┫┗╋┫┃┃
+    ┣┛┃┗━┓┃╻╹╹┗┳━╸╹┗┫╻╻╺┫╹╻╺┫┃┏━╸╻┏╸╻╹┗━┳┛╻╺┓╻╻╺┳┛┏╸╹┣┻╸┃┃╻╺━╋╸╻┗┳╸┃╹╺━╋╸╹╻╺━┳┛╺┫╹╹┃
+    ┗━┻━━┻┻┻━━━┻━━━━┻┻┻━┻━┻━┻┻┻━━┻┻━┻━━━┻━┻━┻┻┻━┻━┻━━┻━━┻┻┻━━┻━┻━┻━┻━━━┻━━┻━━┻━━┻━╸╹
+
+If you translate this function directly to Python, it’s about half as
+much code:
+
+    def show(self, output):
+        h, v = self.horizontal, self.vertical
+
+        for r in range(len(h)):
+            s = []
+            for c in range(len(v[0])):
+                k = (v[r][c],
+                     v[r+1][c],
+                     h[r][c],
+                     h[r][c+1])
+                s.append(glyphs[k])
+
+            output.write(''.join(s) + '\n')
+
+What was the other half?  It’s not, mostly, that Python uses shorter
+tokens.  As far as I can tell, the only really missing part is the
+types (and struct fields), although those are only about 62 of the
+extra 300 bytes of code.  In Python, we don’t have to declare that our
+hash key is a `context` or name its fields, declare the type of the
+receiver, declare the type of the output stream, or declare the output
+buffer as a byte slice.
+
+A (non-modern) C++ or Java version would be far worse — it would have
+type annotations on almost every line of the code.
+
+> ### A non-word-for-word translation ###
+> 
+> The Golang function above was actually from a translation from [a
+> Python program][1] which didn’t use a hash table to produce the
+> characters but rather a search over parallel arrays:
+> 
+>     def render(h, v):
+>         for hline, upline, downline in zip(h, v[:-1], v[1:]):
+>             row = []
+>             for r, l, u, d in zip(hline[1:], hline[:-1], upline, downline):
+>                 row.append(random.choice([c for i, c in enumerate(chars)
+>                                           if  l == left[i]
+>                                           and r == right[i]
+>                                           and u == top[i]
+>                                           and d == bottom[i]]))
+>             yield ''.join(row)
+>
+> [1]: http://canonical.org/~kragen/sw/dev3/unimaze.py
+>
+> This ended up being almost as long as the Golang version, a somewhat
+> unfair comparison since it leaves out the Golang initialization code
+> for the `glyphs` hash table:
+>
+>             for i, glyph := range []rune(chars) {
+>                     k := context{
+>                             up:    topbs[i] == '1',
+>                             down:  bottm[i] == '1',
+>                             left:  lefts[i] == '1',
+>                             right: right[i] == '1',
+>                     }
+>                     glyphs[k] = []byte(string(glyph))
+>             }
+
+### Optimizations and proofs ###
+
+The Python version will detect even method name misspellings at
+runtime; if you said `output.wriet` instead of `output.write`, it
+won’t complain.  Similarly, it detects type errors, where you’re
+calling it with no argument or a non-output-stream argument, at
+runtime.  And if one of the things in `glyphs` isn’t actually a
+string, or one of the keys isn’t a 4-tuple as it should be, or `h` or
+`v` isn’t a two-dimensional array of strings of the right size, that’s
+also a runtime error.  Moreover, if you got the keys in the 4-tuple in
+the wrong order, it won’t be obvious and Python won’t complain.
+
+By contrast, most of these are checked at compile-time by the Golang
+compiler.  It constructs a simple formal proof that the `output`
+argument has a `Write` method: it’s an `io.Writer` interface value,
+and those have `Write` methods, QED.  The only one it doesn’t check is
+the array size, a check it does do at runtime.  But the Golang
+compiler catches a fairly large fraction of bugs by using simple
+theorem proving at compile time, bugs that the Python program would
+need a test suite to catch.  (I didn’t write the test suite.)
+
+The Golang program also runs a lot faster.  It generates a 301×301
+maze (comparable to the Python program’s 300×300 maze) in 400
+milliseconds, while the Python program takes 4.9 seconds to do the
+same task with the same algorithm.  Both are single-threaded, so,
+crudely, the Python program is spending 92% of its time doing
+computations the Golang program doesn’t need to do.  (The Golang
+program could in theory be benefiting from concurrent garbage
+collection, but its user+system time never exceeds the wallclock time
+by more than about 3%, so it can’t be benefiting much.)
+
+A lot of those computations are the ones the compiler did at
+compile-time in order to find bugs, using the type annotations.  Other
+optimizations, though, were choices of how to represent the program’s
+state in memory.
+
+Declaring the output buffer as a byte slice was an optimization;
+originally it was a string appended to with `+=`.  Indeed, having an
+explicit output buffer at all was an optimization; previously the code
+used `fmt.Fprintf(output, "%c", glyphs[k])`.  And the `context` type,
+with its four boolean fields, is presumably both considerably faster
+to copy around and gentler on the garbage collector than Python’s
+tuple of reference-counted pointers.
+
+Separating optimization, implementation, and proof
+--------------------------------------------------
+
+It’s tempting to think that proofs and type specifications are at a
+*higher* level of abstraction than a straightforward implementation,
+while an optimized implementation is working at a *lower* level of
+abstraction than that straightforward implementation.  And you could
+imagine a way for that to be true, where you have a sort of cascade
+from high-level specifications (“the program must not crash”, “there
+must be only a single path through the maze”) down to lower-level more
+detailed specifications (“use Kruskal’s algorithm”) which fill out the
+high-level specifications into something closer to the metal, down to
+low-level micro-optimizations (“represent a cell context as a tuple of
+four booleans, represent those booleans as single bits in a byte, and
+index the glyphs numerically by context rather than by hashing”).  But
+the above example shows that this is not really the way things work
+today.  Perhaps it could be?
+
+Ideally, you could separate the decisions about how to represent state
+(use a byte buffer, use a hash, use an array, use a four-byte struct)
+from the higher-level specification of the algorithm so that you could
+separately prove that the algorithm, abstractly, solves the problem
+it's needed to solve, and that the state representation is a valid
+state representation for that algorithm (that is, its semantics
+faithfully implements the semantics the algorithm needs).  Given a
+system that could construct such proofs, you could automatically
+conduct a heuristic search for state representations that provide the
+required properties.
+
+If an algorithm is written in a sufficiently abstract way, it can be
+automatically specialized to different contexts, while proofs of its
+properties can be written in terms of the abstract algorithm, perhaps
+with reference to properties of the concrete representation it's
+using.  The C++ STL is one example of this approach, but also, for
+example, you can use Newton’s divided-differences polynomial
+interpolation algorithm to perform polynomial interpolation in
+different fields — including, for example, Galois fields, where it
+provides not numerical approximation but Shamir secret sharing.  But
+this can only be done automatically if the original specification of
+polynomial interpolation is written in such a way as to not be limited
+to floating-point.
+
+…
