@@ -1,5 +1,8 @@
+Using Aryabhata’s pulverizer algorithm to calculate multiplicative inverses in prime Galois fields and other multiplicative groups
+==================================================================================================================================
+
 Aryabhata’s presentation of Euclid’s algorithm explains how to find
-the coefficients s and t such that sa + tb = gcd(a, b).  Except I
+the coefficients *s* and *t* such that *sa* + *tb* = gcd(*a*, *b*).  Except I
 don’t understand the explanation, so I am going to try to work through
 an example.
 
@@ -34,23 +37,52 @@ so modulo 56, -13 (=43) and 43 are multiplicative inverses, and modulo
 43, 10 and 56 are.
 
 So after all these years I understand how to find multiplicative
-inverses efficiently in a Galois field.
+inverses efficiently in a Galois field.  At least a Galois field of
+prime order.
 
-If the group is modulo a prime, then you can also find the
-multiplicative inverse by taking to the power n-2, by Fermat’s Little
-Theorem.  But that doesn’t work in general for multiplicative groups
-of any order: 56⁴² % 43 = 1, not 10; 43⁵⁵ % 56 does equal 43, but that
-is sort of a coincidence, since it’s its own multiplicative inverse,
-so half of its powers are 1.
+If a multiplicative group order is a prime *n*, then you can also find the
+multiplicative inverse by taking to the power *n*-2, by Fermat’s Little
+Theorem, so, for example, 56⁴¹ % 43 = 10.  But that doesn’t work in
+general for multiplicative groups of any order: 56⁴² % 44 = 12, but
+because 56 and 44 have a common factor of 4, 56 has no multiplicative
+inverse in ℤ/44ℤ; 43⁵⁴ % 56 is 1, which not its multiplicative inverse
+in ℤ/56ℤ, because 1 is always its own multiplicative inverse.  43 is,
+as I said, its own multiplicative inverse in ℤ/56ℤ, and the pulverizer
+algorithm can compute this just as well without the extra confounding
+factor of 29:
 
-Can I formalize this?  If I’m looking for sa + tb = gcd(a, b), going
-backwards, the substitution into the 377 equation which gives me
-10·377 - 13·1247 = 29 sets s=-13 and t=10, because a was 1247 and b
-was 377 on that step.  These values of s and t come from a quotient of
-3 (-3) in that step and a previous expression for 29, 377 - 3·116,
-which had s=1 and t=-3, and where the remainder was in fact the gcd
-itself.  The new values were computed as (s, t) = (t, s+qt), I think?
-Does that work for the next step, where we re-express in the (1624,
-1247) basis, where the quotient was 1?  Here t=10, s=-13, and q=1, so
-that is (10, -13+10=-3), suggesting that 10·1624 - 3·1247 = 29, which
-is obviously wrong.
+    56 - 43 = 13;
+    43 - 3·13 = 4;
+    13 - 3·4 = 1
+    = 13 - 3·(43 - 3·13) = 10·13 - 3·43
+    = 10·(56 - 43) - 3·43 = 10·56 - 13·43
+
+Can I formalize this algorithm?  The forwards-backwards ordering seems
+to suggest recursion; we could perhaps try to define a function
+egcd(*a*, *b*) → (*s*, *t*, *g*) such that *sa* + *tb* = *g* and *g* =
+gcd(*a*, *b*).  The base case of the recursion would be, I suppose,
+that *a* % *b* = 0, in which case a valid answer is (0, 1, *b*).
+Otherwise, we have *q* = *a* // *b* and *r* = *a* % *b*, so *a* - *qb*
+= *r*, and we need to recurse with *s*, *t*, *g* = egcd(*b*, *r*).
+Assuming that succeeds somehow, we have *sb* + *tr* = *g*, so we can
+deduce that *g* = *sb* + *t*(*a* - *qb*) = (*s* - *tq*)*b* + *ta*, so
+we can return (*t*, *s* - *tq*, *g*).
+
+In Python:
+
+    def egcd(a, b):
+        q, r = divmod(a, b)
+        if r == 0:
+            return 0, 1, b
+
+        s, t, g = egcd(b, r)
+        assert s*b + t*r == g
+        return t, s - t*q, g
+
+Applied, for example, to (70, 24), this gives -1·70 + 3·24 = 2, so in
+ℤ/12ℤ, 35⁻¹ = 11⁻¹ = -1 = 11, and in ℤ/35ℤ, 12⁻¹ = 3, both of which
+are correct.
+
+They say it is possible to extend this algorithm to non-prime-order
+Galois fields GF(*pⁿ*) where *n* > 1 by using polynomial division, but I
+do not yet understand that.
