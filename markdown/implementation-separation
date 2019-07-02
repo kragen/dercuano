@@ -1,3 +1,6 @@
+Separating implementation, optimization, and proofs
+===================================================
+
 One of the approaches the STEPS program wanted to try was to “separate
 implementation from optimization”.  I don’t know that they ever got
 anywhere with that (certainly I never saw anything in their public
@@ -9,7 +12,8 @@ specification of what your program does with a lot of implementation
 choices about how to do it efficiently.  Of the languages I’ve used,
 the one that is purest at describing just the semantics of the desired
 computation is perhaps Scheme, though it’s in no sense the theoretical
-limit in that sense.
+limit in that sense.  What are the ways Scheme and other programming
+languages mix these things together?
 
 Scheme and its discontents
 --------------------------
@@ -162,7 +166,16 @@ tried it on has implicit `force`.)  So a caller that expects a regular
 list as a return value is constraining the callee to produce it
 entirely before returning.  And a callee that expects a regular list
 as an argument is constraining the caller to produce it entirely
-before the callee begins.
+before the callee begins execution.
+
+In mathematics, it’s entirely commonplace to deal with infinite
+sequences on equal terms (heh) with finite sequences, and even
+infinite sequences of infinite sequences, etc.  The decision to
+compute only a finite subset of an infinite sequence is, in many
+cases, a sort of optimization decision — computing too many terms is
+relatively harmless, consuming only extra time and memory, and
+computing all the terms would take infinite time and therefore require
+some kind of hypercomputation.
 
 This kind of thing frequently results in dual implementations: an
 eager implementation for when all the results are needed (more
@@ -481,8 +494,132 @@ separated or, as is traditional, mixed into it) could yield big wins.
 Naturally, Byrd and Kiselyov implemented miniKANREN in Scheme,
 although Clojure also includes a version of it.
 
+From a certain point of view, the Scheme `append` procedure is an
+optimized version of the Prolog `append/3` predicate: it’s a version
+of the predicate specialized to the case where the first two arguments
+are ground and the third argument is a free variable.
+
+### Irreversible computation ###
+
+Consider this Python implementation of the method of secants:
+
+    def sec(f, x0, x1, e):
+        y = f(x0), f(x1)
+
+        while abs(y[1]) > e:
+            x0, x1 = x1, x1 - y[1]*(x1 - x0)/(y[1] - y[0])
+            y = y[1], f(x1)
+
+        return x1
+
+Here is a Scheme equivalent, although it may not be the best way to
+express the algorithm in Scheme:
+
+    (define (sec f x0 x1 e)
+      (letrec ((loop
+                (lambda (y0 y1 x0 x1)
+                  (if (> (abs y1) e)
+                      (let ((xn (- x1 (/ (* y1 (- x1 x0))
+                                         (- y1 y0)))))
+                        (loop y1 (f xn) x1 xn))
+                      x1))))
+        (loop (f x0) (f x1) x0 x1)))
+
+If it terminates, this approximates a root of the function `f` by
+finding the intersection point of the X-axis and the secant line
+through (*xᵢ*₋₁, f(*xᵢ*₋₁)) and (*xᵢ*, f(*xᵢ*)); in the usual cases,
+this is a slightly more efficient approximation of Newton–Raphson
+iteration, since it converges with degree φ to Newton’s 2, but only
+requires a single computation of *y*(*x*) per iteration, rather than
+separate computations of *y*(*x*) and *ẏ*(*x*).  (In some cases, not
+needing to compute the derivative is also useful, although if the
+derivative doesn’t actually exist, this method may not converge.)
+
+The thing I want to point out here is that, assuming floating-point,
+this procedure computes in constant space, but by virtue of doing so,
+it erases all the intermediate values of `x1` and `y`.  If you just
+want the root, that may be okay, but if you want to analyze the
+performance of the algorithm, it may be useful to save those
+intermediate results.
+
+Related to the previous item about laziness — in this form, the
+algorithm fails to terminate at times — notably when you give it real
+starting points for a function whose roots are complex, such as
+`sec(lambda x: x**2 + 2, 0, 1.0, .0000001)`, although it works fine
+with other starting points such as `sec(lambda x: x**2 + 2, 0, 1.0 +
+1.0j, .0000001)`.  Even if it does manage to terminate, it can run for
+many iterations, and in some applications it would be best to
+terminate its execution early, for example if a concurrent search from
+a different starting point finds a solution.
+
+If you sometimes want the constant-space behavior and sometimes want
+the whole sequence of values or guaranteed termination, most
+programming languages require you to restructure the procedure as a
+generator of a lazy sequence, so that a concurrent consumer has the
+opportunity to discard its intermediate values or abort the iteration.
+For example:
+
+    def sec_seq(f, x0, x1):
+        y = f(x0), f(x1)
+
+        while True:
+            yield x1
+            x0, x1 = x1, x1 - y[1]*(x1 - x0)/(y[1] - y[0])
+            y = y[1], f(x1)
+
+This allows you to, for example, take the 10th value, discarding all
+previous values, to compute the first 10 values, or to interleave the
+iterative computation in other ways:
+
+    >>> list(itertools.islice(sec_seq(lambda x: x**2 + 2, 0, 1.0 + 1.0j), 9, 10))
+    [(-2.2572481470524732e-21+1.4142135623730951j)]
+    >>> list(itertools.islice(sec_seq(lambda x: x**2 + 2, 0, 1.0 + 1.0j), 10))
+    [(1+1j),
+     (-1+1j),
+     2j,
+     (-0.2+1.4j),
+     (-0.03448275862068967+1.4137931034482758j),
+     (1.3877787807814457e-17+1.411764705882353j),
+     (2.9885538387977862e-05+1.4142135620573204j),
+     (-2.5897366406179418e-08+1.4142135623730947j),
+     (-8.007108329513308e-22+1.4142135623733687j),
+     (-2.2572481470524732e-21+1.4142135623730951j)]
+
+The original Python and Scheme code is seen to have mixed together the
+space optimization of discarding the intermediate values with the
+implementation of the underlying algorithm.  Scheme is in some sense
+often more abstract than Python with regard to this sort of
+irreversibility, in that you write this loop with a call whose tail
+position the Scheme system is supposed to recognize, rather than
+explicitly overwriting variables with new values; but, on a standard
+Scheme system, you can’t construct some kind of context where
+executing the original Scheme example above gives you access to all of
+the intermediate values.  And in fact the surgery needed to convert
+the Scheme version of the algorithm to optionally produce the whole
+sequence of values, interleaved with the execution of the consumer, is
+more extensive than on the Python version.
+
+(The situation is somewhat worse even than this suggests: in both
+Python and Scheme, if the arguments are arbitrary-precision rational
+objects (or, in some Schemes, integers), the algorithm is not
+constant-space, and the Scheme standard more or less explicitly
+permits garbage collection to be broken, and Scheme space behavior
+depends in most cases on garbage collection.)
+
+But we see that Python and Scheme *permit* us to write this algorithm
+in such a way that the invoking context can preserve the intermediate
+values or discard them, as it wishes.  (Doing this in general requires
+using FP-persistent data structures and avoiding mutation entirely,
+which is totally impractical in Python, and pretty hard to do without
+sacrificing efficiency in Scheme.)  But what would an algorithm
+specification language look like that entirely omitted erasure?
+
 Mixing together optimization, implementation, and proof
 -------------------------------------------------------
+
+So we’ve seen particular ways in which even in Scheme we must entangle
+optimization with implementation, but in more mainstream programming
+languages, the situation is even more extreme.
 
 Consider this Golang code from [my maze program][0]:
 
@@ -667,16 +804,96 @@ conduct a heuristic search for state representations that provide the
 required properties.
 
 If an algorithm is written in a sufficiently abstract way, it can be
-automatically specialized to different contexts, while proofs of its
+automatically specialized to different contexts (given, for example,
+context-specific implementations of the operations it needs),
+while proofs of its
 properties can be written in terms of the abstract algorithm, perhaps
 with reference to properties of the concrete representation it's
 using.  The C++ STL is one example of this approach, but also, for
-example, you can use Newton’s divided-differences polynomial
-interpolation algorithm to perform polynomial interpolation in
+example, you can use Newton’s divided-differences polynomial-interpolation
+algorithm to perform polynomial interpolation in
 different fields — including, for example, Galois fields, where it
 provides not numerical approximation but Shamir secret sharing.  But
 this can only be done automatically if the original specification of
 polynomial interpolation is written in such a way as to not be limited
 to floating-point.
 
-…
+### Arithmetic approximation ###
+
+Two very common optimizations: representing integers as fixed-length
+*n*-bit bitstrings and approximating arithmetic on them with the
+cyclic and multiplicative groups of ℤ/2*ⁿ*ℤ (“integer arithmetic”, in
+the computer sense); and representing members of ℚ or ℝ as
+floating-point numbers and approximating arithmetic on them with
+floating-point arithmetic.  The first is precisely correct in the
+cases where we have no overflow or underflow, and where the overflows
+and underflows cancel out.  (In ANSI C, undefined behavior deprives us
+of the second possibility unless we use `unsigned` values.)  The
+second is approximately correct when the rounding errors are not too
+large, which can be detected dynamically using interval arithmetic,
+affine arithmetic, and friends, or statically using numerical analysis
+(see file `array-intervals` for more on this relationship.)  Also,
+sometimes, we use fixed-length bitstrings with “integer division” to
+approximate the richer arithmetic of ℚ or ℝ, with rounding-error
+considerations similar to those of floating-point.
+
+These are not minor or even constant-factor optimizations.  Consider
+the recurrence that gives rise to the Mandelbrot set† — in ℂ this is
+*zᵢ* = *zᵢ*₋₁² + *z₀*, but for calculation we normally translate it
+into ℝ²:
+
+> *xᵢ* = *xᵢ*₋₁² - *yᵢ*₋₁² + *x*₀  
+> *yᵢ* = 2*xᵢ*₋₁*yᵢ*₋₁ + *y*₀
+
+If (*x*₀, *y*₀) ∈ ℚ², then all of the pairs in the recurrence will be
+in ℚ², so we can straightforwardly compute them precisely on a
+computer using arbitrary-precision arithmetic.  However, if we do
+this, in most cases, the computation takes time exponential in *i*,
+because the numerators and denominators of the *xᵢ* and *yᵢ* double in
+length every iteration!  The first time I implemented the Mandelbrot
+set in Squeak Smalltalk, this is what happened to me, because in
+Squeak, integer division produces arbitrary-precision rationals by
+default, not floating-point numbers.
+
+So optimizing this computation by approximating the results with
+floating-point arithmetic makes it possible to calculate new items of
+the recurrence in constant time, and without the possibility of a
+memory-exhaustion exception, while the precise computation takes
+exponential time and also exponential memory.
+
+Being able to express an algorithm like the computation of the
+Mandelbrot recurrence *separately from* a specification of the
+concrete realization of its operations in a computer could allow us to
+prove results about the algorithm in the abstract, then automatically
+specialize it for a particular concrete domain (such as 32-bit
+floating-point numbers) and determine which of these proofs still
+holds for that concrete approximation.  For example, a proof that it
+computes terms in linear time would fail to hold for an
+arbitrary-precision realization.
+
+As I mentioned above, the Python and Scheme implementations above of
+the method of secants have the same feature — if applied to
+arbitrary-precision rational objects, they can consume amounts of
+space and time that increase exponentially with the number of
+iterations, even when they erase previous results, precisely because
+the expression of the algorithm in those languages can be abstract
+over numeric types.  So, although we could imagine a system which
+would allow us to mechanically verify a constant-space guarantee for
+that algorithm in the case where we erase intermediate values and use
+constant-space numeric types, neither Python nor Scheme is that
+system; and, although we could imagine a system which would allow us
+to use the intermediate values computed by that algorithm without
+explicitly exporting them with a `yield`, neither Python nor Scheme is
+that system either.  We enjoy the worst of both worlds.
+
+† I think Gaston Julia, not Mandelbrot, first called attention to the
+astonishing features of this simple recurrence, but like nearly
+everyone else alive, I owe my introduction to it to Mandelbrot.
+
+### I don’t know what such separation would look like for real ###
+
+All of the above is a sort of laundry list of ways that these
+different optimizations get mixed into our source code daily.  But it
+doesn’t go very far toward exploring how we could really separate them
+in practice.  Suppose you write the Mandelbrot recurrence the way we
+write recurrence relations in math books, as in my example above.
