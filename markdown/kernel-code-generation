@@ -19,46 +19,46 @@ John suggests this early on in his “for deployment” comment, but I think tha
 
 I asked Perry what he thought about the above, and he replied with this gem:
 
-*So you’re correct that the code generation was mostly “template
-instantiation”. I think that was key to having calls like open()
-function in reasonable time. I also suspect LLVM is a blunt instrument
-for this work. That said, it would have been difficult for anyone but
-Massalin to work with the approach in Synthesis. It was very much the
-product of a person who was both intensely brilliant and completely
-comfortable with writing “weird code” in the instruction set they were
-working in.*
+> So you’re correct that the code generation was mostly “template
+> instantiation”. I think that was key to having calls like open()
+> function in reasonable time. I also suspect LLVM is a blunt instrument
+> for this work. That said, it would have been difficult for anyone but
+> Massalin to work with the approach in Synthesis. It was very much the
+> product of a person who was both intensely brilliant and completely
+> comfortable with writing “weird code” in the instruction set they were
+> working in.
 
-*So there’s then the question of how one can take the ideas from
-Synthesis and make them a practical thing that ordinary programmers
-could build and contribute to. And that is almost certainly going to
-involve compiler tooling.  As a prototype, making this work by using
-LLVM is probably a good approach. Ultimately, I think that one is
-going to have to do the magic at kernel build time and have something
-fairly lightweight happen at runtime. But to figure out what that is,
-one needs to play.  And the easiest tools right now for playing
-involve LLVM. If, for example, you can use LLVM successfully to
-specialize a write call’s instruction path down an order of magnitude
-or more, or to do similar things in the networking code, one can then
-ask how to do this better.*
+> So there’s then the question of how one can take the ideas from
+> Synthesis and make them a practical thing that ordinary programmers
+> could build and contribute to. And that is almost certainly going to
+> involve compiler tooling.  As a prototype, making this work by using
+> LLVM is probably a good approach. Ultimately, I think that one is
+> going to have to do the magic at kernel build time and have something
+> fairly lightweight happen at runtime. But to figure out what that is,
+> one needs to play.  And the easiest tools right now for playing
+> involve LLVM. If, for example, you can use LLVM successfully to
+> specialize a write call’s instruction path down an order of magnitude
+> or more, or to do similar things in the networking code, one can then
+> ask how to do this better.
 
-*There are, of course, a number of interesting paths towards playing
-with this. I suspect that none of them end anywhere near where they
-start. But the only way to see what might be possible with much better
-tooling is to start, and you have to start somewhere.*
+> There are, of course, a number of interesting paths towards playing
+> with this. I suspect that none of them end anywhere near where they
+> start. But the only way to see what might be possible with much better
+> tooling is to start, and you have to start somewhere.
 
-*BTW, I think the time is right, or even over-right, for this. Single
-processor core performance is stalled out, and while in 1992 one could
-just say “well, we’ll have another factor of ten performance
-improvement in a few years, who needs the trouble”, that’s no longer
-the case.  Note that this argument also applies, to a considerable
-extent, to other parts of the modern software ecosystem. When you
-can’t just say “we could spend a couple of months optimizing this, but
-the next generation of processors will be out by then”, things change.*
+> BTW, I think the time is right, or even over-right, for this. Single
+> processor core performance is stalled out, and while in 1992 one could
+> just say “well, we’ll have another factor of ten performance
+> improvement in a few years, who needs the trouble”, that’s no longer
+> the case.  Note that this argument also applies, to a considerable
+> extent, to other parts of the modern software ecosystem. When you
+> can’t just say “we could spend a couple of months optimizing this, but
+> the next generation of processors will be out by then”, things change.
 
-*Anyway, not sure if this answers your call for comments, but if you
-are interested in specific areas around this, I’ve no shortage of
-opinions. Many would say I have far too many opinions...*
+> Anyway, not sure if this answers your call for comments, but if you
+> are interested in specific areas around this, I’ve no shortage of
+> opinions. Many would say I have far too many opinions...
 
-*You can quote any subset or the entire thing. So long as you don’t
-distort my intent I have no problem with people using my words that
-way.*
+> You can quote any subset or the entire thing. So long as you don’t
+> distort my intent I have no problem with people using my words that
+> way.
