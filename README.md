@@ -1,6 +1,9 @@
 Dercuano
 ========
 
+(You can download the latest build, full of prerendered HTML, at
+<http://canonical.org/~kragen/dercuano-20190630.tar.gz>.)
+
 I have a few thousand pages of notes I mostly haven’t published in any
 form, and I’m not confident I’ll be able to keep a server running to
 serve them up.  So Dercuano (a mutated version of the Spanish word
