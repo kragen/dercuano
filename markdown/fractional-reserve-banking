@@ -1,0 +1,99 @@
+Replacing fractional-reserve banking with a bond market disintermediated with a blockchain
+==========================================================================================
+
+I was reading [Jonathan Stray’s
+account](http://jonathanstray.com/the-origin-of-banking) of Jon
+Hicks’s possibly fictional 1989 account of the how banking and modern
+money came to be, and it occurred to me that the bond market might be
+an alternative to the borrow-short lend-long model of
+fractional-reserve demand-deposit banking.
+
+That is, if you have some money that you want to keep liquid but also
+earn interest on, one possibility is to deposit it in a bank as demand
+deposits.  The bank lends (most of) it out at higher interest, keeping
+a small (“fractional”) reserve on hand in case some depositors show up
+one day to close their accounts, and pays some (lower) interest to you
+and the other depositors for the use of your money.  (Modern banks has
+been able to mostly eliminate depositor interest, as their oligopoly
+on payment systems, and in some case government regulations, obliges
+people to deposit their money in banks even if they don’t earn
+interest.)  The risk you take is that there might be a bank run — if
+too many depositors show up demanding their demand deposits at once,
+the first ones will get paid in full and the last ones will get their
+share of whatever is left over from the bankruptcy.
+
+Given the existence of a liquid trading market, bonds, such as
+corporate bonds, might be a reasonable alternative.  Instead of
+depositing your money in a bank account, you buy some bonds.  Instead
+of withdrawing it, you sell the bonds on the market.  Bond prices go
+up and down a bit — usually measured in basis points — and
+occasionally companies will go bankrupt (or countries will go into
+sovereign default) and again you’re just a bankruptcy creditor, but
+you can diversify to minimize this risk.  Lending to companies is
+overall mostly profitable, and the interest rates are higher than you
+get with a checking account.
+
+This is why money-market accounts are popular, but there’s no
+fundamental reason that retail investment in the corporate-bond market
+needs to be intermediated by banks or brokers; that’s just an artifact
+of the limits of 20th-century information-processing technology.
+Intermediating retail access to corporate bonds in this way just adds
+risk — your bank or broker is far more likely to go bankrupt than the
+entire basket of companies you lend to, and additionally they’re in a
+position to cheat you in a variety of ways, including bucket-shop
+tactics (that is, fractional-reserve banking, but in a way that is
+illegal in the US), front-running, and paying bonuses to their
+executives just before bankruptcy.
+
+How would this differ in practice from a bank account?  Blue-chip
+corporate and sovereign bonds typically fluctuate in value only by
+basis points, so the chances of a significant loss of capital in this
+way is fairly small, and you can diversify the risk across many
+different debtors.  The big difference is what happens when there’s a
+“bank run”: in the money market, those lenders who are most eager to
+liquidate their holdings are often the ones who take the losses, while
+in a demand-deposit bank run, the most eager lenders are the only ones
+who get paid.  A temporary selloff in the bond market doesn’t directly
+affect the companies whose bonds are being sold, unless they are
+floating a new issue of bonds at that moment, which they usually
+aren’t.  If the selloff is indeed temporary, rather than a result of
+the debtor’s impending insolvency, those lenders who held during the
+selloff will preserve their capital (the precise opposite of a bank
+run), and those who risked buying the bargain-priced bonds are
+rewarded.
+
+In the modern commercial paper market, though, clearing of trades is
+not instantaneous; the US corporate and municipal debt markets mostly
+clear via DTC, the Depository Trust Company, which acts as a
+counterparty to most transactions in corporate and municipal debt,
+permitting settlement to be delayed for two days or longer.  As I
+understand it, the London Clearing House’s EquityClear SA, despite its
+name, plays a similar role in Europe.  Such clearing houses centralize
+debt-transaction counterparty risk in much the same way that banks and
+bank clearing houses centralize counterparty risk for cash
+transactions; without clearing houses, buyers of debt would be taking
+the risk that sellers would take the money and run without ever
+handing over the bonds they were ostensibly selling.
+
+Clearing house insolvency is a likely outcome of the next world war,
+however, and represents the kind of systemic risk that it’s very
+difficult to diversify away.
+
+The obvious solution is to clear the trades with the Ethereum
+blockchain or something similar, so that the transfer of debt title
+from the seller to the buyer is a single atomic transaction with the
+transfer of funds from the buyer to the seller.  This eliminates
+counterparty risk from the bond markets as long as the blockchain’s
+integrity remains secure.
+
+The actual coupon payments on the bonds, or title to collateral to
+secure those payments, *could* be incorporated into the same smart
+contract, but this is much less essential — the lenders are at least
+theoretically aware of who they’re lending to and assuming the risk
+that that counterparty (the borrower, that is, the issuer of the
+bonds) will default.  The whole purpose of the borrower issuing debt
+in the first place is so that they can invest the money thus raised,
+so you would expect that for most of the lifetime of the bond, they
+won’t have an account with enough money in it to pay off the bond.  So
+there’s little point in making the coupon payments nominally automatic
+via a smart contract.
