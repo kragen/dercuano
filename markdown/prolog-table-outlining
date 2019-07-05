@@ -1,0 +1,280 @@
+I’ve been thinking again about Darius Bacon’s Sniki and the space of
+CRUD webapp development, which people still seem to be mostly doing
+using Django, Rails, and similar 2005-vintage designs, despite the
+popularity of schemaless and schema-lite database systems like
+MongoDB and Redis.
+
+“Sniki”?
+--------
+
+A few years back, Darius Bacon wrote an interesting “Semantic Network
+Wiki” supporting RDF-like triples, called
+[Sniki](https://github.com/darius/sniki).  It explained:
+
+> This is basically like a wiki only with typed links. Any page can
+> serve as a link type. Each page lists all the links it's involved
+> in, as source, type, or target. You edit the links in a separate
+> text area.
+
+It was really a free-form database.  On any page, you could include a
+set of property-value pairs, using square brackets to enclose
+multi-word items:
+
+    written 2019-03-11
+    updated 2019-07-05
+    concerns politics
+    supersedes [Taxation without representation]
+
+Each of these property-value pairs becomes a triple describing the
+page; for example, if that page were called “Declaration of
+Independence”, we would have triples such as ([Declaration of
+Independence] concerns politics) and ([Declaration of Independence]
+supersedes [Taxation without representation]) in the semantic network.
+
+Such a database is only interesting insofar as you can query it, and
+Sniki had a very easy and powerful way to query:
+
+> [Y]ou can produce tables from database-style queries like this:
+> 
+> [tabulate recipes recipe ID, ID title Title, ID description Description, ID date Date]
+>
+> … In general a query looks like [tabulate clause1, clause2, ...]
+> where each clause is a triple denoting a typed link, with variables
+> capitalized.  The table then shows one row for each way of filling
+> in all the variables.
+
+So the query is Prolog-like, and the results of matching the query
+against the database of triples is displayed as a table.  The
+“recipes” page I wrote on it when Darius had it running read:
+
+> These came from an introduction to Ruby on Rails.  I wondered how
+> easy we could make the same sort of thing without 'programming' or a
+> relational database.  That example app also had forms for update and
+> templates for the different pages, though.
+>
+> [tabulate recipes recipe ID,  
+> ID title Title,  
+> ID description Description,  
+> ID date Date]
+>
+> Here's just desserts:  
+> [tabulate recipes recipe ID,  
+> ID title Dessert,  
+> ID is-dessert true]
+>
+> Just recipes Beatrice likes:
+>
+> [tabulate recipes recipe ID,  
+> ID title Title,  
+> ID description Description,  
+> ID date Date,  
+> ID beatrice-likes yes]
+
+This rendered as three tables: one with ID, Title, Description, and
+Date columns, another with ID and Dessert columns, and a third with
+the same columns as the first but fewer rows.
+
+This page had the following property-value pairs:
+
+    recipe recipe1
+    recipe recipe2
+    recipe new-recipe-for-rohit
+
+The page new-recipe-for-rohit had the following property-value pairs:
+
+    title [hot cocoa]
+    description [Everyone's favorite]
+    date [20 April 2005]
+    is-dessert true
+    [see also] sniki
+    beatrice-likes yes
+    author [Kragen]
+
+Being linked from the “recipes” page with a “recipe” property marked
+it as being a recipe, although an [is recipe] property like the
+is-dessert property would have worked too.  Because it’s a dessert and
+Beatrice likes it, it shows up in all three tables.
+
+Another page explained:
+
+> [Experiments with Oval](http://ccs.mit.edu/papers/CCSWP181/) from
+> 1994 partly inspired this. It's a hypertext system built around
+> Objects, Views, Agents, and Links, to make it possible for ordinary
+> people to create collaborative apps without 'real' programming.  The
+> current to-do list comes partly out of this paper.
+
+Sadly I still haven’t read the Oval paper.
+
+Providing an editable spreadsheet view of a query result
+--------------------------------------------------------
+
+A feature of Sniki that was at times annoying was the fact that every
+variable in the query was visible in the table; the above queries, for
+example, include an ID column that says meaningless things like
+“recipe2”.  However, by the same token, if you added an “add row”
+button, it would be straightforward to insert the necessary triples
+into the database, or “assert” them, in Prolog terminology.
+
+This is fairly asymmetric with deletion, since the absence of any one
+of the triples necessary for a table row would result in deleting the
+table row; in my recipe example above, deleting either the title, the
+description, or the date property — as well as the recipe link — would
+remove the row from the table.  In cases like these, you’d probably
+want deletion to delete the entity and all the links to and from it,
+as well as perhaps the links that use it as a link type.
+
+This suggests that in some cases you’d want to use a nested query,
+like a Prolog `findall`, for entities you want to appear in the table
+even if they lack a certain property — which probably suggests you’d
+like them to occur only once even if they have more than one value for
+the property.  Perhaps you could use nested `[]` for this if you want
+a lightweight textual syntax:
+
+    [Invoice for Customer, Invoice date Date, Customer name Name,
+        [Invoice line-item Item,
+        Item qty Quantity,
+        Item price Price,
+        Item sku SKU,
+        SKU description Description],
+        [Invoice payment Payment, Payment amount Amount, Payment date Date],
+    ]
+
+These nested queries would appear as nested tables in the table view,
+optionally with the ability to add, copy, update, and delete rows, or
+collapse the nested table.
+
+An alternative, nesting-free way to handle nested queries is with a
+sort of outline view using something very vaguely like Prolog’s `!`
+cut operator:
+
+    [Invoice for Customer, Invoice date Date, Customer name Name
+    | Invoice line-item Item,
+      Item qty Quantity,
+      Item price Price,
+      Item sku SKU,
+      SKU description Description]
+
+The idea here is that, interactively, you can navigate around a
+three-column table with Invoice, Customer, Date, and Name columns, and
+whatever row you have highlighted in that table, a detail table
+appears to the right with the Item, Quantity, Price, SKU, and
+Description columns for all the line items for that invoice.  It’s
+like Prolog’s “cut” in the limited sense that once you succeed in
+getting to the right of it (in this case, because the user has
+selected the row) and exhaust the possibilities there, you don’t cross
+to the right of it again.  Unlike Prolog’s cut, though, you do keep
+examining possibilities to the left of it in order to fill up the rest
+of the table there.
+
+Here’s a crude mockup with example data mostly from [exampledb.py]:
+
+[exampledb.py]: http://canonical.org/~kragen/sw/dev3/exampledb.py
+
+<table class="pto-example">
+<tr><td><table>
+<tr><th>Invoice<th>Customer<th>Date<th>Name
+<tr><td>i8032<td>c8021<td>2018-02-01<td>Edward Brooks, Morris Petroleum Enterprises
+<tr><td>i8033<td>c8021<td>2018-06-07<td>Edward Brooks, Morris Petroleum Enterprises
+<tr class="selected"><td>i8034<td>c79474<td>2018-04-01<td>Anthony Hill, LHHB Engineering
+<tr><td>i8035<td>c15376<td>2018-08-08<td>Janet Parker, Gray–Wright LLC
+<tr><td class=button>+</td>
+</table><td><table class="selected">
+<tr><th>Item<th>Quantity<th>Price<th>SKU<th>Description
+<tr><td>li181312<td>5<td class=n>$300.50<td>sku901<td>Gray daily glass toaster oven<td class=button>×
+<tr><td>li181313<td>1<td class=n>$21.00<td>sku353<td>Gray polyester ultrasonic sweater<td class=button>×
+<tr><td>li181314<td>1<td class=n><input size=6 value="75.50"><td>sku759<td>Gold spandex surgical dress, size L<td class=button>×
+<tr><td>li181315<td>2<td class=n>$20.00<td>sku751<td>Black spandex electronic boxers, size M<td class=button>×
+<tr><td class=button>+</td>
+</table>
+</table>
+
+<style>
+.pto-example { background-color: #eee; overflow-x: auto; text-shadow: 0 0.1em 0.2em #fff }
+.pto-example > tbody > tr > td { vertical-align: top }
+.pto-example .selected { background-color: #cbf }
+.pto-example table th, .pto-example table td { padding: 0.25em; vertical-align: top }
+.pto-example .n { text-align: right }
+.pto-example table td { border: 1px inset }
+.pto-example .button {
+    vertical-align: middle;
+    text-align: center;
+    font-size: 2em;
+    text-shadow: 0.1em 0.1em 0.2em #fff;
+    border: 0;
+}
+</style>
+
+Ideally you could tag the generated ID columns so they don’t display
+by default and so that an “add” command generates them automatically
+from some kind of id-generating function, even if Joe Celko *does*
+think this is a bad way to make a database:
+
+<table class="pto-example">
+<tr><td><table>
+<tr><th>Date<th>Name
+<tr><td>2018-02-01<td>Edward Brooks, Morris Petroleum Enterprises
+<tr><td>2018-06-07<td>Edward Brooks, Morris Petroleum Enterprises
+<tr class="selected"><td>2018-04-01<td>Anthony Hill, LHHB Engineering
+<tr><td>2018-08-08<td>Janet Parker, Gray–Wright LLC
+<tr><td class=button>+</td>
+</table><td><table class="selected">
+<tr><th>Quantity<th>Price<th>Description
+<tr><td>5<td class=n>$300.50<td>Gray daily glass toaster oven<td class=button>×
+<tr><td>1<td class=n>$21.00<td>Gray polyester ultrasonic sweater<td class=button>×
+<tr><td>1<td class=n><input size=6 value="75.50"><td>Gold spandex surgical dress, size L<td class=button>×
+<tr><td>2<td class=n>$20.00<td>Black spandex electronic boxers, size M<td class=button>×
+<tr><td class=button>+</td>
+</table>
+</table>
+
+### Field editing ###
+
+I’ve said that record *creation* is straightforward with such a
+system, but *update* is surprisingly rather complicated.  In a
+database viewer that displays a single SQL table as a table, it’s
+straightforward to know which record to update: you update the
+database record that corresponds to the table row on the screen.
+Here, editing fields is a bit trickier.
+
+In the above example query, the Description field in the line-item
+table came from the SKU entity, that is, the description of the
+product.  In a case like this, it might not be ideal to automatically
+propagate edits to the SKU (and thus to all the other invoices and
+perhaps the web page for the product as well); conceivably you’d want
+the field to display read-only or to be a link to a detail page for
+the SKU entity itself, so that you could see the scope of the change
+you were making.
+
+How about the SKU field itself, which links the line-item entity with
+the SKU entity?  Suppose you choose to display the field and then edit
+it, changing “sku759” to “sku751”.  There are at least two reasonable
+candidate results of such an action:
+
+1. You could update both the triple (li181314 sku sku759) and the
+   triple (sku759 description [Gold spandex surgical dress, size L])
+   to use “sku751” instead of “sku759”.  This would probably need to
+   propagate to all the other occurrences of “sku759” in the system,
+   as well.  And, in this case, this would amount to merging two SKUs,
+   since “sku751” already exists (it’s the black spandex electronic
+   boxers, size M), which is perhaps a situation the user should be
+   warned about.
+
+2. You could update just the triple (li181314 sku sku759), where we
+   originally got “sku759”, to point to some other SKU that has a
+   description; this will change the value displayed in the column to
+   the right.  Displaying this description during the selection
+   process is probably necessary, too.
+
+### Recursion ###
+
+If you name queries, you could very reasonably refer to a query within
+itself:
+
+    explore(Dir) :- Dir contains-file File, File file-size Size | explore(File).
+
+With the columnar presentation described above, this is a
+Miller-columns filesystem explorer like the one in MacOS X, while with
+a collapsible tree view, it would be a tree-style filesystem explorer.
+
+### Programming-by-example query editing XXX ###
+
