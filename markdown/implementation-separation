@@ -614,6 +614,85 @@ which is totally impractical in Python, and pretty hard to do without
 sacrificing efficiency in Scheme.)  But what would an algorithm
 specification language look like that entirely omitted erasure?
 
+#### Euclid’s gcd algorithm ####
+
+The first algorithm presented in an algorithms course is often
+Euclid’s algorithm for computing greatest common divisors.  Consider
+this Python implementation:
+
+    def gcd(a, b):
+        while b:
+            a, b = b, a % b
+        return a
+
+Or its Scheme equivalent, although the Scheme standard already
+provides this function:
+
+    (define (gcd a b)
+      (if (= b 0)
+          a
+          (gcd b (remainder a b))))
+
+Like the method-of-secants code, this computes a sequence of
+intermediate values before arriving at its final answer, and these
+intermediate values are lost.  (However, at least for the usual data
+types, in this case termination is guaranteed.)  It turns out that, as
+explained in file `pulverizer-algorithm`, the lost values are actually
+very useful; you can use them to efficiently compute the inverses of
+the elements of a multiplicative group or find that no such inverses
+exist, because they allow you to compute not only *g* = gcd(*a*, *b*)
+but also coefficients *s* and *t* such that *sa* + *tb* = *g*.  The
+easiest way to do this in Python is, first, to restructure the
+algorithm as a recursive algorithm like the Scheme implementation:
+
+    def gcd(a, b):
+        return a if b == 0 else gcd(b, a % b)
+
+Second, to push the termination test down the stack one level:
+
+    def gcd(a, b):
+        r = a % b
+        if r == 0:
+            return b
+
+        return gcd(b, r)
+
+Finally, to augment the return value with the additional information:
+
+    def egcd(a, b):
+        q, r = divmod(a, b)      # r = a - qb
+        if r == 0:
+            return 0, 1, b       # 0a + 1b = b
+
+        s, t, g = egcd(b, r)     # sb + tr = g
+        assert s*b + t*r == g
+        return t, s - t*q, g     # sb + t(a - qb) = g = ta + (s - tq)b
+
+For example, if invoked as `egcd(81, 18)`, this returns (1, -4, 9),
+because 1·81 - 4·18 = 9, their greatest common divisor;, so in ℤ/81ℤ,
+18 has no multiplicative inverse.  But, if invoked as `egcd(93, 26)`,
+it returns (7, -25, 1), because 93 and 26 are relatively prime, and
+7·93 - 25·26 = 1, so in ℤ/93ℤ, the multiplicative inverse of 26 is
+-25, which is to say, 68.
+
+In a sense, the simpler functions above are optimizations of this one:
+they are iterative and they avoid doing work and allocating memory to
+calculate *s* and *t* when not needed.  You can of course write the
+extended version and hope that your compiler is smart enough to detect
+this situation, but you will probably be disappointed, and moreover
+you will probably have no way of knowing.  (Even if you grovel over
+assembly listings to verify it once, you likely won’t notice if future
+change to the code break the optimization.)
+
+Wouldn’t it be better if you could write the extended version and
+*assert* that, at a given callsite, the algorithm used should be
+iterative?  If the compilation failed because that assertion couldn’t
+be satisfied, wouldn’t it be good to be able to explain to the
+compiler how to make the optimization and what assumptions justified
+the optimization, and have the compiler search for a counterexample
+for the compilation error message if your assumptions were wrong, or
+at least suggest a lemma you could try to give it a proof for?
+
 Mixing together optimization, implementation, and proof
 -------------------------------------------------------
 
