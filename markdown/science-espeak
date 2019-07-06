@@ -1,4 +1,4 @@
-Improving "science" in eSpeak's lexicon
+Improving “science” in eSpeak's lexicon
 =======================================
 
 So I've been playing around with speech synthesis software tonight.
@@ -17,10 +17,10 @@ The problem
 -----------
 
 [eSpeak](http://espeak.sourceforge.net)
-gets "neuroscience" and "pseudoscience" wrong, 
+gets “neuroscience” and “pseudoscience” wrong, 
 pronouncing them with a `[[s,i@ns]]`
 rather than a `[[s'aI@ns]]`.  
-It also gets "omniscience" and "prescience" wrong, 
+It also gets “omniscience” and “prescience” wrong, 
 or at least pronounces them
 rather differently than I would:
 
@@ -30,11 +30,11 @@ rather differently than I would:
      D@2 s'aI@ns Vv n'3:r-@s,i@ns I2z n,0t#@ saI@nt'IfIk _:_:O@ kw,eIzaIsi@nt'IfIk sj'u:d@s,i@ns
      k,0nsI2;'EnS@sli p3sj'u: '0mnIs,i@ns _:_:and pr'i:si@ns
 
-I would pronounce the "science" in "omniscience" and "prescience" as
+I would pronounce the “science” in “omniscience” and “prescience” as
 `[[S@ns]]` and put the accent on another syllable.
 
-There's a special rule for "scien" beginning a word, and for
-"conscience":
+There’s a special rule for “scien” beginning a word, and for
+“conscience”:
 
     en_list:conscience       k0nS@ns
     en_rules:       _sc) ie (n        aI@
@@ -42,9 +42,9 @@ There's a special rule for "scien" beginning a word, and for
 
 However, Jonathan Duddington has said
 he wants to keep the eSpeak distribution small,
-so he "wouldn't want to include too many unusual or specialist words".
+so he “wouldn’t want to include too many unusual or specialist words”.
 (See <http://sourceforge.net/forum/forum.php?thread_id=1700280&forum_id=538920>
-where he talks about why he doesn't want to import the Festival lexicon.)
+where he talks about why he doesn’t want to import the Festival lexicon.)
 Already, `espeak-data/en_dict` is 80KB,
 which is half the size of the `speak` binary.
 
@@ -56,7 +56,7 @@ that a maintainer could adopt
 in order to improve the coverage of their special-case word files
 without letting them get large.
 Suppose
-that there is a scalar metric of "goodness"
+that there is a scalar metric of “goodness”
 that can be applied independently to each special case.
 Here are three plausible strategies,
 ordered from least to most stringent.
@@ -84,25 +84,25 @@ ordered from least to most stringent.
   but add new items
   as long as they improved the median item quality of the file ---
   that is, as long as the new item
-  improved the program's performance
+  improved the program’s performance
   more than most of the items in the file.
   This will gradually slow down and eventually stop
   the addition of new items,
   because that median quality will gradually increase.
 
-I am going to approximate "quality"
-with "frequency",
+I am going to approximate “quality”
+with “frequency”,
 on the theory that mispronouncing a rare word
 is always better than mispronouncing a common one.
 
 Note the analogy
-to Google's famous hiring policy:
+to Google’s famous hiring policy:
 only hiring candidates who raised their average ability.
 
 Evaluating word frequencies
 ---------------------------
 
-Are these "science" words significant enough to include?
+Are these “science” words significant enough to include?
 `en_list` only contains 2869 lines, maybe 2400 of which are words.
 So maybe only the top 2400 or so exceptions
 to the normal rules of pronunciation
@@ -114,7 +114,7 @@ and put the results online
 at <http://canonical.org/~kragen/sw/wordlist>.
 It has 109557 lines,
 ordered from the most common words
-("the", "of", and "and", each occurring millions of times) 
+(“the”, “of”, and “and”, each occurring millions of times) 
 to the least common
 (with a cutoff of 5 occurrences,
 because most of the words with fewer
@@ -179,25 +179,25 @@ The 50th-percentile among the sample of 20
 (of which two weren't words,
 and a third wasn't found)
 seems to be line 11 134
-with the word "con".
+with the word “con”.
 That is,
 the exceptions in `en_list`
 are mostly drawn
 from the most frequently used
 eleven thousand words in the language.
-(Maybe words like "barbeque", "rajah", and "unread"
+(Maybe words like “barbeque”, “rajah”, and “unread”
 should be dropped.)
 
-So under the policies "C+" and "C-",
-any word that is more common than "barbeque",
+So under the policies “C+” and “C-”,
+any word that is more common than “barbeque”,
 at position 87737 in the British National Corpus tabulation,
 (or maybe some word even a bit rarer than that)
 should be added to the file.
-(Under policy "C+", 
+(Under policy “C+”, 
 some word would be removed to compensate,
 raising the threshold.)
-Under the policy "A",
-the threshold would be "con", 
+Under the policy “A”,
+the threshold would be “con”, 
 at position 11 134.
 
 Unfortunately, José is missing.
@@ -205,7 +205,7 @@ I think I excluded accented characters
 when I tabulated the frequencies initially.
 
 Anyway, that gives us a way to compare
-the "science" words:
+the “science” words:
 
     kragen@thrifty:~/pkgs/espeak-1.37-source/dictsource$ grep -n scien[tc]
         /home/kragen/devel/wordlist 
@@ -245,7 +245,7 @@ the "science" words:
     103190:5 presciently
     103191:5 prescientific
 
-Of these, only those more common than "conscience"
+Of these, only those more common than “conscience”
 seem to deserve a place in `en_list`.
 How does eSpeak do now?
 
@@ -263,33 +263,33 @@ How does eSpeak do now?
 It pronounces everything correctly
 until it gets to "omniscient" and "prescient",
 and maybe its pronunciations for those are correct,
-but at least they're not the pronunciations I would use.
+but at least they’re not the pronunciations I would use.
 
-Under policy "A", 
+Under policy “A”, 
 those words are not common enough to add to `en_list`,
 because they would lower 
 the average frequency of words in `en_list`
 unless you removed a less common word to compensate.
 
-Under policies "C+" and "C-",
-not only "omniscient" and "prescient" qualify,
+Under policies “C+” and “C-”,
+not only “omniscient” and “prescient” qualify,
 but so do 
-"neuroscience", "geoscience", "neuroscientists", and "geoscience",
+“neuroscience”, “geoscience”, “neuroscientists”, and “geoscience”,
 which eSpeak currently mispronounces.
 
-(Including all the exceptions that as rare as "prescient"
+(Including all the exceptions that as rare as “prescient”
 might quadruple the size of `en_list`,
 and perhaps `en_dict` as a result,
 if arbitrary spellings were as common among rare words
 as they are among common words.
 Think of that as an upper bound.
-Including all the exceptions as rare as "neuroscientists"
+Including all the exceptions as rare as “neuroscientists”
 might multiply its size by seven.
-This is the downside of policy "C-",
-but it does not happen with policy "C+".
+This is the downside of policy “C-”,
+but it does not happen with policy “C+”.
 On the other hand,
-under policy "C+",
-even "prescient" might not survive long after being added.)
+under policy “C+”,
+even “prescient” might not survive long after being added.)
 
 Recommendation
 --------------
@@ -325,7 +325,7 @@ I think
 there is a need for a larger `en_list` and `en_rules`
 to be available,
 even if they aren't part of the standard distribution.
-eSpeak's current footprint
+eSpeak’s current footprint
 for a single language
 is about 160KB for the executable
 and 80KB for the dictionary.
@@ -363,4 +363,101 @@ with the push of a button,
 the process of coming up with
 the tens of thousands of special cases
 would be a lot quicker.
+
+Update from 2019: eSpeak is super awesome now
+---------------------------------------------
+
+The above is about eSpeak 1.37 from perhaps 2008.  I currently have
+eSpeak 1.48.03 from 2014 installed, and en_dict is now 116K instead of
+80K.  The en/en-r voice used above doesn’t exist any more, but the
+en-us voice is a fairly close equivalent:
+
+    $ espeak -v en-us+f2 -s 250 -x "The science of neuroscience is not a scientific
+         or quasiscientific pseudoscience.  Conscientiously pursue
+         omniscience and prescience."
+     D@2 s'aI@ns Vv n'U@r@s,aI@ns Iz n,0t#@ saI@nt'IfIk_:_: O@ kw,eIzaIsaI@nt'IfIk s'u:doUs,aI@ns
+     k,0nsI2;'EnS@sli p3s'u: 0mn'IsI;@ns_:_: and pr'i:si@ns
+
+It now pronounces “neuroscience” and “pseudoscience” correctly.  The
+relevant part of `en_rules` is as follows:
+
+        sc) ie (nc     aI@
+            ie (ntiC   aI@
+       _sc) ie (n      aI@
+    ?8 _sc) ie (n      aIa#
+
+I think that means that now the “ie” in any instance of “scienc” will
+be pronounced as “aI@”, regardless of whether it’s at the beginning of
+the word, which is what the “\_” in the last two entries means, as
+explained in docs/dictionary.html in the eSpeak source code.
+
+My other example now renders as follows:
+
+    $ espeak -v en-us+f2 -s 250 -x "Science is 
+            scientific and done by scientists, who work in the sciences.  A 
+            scientist with a conscience may be conscientious.  Those with 
+            scientifically-minded consciences will conscientiously avoid 
+            unscientific claims of omniscient beings or prescient prophets."
+
+    s'aI@ns Iz saI@nt'IfIk_:_: and d'Vn baI s'aI@ntIsts
+     h,u: w'3:k InD@2 s'aI@nsI#z
+     a# s'aI@ntIst wID a# k'0nS@ns m'eI bi: k,0nsI2;'EnS@s
+     DoUz wID saI@nt'IfIklim'aIndI#d k'0nS@nsI#z wI2l k,0nsI2;'EnS@sli; a#v'OId
+
+(line break inserted)
+
+    VnsaI@nt'IfIk kl'eImz Vv 0mn'IS@nt b'i:;I2Nz_:_: O@ pr'i:si@nt pr'0fI2ts
+
+This is different in several details from the above, but overall it
+doesn’t seem to be worse in any way.  Also, eSpeak now has an `--ipa`
+option, which produces the following output instead:
+
+> sˈaɪəns ɪz saɪəntˈɪfɪk ænd dˈʌn baɪ sˈaɪəntɪsts  
+>  hˌuː wˈɜːk ɪnðə sˈaɪənsᵻz  
+>  ɐ sˈaɪəntɪst wɪð ɐ kˈɑːnʃəns mˈeɪ biː kˌɑːnsɪˈɛnʃəs  
+>  ðoʊz wɪð saɪəntˈɪfɪklimˈaɪndᵻd kˈɑːnʃənsᵻz wɪl kˌɑːnsɪˈɛnʃəsli ɐvˈɔɪd ʌnsaɪəntˈɪfɪk klˈeɪmz ʌv ɑːmnˈɪʃənt bˈiːɪŋz ɔːɹ pɹˈiːsiənt pɹˈɑːfɪts  
+
+To me, this is dramatically more readable, but it is omitting some
+details that are important to at least eSpeak’s pronunciation; for
+example, the `_:_:` pause above doesn’t seem to appear, nor does the
+distinction between I (stressed) and I2 (unstressed, but not reduced
+like the undocumented I#).  You can use it to translate from eSpeak’s
+internal format to IPA by using `[[]]`:
+
+    $ espeak -v en-us+f2 -s 250 --ipa "[[h,u: w'3:k InD@2 s'aInsI#z]]"
+     hˌuː wˈɜːk ɪnðə sˈaɪnsᵻz
+
+This makes it easy to compare the old and new pronunciations
+simultaneously by ear and by reading the IPA transcription, which
+reveals a few different improvements:
+
+    $ espeak -v en-us+f2 -s 250 --ipa "[[D@2 s'aI@ns Vv n'3:r-@s,i@ns I2z n,0t#@ saI@nt'IfIk _:_:
+    O@ kw,eIzaIsi@nt'IfIk sj'u:d@s,i@ns]].
+    [[k,0nsI2;'EnS@sli p3sj'u: '0mnIs,i@ns _:_:and pr'i:si@ns]].
+    The science of neuroscience is not a scientific or quasiscientific pseudoscience.
+    Conscientiously pursue omniscience and prescience."
+
+    ðə sˈaɪəns ʌv nˈɜːɹəsˌiəns ɪz nˌɑːɾə saɪəntˈɪfɪk  ɔːɹ kwˌeɪzaɪsiəntˈɪfɪk sjˈuːdəsˌiəns
+     kˌɑːnsɪˈɛnʃəsli pɚsjˈuː ˈɑːmnɪsˌiəns ænd pɹˈiːsiəns
+     ðə sˈaɪəns ʌv nˈʊɹɹəsˌaɪəns ɪz nˌɑːɾə saɪəntˈɪfɪk ɔːɹ kwˌeɪzaɪsaɪəntˈɪfɪk sˈuːdoʊsˌaɪəns
+     kˌɑːnsɪˈɛnʃəsli pɚsˈuː ɑːmnˈɪsɪəns ænd pɹˈiːsiəns
+
+This also means you can use it with `-q` as a fairly reliable
+converter from standard English orthography to IPA:
+
+>  ðɪs ˈɑːlsoʊ mˈiːnz juː kæn jˈuːz ɪt wɪðkjˈuː æz ɐ ɹˈæpɪd ænd fˈɛɹli ɹɪlˈaɪəbəl kənvˈɜːɾɚ fɹʌm stˈændɚd ˈɪŋɡlɪʃ ɔːɹθˈɑːɡɹəfi tʊ ˌaɪpˌiːˈeɪ
+
+It’s a little slow for use in this mode; converting the first 83955
+words of the KJV took 1'57" on my laptop, which is only 718 words per
+second, about three times faster than speech.  But this speed is
+sufficient to solve many problems with.  The particular problem that
+made me update this note tonight is that of finding sets of minimal
+pairs of English words for ESL learners to learn to distinguish the
+phonemes in, the hard part of which for a computer is finding out what
+the pronunciations of the English words are; the following command
+lines generated a decent pronouncing dictionary in just over 5
+minutes:
+
+    $ espeak -v en-us+f2 --ipa -q < /usr/share/dict/words > words-ipa-2
+    $ paste /usr/share/dict/words words-ipa-2 > pronunciation-dictionary
 

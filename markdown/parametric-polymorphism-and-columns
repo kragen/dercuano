@@ -1,0 +1,38 @@
+In a relentlessly monomorphic language with good type safety, you
+could imagine reducing the size of object pointers to the size needed
+to distinguish the members of their class.  If there are never more
+than 16 Rectangle objects, for example, you don’t need more than 4
+bits to identify a Rectangle; you can store their xmin, ymin, xmax,
+and ymax attributes in arrays of size 16.  This is actually a
+practical thing to do in Verilog, where you actually can have a 9-bit
+variable (as opposed to a 16-bit one).
+
+Now, maybe your Rectangle object is instead actually made of Point
+objects ul and lr.  If you want to pass the ids of those Point objects
+to Point functions, you have two options:
+
+1. The Fortran option: make the x and y attribute arrays of the Point
+   class explicit parameters to the Point function.
+
+2. The Smalltalk option: store all the Point attributes in the usual
+   Point attribute arrays, then put the ids of the Points in question
+   into ul and lr.
+
+So far so good, although in #2 maybe you are spending more space on
+the Point pointers than on the Rectangle pointers.
+
+Okay, now here’s a thing that bothers me.  What do I do if I want
+parametric polymorphism?  Consider the case of an 'a list made out of
+car and cdr attributes, where the car has type 'a and the cdr has type
+'a list, and where maybe we use -1 or something for a null cdr.  Can I
+write a polymorphic list length function?
+
+I have somewhat corresponding options.
+
+If I have a Rectangle list type, for example, its car array can be of
+4-bit Rectangle ids, in an alternative analogous to #1.  But the
+length function doesn’t actually use that array at all; it only needs
+the corresponding cdr array.  So that works fine.  In an alternative
+analogous to #2, I store all types of 'a list in the same car and cdr
+array, so the car array needs to be wide enough to accommodate
+pointers to any object type.

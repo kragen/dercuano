@@ -1,0 +1,37 @@
+It should be relatively straightforward to implement Bicicleta with
+Self-style "maps" --- where each "map" contains a bunch of constant
+things inherited from somewhere (in Self, cloned from somewhere) and a
+few variable things.
+
+Many objects in Bicicleta seem to inherit directly from some
+widely-used global constant (prog.if, prog.sys.nil, and so on) and
+then override a small number of things.  Objects that inherit directly
+from a particular other object and override the same set of things can
+share the same "map", just as if they were members of a Self clone
+family.
+
+If you take outer-self references into account as if they were
+overridden slots, you can cover a larger number of cases.  For
+example, prog.sys.rational.coerce:
+
+        coerce = {op: arg1 = 2
+            '()' = prog.if(
+                op.arg1.denom.is_ok -> op.arg1,
+                op.arg1.as_integer.is_ok -> self.new(op.arg1.as_integer, 1),
+                else = prog.error(\"could not coerce {arg1} to rational\" % op)
+            )
+        }
+
+The 'coerce' methods in different 'rational' objects differ only in
+their binding of 'self', and their children differ only in that and in
+their binding of 'arg1'.  Ideally you could put most of this stuff
+into a prog.sys.rational.coerce "map" object.
+
+This brings up a bit of a problem --- ideally you'd have one map
+object for all the (ordinary) coerce activation records, and those
+activation records would just have slots for self and arg1.  As
+proposed above, each rational object's coerce method would have only a
+slot for self; but the activation records of a particular rational
+object's coerce method would have a map of their own, corresponding to
+that rational object.
+

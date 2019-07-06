@@ -1,0 +1,30 @@
+Emacs stores the text in a buffer in a buffer-gap representation: the
+text before the cursor is in one contiguous block, the text after it
+is in another contiguous block, and there is a slack space in between.
+This makes inserting or deleting text at the cursor very fast, while
+moving the cursor is somewhat slower, involving copying the text that
+the cursor moves past to the other side of the buffer gap.  This is
+not a very fashionable way of doing things nowadays, since it involves
+a lot of mutation in the course of what you’d think would be read-only
+operations, but in practice it works very well indeed.
+
+I was thinking that a possibly interesting representation for mutable
+*sorted* sequences is a somewhat analogous thing, one which maintains
+two *heaps* for the elements before and after a “cursor”.  To move the
+cursor forward, you pop an item off the after-heap, which is a
+min-heap, and insert it into the before-heap, which is a max-heap.  To
+move the cursor backward, you pop an item off the before-heap and
+insert it into the after-heap.  You can insert and delete items from
+these two heaps as well.  All four of these operations — forward,
+back, insert arbitrary, and delete arbitrary — have logarithmic
+worst-case and average-case time.  Initially building the heaps from
+an unsorted set of items (with a given key as the cursor position)
+takes linear time.  No external space is needed.
+
+The more normal way to support these operations would be using a
+B-tree.  Is that better?  It gives you logarithmic insertion and
+deletion time, yes, but it takes N log N time to build the B-tree in
+the first place, and it takes potentially substantial space to build.
+It also gives you some goodies that the double-heap does not:
+logarithmic-time access to find a given key and constant-time
+iteration.

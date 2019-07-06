@@ -1,0 +1,40 @@
+So I've been thinking a bunch about content-hash-addressed blob stores
+and automatic deterministic recomputation.
+
+One highly desirable attribute of such a system is that the result of
+a given computation always be the same — like Java’s WORA aspiration,
+but for real this time.  That is, running a program whose code has a
+given tree hash A on an input dataset that has another given tree hash
+B will always and forever produce an output dataset C that is bitwise
+identical to any other time and place that it may have been correctly
+computed.  This has several benefits:
+
+1. The program’s output can be safely cached so that, if the same
+   result is requested again in the future, it need not be recomputed;
+   it is adequate to use the cached result, at least if you trust the
+   place it was computed.
+
+2. Malfunctions or security breaches that produce incorrect outputs
+   can always be detected, in theory, by rerunning the computation
+   elsewhere.
+
+3. The program's output can be safely *deleted* from the cache, or
+   stored on unreliable storage media that may corrupt bits, because
+   its integrity can always be checked against the hash, and it can
+   always be produced again on demand.
+
+4. In particular, if our definition of “program” includes a primitive
+   that allows us to invoke a given compiler on a “source file” in a
+   dataset, then run its output, then we can 
+
+There are several difficult prerequisites to achieve it:
+
+1. You need some kind of virtual machine definition to run program
+   code on; the simpler the virtual machine definition, the more
+   likely any given implementation is to be correct, but excessive
+   definitional simplicity may also make it impractically slow or
+   difficult to program for.
+
+2. You need to capture all dependencies
+
+3. Any concurrency must be deterministic

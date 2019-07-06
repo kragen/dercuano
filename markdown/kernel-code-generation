@@ -1,0 +1,64 @@
+John Regehr just posted [It’s Time for a Modern Synthesis
+Kernel](https://blog.regehr.org/archives/1676), and I wrote [the
+following comment on the orange
+website](https://news.ycombinator.com/item?id=20337231).
+
+This is a wonderful idea, and I hope many people start working on it right away.
+
+Although Massalin has never published her code, according to my memory of her thesis, Synthesis’s runtime code generation was *mostly* extremely simple, more like linking than what we think of as “code generation” — it copied a template method into the appropriate slot in the newly-generated quaject, then overwrote specific bytes in the generated code with pointers to the relevant callout (or, in some cases, the initial value of an instance variable for that quaject).  Parts of the code that did not benefit from being specialized in this way were factored into ordinary functions the quaject method would just call.
+
+This meant that only a small amount of code was generated for each quaject, and the runtime code generation was very nearly as fast as memcpy(), which meant that it was reasonable to use it on every quaject instantiation.
+
+Massalin *also* talked about applying some optimizations to the generated code, such as the constant-folding and dead-code removal John mentions, but I have the intuition that only a minority of quaject instantiations involved such more aggressive optimizations.  Since she never published Synthesis, it’s impossible to know for sure.  (I’m not questioning her integrity or claiming that the impressive benchmarks reported in her dissertation are faked; I’m saying that we unfortunately can’t see the exact mixture of interesting things you need to do to get those kickass benchmarks; so, like an insecure Intel CPU, I’m reduced to speculation.)
+
+Later implementations inspired by Massalin’s approach included Engler’s VCODE (which, to my knowledge, has also never been published; Engler’s PLDI paper cites Massalin in the second sentence of the abstract), which was used to implement Engler’s `C, and GNU Lightning (inspired by Engler’s published papers *about* VCODE), used in a number of modern JIT compilers.
+
+I suspect that, by contrast, John’s idea of using LLVM is inevitably going to have much higher overhead — if only from the CPU cache devastation brought about by any LLVM invocation — so will only be a win for much-longer-lived objects, where the large instantiation overhead can be amortized over a much larger number of invocations.  An intermediate approach like Engler’s `C might be more broadly applicable.
+
+John suggests this early on in his “for deployment” comment, but I think that it’s probably necessary for prototyping too, since the objective of the whole exercise would be to get an order-of-magnitude speedup, and the objective of the prototype would be to find out if that’s a plausible result.  A prototype that makes all your programs run slower due to LLVM wouldn’t provide any useful evidence about that.
+
+I asked Perry what he thought about the above, and he replied with this gem:
+
+> So you’re correct that the code generation was mostly “template
+> instantiation”. I think that was key to having calls like open()
+> function in reasonable time. I also suspect LLVM is a blunt instrument
+> for this work. That said, it would have been difficult for anyone but
+> Massalin to work with the approach in Synthesis. It was very much the
+> product of a person who was both intensely brilliant and completely
+> comfortable with writing “weird code” in the instruction set they were
+> working in.
+
+> So there’s then the question of how one can take the ideas from
+> Synthesis and make them a practical thing that ordinary programmers
+> could build and contribute to. And that is almost certainly going to
+> involve compiler tooling.  As a prototype, making this work by using
+> LLVM is probably a good approach. Ultimately, I think that one is
+> going to have to do the magic at kernel build time and have something
+> fairly lightweight happen at runtime. But to figure out what that is,
+> one needs to play.  And the easiest tools right now for playing
+> involve LLVM. If, for example, you can use LLVM successfully to
+> specialize a write call’s instruction path down an order of magnitude
+> or more, or to do similar things in the networking code, one can then
+> ask how to do this better.
+
+> There are, of course, a number of interesting paths towards playing
+> with this. I suspect that none of them end anywhere near where they
+> start. But the only way to see what might be possible with much better
+> tooling is to start, and you have to start somewhere.
+
+> BTW, I think the time is right, or even over-right, for this. Single
+> processor core performance is stalled out, and while in 1992 one could
+> just say “well, we’ll have another factor of ten performance
+> improvement in a few years, who needs the trouble”, that’s no longer
+> the case.  Note that this argument also applies, to a considerable
+> extent, to other parts of the modern software ecosystem. When you
+> can’t just say “we could spend a couple of months optimizing this, but
+> the next generation of processors will be out by then”, things change.
+
+> Anyway, not sure if this answers your call for comments, but if you
+> are interested in specific areas around this, I’ve no shortage of
+> opinions. Many would say I have far too many opinions...
+
+> You can quote any subset or the entire thing. So long as you don’t
+> distort my intent I have no problem with people using my words that
+> way.

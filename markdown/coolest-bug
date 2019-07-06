@@ -1,0 +1,41 @@
+One of the fun things about writing graphics code is that you get
+better bugs.  In normal programming, bugs are mostly frustrating: they
+get in your way, make things harder, corrupt data you painstakingly
+created, or crash the program and interrupt what you're doing.  But a
+lot of bugs in graphics code either look really cool or have no real
+visible effect.
+
+At the moment I'm not writing graphics code.  I'm writing an
+almost-Scheme compiler in itself.  But I just created a really bizarre
+bug.
+
+Here's a little bit of the assembly output from the compiler:
+
+    epacse__4:
+            # compute desired %esp on return in %ebx and push it
+            lea 4(%esp,%edx,4), %ebx
+    ...
+            movl (htgnel_gnirts__2), %eax
+
+Where did `htgnel_gnirts__2` come from?  Well, it's `_string_length`
+spelled backwards, followed by `_2`.  And `epacse` is `escape` spelled
+backwards.  I accidentally created a bug that *spells names
+backwards*.  That's almost as funny as some of my graphics-code bugs.
+
+How this happened requires a little bit of explanation.  In Scheme, as
+in most Lisps, adding items to the beginning of a list is fast and
+safe, but adding onto the end of a list is either slow and bug-prone,
+safe but extremely slow, or very verbose and therefore bug-prone and
+hard to maintain.  But reversing a list is relatively fast.  So I
+wrote a function that looked like this:
+
+    (define (stringlist->string stringlist) 
+      (list->string (reverse (stringlist->string-2 stringlist 0))))
+
+Because I thought stringlist->string-2 was going to have to build up a
+list of all the characters *backwards*, and then I was going to have
+to reverse it.
+
+When stringlist->string-2 turned out to be able to build up the list
+of characters in the right order --- by adding them backwards --- I
+forgot to take out the `reverse`.

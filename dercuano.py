@@ -38,7 +38,8 @@ def ok(a, b):
 class Bundle:
     def __init__(self, dirname):
         self.dirname = dirname
-        self._relations = as_relations(load_triples(self.filename('triples')))
+        self._relations = as_relations(list(load_triples(
+            self.filename('triples'))))
         self.output_dir = 'dercuano-' + self.get_version()
         self.cached_titles = {}
         self.notes = list(self._notes())

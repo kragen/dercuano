@@ -1,0 +1,36 @@
+Interesting features of gas:
+
+- multiple subsections: `.data 0`, `.data 1`, etc.  You can switch around
+  between them during assembly, and then they get concatenated when
+  assembly is done.  There’s some ambiguity in the manual about how
+  this interacts with the “.” symbol.
+- The “.” symbol, which is like Intel’s $, and which can be reassigned
+  to move around and assemble things in funny places.  I haven’t yet
+  tried using it to assemble code someplace we’ve already been
+  (e.g. for a counted string).  The documentation for `.org` says this
+  won't work.
+- `.fill` would be useful for filling an area with a pattern (despite
+  its bizarre semantics.)
+- there is of course a full conditional compilation system.
+- there is of course a full macro facility, with default arguments,
+  named arguments, recursive macros, string interpolation, the ability
+  to redefine existing symbols, and optionally local variables.
+- `.incbin` lets you suck in an external file, or part of an external
+  file, as data.
+- It uses Knuth's `1f`, `1b`, `2f`, `2b` local labels.  These work remarkably
+  well for something so archaic-looking.
+- The `-a` option generates an assembly listing.  There's a bunch of
+  formatting stuff for the listings: `.eject`, `.title`, `.sbttl`,
+  `.nolist`, `.list`, `.psize`.
+- It supports bignum math and emitting 8- and 16-byte integers from
+  them.
+- There’s a “section stack” so you can assemble into a different
+  section for a while, then pop back to where you were, or even swap
+  back and forth between two sections without knowing which ones they
+  are.  Unfortunately, at the moment, the section stack is only partly
+  implemented as documented.
+- `.print` prints stuff out.
+- ELF apparently has a bunch of section flags: “allocatable”,
+  writable, executable, "mergeable", and a few more
+- there’s sort of support for defining struct fields with `.struct`
+- `.intel_syntax` supports Intel assembler syntax.

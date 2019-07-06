@@ -1,0 +1,25 @@
+Reading Sorav Bansal’s dissertation, I was struck by the fact
+that in the middle of the binary-translation section, he tackles the
+register allocation problem using the Viterbi algorithm, although he
+seems not to have realized that he was solving register allocation
+(conventionally considered NP-hard) or that his solution was the
+Viterbi algorithm.
+
+The context is not conventional compiler code generation but rather
+binary translation from PowerPC code to 386 code, so both the input
+and output of his system are sequences of instructions.  He is faced
+with the question of how to assign registers for the output
+instructions.
+
+His solution is to compute the cost of all possible register maps, one
+input instruction at a time, as he walks through the input code,
+adding an extra “switching cost” when the predecessor state used a
+different register map; but he retains only the lowest-cost few maps
+at any given point in order to keep the cost reasonable, up to about 8
+maps, though he only gets a significant performance advantage up to
+about 3 maps.  (I wonder if this is due to having several maps that
+are essentially equivalent.)
+
+This seems like a remarkably simple approach to a remarkably difficult
+problem, so simple that I am led to wonder whether it actually works.
+Some other aspects of the scholarship in the dissertation are shaky.
