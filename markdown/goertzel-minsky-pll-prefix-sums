@@ -234,6 +234,43 @@ tried this yet.
 (18375 Hz is 2.6180 radians or 150° per sample, so the Goertzel
 recurrence becomes roughly *sₙ* = -1.732 *sₙ*₋₁ - *sₙ*₋₂.)
 
+Alternatively, suppose I’m trying to detect the tune I’m whistling as
+in file `whistle-detection`, in the band 600Hz to 1600Hz.  Typically
+if I’m whistling it’ll be the loudest sound in that band, maybe 20 to
+40 dB louder than anything else nearby.  Suppose we have a whistle at
+1477Hz and we’re trying to detect it by windowing a 1400Hz Goertzel
+filter; we’ll get a phase spinning around the circle at 77Hz.  So if
+our window mostly averages over, say, 3 ms (4.2 cycles of the 1400Hz
+reference), the phase will rotate around almost one quadrant,
+attenuating the phasor’s average magnitude by about √2, or 1.5 dB.  By
+unwrapping the phase (again, like a phase vocoder) we can determine
+the beat frequency and phase direction, and thus the real frequency.
+So windowing a single Goertzel filter about 500 times a second covers
+about 200Hz of bandwidth, so about five or ten of them should cover
+the whole band of interest.
+
+As long as the window is pretty close to Gaussian, there’s a
+relatively precise reciprocal relationship between the bandwidth and
+necessary number of windows per second for each filter.  Using a
+window that’s half as long requires us to use twice as many windows
+per second, but also covers twice the bandwidth in a single filter, so
+we need half as many filter center frequencies.  In the limit, where
+our windowed filter kernel is just an impulse, we’re just trying to
+“unwrap the phase” of individual samples (or perhaps pairs of samples,
+since *yₖ* uses *sₖ*₋₁ as well).  At the other extreme, with a very
+large number of very narrow frequency bands, each with windows tens or
+hundreds of milliseconds long, we only need check each band every
+hundred or more milliseconds, but we start losing temporal precision.
+
+But at that point, wouldn’t it be faster to window a downconverted
+signal and do a Fast Fourier Transform?  Then we only have to do
+O(lg *N*) work per sample to get each of *N* frequency bands instead
+of O(*N*) work.
+
+(Perhaps the best way to understand the CIC-windowed Goertzel filter
+in this context is precisely that it’s providing a windowed
+downconverted signal, which we can then Fourier-transform if we like?)
+
 ### In one line of C ###
 
 Here’s a one-line obfuscated C program from file
