@@ -1,0 +1,89 @@
+Fermat conjectured that all [Fermat numbers], numbers of the form 2*ⁿ*
++ 1 where n = 2*ⁱ* for some *i* ∈ ℕ, were prime.  In fact, as far
+as we know, only the first five (*i* ∈ [0, 4]) are prime, namely 3, 5,
+17, 257, and 65537; Euler showed in 1732 that when *i* = 5 the number
+you get, 4'294'967'297, is composite.  Fermat’s original conjecture
+was [in 1650], so it's sort of puzzling that it took 82 years to
+disprove it.
+
+[Fermat numbers]: https://en.wikipedia.org/wiki/Fermat_numbers
+[in 1650]: http://mathworld.wolfram.com/FermatPrime.html
+
+In fact, you can disprove it using [Fermat’s Little Theorem][flt],
+that *aⁿ* ≡ *a* (mod *n*) if *n* is prime.  Nonprime numbers *n* that
+pass this primality test for every *a* are called “[Carmichael numbers]”
+or “Fermat pseudoprimes”, and they do exist, but 4'294'967'297 happens
+not to be one of them.  So, for example, when *n* = 4'294'967'297,
+3*ⁿ* % *n* = 497'143'886, which is not 3.  (It does pass the test with
+*a* = 2.)  This is usually a very much easier way to show that a large
+number is composite than by finding its factors.
+
+[Carmichael numbers]: https://en.wikipedia.org/wiki/Carmichael_numbers
+[flt]: https://en.wikipedia.org/wiki/Fermat's_Little_Theorem
+
+You could reasonably argue that Fermat didn’t have a gigaflops netbook
+in his lap when he made his conjecture, and so he could hardly be
+expected to go around raising numbers to such powers, but actually the
+calculation is something you could do with pen and paper in a day or
+two, particularly if you had a table of squares to speed you up.  You
+proceed by successive squaring, dropping out a 4'294'967'297 when
+necessary; each number here is the square mod *n* of the previous one:
+
+    3¹ % 4294967297 = 3
+    3² % 4294967297 = 9
+    3⁴ % 4294967297 = 81
+    3⁸ % 4294967297 = 6561
+    3¹⁶ % 4294967297 = 43046721
+    3³² % 4294967297 = 3793201458
+    3⁶⁴ % 4294967297 = 1461798105
+    3¹²⁸ % 4294967297 = 852385491
+    3²⁵⁶ % 4294967297 = 547249794
+    3⁵¹² % 4294967297 = 1194573931
+    3¹⁰²⁴ % 4294967297 = 2171923848
+    3²⁰⁴⁸ % 4294967297 = 3995994998
+    3⁴⁰⁹⁶ % 4294967297 = 2840704206
+    3⁸¹⁹² % 4294967297 = 1980848889
+    3¹⁶³⁸⁴ % 4294967297 = 2331116839
+    3³²⁷⁶⁸ % 4294967297 = 2121054614
+    3⁶⁵⁵³⁶ % 4294967297 = 2259349256
+    3¹³¹⁰⁷² % 4294967297 = 1861782498
+    3²⁶²¹⁴⁴ % 4294967297 = 1513400831
+    3⁵²⁴²⁸⁸ % 4294967297 = 2897320357
+    3¹⁰⁴⁸⁵⁷⁶ % 4294967297 = 367100590
+    3²⁰⁹⁷¹⁵² % 4294967297 = 2192730157
+    3⁴¹⁹⁴³⁰⁴ % 4294967297 = 2050943431
+    3⁸³⁸⁸⁶⁰⁸ % 4294967297 = 2206192234
+    3¹⁶⁷⁷⁷²¹⁶ % 4294967297 = 2861695674
+    3³³⁵⁵⁴⁴³² % 4294967297 = 2995335231
+    3⁶⁷¹⁰⁸⁸⁶⁴ % 4294967297 = 3422723814
+    3¹³⁴²¹⁷⁷²⁸ % 4294967297 = 3416557920
+    3²⁶⁸⁴³⁵⁴⁵⁶ % 4294967297 = 3938027619
+    3⁵³⁶⁸⁷⁰⁹¹² % 4294967297 = 2357699199
+    3¹⁰⁷³⁷⁴¹⁸²⁴ % 4294967297 = 1676826986
+    3²¹⁴⁷⁴⁸³⁶⁴⁸ % 4294967297 = 10324303
+    3⁴²⁹⁴⁹⁶⁷²⁹⁶ % 4294967297 = 3029026160
+
+This final result at the end would have needed to be 1; if you
+multiply it by 3 mod 4'294'967'297, you get the number I gave earlier,
+497'143'886, which is manifestly not 3.
+
+Squaring a ten-digit number like 3'422'723'814 by hand is a
+significant amount of work, though you can reduce it substantially by
+looking up the first and last digits in a table of squares.  But of
+course poor old Fermat couldn’t just run off the 60-page table of the
+first ten thousand squares with a one-line command:
+
+    perl -le 'print "$_² = ", $_*$_ for (1..10000)' | pr -3 | lpr
+
+He might have had such a table available — people were printing books
+with mathematical tables of this size around this time — but I’m
+uncertain as to whether he did.  If he did, it probably contained many
+errors.  [Wikipedia suggests no such table was available until Antoine
+Voisin published a table of 1000 squares in 1817][sq], although
+multiplication algorithms using them have been known since ancient
+Babylonia.
+
+[sq]: https://en.wikipedia.org/wiki/Multiplication_algorithm#Quarter_square_multiplication
+
+And he didn't even have Karatsuba multiplication (see file
+`karatsuba`) to help him along.
