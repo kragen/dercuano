@@ -67,40 +67,34 @@ Stacks and expressions
 
 A major weakness of assembly languages is that they don’t have
 expressions, except for expressions evaluated at compile-time.  In
-effect, you must name all your temporary variables.  Consider this
-line of C from [μpaint.c]:
+effect, you must name all your temporary variables.  Consider these
+two lines of C from dietlibc’s `getenv` function:
 
-            if (m->buttons) yp_line(img, m->p.y)[m->p.x] = m->buttons & 1 ? 0 : -1;
+        if ((memcmp(environ[i],s,len)==0) && (environ[i][len] == '='))
+          return environ[i] + len + 1;
 
-[μpaint.c]: https://gitlab.com/kragen/bubbleos/blob/702c5aad04eb84302009e9a7168dd088cb5c903a/yeso/%CE%BCpaint.c#L17
+If you compile this for i386 in the usual way dietlibc is compiled,
+you get this:
 
-This uses the inlined definition of `yp_line`:
+      12:lib/getenv.c  ****     if ((memcmp(environ[i],s,len)==0) && (environ[i][len] == '='))
+      55              	 .loc 1 12 0
+      56 002b 896C2408 	 movl %ebp,8(%esp)
+      57 002f 89742404 	 movl %esi,4(%esp)
+      58 0033 891C24   	 movl %ebx,(%esp)
+      59 0036 E8FCFFFF 	 call memcmp
+      59      FF
+      60              	.LVL4:
+      61 003b 85C0     	 testl %eax,%eax
+      62 003d 750C     	 jne .L4
+      63              	 .loc 1 12 0 is_stmt 0 discriminator 1
+      64 003f 803C2B3D 	 cmpb $61,(%ebx,%ebp)
+      65 0043 7506     	 jne .L4
+      13:lib/getenv.c  ****       return environ[i] + len + 1;
+      66              	 .loc 1 13 0 is_stmt 1
+      67 0045 8D442B01 	 leal 1(%ebx,%ebp),%eax
+      68 0049 EB0B     	 jmp .L2
 
-    static inline ypix *
-    yp_line(ypic c, int y)
-    {
-      return &c.p[y*c.stride];
-    }
-
-From these, GCC generates the following gnarly i386 code:
-
-     162              	.L12:                               ; entry point of conditional (see below)
-     168 00be 0FAF4DBC 		imull	-68(%ebp), %ecx     ; multiply m->p.y by line width in bytes
-     173 00c2 83E001   		andl	$1, %eax            ; mask off mouse button 1
-     177 00c5 8B75B8   		movl	-72(%ebp), %esi     ; load image base address
-     181 00c8 3C01     		cmpb	$1, %al             ; convert 1 to 0 and 0 to -1…
-     182 00ca 19C0     		sbbl	%eax, %eax          ; using this subtraction
-     186 00cc 8D0C8E   		leal	(%esi,%ecx,4), %ecx ; load address of line start
-     190 00cf 890491   		movl	%eax, (%ecx,%edx,4) ; store pixel (m->p.x is in %edx)
-     192              	.L19:
-
-...
-
-     241 0129 8A4008   		movb	8(%eax), %al        ; load mouse buttons into %al
-     242              	.LVL26:                             ; start here!
-     243 012c 84C0     		testb	%al, %al            ; check to see if any buttons pressed
-     244 012e 758E     		jne	.L12                ; if so, branch to above drawing code
-     245 0130 EBA0     		jmp	.L19                ; otherwise skip it
+(Except that dietlibc has a native assembly version of this function anyway.)
 
 
 Macros
