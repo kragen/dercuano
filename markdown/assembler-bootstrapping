@@ -1,0 +1,109 @@
+I’ve explored the question of bootstrapping computer systems from
+scratch in some detail, but one of the things I haven’t touched on
+much is the design of the assembler — that is, the compiler from
+assembly language into machine code.  This is somewhat curious,
+because assemblers have been quite critical in the bootstrapping
+process of actual computers, historically speaking.
+
+History
+-------
+
+Early computers were divided into the “first generation” of
+vacuum-tube computers (arguably starting with EDVAC and EDSAC in
+1949), the “second generation” of transistorized computers (for
+example, the popular IBM 7090, first shipped in 1959), and the “third
+generation” of integrated-circuit computers (such as the System/360
+model 85, 1969).  Similarly, there were three “generations” of
+programming languages around the same time — the “first-generation
+programming languages” were binary or decimal machine code, the
+“second-generation programming languages” were assembly languages
+(originating on the EDSAC in 1948, before it actually operated, but
+becoming popular around 1955 with SOAP), and the “third-generation
+programming languages” were high-level languages like COBOL, ALGOL,
+and FORTRAN, arguably starting in 1951 with Grace Hopper’s A-0
+compiler or in 1955 with her FLOW-MATIC, but not becoming popular
+until the 1960s.
+
+(Many subsequent “generations” have been touted by one or another
+person, most famously Moore’s 1970s language FORTH, the fad for
+marketing new languages as “4GLs” in the 1990s, and the Japanese Fifth
+Generation Computing Project; their implicit promises of revolutionary
+improvement have not been fulfilled.)
+
+From their initial popularity in the 1950s until C finally made
+assemblers obsolete except for niche tasks around 1988, most computer
+systems software (including the assemblers themselves) was written in
+assembly language, and during much of this time, even much application
+software was written in assembly language.  Among other very
+influential software, I believe that all of OS/360, MACLISP, TECO,
+BASIC-80, GW-BASIC, AppleSoft BASIC, TOPS-10, TENEX, TOPS-20, MS-DOS,
+SNOBOL4, SKETCHPAD, WordStar, VisiCalc, Lotus 1-2-3, QuickDraw, nearly
+all NES games, and early versions of Turbo Pascal were all written in
+assembly language.  Unix was very unusual in being an operating system
+*not* written in assembly starting around 1972 (although the early
+versions of Unix were indeed in assembly).
+
+Well into the 1990s, computers were slow enough (and compilers bad
+enough) that programming in assembly language was occasionally
+necessary for any “serious” programmer — nearly all software ran into
+performance bottlenecks that could only be overcome with assembly
+language or custom hardware.  So video game engines and
+transaction-processing software were routinely written in assembly.
+Nowadays, this is much less often the case, and a much smaller
+fraction of modern software is written in assembly, particularly since
+the bulk of computing power in modern personal computers has shifted
+to their Tera-like GPUs — now if you want more computing power, you
+reach for the GPU, not assembly language for the CPU.
+
+Knuth (who wrote the software for his landmark book series The Art Of
+Computer Programming entirely in assembly language) has suggested that
+it’s reasonable to write an assembler in an afternoon, for a computer
+that’s not overly complicated, anyway.  Modern binary executable
+formats add a certain amount of overhead to this, as do modern
+complicated addressing modes.
+
+Stacks and expressions
+----------------------
+
+A major weakness of assembly languages is that they don’t have
+expressions, except for expressions evaluated at compile-time.  In
+effect, you must name all your temporary variables.  Consider this
+line of C from [μpaint.c]:
+
+            if (m->buttons) yp_line(img, m->p.y)[m->p.x] = m->buttons & 1 ? 0 : -1;
+
+[μpaint.c]: https://gitlab.com/kragen/bubbleos/blob/702c5aad04eb84302009e9a7168dd088cb5c903a/yeso/%CE%BCpaint.c#L17
+
+This uses the inlined definition of `yp_line`:
+
+    static inline ypix *
+    yp_line(ypic c, int y)
+    {
+      return &c.p[y*c.stride];
+    }
+
+From these, GCC generates the following gnarly i386 code:
+
+     162              	.L12:                               ; entry point of conditional (see below)
+     168 00be 0FAF4DBC 		imull	-68(%ebp), %ecx     ; multiply m->p.y by line width in bytes
+     173 00c2 83E001   		andl	$1, %eax            ; mask off mouse button 1
+     177 00c5 8B75B8   		movl	-72(%ebp), %esi     ; load image base address
+     181 00c8 3C01     		cmpb	$1, %al             ; convert 1 to 0 and 0 to -1…
+     182 00ca 19C0     		sbbl	%eax, %eax          ; using this subtraction
+     186 00cc 8D0C8E   		leal	(%esi,%ecx,4), %ecx ; load address of line start
+     190 00cf 890491   		movl	%eax, (%ecx,%edx,4) ; store pixel (m->p.x is in %edx)
+     192              	.L19:
+
+...
+
+     241 0129 8A4008   		movb	8(%eax), %al        ; load mouse buttons into %al
+     242              	.LVL26:                             ; start here!
+     243 012c 84C0     		testb	%al, %al            ; check to see if any buttons pressed
+     244 012e 758E     		jne	.L12                ; if so, branch to above drawing code
+     245 0130 EBA0     		jmp	.L19                ; otherwise skip it
+
+
+Macros
+------
+
+Serious assembly programming makes use of assemb
