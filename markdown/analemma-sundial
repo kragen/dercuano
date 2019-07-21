@@ -1,1 +1,186 @@
+There are a variety of sundial designs that incorporate the solar
+analemma in one or another form, so that they can provide the precise
+time according to current civil time standards — which hold that each
+day and each second should have the same length despite the
+eccentricity and consequent inconstant speed of the Earth’s orbit and,
+thus, the solar day.
 
+A spot on the wall
+------------------
+
+I was thinking in particular of using the sunbeam reflected from a
+small round mirror to illuminate a spot on a wall; the point
+illuminated on the wall will vary according to both the time of day
+and the angle of elevation of the sun.
+
+         |       |
+         | light |w
+         \-------|a      
+    mirror       |l
+                 |l
+
+Each day the sunbeam will sweep a (noncircular) arc across this wall,
+but from day to day the arc will vary as the elevation angle of the
+sun does.  The total variation in elevation from solstice to solstice
+is about 47°; it is fastest near the equinoxes and slowest near the
+solstices.  I roughly guess that that means that, at its fastest, it
+moves about half a degree per day, which is rather pleasantly the size
+of the sun as seen from Earth.
+
+This means that, if the mirror is small enough, the spot on the wall
+will also take up about half a degree (32 arcminutes) as seen from the
+mirror.  So, in theory, you could mark the arcs on the wall for each
+day of the year; they will gradually be displaced by a quarter of a
+day each year until being reset by the leap year.
+
+This means that, in theory, you could mark two times of day on the
+wall at each point, one for when the sun crosses that point moving
+north and one for when it is moving south.  Or you could switch out
+the wall twice a year, on the solstices, and mark one time of day on
+the wall at each point.
+
+Since an hour is 15° (360÷24), half a degree is about two minutes, so
+each point along the centerline of the spot’s track will be
+illuminated for about two minutes.  This would seem to pose some
+difficulties for telling time with a sundial with less error than two
+minutes, but if the mirror is small, the spot is a well-defined circle
+with the size of the sun’s disc, and you can see the location of its
+center to a precision of something like a tenth of its width; this
+should permit a timekeeping precision of something like ten seconds.
+
+For those ten seconds to constitute about a millimeter of motion, the
+distance from the small mirror to the wall needs to be about 1.4
+meters, although perhaps this can be productively folded up using
+additional mirrors.  At this distance, the 32-arcminute sun disk will
+project as a 13-mm-diameter circle convolved with the shape of the
+mirror.  (If you want a sharp boundary on it without sacrificing as
+much brightness, you might consider using a mirror in the shape of an
+annulus; an annulus convolved with a solid circle has the same
+diameter, but a much sharper boundary, than two solid circles
+convolved.)
+
+Caustics
+--------
+
+Suppose that the wall is itself a mirror, but not a flat one.  Then it
+will reflect the spot elsewhere, for example onto a screen, but
+distorted and possibly changed in direction.  It can form caustics in
+the reflection, and these caustics can have stronger contrasts than
+mere solar caustics, because the light falling on the wall comes from
+a smaller point source than the sun’s disc.  (It might be worthwhile
+to make the mirror subtend, for example, 8 arcminutes; at the
+1.4-meter distance suggested above, this is about 3.3 millimeters.
+(Assuming we’re using a circular mirror, not an annulus.)
+
+To focus the spot back to a 3.3-mm point at the same distance would
+merely require a radius of curvature of that same 1.4 meters.  The
+versine of half of 32 arcminutes is about 1.1 × 10⁻⁵, so if you made
+the 13-mm spot a spherical reflector, its center would need to be cut
+deeper than its edges by about 15 microns, a number which varies only
+a little as the focal length and direction vary.  See file `caustics`
+for some notes on how to shape nearly-flat surfaces to arbitrary
+shapes with this kind of precision.
+
+In particular, it wouldn’t be that hard for a series of facets to
+reflect the beam to the same place on the screen as the sun’s image
+passed over them, so that instead of scanning across the screen, the
+projected image stayed in the same place; but it could vary from one
+facet to the next.  And if the facet is convex rather than concave, it
+could be larger than the 13-mm illuminated area on the wall, rather
+than smaller, though at the cost of brightness.
+
+(And there don’t need to be actual facets; you can use a smooth curve
+only occasionally interrupted with the kind of discontinuity you see
+in Fresnel lenses.  Facets are just a crude discrete approximation of
+the problem.)
+
+Unavoidably, though, since each point along the center of the track is
+illuminated for two minutes, there will be a certain amount of fading
+from one image to the next over the course of those two minutes.
+
+One particularly attention-getting image to project might be the
+current time, written in Arabic numerals, with a colon, like the
+various “digital sundial” projects that exist.
+
+This poses the problem of how to avoid a vague superposition of
+numerals during the two-minute transition from one facet to the next.
+A possible solution is to use a larger number of smaller facets, so
+that the facets close to the transition zone are projecting not just
+the current time but the *negative* of the adjacent time; on one side
+of the boundary of the 12:46 to 12:48 transition, for example, you
+would project a mostly gray image with “12:4” in white, “6” in white,
+and “8” in black, while on the other side, you would project the “8”
+in white and the “6” in black.  Thus, as the preponderance of light
+shifted from one side of the boundary to the other, the “6” would fade
+to gray and be replaced by the “8”.
+
+(To keep the black image from being obtrusive a bit further over,
+you’d want to counterbalance it with a dimmer and perhaps blurrier
+white image, etc.; I think the brightness curve ends up looking
+something like the derivative of sinc.  Essentially you’re trying to
+Wiener-filter out the low-pass temporal filter imposed by the sun's
+nonzero width in order to get a sharper transition.)
+
+This approach to getting faster transitions by counterbalancing with
+inverse images probably precludes the use of *caustics* in the sense
+of places where the Jacobian determinant (of the position of the beam
+on the screen as a function of its position on the mirrored wall)
+vanishes, since that could easily create more brightness than you
+could counterbalance, but you can still vary the magnitude of that
+determinant substantially to vary the brightness.  But your contrast
+ratio might be limited to 2:1, which sucks.
+
+This poses the additional question of whether the facets would need to
+be so small that diffraction would pose a problem.  If the individual
+facets were 1 mm across and were effectively planar at the level of
+100-μm-diameter “microfacets”, which seems feasible, the Airy limit
+(1.220λ/D for a circular aperture, as explained in file
+`caustic-business-card`) would be, say, 1.22·555 nm / 100 μm, about
+23 arcminutes of diffraction-limited divergence.  So, yes, diffraction
+would start to pose a problem; the wall might need to be larger and
+further away, and you might need to use larger microfacets.  But it’s
+not so overwhelming that I think it makes the problem infeasible, just
+challenging.
+
+Scratch holograms
+-----------------
+
+Suppose that instead of using caustics, you use Bill Beaty’s scratch
+holograms.  You stick a bronze plaque on a wall, paint it with clear
+polyurethane, and put a peephole nearby.  The reflection off the
+scratches on the plaque from the sun when you’re looking through the
+peephole displays the current time.
+
+A simple approximation, which is easy to improve on, is to divide the
+plaque into pixels, and add scratches to each pixel to reflect the sun
+at every angle where it should be lit up.  As long as the scratches
+aren’t too dense, the scratches at different angles will only
+interfere a little bit with each other, but it still might be a good
+idea to display different times on different parts of the display to
+reduce the “burn-in” effect of too many scratches in the same place.
+If the plaque is facing north (or south, if you’re in the northern
+hemisphere *like a sucker*) and the peephole is in front of and below
+it, the sun will move through nearly a whole 180° arc each day, but
+faster close to noon.
+
+Correcting for the Equation of Time can’t be done by displaying
+different images at different times of year depending on the
+elevation, but it could be done to some extent by moving the peephole;
+the angle at which a point P on a scratch reflects is when it is
+perpendicular to the plane including your eye, the sun, and P.  So
+moving the sun a little to the left is equivalent to moving your eye a
+little to the right, and vice versa.  So it might be adequate to mark
+dates along the bottom of a viewing slit to show you where to position
+your eye.  (Maybe a part of the plate you view from the side instead
+of from below could tell you what the sun’s elevation is and thus what
+the date is.)
+
+As with the analemma, I’m not going to do the math for the angles
+right now.
+
+The scratches, though, I will.  The scratch depth needs to be at least
+on the order of a wavelength of light (say, half a wavelength) in
+order to scatter incoming light properly — the ray entering at a point
+should leave as a plane.  It is unreasonably challenging to make the
+scratch walls much steeper than 45°, and indeed with the usual kind of
+abrasive scratches, you’ll get 

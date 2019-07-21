@@ -1,0 +1,403 @@
+I’ve explored the question of bootstrapping computer systems from
+scratch in some detail, but one of the things I haven’t touched on
+much is the design of the assembler — that is, the compiler from
+assembly language into machine code.  This is somewhat curious,
+because assemblers have been quite critical in the bootstrapping
+process of actual computers, historically speaking, and often they
+have been highly extensible.
+
+Suppose you had a minimal assembler that you could gradually extend
+into a reasonable high-level-language programming environment,
+starting with some tiny minimal core and gradually adding
+functionality.  What would it look like?
+
+Maybe we should start by looking at the history of assemblers.
+
+History
+-------
+
+Early computers were divided into the “first generation” of
+vacuum-tube computers (arguably starting with EDVAC and EDSAC in
+1949), the “second generation” of transistorized computers (for
+example, the popular IBM 7090, first shipped in 1959), and the “third
+generation” of integrated-circuit computers (such as the System/360
+model 85, 1969).  Similarly, there were three “generations” of
+programming languages around the same time — the “first-generation
+programming languages” were binary or decimal machine code, the
+“second-generation programming languages” were assembly languages
+(originating on the EDSAC in 1948, before it actually operated, but
+becoming popular around 1955 with SOAP for the IBM 650), and the
+“third-generation programming languages” were high-level languages
+like COBOL, ALGOL, and FORTRAN, arguably starting in 1951 with Grace
+Hopper’s A-0 compiler or in 1955 with her FLOW-MATIC, but not becoming
+popular until the 1960s.
+
+Assemblers were adopted more rapidly on drum machines like the IBM 650
+because the placement of the instructions was not sequential, and due
+to the nonuniform access time of the drum, even choosing the addresses
+for a straight-line sequence of instructions was a difficult
+optimization problem.
+
+(Many subsequent “generations” have been touted by one or another
+person, most famously Moore’s 1970s language FORTH, the fad for
+marketing new languages as “4GLs” in the 1990s, and the Japanese Fifth
+Generation Computing Project; their implicit promises of revolutionary
+improvement have not been fulfilled.)
+
+From their initial popularity around 1960 until C finally made
+assemblers obsolete except for niche tasks around 1988, most computer
+systems software (including the assemblers themselves) was written in
+assembly language, and during much of this time, even much application
+software was written in assembly language.  Among other very
+influential software, I believe that all of OS/360, MACLISP, TECO,
+BASIC-80, GW-BASIC, AppleSoft BASIC, TOPS-10, TENEX, TOPS-20, MS-DOS,
+SNOBOL4, SKETCHPAD, WordStar, VisiCalc, Lotus 1-2-3, QuickDraw, nearly
+all NES games, and early versions of Turbo Pascal were all written in
+assembly language.  Unix was very unusual in being an operating system
+*not* written in assembly starting around 1972 (although the early
+versions of Unix were indeed in assembly).
+
+Well into the 1990s, computers were slow enough (and compilers bad
+enough) that programming in assembly language was occasionally
+necessary for any “serious” programmer — nearly all software ran into
+performance bottlenecks that could only be overcome with assembly
+language or custom hardware.  So video game engines and
+transaction-processing software were routinely written in assembly.
+Nowadays, this is much less often the case, and a much smaller
+fraction of modern software is written in assembly, particularly since
+the bulk of computing power in modern personal computers has shifted
+to their Tera-like GPUs — now if you want more computing power, you
+reach for the GPU, not assembly language for the CPU.
+
+Knuth (who wrote the software for his landmark book series The Art Of
+Computer Programming entirely in assembly language) has suggested that
+it’s reasonable to write an assembler in an afternoon, for a computer
+that’s not overly complicated, anyway.  Modern binary executable
+formats add a certain amount of overhead to this, as do modern
+complicated addressing modes.
+
+Macros
+------
+
+Serious assembly programming makes use of assembly-language macros,
+which are considerably more powerful than the macros we’re used to in
+other programming languages.  In [httpdito], I defined some gas macros
+that use conditionals to do a little bit of size optimization,
+providing special shortcuts to set registers to 0, 1, 2, or
+themselves:
+
+    ### Set dest = src.  Usually just `mov src, dest`, but sometimes
+    ### there's a shorter way.
+    .macro be src, dest
+            .ifnc \src,\dest
+            .ifc \src,$0
+            xor \dest,\dest
+            .else
+            .ifc \src,$1
+            xor \dest,\dest
+            inc \dest
+            .else
+            .ifc \src,$2
+            xor \dest,\dest
+            inc \dest
+            inc \dest
+            .else
+            mov \src, \dest
+            .endif
+            .endif
+            .endif
+            .endif
+    .endm
+
+This is used in macros like these:
+
+    .macro sys1 call_no, a
+            be \a, %ebx
+            sys0 \call_no
+    .endm
+
+    .macro sys0 call_no
+            be \call_no, %eax
+            ## There's a new, faster instruction for system calls, but I
+            ## don't know how to use it yet.
+            int $0x80
+    .endm
+
+[httpdito]: http://canonical.org/~kragen/sw/dev3/server.s
+
+In [tokthr], I used gas assembler macros to define bytecode including
+relative jumps:
+
+    2:      .byte b_c_at_inc, b_rot, b_c_at_inc, b_rot
+            .byte b_sub, b_dup # - dup if
+            fif 1f
+            .byte b_unrot, b_twodrop, b_unloop, b_exit
+    1:      .byte b_drop, b_swap
+            floop 2b
+
+Here `b_sub`, `b_dup`, etc., are bytecodes, and `fif` and `floop` are
+macros that insert jump bytecodes with relative jump offsets encoded
+in the format tokthr’s bytecode interpreter wants:
+
+            .macro fif, target      # if, or end of while loop
+            .byte b_branch_on_0, \target - . - 1
+            .endm
+            .macro floop, target    # do loop
+            .byte b__loop, \target - . - 1
+            .endm
+            .macro felse, target    # else, unconditional jump
+            .byte b_branch, \target - . - 1
+            .endm
+
+Unfortunately, gas assembly macros aren’t quite powerful enough to
+define things like nested conditional control structures.  The above
+code uses the “local” numeric labels `1f` and `2b`, an invention of
+Knuth’s adopted by gas.
+
+The `b_branch_on_0` bytecode is itself defined by a macro, in this
+case `defasm`:
+
+            defasm branch_on_0, "(if)"
+            pop %eax
+            and %eax, %eax
+            jz branch
+            inc %esi                # skip 1-byte jump offset
+            jmp next
+
+`defasm` is defined as follows in terms of a more basic
+`define_bytecode` macro, which uses the process of adding data to a
+given section and subsection as a sort of counter variable: each newly
+defined bytecode is assigned a unique address, and if the 256-entry
+table overflows, you get a compile-time error:
+
+            .macro define_bytecode name, realname, origin
+            .pushsection .data      # save current position, go to data section
+            .subsection 1           # and subsection 1, where we put the addrs
+            b_\name = (. - token_table) / 2 # define b_foo as the index of this ptr
+            .ifeq b_\name - 256
+            .error "\name got bytecode 256"
+            .endif
+            .short \name - \origin # insert offset which will be resolved next
+            .popsection             # return to where we were, and
+            .pushsection .dictionary
+            countedstring "\realname"
+            .popsection
+    \name:                          # define the name
+            .endm
+            .macro defasm name, realname
+            define_bytecode \name, "\realname", machine_code_primitives
+            .endm
+
+But gas also has a `.set` pseudo-op that gives you variables that can
+be mutated arbitrarily during the process of assembly.
+
+To generate unique labels, you can declare them as local to a
+particular macro (in gas with the `.altmacro` pseudo-op, for example),
+you can generate unique labels from a parameter (as above in
+`define_bytecode`), you can use local numeric labels, or you can
+generate unique labels in some other way, such as the following:
+
+            .macro countedstring name
+            .byte stringlength\@
+    1:      .ascii "\name"
+            ## Here we count the length of the string --- computers
+            ## are for counting bytes so people don't have to!
+            stringlength\@ = . - 1b
+            .endm
+
+Here `\@` is a magic counter that gas increments for each macro
+expansion, providing enough randomness for the macros to generate
+unique symbols.
+
+I also defined a `def` macro which takes an arbitrary number of
+arguments, in order to define bytecode subroutines that fit on a
+single line with straight-line control flow:
+
+        def neg1, "-1", b_dolit_s8, -1   # ( -- -1 )
+        def add, "+", b_umplus, b_drop  # ( a b -- a+b ) drop the carry
+        def sub1, "1-", b_neg1, b_add    # ( n -- n-1 )
+
+This uses the `vararg` feature of gas’s macro system:
+
+        .macro def name, realname, bytes:vararg
+        defbytes \name, "\realname"
+        .byte \bytes
+        .byte b_exit
+        .endm
+
+[tokthr]: https://github.com/kragen/tokthr
+
+In many assemblers, even the native machine instructions are defined
+as macros, rather than being built in to the assembler.  Here’s an
+excerpt from a disk image of the RDOS operating system for the Data
+General Nova (see file `nova-rdos`):
+
+    ; COPYRIGHT (C) DATA GENERAL CORPORATION 1977, 1978, 1979, 1980, 1981, 1982
+    ; 1983, 1984
+    ...
+    ;INSTRUCTION DEFINITON FILE
+    ...
+    ;DEFINE MEMORY REFERENCE INSTRUCTIONS THAT DON'T REQUIRE AC'S
+    .DMR JMP=      000000
+    .DMR JSR=       004000
+    .DMR ISZ=       010000
+    .DMR DSZ=       014000
+
+    ;DEFINE MEMORY REFERENCE INSTRUCTIONS THAT REQUIRE AC'S
+    .DMRA LDA=   020000
+    .DMRA STA=      040000
+
+    ;DEFINE THE ALC INSTRUCTIONS
+    .DALC COM=      100000
+    .DALC NEG=      100400
+    .DALC MOV=      101000
+
+However, I think `.DMR`, `.DMRA`, and `.DALC` are in fact built into
+the DG assembler.
+
+Nowadays NASM is a more popular assembler than gas, in large part
+because its macro system is more capable; [NASM’s macro system],
+though it’s still ad-hoc, has not only conditionals and macro-local
+labels but also a “context stack” mechanism that enables you to define
+macros for nesting control structures and the like by providing labels
+that are local to a “context” rather than a single macro expansion.
+
+[NASM’s macro system]: https://nasm.us/doc/nasmdoc4.html
+
+Stacks and expressions
+----------------------
+
+A major weakness of assembly languages is that they don’t have
+expressions, except for expressions evaluated at compile-time.  In
+effect, you must name all your temporary variables.  This makes
+assembly language verbosity and bug-prone, though it’s not the only
+factor.  Consider these two lines of C from dietlibc’s `strtod`
+function; here `value` is a floating-point number:
+
+        while ( (unsigned int)(*p - '0') < 10u )
+            value = value*10 + (*p++ - '0');
+
+These get compiled to the following assembly and machine code,
+somewhat abbreviated and commented:
+
+      74 0046 EB0C     	 jmp .L7
+      76              	.L8:
+      78 0048 D80D0000 	 fmuls .LC2       ; multiply value by floating-point 10
+      78      0000
+      80 004e 47       	 incl %edi        ; p++
+      82 004f 51       	 pushl %ecx       ; copy binary number to memory address
+      83 0050 DA0424   	 fiaddl (%esp)    ; add in-memory binary number to float
+      84 0053 5B       	 popl %ebx        ; fix the stack
+      86              	.L7:
+      88 0054 8A07     	 movb (%edi),%al  ; *p
+      89 0056 0FBEC8   	 movsbl %al,%ecx  ; sign-extend into %ecx
+      90 0059 83E930   	 subl $48,%ecx    ; - '0' to convert from ASCII to bin
+      91 005c 83F909   	 cmpl $9,%ecx     ; < 10?  i.e., <= 9?
+      92 005f 76E7     	 jbe .L8          ; if so then loop!
+     255              	 .section .rodata.cst4,"aM",@progbits,4
+     256              	 .align 4
+     257              	.LC2:
+     258 0000 00002041 	 .long 1092616192 ; floating-point 10, poorly represented
+
+The particular thing I want to call attention to here is that the C
+code refers to only two variables, `p` and `value`, which are assigned
+to the assembly-level registers %edi and st(0), which is the top of
+the 8087 register stack that `fmuls` and `fiaddl` implicitly act on.
+The assembly code, however, additionally refers to “variables” %ecx,
+%esp, %ebx, %al, and .LC2, although .LC2 is just the literal constant
+10.  Of these, %al, %ecx, and (%esp) are used to hold temporary
+results that in the C code are left nameless, while %esp is used as a
+pointer to (%esp), and %ebx is used as a bit bucket.
+
+You could write the code in a pretty closely analogous way in C,
+though I’ve taken the liberty of reordering the basic blocks so that
+we have an exit from the middle of the loop instead of an entry into
+it, and there’s no C equivalent for squirrelling a value away in
+memory so the 8087 can see it:
+
+    for (;;) {
+        char a = *p;
+        unsigned c = a;
+        c -= '0';
+    if (c > 9) break;
+        const static float t = 10.0;
+        value *= t;
+        p++;
+        value += c;
+    }
+
+To my eye, at least, this is not an improvement; the indirection of
+dataflow through explicit variables, which are mutated, makes that
+dataflow (which is mostly tree-like) much harder to understand.  If we
+call out the one place where the dataflow goes to more than one place
+by using a variable, it gets better, and I think a bit better even
+than the C original:
+
+    unsigned c;
+    while ((c = (unsigned)*p - '0') < 10) {
+        value = value*10 + c;
+        p++;
+    }
+
+I think that, in some sense, this is the essence of stack-machine
+instruction set designs like the GreenArrays x18 core in the GA4 and
+GA144, and of FORTH: by adding an operand stack to assembly language,
+they eliminate the need to assign temporary variables explicitly to
+intermediate nodes of tree-shaped rootwards dataflow.  In FORTH the
+code precisely analogous to the above looks something like this:
+
+    variable c
+    ...
+    begin  p @ c@  [char] 0 -  dup c !  10 u< while
+        value f@ 10. d>f f*  c @ 0 d>f f+  value f!
+        1 p +!
+    repeat
+
+This is 27 run-time operations (`[char]` and `begin` are purely
+compile-time) which is just over twice the 11 instructions in the i386
+code above.  Such a 2:1 ratio is typical for stack-machine code and
+register-machine code.
+
+It happens, though, that there’s no need for the separate variable
+`c`; we can store it on the operand stack:
+
+    begin  p @ c@  [char] 0 -  dup  10 u< while
+        d>f  value f@ 10. d>f f*  f+  value f!
+        1 p +!
+    repeat drop
+
+Or the return stack:
+
+    begin  p @ c@  [char] 0 -  dup >r  10 u< while
+        value f@ 10. d>f f*  r> 0 d>f f+  value f!
+        1 p +!
+    repeat rdrop
+
+Nor do we need an explicit `fvariable value`; as the i386 code does,
+we can use the top item on the floating-point stack, which ANS FORTH
+allows to be the operand stack or not:
+
+    begin  p @ c@  [char] 0 -  dup >r  10 u< while
+        10. d>f f*  r> 0 d>f  f+
+        1 p +!
+    repeat rdrop
+
+Forth also has compile-time evaluation, which we can use to avoid
+reconverting 10 to floating-point every time through the loop:
+
+    begin  p @ c@  [char] 0 -  dup >r  10 u< while
+        [ 10. d>f ] fliteral f*  r> 0 d>f  f+
+        1 p +!
+    repeat rdrop
+
+That’s only 21 operations, just under 2:1.  However, perhaps more to
+the point, it’s *dramatically* less code than the assembly version;
+it’s close to the C version in verbosity.  (On the other hand, I feel
+that I have more bugs writing stack code than register code; I succumb
+too easily to the temptation to keep lots of things on the stack, and
+then I lose track of where things are.)
+
+The upshot of this is that if you have an operand stack sitting around
+somewhere, then it becomes feasible to compose “expressions” by
+concatenating bits of executable code that communicate implicitly
+through that operand stack.  This more or less gives you Forth.
