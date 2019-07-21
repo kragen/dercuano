@@ -1,0 +1,490 @@
+Measuring the moisture content of coffee and other things with dielectric spectroscopy
+======================================================================================
+
+How can you measure the humidity of coffee, rice, beans, yerba mate,
+flour, oatmeal, polenta, wood, clay, concrete, soil, plastics, and so
+on?
+
+The measurement techniques described in `trellis-coded-buttons` can be
+applied to humidity measurement, but there are additional issues.
+
+The importance of humidity
+--------------------------
+
+On Earth, humidity is a crucially important property for many
+purposes.
+
+### Food ###
+
+Dried food stored with too much moisture can grow mold, and in
+particular mold on improperly stored legumes is one of the major
+causes of human liver cancer in the world, by way of aflatoxin
+contamination in the food eaten by the humans.  Also, extra moisture
+in food represents extra weight that must be stored and sometimes
+moved, and food is often sold by weight, so standards of marketability
+impose maximum humidity contents on foods.
+
+File `deep-freeze` talks a bit about moisture content of marketed dry
+food (11% or less for marketed soybeans, for example).  File
+`food-storage` talks a bit about moisture as a factor in food decay.
+
+### Wood and wood products ###
+
+Wood expands and contracts considerably according to humidity, and so
+must be dried to roughly the proper humidity before being made into
+things, so that it doesn’t expand or contract too much after being
+assembled; also, ever since the development of lignolytic enzymes such
+as lignin peroxidase (probably at the end of the Carboniferous),
+already-installed wood is subject to attack by fungus if it’s humid.
+
+Additionally, humidity in installed wood can indicate the presence of
+termites, which will destroy the wood, or a water leak, which may
+destroy things in contact with the wood, as well as permitting fungal
+growth, as above.
+
+Wood products like fiberboard and particle board are similar to wood
+in this way, but some of them additionally suffer direct degradation
+from being wetted.  Most varieties of MDF expand about 60% in the
+cross-grain direction when they get wet, losing most of their already
+rather pitiful strength in the process, and the adhesives used in in
+particle board are also often degraded by getting wet, even if the
+moisture doesn’t last long enough to permit mold attack.
+
+Dry wood and wood products also provide substantial insulation values,
+while their wet versions do not.
+
+File `solar-air-conditioner` talks a bit about various organic
+hygroscopic substances, including wood, and how much water they can
+absorb: dry wood contains about 12% moisture, while wood in
+equilibrium with a humid atmosphere can contain up to 25% to 30%
+humidity.
+
+### Clay ###
+
+The physical properties of a clay body† prepared for pottery-making
+depend sensitively on its moisture content.  In a couple of percent
+near 20% water by weight, it transitions from brittle “dry” clay,
+which is still cool to the touch because of the heat-pipe effect as
+water evaporates from near the humans’ fingers, to flexible
+“leather-hard” clay, which can still be broken, to fully plastic clay
+which can be deformed arbitrarily as long as it’s kept in compression.
+(Like ductile iron, it still eventually reaches brittle fracture under
+sufficient tensile deformation.)  A fully plastic clay body is a
+fucking amazing material for forming: it requires very little force to
+deform it, and because its elastic deformation is so small as to be
+very difficult to measure, which means that once you form it into a
+shape, it has very little springback as you remove the forming tool.
+
+There’s a further humidity reduction from “dry” to “bone-dry”, at
+which point the object no longer feels cool to the touch, and is ready
+for firing.  Bone-dry clay is still brittle, but considerably stronger
+than merely “dry” clay.
+
+The precise moisture percentages at which the clay body transitions
+between these states vary fairly widely depending on the types of clay
+involved and the other ingredients.
+
+As the clay body dries, it contracts, which sets up stresses in the
+object, which can deform it, and provokes some dimensional
+imprecision — the contraction is typically anisotropic due to not only
+anisotropic orientation of clay grains but also because of external
+forces present during the contraction process, so the shrinkage is
+somewhat unpredictable.  Nearly all of this contraction is between the
+“fully plastic” state and the “leather-hard” state; there is
+dramatically less contraction from “leather-hard” to “dry”, and none
+from “dry” to “bone-dry”, and almost none from “bone-dry” to
+bisque-fired (sintered) ceramic.  (Glaze-firing densifies the ceramic
+further, producing further contraction.)
+
+In the plastic state, the clay is sticky and tends to adhere to
+whatever you use to form it, pulling it out of shape as the forming
+contact ends; once it is leather-hard, it is no longer sticky.
+Plastic clay in a dry atmosphere forms a thin leather-hard layer at
+the surface which can serve to ameliorate this stickiness.
+
+So, if you form clay in the fully plastic state, you get substantial
+contraction and consequent imprecision upon drying to leather-dry.  If
+you form the clay in the leather-hard state, you can get near-net
+shapes, but you are very limited in the deformations you can achieve.
+You can also *cut* leather-hard clay with a blade, getting
+glassy-smooth surfaces, although these do not survive bisque firing.
+Once the clay is dry, it can be further cut to shape with abrasive
+processes, at the risk of shattering the brittle piece.
+
+So, precise measurements of clay moisture content, down to a fraction
+of a percent, are very useful for controlling manufacturing processes,
+particularly automated manufacturing processes.  The humidity at each
+of these transition regions depends on the precise contents of the
+clay body, but if you’re using a well-controlled clay body, you can
+calibrate your humidity levels to that clay body and get reproducible
+manufacturing results.
+
+† For making pottery, we mix clays with other materials, including of
+course water, but also sand, other “tempers” such as grog (powdered
+fired clay), flocculants, deflocculants, and organic gums, in order to
+balance the properties of plasticity, green strength, contraction,
+firing temperature, and strength after firing; this mixture is called
+a “clay body”, although sometimes in the above I’ve sloppily called it
+“clay”.  Pure clay contracts on drying considerably more than
+commonly-used clay bodies do, and its green strength and even fired
+strength are much lower.
+
+### Concrete ###
+
+Concrete needs water to harden, but I think that if it’s too wet,
+atmospheric carbon dioxide can’t penetrate, which slows the hardening
+process.  If it dries out before hardening fully, it can become
+crumbly and impossible to harden.  So, during hardening, it’s
+potentially beneficial to monitor the moisture.
+
+Also, continued exposure to water can degrade concrete, particularly
+if the water contains high concentrations of, for example, chloride or
+hydronium ions.  And, as with wood, moisture in concrete can be a sign
+of water leakage, which can eventually result in damage to other
+objects if it continues.  If the moisture is sufficient to saturate
+the surface of the concrete, it usually becomes very visible to the
+humans by darkening the concrete, but if the surface is kept somewhat
+dry by exposure to air, moisture in concrete can be entirely
+invisible.
+
+So, monitoring moisture in concrete is useful both during hardening
+and long afterwards.
+
+### Soil ###
+
+Soil moisture is crucially important for plant growth, because if
+there isn’t enough moisture in the soil, plants can’t suck it out of
+the soil, so they stop growing and eventually die.  Also, if the
+moisture levels are too high, you get two kinds of fungal problems and
+a bacterial problem: too much water can suffocate symbiotic
+mycorrhizal fungi, which are extremely beneficial to land plants
+(although some land plants can survive without mycorrhiza); too much
+moisture can help non-symbiotic fungi to eat the plants; and, without
+access to nitrogen from air, rhizobial bacteria cannot fix nitrogen.
+
+However, the particular level of soil moisture needed for plant growth
+depends on the salinity of the soil; roots have a harder time pulling
+moisture out of saline soils due to higher osmotic pressure.
+
+### Plastic ###
+
+Many common plastics, notably including PET, nylon 6, and PLA, are
+hygroscopic; they absorb water from the air.  In ordinary use, this is
+rarely a problem, or is even beneficial, but it has a couple of
+important effects on melting or hot-forming the plastics.
+
+First, the absorbed water affects the plastics’ specific heat,
+generally increasing it, so the plastic heats up more slowly.  Second,
+although these plastics are relatively stable in the presence of water
+at ordinary temperatures, they hydrolyze at the temperatures used for
+forming or melting them.  (Also, PLA in particular, if kept wet,
+hydrolyzes to lactate over several months at body temperature, and
+several years at room temperature.)  So they must be dried before
+molding, which is done by heating them to a lower temperature for
+several hours.
+
+Static permittivity
+-------------------
+
+Electric charge produces an electric field according to Gauss’s law,
+∇·E = ρ/ε₀, where ρ is the charge density and ε₀ is about 8.8541878 ×
+10⁻¹² A² s⁴ / kg m³.  But, here on Earth, the electric field we
+observe is always lower than this prediction — usually about 0.06%
+lower in air, almost 5 times lower in glass, and almost 90 times lower
+in pure water.  That is, to get a given field, we need about 0.06%
+more charge than this law would predict, or about 5 times as much
+charge if the region of interest is mostly filled with glass, or
+almost 90 times as much charge underwater.  (Of course, unless our
+water is very pure, the charge will leak away over time through
+electrolytic currents, but we can do this measurement pretty quickly,
+in much less than a nanosecond, so the leakage is small.)
+
+We explain this by a phenomenon called “electric susceptibility”: we
+suppose that the molecules of the substance have their own electric
+fields, and they interact with the applied field.  For example, in
+water, the two hydrogen atoms are kind of on the same side of the
+oxygen, and they have a small positive charge, while the oxygen has a
+small negative charge, less than an electron.  So if we put a negative
+charge on the left of it, it attracts the hydrogens and repels the
+oxygen.  Because water is a liquid, the water molecule is free to turn
+around, it tends to turn so that its hydrogens are on the left and the
+oxygen is on the right (“dipole relaxation”).  So then the water
+molecule’s own tiny electric field is subtracted from the electric
+field of the negative charge we put to its left, and in fact it
+cancels almost 99% of it under ordinary conditions.  So we need 90
+times as much charge to get the same electric field as we would
+predict from Gauss’s law.
+
+There are a few different ways that charges can move around inside the
+substance (“polarize”) in response to the applied electric field.  For
+example, in addition to molecules turning around, ions can move around
+(“ionic conduction”); crystal structures can deform (“ionic
+polarization”); electrical charge can flow to different parts of a
+molecule, especially a conjugated compound; and so on.  As a general
+principle, though, because opposite charges attract each other, all of
+these effects *cancel* the field somewhat; they never make it
+stronger.  The cancellation is never complete, either, because as it
+approaches completeness, the leftover field’s influence on the charges
+approaches zero, so other influences on them are more important, like
+thermal motion.  So we would expect that usually heat would make this
+susceptibility go down, and in fact we do see this with water: at
+100°, we only need about 55 times as much charge as Gauss’s law
+predicts, instead of the 88 times as much charge we need at 0°.
+
+So usually when we apply Gauss’s law, we apply it in the form ∇·E =
+ρ/ε, where the ε is a “permittivity” which is ε₀ multiplied by a
+“relative permittivity” or “dielectric constant” that includes the
+susceptibility of the medium, as well as the inherent “vacuum
+permittivity” ε₀.  So, for water at 0°, we say the relative
+permittivity is 88, and for water at 100°, we say it is 55.
+
+(This effect is also the main reason light travels at different speeds
+through different substances, which is why transparent substances both
+refract and reflect light at their surfaces.  Rutile — titanium
+dioxide — refracts light so strongly because its permittivity is even
+higher than water’s, even though it’s solid.)
+
+Porous, dry organic materials like paper, wood, coffee, beans, and
+rice have relative permittivities around 4, which is much smaller than
+water’s permittivity of 88.  By coincidence, quartz sand’s relative
+permittivity is also about 4 (it’s 3.9) and so is concrete’s (it’s
+4.5).  So, if these materials absorb water, their permittivity goes up
+substantially.
+
+Static relative permittivity is just an approximation
+-----------------------------------------------------
+
+Consider the polarization of water again, though.  It happens by
+turning the water molecules around so that their hydrogens are
+predominantly on the side toward the negative charge and their oxygens
+are on the side toward the positive charge.  It happens that this
+effect is close to linear under normal circumstances: slowly applied
+fields that are quite small compared to the enormous electric fields
+inside the molecule.  But, as you can imagine, this linearity breaks
+down under other circumstances.
+
+One aspect of this is that it takes a certain amount of time for the
+molecules to come into this alignment, and some of the energy of the
+applied field is lost in the process — the molecules in liquid water
+are shaking around under the influences of one another’s fields, and
+so if you apply a rapid enough jolt of electrical field, they won’t
+respond fast enough.  So as the time we’re considering goes to zero,
+or frequency goes to infinity, the susceptibility also goes to zero.
+
+(In optics, this variation of permittivity with frequency is called
+“chromatic aberration” or more generally “material dispersion”.)
+
+So you could imagine rapidly bringing some charge into proximity with
+some water, over a short time period, like an attosecond.  At first
+you would observe the whole field predicted by Gauss’s law in its pure
+form, the ε₀ form, but then if you left the charge there for a while,
+gradually the field would decay down to its usual level of about 1% of
+its original value.  Most of the energy has gone out of the field.
+Where did it go?
+
+And of course the answer is that it went into heating up the water
+molecules: as they rotated around to come into alignment with this
+sudden jolt of electrical field, they jostled against each other and
+gained some kinetic energy.  And this is how we heat up water in a
+microwave oven, by applying an electrical field that goes the other
+direction every 210 picoseconds or so.  This loss of electrical energy
+to heat is called a “dielectric loss”.  The dielectric loss is often
+combined with the dielectric constant into a single complex number
+called the “complex permittivity”.
+
+A thing to note there is that the different susceptibility mechanisms
+operate on different time scales.  Ionic conduction is a great deal
+slower than dipole relaxation, for example, and water always contains
+some ions; water absorbed by organic matter or soil usually contains
+an enormous quantity of ions.  It happens that ions become more mobile
+when the temperature is higher, so the low-frequency permittivity of
+moist organic matter is dominated by ionic conduction, and so its
+permittivity goes *up* when it gets hot, instead of down like pure
+water’s, at least until it’s close to boiling.  But, for the same
+reason, the permittivity of water with lots of ions drops sharply with
+frequency, much more sharply than pure water’s, and above a few tens
+of megahertz, its permittivity becomes dominated by dipole relaxation
+and drops with temperature, for the reason explained above.
+
+So, for example, carrots contain so many solvated ions that, at low
+frequencies, they have a relative permittivity of about 600 at 25°,
+which increases to about 850 at 45°, but around 100 MHz the
+permittivity of carrots is nearly invariant with temperature.  Navel
+oranges, which contain many fewer ions, only have a relative
+permittivity of about 200 at 25°, which increases to 250 at 45°, and
+the point at which their permittivity becomes insensitive to
+temperature is about 40 MHz.  (All of this is according to Nelson’s
+2006 paper, “Agricultural applications of dielectric measurements.”)
+
+(I am somewhat skeptical of the precision of these numbers;
+theoretical considerations suggest that they come from
+Maxwell–Wagner–Sillars polarization, which can give you arbitrarily
+large permittivities because the charges can be separated by
+arbitrarily large distances.)
+
+Not only the permittivity but also the dielectric loss varies with
+frequency; the dielectric loss, too, falls with frequency in the
+limit, but may locally rise over some frequency range.
+
+Another way this linear approximation can fail is with very strong
+fields.  At the macroscopic field strengths we usually observe, the
+linear approximation is very good, but you can easily see that once,
+for example, all the water molecules are all pretty well lined up with
+the applied field, they can’t align themselves any further to cancel
+an even stronger applied field; any further electrical susceptibility
+must be due to other effects such as the molecules bending, or charge
+moving around on them, or ions moving through the water, which are
+much weaker effects.  So at high enough field strengths, the relative
+permittivity of any substance drops back to almost 1, just like its
+relative magnetic permeability.  In optics these deviations from
+linearity are called the “Kerr effect”, and they are one of a few ways
+to get nonlinear interactions between light beams or to electrically
+control light beams at subnanosecond timescales.  (At even higher
+field strengths, though, the applied field is stronger than the fields
+that hold the molecules together and the substance will ionize.  This
+alters its electrical and optical properties more radically.)
+
+This nonlinearity is also very important in practice with ceramic
+capacitors; among the highest-dielectric-constant materials available
+are the piezoelectric ceramics barium titanate and lead zirconate
+titanate, which can have relative permittivities (dielectric
+constants) in the thousands, and they make possible high-capacitance
+chip capacitors.  But when fully charged to their rated voltage, the
+capacitance of these capacitors can drop by almost half — the field is
+almost high enough to cause avalanche breakdown of the perovskite
+structure, and the permittivity of the dielectric drops dramatically
+at such high fields.
+
+However, I don’t think these strong-field effects are important to the
+moisture-measurement problem.
+
+Another direction in which the linear approximation fails — for some
+substances — is in the limit of long time periods.  The energy stored
+in a capacitor at a given field strength is proportional to the
+permittivity of the capacitor’s dielectric; by using a
+higher-permittivity dielectric, you can store more energy in the same
+space.  So why don’t we use water-dielectric capacitors for everything
+except cases where miniaturization is paramount, since water is so
+much cheaper than lead zirconate titanate?  It turns out that, in the
+limit of large times, water will always break down in a constant
+electric field, although the time it takes extends exponentially as
+the field is reduced.  So water-dielectric capacitors do work, and
+they are used for some systems that need to release an enormous amount
+of energy very quickly, but they cannot hold their charge for a long
+time.
+
+A third direction in which this approximation fails has to do with
+anisotropic materials, which can have greater permittivity in some
+directions than in others.
+
+Applying permittivity variation to moisture measurement
+-------------------------------------------------------
+
+So, suppose you have some ground coffee, and you want to know how much
+moisture it contains.  The most straightforward thing to do is to
+place an insulated metal plate in contact with the coffee — for
+example, a copper pour on a printed circuit board, covered with solder
+mask — and charge the plate up to a given voltage, like 3.3 volts.
+The amount of charge needed for this will depend on the permittivity
+of the coffee.  To measure the charge, you can allow the plate to
+discharge through a known, or at least constant, resistance, and
+measure the time constant of the decay curve.  This gives you a
+measurement which depends on the moisture content of the coffee.
+
+(For a sensor that isn’t connected to earth ground, you might actually
+need two equal-size metal plates, one treated as “ground”, to reduce
+variation due to the floating voltage of the instrument.)
+
+The problem with this is that, as explained above, the measurement
+depends not only on the moisture, but also on the temperature.  It
+also depends on how tightly packed the coffee is, because if there’s
+more air mixed in with the coffee, that will lower the measured
+permittivity.  And in situations where the measurement is being taken
+by placing some kind of handheld sensor against the coffee (or wood or
+whatever), rather than dumping the coffee into the sensor, you have
+the additional variables of the size of the air gap between the sensor
+and the coffee, and the percentage of the plate that is in contact
+with the coffee.
+
+(I suspect, but am not certain, that all three of density, contact
+area, and air gap size will have essentially the same effect, in which
+case we can lump them together into a single unknown, “quantity of
+material”.)
+
+In an alternative arrangement, you run a sinusoidal AC voltage at a
+controlled frequency into the sensor plate (or plates) and measure the
+AC current that ensues, thus giving you a measure of capacitance,
+which varies linearly with permittivity; the phase shift between the
+voltage and the current tells you how large the dielectric losses are.
+If you know enough about the substance whose humidity you’re
+measuring, you can choose the frequency where its permittivity doesn’t
+vary with temperature, only with density and humidity, and then you
+can use the dielectric losses to determine how much of the substance
+you’re measuring.
+
+More generally, at that point, it’s just a matter of estimating two
+unknowns (moisture content and quantity of material) from two
+measurements (capacitance and loss factor).
+
+By sweeping the frequency over a wide range, you can obtain a whole
+spectrum of complex permittivities at different frequencies, which in
+theory can provide you with an arbitrarily large number of possibly
+independent measurements.  This could allow you to estimate a larger
+number of unknowns, such as temperature, moisture content, density,
+air gap size, and contact area, and perhaps even to distinguish
+between, for example, coffee, human flesh, and rice.
+
+Another possibility is to use an array of smaller “pixel” contacts;
+for example, a 16×16 array of 4 mm × 4 mm contact areas separated by
+1-mm gaps would enable an independent permittivity measurement on each
+pixel.  This would reduce the problem of unknown contact area (where
+an unknown fraction of the sensor plate is in contact with the
+material being measured) and also permit the generation of images.
+
+In the cases of soil and concrete, an important additional unknown is
+salinity.  In soil in particular, higher salinity increases
+permittivity and conductivity, but makes water less available to
+plants, while higher moisture increases permittivity and conductivity,
+while making water more available to plants.  So if we want to measure
+the soil’s need for irrigation, but don’t know the salinity, a simple
+permittivity measurement is insufficient — we need to estimate both
+the moisture content and the salinity, and probably the density and
+temperature as well.  For irrigation measurements in particular, it
+may be feasible to supplement the permittivity measurements with
+resistivity measurements and thermometer measurements, if you’re
+leaving the sensor embedded in the soil long enough to measure its
+temperature to some degree of precision.
+
+An alternative approach to controlling for temperature effects is to
+intentionally heat the material being measured during the sensing
+process.  The dielectric losses being measured will deposit a small
+and approximately known amount of heat into the substance being
+measured; since some of the temperature coefficients of permittivity
+we’re talking about above are as high as 2% per degree (20000 ppm/K),
+even small temperature shiffts might be detectable, and might provide
+a much-needed additional dimension of variation.  That is, you can map
+the complex permittivity of the sample not just at many frequencies
+but at many frequencies at many temperatures.
+
+### Harmonics and analog electronics ###
+
+If you’re generating the stimulus signal from something like an AVR
+Arduino, the signals you can generate are somewhat limited — the AVR
+can easily generate square waves of up to about 4 MHz, and I think
+that by hacking the SPI you can generate a somewhat noisy 8-MHz square
+wave.  More modern cheap microcontrollers like the STM32L0 and STMF0
+lines (see file `stm32`) can easily generate square waves and pulse
+trains at a few tens of MHz.  However, as mentioned earlier, the
+permittivity of moist organic material has important variations up to
+and above 100 MHz — in particular, you often have to go that high for
+the dipole-relaxation mechanism to be the dominant contributor to the
+dielectric constant.
+
+However, an 8-MHz square wave has significant harmonics at 24 MHz,
+40 MHz, 56 MHz, and 72 MHz.  Perhaps a small amount of analog
+circuitry connected to the outside of the microcontroller could
+filter out a particular harmonic for later conversion.
+
+However, if you’re doing *that*, maybe you should just offload the
+whole oscillation and demodulation task onto analog electronics,
+reserving the microcontroller for just control.
