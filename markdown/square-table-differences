@@ -1,0 +1,98 @@
+A failed attempt to make squares cheaper to compute
+===================================================
+
+Could you cheaply generate a lazily filled square table using the
+method of differences?
+
+The squares are the sums of the odd naturals; 5² = 25 = 1 + 3 + 5 + 7
++ 9, for example.  The simplest way to tabulate the sequence of
+squares *y* = *x*², or for that matter any polynomial function, is
+using the method of differences, here using three columns because the
+sequence is quadratic:
+
+    2    1    1
+    2    3    4
+    2    5    9
+    2    7   16
+    2    9   25
+    2   11   36
+    2   13   49
+
+Here each number is the sum of the number to its left and the number
+above it, except the first row.
+
+This is not a very appealing way to find 28², though.
+
+Consider, though, if we want to tabulate *y* = (3*x*)² = 9*x*².  We
+can tabulate this sequence with the same algorithm, but starting from
+a first row that is multiplied by 9:
+
+    18    9    9
+    18   27   36
+    18   45   81
+    18   63  144
+    18   81  225
+    18   99  324
+    18  117  441
+    18  135  576
+    18  153  729
+
+This has gotten us somewhat more quickly to 27² = 729, which is very
+close to knowing 28²; specifically, the difference is 2·27 + 1 = 55,
+so 28² = 729 + 55 = 784.  We could have gotten there even faster by
+tabulating *y* = (9*x*)² = 81*x*² in the same way, starting with a
+first row multiplied by 9² = 81:
+
+    162    81    81
+    162   243   324
+    162   405   729
+
+That is, this setup allows us to leap ahead as we tabulate squares,
+skipping eight out of every nine items.  We could leap by tens, or by
+hundreds, or by 27s, or by any other number.  And once these squares
+are tabulated, we can keep them tabulated and not recalculate the ones
+needed to get us close to our objective.
+
+This suggests a general procedure for finding your way to a given
+square with a logarithmic number of N-digit additions: first leap by
+the largest power of 3 less than the number, twice if necessary; then
+the next-largest power of 3, twice if necessary; and so on, until
+you’re leaping by 1s.  So, for example, to square 451, first find the
+square of 243, then 324 (leaping by 81), then 405, then 432 (leaping
+by 27), then 441 (leaping by 9), then 450, then 451.  This involves 12
+three-digit additions, which is worse than the standard
+partial-products approach, but only by a factor of 4.  And it’s the
+same 12 operations we’d need to find the 451st term of an arbitrary
+quadratic sequence, not just *y* = *x*².  And maybe some of those
+values would be already tabulated if this isn’t the first number we’re
+squaring.
+
+However, there’s a missing piece here.  When we arrived at 27 leaping
+by 9s, our computational state said:
+
+    162   405   729
+
+To leap by 1s again instead of 9s, we need to somehow get from that to
+this:
+
+      2    55   729
+
+The 2 is easy — it’s the same 2 on the first line of the leaping-by-1s
+square sequence — but where do we get the 55 from?
+
+I’m pretty sure that the second column we need to slow down by a
+factor of 9 is a linear function of the previous computational state
+(162, 405, 729), and I think you can derive that linear function from
+Newton’s divided-differences form for the underlying polynomial.
+
+But I suspect it really only depends on the 405 in this case.  55 is
+55 because it’s 2*x* + 1.  405 is 405 because it’s 18*x* - 81.  So 55
+is 2(405 + 81)/18 + 1 = 405/9 + 10.  Extending this to arbitrary
+quadratic functions (which potentially have a different second-order
+difference) might involve taking the 162 into account: it’s the 2 of
+our original second-order difference multiplied by the square of our
+speed.
+
+This is kind of shitty, though, because we were hoping to avoid
+multiplying a two-digit number by itself, and to get there we ended up
+dividing a three-digit number by 9, which is *harder*.

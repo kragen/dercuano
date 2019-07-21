@@ -1,3 +1,8 @@
+(See `cpu-ui` for related ideas.)
+
+The Olivetti Programma 101 in 1964 and its VWXZ keys
+----------------------------------------------------
+
 I was reading about the Olivetti Programma 101 desktop computer today.
 It cost US$3200 when it came out in 1964; they sold forty thousand of
 them.  It could be used as a printing calculator (LED displays were
@@ -16,6 +21,9 @@ the calculator finished feeding the magnetic card through the reader,
 it would come to rest atop these keys, so it could bear human-readable
 labels for them, explaining what the newly-loaded program had
 programmed them to do.
+
+The keyboard *is* the instruction set
+-------------------------------------
 
 RPN calculators, of which I assume the Programma was one, enjoy a
 pleasantly simple way of programming them: the sequence of
@@ -50,6 +58,9 @@ you can make those keys and those instructions reprogrammable.
 runs when the computer is waiting for an instruction from the keyboard
 and doesn’t get one, you can incrementally extend the computer’s
 instruction set into an arbitrary application.)
+
+How teensy can you make the machine?
+------------------------------------
 
 We probably can’t make do with 32 instructions and keys on the
 keyboard.  A modern “four-function” calculator has the digits, “.”,
@@ -92,13 +103,16 @@ meanings of 32 of the 64 possible six-bit instructions (and keys); the
 other 32 instructions are hard-wired, perhaps taken from the F18a
 core.  Those 240 words of RAM can contain 960 instructions, which can
 invoke routines in the other 1024 instructions stored in ROM.  These
-are stack-machine instructions, so this is roughly comparable to 1000
-machine instructions for the 386 or SPARC: barely enough for a simple
+are stack-machine instructions, so you have to spend about half of them
+on stack manipulation to make up for not having operand fields,
+so this is roughly comparable to 1000
+machine instructions for the 386 or SPARC
+(500 in RAM, 500 in ROM): barely enough for a simple
 compiler or assembler, plenty for a video game, and probably not
 enough for a working TCP/IP stack.
 
 (It’s a great deal more than the 1024 bits of RAM in the Atari 2600 or
-the 1152 bits of RAM in an F18a core, but less than the 8192 bits of
+the 1152 bits of RAM in an F18a core, but less than the 16384 bits of
 RAM in an ATMega328 Arduino, and dramatically less than its 262144
 bits of Flash.)
 
@@ -116,6 +130,9 @@ calculator or a pocket watch, but not in the same world of difficulty
 as many mechanical machines that already physically exist.  In fact,
 it’s probably a lot less demanding than the Jaquet-Droz automata.
 
+Comparison to the GreenArrays F18A
+----------------------------------
+
 The F18A has a ten-item parameter stack and IIRC a nine-item control
 stack; more deeply nested code will not be able to return.  In its
 case, since they’re 18 bits wide, they amount to 342 bits.  On this
@@ -128,6 +145,9 @@ the size of the RAM and therefore probably a good investment.
 (The F18A also has some named memory pointer registers, one of which
 is also used for multiplication, and a few other miscellaneous
 features.)
+
+Arithmetic overflow and usability
+---------------------------------
 
 My experience with integer math in computer programs is that I have to
 think about overflow incessantly with 8-bit variables, frequently with
@@ -145,7 +165,192 @@ programs that don’t care about transcendental functions and instead do
 other things, like assemblers and BASIC interpreters, so you can
 bootstrap to higher levels of abstraction.
 
+Modeless machine-code programming by example
+--------------------------------------------
+
 You could maybe eliminate the distinction between compiling and
 interpreting modes by always recording the user’s keystrokes into some
 memory buffer or other, thus always preserving the option of executing
-them later.
+them later.  (See file `cpu-with-knobs` for more elaboration on this
+theme, in a non-stack-machine context.)
+
+Display refresh, task segments, and multithreading
+--------------------------------------------------
+
+If you’re executing machine code interactively to do calculations, you
+probably want to see the values you’re operating on.  If the CPU has
+registers (for example, a top-of-operand-stack and
+next-on-operand-stack register), you probably want to see those
+registers rather than, say, some memory location.  But more advanced
+applications might want to display something custom, which might not
+be numbers.  One way to do this would be for hardware to copy these
+registers onto the display every, say, 15 or 20 milliseconds; if the
+system that does this raises an interrupt a little earlier, then a
+custom interrupt handler could arrange to set those registers to the
+desired display value for a few dozen microseconds.  Another way would
+be to update the display explicitly rather than implicitly, possibly
+also from a timer interrupt handler.
+
+This ties in with how the machine’s control flow weaves together
+keyboard response, background-task service, and interruption of
+accidental infinite loops.  A standard single-threaded computer runs a
+top-level infinite event loop with its PC either at a halt instruction
+or running some background task most of the time; when you press a
+key, an interrupt is raised, the background task is suspended (or the
+halt is raised), and the PC moves into the keyboard interrupt handler;
+this buffers a keystroke and perhaps sets a flag or two, and upon
+return, the main event loop takes note of the keystroke (sooner or
+later) and acts upon it, perhaps invoking other subroutines.
+
+Here we’re proposing that the PC normally be pointing *to the
+keyboard*, such that when the CPU attempts to fetch an instruction,
+the fetch blocks until a key is pressed; possibly a timer interrupt
+might interrupt the blocked fetch from time to time, running some
+background task, before resuming the blocked fetch; when the keystroke
+executes, it may call some other subroutine, pushing the address of
+the keyboard onto the stack for a while until the subroutine finishes
+and the CPU awaits the next keystroke.
+
+One consequence of this is that you need some way to keep the PC from
+incrementing out of the keyboard space.  This could be done with
+saturating arithmetic (placing the keyboard at the end of the address
+space), an equivalent special case in the PC increment logic at some
+other arbitrary address, or in a non-special-case way by limiting the
+width of the PC increment logic.  For example, you could simply omit
+the carry out of the 7th bit of the PC (and everything beyond), such
+that every 128 memory words formed a separate “task segment” — if
+control falls off the end of one, it just wraps back to its beginning.
+Then you memory-map the keyboard to an entire task segment.  (I think
+I got this solution from the GreenArrays chips, but of course an 8086
+will do much the same thing — IP is a 16-bit register and doesn't
+overflow into CS; if you execute off the end of a 64K code segment, it
+will wrap back to the beginning.)
+
+However, in this model, quite aside from how it may or may not handle
+PC incrementation, two problems are not entirely resolved.  First, how
+do you recover control if you accidentally invoke an infinite loop
+which never returns into the keyboard address space?  Second, how can
+a best-effort background task (as opposed to an isochronous task like
+updating the display or incrementing an RTC) yield its time slice to
+interactive computation?  After all, from the point of view of an
+interrupt handler, the difference between being invoked when the
+machine is idle and while it’s running some computation is just a
+matter of whether it’s returning to the keyboard’s address or
+somewhere else; it would be ugly to have it introspect that in order
+to decide whether to return before doing its quantum of work.
+
+I’m not yet convinced there’s a clean solution to those problems
+within the keyboard-is-instruction-set, no-monitor-program-needed
+constraint.
+
+The 8080 RST instruction and keyboard bucky bits
+------------------------------------------------
+
+Each instruction on the Intel 8080 was one byte, not counting possible
+operand bytes following the opcode byte in the instruction stream, so
+there were only 256 possible instructions.  8 of these precious slots
+were given over to an “RST” instruction, glossed “restart”, which
+included a 3-bit operand field “nnn”; in octal, it had the opcode
+03N3.  These called a subroutine at address 000 0N0 (again, in octal),
+and the machine’s hardware interrupt, as I understand it, invoked the
+eighth of these eight subroutines in the same way as if an RST 7
+instruction had been issued.
+
+Since they called a subroutine in the usual way, pushing the PC on the
+stack, the code thus invoked could RET to the program that had invoked
+the RST instruction (or that happened to be running when the hardware
+interrupt arose), which would then continue its execution as if
+nothing untoward had happened.  In essence, the eight RST instructions
+provided eight programmable opcodes, vectored to subroutines in RAM or
+ROM.
+
+The question arises: if some of your opcodes are such vectorable
+subroutine calls, and you’re relying on this for your user interface,
+what is the proper number of them to have?  The Olivetti Programma
+101’s four programmable keys is probably too few, as is the 8080’s
+eight RST opcode bytes.  You usually want to have more than eight
+actions available to the user at any given time when they are using an
+application, especially if they are going to be composing text.  And
+it’s reasonable to think that high-level application code might
+consist largely of calls to existing subroutines, although some amount
+of immediate data is surely needed; being able to vector a significant
+chunk of the instruction set to such subroutines might be a really
+cool way to extend the instruction set in an application-specific way,
+taking language-oriented programming down to the machine-code level.
+
+One constraint here is the physical keyboard size.  The keyboard I’m
+typing this on has 88 keys, like a piano.  (It’s a “Genius” “Luxemate
+100” USB keyboard chosen because it was cheap and small enough to
+easily fit into my backpack, despite having kind of a shitty feel and
+a non-coiling cord.)  A minimal typewriter-style keyboard probably has
+around 50 keys, as does the “Cifra SC-9100” scientific calculator I
+profiled in `scicalc-usability`.  A keyboard with 256 or 512 keys
+would be unwieldy.  Even the 101-key keyboards that are common on PCs
+nowadays are unwieldy; you can’t reach most of their keys without
+moving your hands.  The Android 4 on-screen keyboard on the phone I
+have here has only 34 keys, and it requires constant mode-switching
+and autocorrect to approximate usability.  Termux, a Unix CLI
+environment for Android, adds 17 more keys, bringing the total to 51,
+and does reach a more reasonable level of usability.
+
+StoneKnifeForth, which is an i386 compiler that compiles itself into a
+Linux ELF executable in two pages of source code (or 7 pages counting
+comments), consists of 50 subroutines and variables.  More elaborate
+software modules need more, but probably it’s only rarely useful to
+have many times more subroutines accessible than that.
+
+So, an interesting design alternative: have an 8-bit instruction set
+of which 64 bytes — perhaps the ones corresponding to ASCII digits and
+lowercase — are directly generated by the keyboard and vectored like
+the 8080’s RST instructions are vectored:
+
+      +  0 1 2 3 4 5 6 7 8 9 a b c d e f
+    0x20   ! " # $ % & ' ( ) * + , - . /
+    0x30 0 1 2 3 4 5 6 7 8 9 : ; < = > ?
+    0x60 ` a b c d e f g h i j k l m n o
+    0x70 p q r s t u v w x y z { | } ~ DEL
+
+This omits uppercase letters, @, [, \\, ], ^, \_, and the control
+characters other than DEL; none of these are essential for arithmetic,
+and this was probably a deliberate design decision on the part of the
+ASCII committee: a single contiguous 32-character chunk of the code
+space is adequate for FORTRAN, except for the alphabet.
+
+In addition to these 64 keys, corresponding directly to bytes that
+invoke subroutine calls in the CPU, you can have two “bucky keys” to
+generate the rest of the possible 8-bit bytes.  One of them (“Meta”)
+should obviously set the high bit, while the other one probably needs
+to act like Shift for the lowercase letters, which is to say that it
+maps 0x61 to 0x41, 0x70 to 0x50, and so on.  The simplest thing for
+this “Shift” to do would be to clear the 0x20 bit, which would map the
+digits and most punctuation to control characters.  In particular,
+backspace would be shift-“(“, tab would be shift-“)”, CR would be
+shift-“-”, and LF would be shift-“\*”.  This may be too outré to use
+in practice, although at least DEL is on a key of its own.
+
+Traditional keyboards, as represented by libvte and xterm anyway,
+ignore Ctrl for pretty much everything in the 0x20 and 0x30 rows,
+except that Ctrl-/ yields ^_, US.
+
+The idea is that, even if the majority of the keys on the keyboard
+correspond to vectored-subroutine instructions, some key combinations
+would instead correspond to hardwired instructions that would allow
+you to regain control and rebootstrap the system even if the
+subroutines attached to your normal keys got horked.
+
+(Consider instead the approach of providing “Shift” and “Ctrl” keys
+that individually do what you would expect: shift-a is A, ctrl-j is
+SOH, shift-j is J, ctrl-j is LF.  So shift must map 0x60 to 0x40 and
+0x70 to 0x50, while ctrl maps 0x60 to 0x00 and 0x70 to 0x10.  But
+technically that leaves open the shift mapping and the ctrl mapping
+for 0x20 and 0x30, as well as the ctrl-shift mapping for everything.
+For example, you could have shift map 0x20 and 0x30 to 0xa0 and 0xb0,
+ctrl-shift map 0x20 and 0x30 to 0x80 and 0x90 and map 0x60 and 0x70 to
+0xc0 and 0xd0, and ctrl map 0x20 and 0x30 to 0xe0 and 0xf0.  There’s
+probably a viable option in this space that can be achieved with a few
+logic gates, but for now I will leave the option open.  Furthermore,
+for now I won’t consider the possibility of a second bucky bit for a
+Meta key, or a third bucky bit for key release events, although
+detecting long key presses is clearly necessary for many important
+applications, such as Tetris.  These suggest nine- or ten-bit
+instruction “bytes”, which would be mostly vectored subroutines.)
