@@ -264,6 +264,11 @@ recursive call.  It may be worthwhile as an optimization to simply
 `memcpy()` a relevant chunk of the compile-time stack rather than
 enumerating all the necessary variables.
 
+(Incidentally, since it only gets invoked once per recursive loop and
+knows exactly how much stack space it needs, the trampoline is in a
+position to efficiently check for stack overflows and report them in a
+usable fashion, something C runtimes usually fail badly at.)
+
 C, however, has another feature that complicates this: you can take
 the address of a local variable and pass it to other functions.  (In
 C, you can also store it in data structures; the Pascal family
@@ -309,6 +314,15 @@ It can even solve the problem of parameter passing — the caller gets
 relocations for the callee’s activation record so that it can poke the
 arguments into the proper locations in memory and get results from the
 proper place, assuming you aren’t passing arguments in registers.
+
+This might still be useful on more modern small computers like the AVR
+and the STM32, because they are usually run in environments where they
+don’t have a sensible way to report a failure.  (See file
+`failure-free`.)  Under normal circumstances, there is no way to
+statically bound the stack usage of a C program, because C supports
+recursive loops, and ruling them out requires whole-program analysis.
+If your stack overflows into your heap, which can easily happen on an
+Arduino, you may get incorrect results or your program may just crash.
 
 As an even more nontraditional alternative, you could use a
 BibTeX-style two-stage compilation process; first, you compile each

@@ -49,16 +49,155 @@ compile-time assertions about program behavior.
 Such static checking can happen after compile time as well as before.
 For example, for TinyOS, a stack depth checker was developed that
 statically verifies the maximum stack depth of a machine-code program.
+(See also file `direct-addressing` for more on how to do this.)
 
 Pointer-reversal tree traversal
 -------------------------------
 
+Lisp systems traditionally used a mark-and-sweep garbage collector,
+which first *marks* all the nodes in memory that are accessible from
+“roots” (such as the stack or global variables), then *sweeps* through
+memory to find any unmarked objects, adding them to the free list.  A
+simple implementation of the mark phase that handles only conses might
+look something like this:
 
+    (defun gc-mark (node)
+      (when (and (consp node)
+                 (not (eq (mark-field node) *collection-number*)))
+        (setf (mark-field node) *collection-number*)
+        (gc-mark (car node))
+        (gc-mark (cdr node))))
+
+This is simple enough, but it sweeps a critical issue under the
+carpet: those recursive calls to `mark` eat up stack space.  How much
+stack space do they need?  Well, it can be as much as one level of
+stack for every live cons, if they’re all in a single list!  Normally
+traversing a tree through recursive calls like this is a reasonable
+thing to do, but this function is being invoked because the
+interpreter ran out of memory, except what it needs for the stack, and
+needs to free some up.  So statically bounding the stack usage, as
+mentioned in the previous item, would be really super useful.
+
+You might think we could rewrite it into a non-recursive loop:
+
+    (defun gc-mark (node)
+      (loop while (and (consp node)
+                  (not (eq (mark-field node) *collection-number*)))
+         do (setf (mark-field node) *collection-number*)
+         do (gc-mark (car node))
+         do (setf node (cdr node))))
+
+That way, if we have one huge long list `(a b c d ... zzz)`, we don’t
+eat up our stack recursing down it; each cons of the list gets
+processed in the same stack frame as the previous one.  But we still
+have a recursive loop which can still eat up space bounded only by the
+number of conses — it’s just that now it has to look like
+`(((((...zzz...)))))` instead.
+
+The fundamental problem is that every time we encounter a new cons, we
+encounter not one but two new pointers to follow, and so whichever
+path we choose to take, the number of paths not traveled by can always
+keep growing, one new path for each cons node we traverse.
+
+If we could only leave some sort of breadcrumbs in those conses in
+order to avoid needing to allocate that data on the stack!  Too bad
+they’re already full of essential data.
+
+Consider this implementation of NREVERSE for lists:
+
+    (defun my-nreverse (list)
+      (loop with next with reversed = nil
+         if (null list) return reversed
+         do (progn
+              (setf next (cdr list))
+              (setf (cdr list) reversed)
+              (setf reversed list)
+              (setf list next))))
+
+It isn’t recursive and doesn’t allocate any memory other than its
+three local variables.  Nevertheless, `(nreverse (nreverse list))`
+will traverse the same list nodes twice, once forwards and once
+backwards, and it leaves them in the same state as before.  By
+reversing the pointers, it maintains the state it needs to traverse
+the list again in reverse order.
+
+This implementation of NREVERSE is a simple case of pointer-reversal
+tree traversal.  Where regular tree traversal maintains a single
+pointer to the current node, we maintain two pointers: the current
+node and the previous node.  (While executing a movement along the
+tree, we have an additional temporary pointer, called `next` above.)
+The previous node used to have a pointer to the current node, but no
+longer does; it now points to its own previous node instead.  It
+happens that the backward traversal in this case is precisely the same
+as the forward traversal, but that is not the case in general.
+
+To walk the whole tree, sometimes you’ll be descending down the left
+branch (the car) and sometimes down the right branch (the cdr).  That
+means that sometimes the previous node will have its car reversed and
+pointing to its parent, in which case when we return back up to it we
+want to descend down the cdr branch instead, and sometimes it will
+have its cdr reversed and pointing to its parent, in which case when
+we return back up to it we want to keep on returning back up to its
+parent.  To distinguish these two cases, we need to store that one bit
+of per-node state somewhere, just like the mark bit, and typically we
+use a bit somewhere in the node itself, though there are other
+options.  If you have three or four children on a node, you need two
+bits instead of one, and so on.  When you finish walking the tree, you
+have undone all your mutations.
+
+And that’s Deutsch–Schorr–Waite tree traversal, which needs only a bit
+per node in the worst case instead of a word per node.
+
+Deutsch–Schorr–Waite tree traversal is designed as a failure-free
+algorithm because, like most algorithms, garbage collection can only
+fail by running out of memory; but, in the GC case, that failure is an
+overwhelmingly likely outcome if you don’t make it impossible.
+
+You can use it for things other than garbage collection.  You can
+implement a binary-tree search function using Deutsch–Schorr–Waite
+traversal, for example; you just choose which child to recurse down by
+comparing the key, and when you’re traversing back up the tree, you
+always just go up to the parent, rather than sometimes traversing down
+to another child, as you do for garbage collection.
+
+Using it for DAG traversal may be hairier; GC uses the mark bit to
+avoid endlessly revisiting the same nodes, but other traversal
+algorithms may not be able to.
+
+An interesting thing about this traversal is that it’s achieved by
+using mutation instead of the usual side-effect-free algorithms to
+traverse the tree, because the alternative to storing the breadcrumbs
+with mutation is to allocate memory for them, and that introduces
+failure.  (See file `z-machine-ops` for some notes on a memory model
+that’s all about tree mutation and was at one point used by a
+significant number of hackers.)
 
 Fixed-size queues
 -----------------
 
+It’s quite common for a computer system to contain some parts that
+have to be failure-free and use bounded space and bounded time, and
+other parts that don’t; for example, a robot control system might
+contain one component that periodically toggles a pin to generate a
+waveform to control a servomotor, another component monitoring sensors
+and running a PID control algorithm that commands the first component
+what signal to emit, and a third motion-planning component that tells
+the PID control what set-point to use.  If the waveform generator
+misses its deadlines (a few hundred μs of error at most is acceptable;
+RC model servos use a 50Hz pulse-position-modulation signal with a
+pulse width of 500μs to 2500μs encoding the commanded position, so
+100μs of error is a 5% error), the waveform will have the wrong duty
+cycle, and the servomotor will receive the wrong command, possibly
+breaking the robot or a person near it.  If the PID control algorithm
+misses its deadlines (typically a few milliseconds), the control
+system will at least oscillate and possibly go out of control.  If the
+motion-planning algorithm runs slowly, though, the robot just takes
+longer to get things done.
 
+This gives you a lot of freedom to have failures and missed deadlines
+in your motion-planning algorithm, but not if they can propagate to
+the waveform generator or even the PID controller.  But clearly these
+components of the system need to communicate somehow.
 
 Fixed-size object pools
 -----------------------
