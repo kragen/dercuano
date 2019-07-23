@@ -1,0 +1,146 @@
+(Related to file `differential-spiral-cam`, which describes a way to
+use a similar mechanism to get a complex programmed sequence of
+motions from a simple mechanism.)
+
+The standard Chinese windlass mechanism
+---------------------------------------
+
+The standard Chinese windlass mechanism gets a very large mechanical
+advantage from a simple mechanism by using a pulley as a differential:
+
+       rope
+    __******__
+      ||||||  |   rope         crank
+      ||||||  |__******__     _____
+      ||||||     ||||||  |   |  ___|
+      ||||||     ||||||  |___| |
+      ||||||     ||||||   _____|
+      ||||||     ||||||  |
+      ||||||   __||||||__|drums
+      ||||||  |  |*****
+    __||||||__|  |
+      ******     |
+           | ___ |
+           |/pul\|
+           ||ley||
+           \\___//
+            -----
+
+Rope is wound in the same direction around two drums of different
+sizes which rotate together, typically turned by a hand crank, or by
+another wheel with an endless chain or rope or belt around it;
+rotating the drums will always pay out rope from one and take up rope
+from the other.  The rope runs down from one drum, around a
+free-hanging pulley, and back up to the other drum.  So the pulley
+moves up or down by half the difference in the rope paid out from one
+drum and taken up by the other.
+
+Through the magic of the differential mechanism, this very simple
+mechanism provides an arbitrarily large mechanical advantage,
+inversely proportional to the absolute difference in diameter of the
+two drums.  If the two drums are equal in size, the mechanical
+advantage is infinite.
+
+To take a more practical example, if you want to lift two tonnes (20
+kN) by exerting 100 N on a 200-mm-radius crank, you need a mechanical
+advantage of 200: a 2-mm difference between the two drums will provide
+you with this.  (That’s in radius; it’s a 4 mm difference in
+diameter.)  Perhaps one drum is 50 mm in diameter, while the other is
+54 mm in diameter, or perhaps one is 400 mm in diameter, while the
+other is 404 mm in diameter (although it may be difficult to find such
+a drum); the mechanical advantage is the same either way.
+
+Let us suppose that we use a 50-mm and a 54-mm drum, or rather bar.
+Each lifting revolution lifts the pulley by 2πmm ≈ 6.3 mm, paying out
+π50mm ≈ 157 mm of rope from one bar and taking up π54mm ≈ 170 mm of
+rope on the other bar.  Lifting the two-tonne weight by 2000 mm
+requires some 320 turns of the crank, paying out 50.24 meters of rope
+from one bar and taking up 54.4 meters of rope wrapped onto the other.
+
+### Some difficulties with it ###
+
+This has the somewhat annoying result that you will need 55 meters of
+one-tonne rope or webbing wrapped around your windlass to lift the two
+tonnes by only two meters.  This rope might average 3 mm thick, and if
+we want predictable mechanical advantage, it cannot freely wrap in
+multiple layers — that would increase the effective diameter of the
+windlass by 6 mm.  And we need about a meter of length of each drum,
+since we need 320 turns of 3-mm rope, one right next to the other.
+This has the rather dismaying result that our pulley hangs *down* by
+two meters but *across* by half a meter relative to its attachment
+point on each bar:
+
+    -------------__________________
+    ))             )))))))))))))))|-_ crank
+    _____________------------------
+      \  big bar  /  little bar
+       \         /   (with most of
+        \       /     the rope)
+         \     /
+          \   / more rope
+           \o/
+
+
+This is going to put rather significant side forces on the rope that
+will attempt to slide it along the length of the bar, add extra
+tension to the rope that isn’t part of the load it’s bearing, and
+change the mechanical advantage.
+
+The helical-grooved cone pulley
+-------------------------------
+
+So, the alternative I was thinking about is that, instead of two
+drums, you can use a *single* tapered conical pulley with a single
+spiral groove on it, and run the pulley between two near-adjacent
+turns of the groove, one with a radius 2 mm greater than the other.
+
+For example, suppose the groove is 3 mm wide, and there is a 16.5-turn
+blank spot with no rope on it in between the takeup part and the
+payout part.  This makes the blank spot 49.5 mm long and means that
+the pulley tapers by 2 mm of radius every 49.5 mm of its length, an
+included angle of 4.6°.  Because you still need 320 turns of rope, you
+still need a meter-long tapered cone, but now it’s only one meter long
+instead of two, or 1.01 m to be more exact.  Its radius at the wide
+end is 40.8 mm greater than at the narrow end, and the pulley hangs
+from two points that are only separated by 49.5 mm of length and, say,
+40 to 80 mm of width.
+
+(You might be able to squish adjacent turns of rope together a bit if
+you skimp on making a full half-circle profile for the groove, or make
+it a bit elliptical in cross-section, deeper than a perfect torus, I
+don’t know.  Maybe you could shorten the apparatus by a third that
+way.)
+
+High-precision movement
+-----------------------
+
+There are three different reasons for wanting very large mechanical
+advantages like the one provided by this mechanism.  The first,
+discussed above, is to develop very large forces.  (File
+`tapered-thread` discusses another very simple mechanism that does
+this using a tapered helix.)  A second is precisely the
+reverse — achieving very high *speeds* but low forces by applying
+force to backdrive the mechanism through its stiffer part.  In this
+case this is not applicable because the frictional losses are too
+large, and this self-locking behavior is considered a feature in the
+original use of the Chinese windlass to lower buckets down wells.  The
+third is to achieve very high *precision* by precisely translating a
+reasonable-sized movement, such as moving the crank by a millimeter,
+into a much smaller movement, such as moving the pulley by ten
+microns.
+
+With high-rigidity materials like UHMWPE, this mechanism may be
+applicable to such uses, in particular in parallel kinematics; the
+groove guiding the cable should reduce uncertainty about where the
+cable is anchored to, and hexapod-crane-type mechanisms can be
+considerably more rigid for a given total mass than mechanisms that
+rely on resisting bending moments over long distances.  Particularly
+with UHMWPE’s high lubricity on steel, it may be possible to dispense
+with the movable pulley and its bearings and simply run the cable
+through a metal eye, but the bearings of the conical drum will still
+be a source of error.
+
+I worry, though, about the unknown and presumably load-dependent
+amount of squish in the transverse dimension of the cable as it wraps
+around the drum.
+

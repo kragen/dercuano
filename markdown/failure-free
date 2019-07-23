@@ -158,7 +158,8 @@ implement a binary-tree search function using Deutsch–Schorr–Waite
 traversal, for example; you just choose which child to recurse down by
 comparing the key, and when you’re traversing back up the tree, you
 always just go up to the parent, rather than sometimes traversing down
-to another child, as you do for garbage collection.
+to another child, as you do for garbage collection.  More
+interestingly, you can implement red-black tree insertion this way.
 
 Using it for DAG traversal may be hairier; GC uses the mark bit to
 avoid endlessly revisiting the same nodes, but other traversal
@@ -172,8 +173,57 @@ failure.  (See file `z-machine-ops` for some notes on a memory model
 that’s all about tree mutation and was at one point used by a
 significant number of hackers.)
 
-Fixed-size queues
------------------
+Of course, such a mutating tree traversal would be a disaster if it
+could be interrupted in the middle, for example, by an out-of-memory
+exception or a program interruption from the keyboard.  But since what
+we’re exploring here is precisely how to eliminate such exceptions
+from our system, we are justified in taking advantage of the benefits
+thus gained.
+
+Note that, in the above loop, the number of pointers to a given node
+remains constant, except for the ephemeral copy in `next`.  I think
+this is a necessary property of all such traversal algorithms on
+trees, which is to say, data structures with only a single pointer to
+each node; my reasoning is as follows.
+
+If the reference count of such a linearly-referenced node drops, it
+drops to zero, and the node leaks.  If you have a garbage collector,
+it may recover the node later, and you may be able to avoid turning a
+memory leak into an actual failure, but for reasons explained in the
+introduction, I don’t think garbage collection is likely to be
+compatible with failure-free computing.
+
+For the reference count of such a linearly-referenced node to
+increase, either it must be overwriting some other reference and
+decreasing its reference count, or it must be allocating new memory;
+neither of these is compatible with failure-free computing.
+
+(The potential hole in this reasoning is that it’s legitimate for the
+traversal algorithm to have some finite number of local variables like
+`next` above that potentially alias pointers found in nodes on the
+heap, but which may be the only access path to a node at some time.
+I’m not sure this is ever essential but I don’t have a strong argument
+that it isn’t.)
+
+Swap is an adequate primitive for expressing such arbitrary
+permutations of pointers, and it guarantees that no pointers are
+duplicated or destroyed.  The pointer permutation in the above
+NREVERSE loop could be thus expressed without temporary variables as
+follows:
+
+    (swapf reversed (cdr list))
+    (swapf list reversed)
+
+However, I do not have faith that such a microscopic approach to
+eliminating failure can scale to a whole computing system.
+
+Note that this approach to tree traversal does not bound the time
+needed for a tree traversal, only the space, and indeed it prevents
+you from killing the traversal process after a timeout to bound the
+traversal time cheaply.
+
+Fixed-size queues to permit communication with non-failure-free systems
+-----------------------------------------------------------------------
 
 It’s quite common for a computer system to contain some parts that
 have to be failure-free and use bounded space and bounded time, and
@@ -199,10 +249,102 @@ in your motion-planning algorithm, but not if they can propagate to
 the waveform generator or even the PID controller.  But clearly these
 components of the system need to communicate somehow.
 
+The simplest approach is for them to share an atomically-updated
+variable; in an analog system, this might be the voltage on a wire
+connecting two of the components, or if we’re running the PID
+controller on the same microcontroller that generates the waveform, a
+`volatile` variable written to by the PID controller process and read
+by an interrupt handler that generates the waveform, or an I/O
+register in a waveform-generation peripheral integrated into the
+microcontroller, like the AVR’s timer/counter modules.
+
+In the case of a `volatile` variable, though, we need to be careful of
+the danger of “torn reads”: perhaps you’re updating the value from
+0x00ff to 0x0100, but on an AVR, that update involves sequentially
+setting two different bytes of RAM.  If an interrupt handler runs
+between the two updates, it might see 0x0000 or 0x01ff and the robot
+might kill somebody.
+
+(The “variable” might be arbitrarily large; you can think of
+framebuffers as being such “variables” shared between the main program
+and the display hardware, or in the case of the Arduino TVout library,
+the interrupt handler that generates the video signal.  In this case
+“tearing” is manifested as on-screen “tearing” of images.)
+
+This is similar to the CRT ADC case for which Gray invented Gray code,
+and so in this case you could try using Gray code to limit the
+magnitude of the torn-read error, but there are other more general
+solutions.  One is to use a circular buffer to enqueue values to be
+communicated between components with different deadlines, a fixed-size
+queue that never blocks, in order to isolate failures within a given
+component.
+
+XXX include implementation
+
+This allows the PID component, for example, to isolate itself from
+failures in motion planning — if it goes to read messages from motion
+planning and none are there, it immediately gets a queue-empty
+message, a totally normal situation, and goes on about its business.
+Similarly, the waveform generator, if it has no new messages from the
+PID component, can go on about its business; and if there are
+interrupt handlers for the sensors feeding the PID controller, they
+too can add messages to a queue for it, not concerned about the PID
+controller’s lack of adherence to their deadlines.  If the queue gets
+full because the PID controller is failing, the sensor-reading
+messages will be lost, but the sensor-reading interrupt handler won’t
+itself fail.
+
+The same approach is essential in non-isochronous communication
+networks.  If a gateway receives packets on one or more input streams
+whose maximum total input bandwidth is A, and forwards those packets
+to one or more network interfaces whose total minimum guaranteed
+output bandwidth is B, then as long as A > B, it needs a bounded-size
+queue for outbound packets, and may drop packets at times.  (Most
+commonly B = 0 because the common types of networks do not provide any
+guaranteed bandwidth.)
+
 Fixed-size object pools
 -----------------------
+
 Anytime algorithms
 ------------------
+
+“Anytime algorithms” or “interruptible algorithms” are a family of
+algorithms which can be interrupted at any time and get some kind of
+answer; if allowed to run longer, they can produce better answers.  In
+particular, iterative approximation algorithms, which produce a series
+of progressively closer approximations to a mathematically correct
+answer, can be used as anytime algorithms.
+
+For example, this Python implementation of the method of secants (from
+file `implementation-separation`) is an anytime algorithm.  It tries
+to find a zero of the scalar function `f` starting from guesses `x0`
+and `x1`, which are in general vectors:
+
+    def sec_seq(f, x0, x1):
+        y = f(x0), f(x1)
+
+        while True:
+            yield x1
+            x0, x1 = x1, x1 - y[1]*(x1 - x0)/(y[1] - y[0])
+            y = y[1], f(x1)
+
+After each iteration, `sec_seq` yields control back to the main
+program along with its current best solution; the main program can
+elect to resume it for another iteration or to accept that solution,
+either because it’s adequately precise, because it’s run out of time,
+or perhaps because a different approach to finding a zero is working
+better.  (CPython doesn’t allow us to prove tight bounds on the
+execution time of a single iteration, or to interrupt it either safely
+or in bounded time, but you could imagine a language that did; and, in
+some cases, even CPython’s loosey-goosey behavior will be good
+enough.)
+
+Anytime algorithms can exist in non-continuous domains, too — an
+optimizing compiler, for example, could reasonably work by
+constructing a correct but possibly slow compiled piece of code, then
+attempt various ways of optimizing it as long as there is time.
+
 Mathematical optimization
 -------------------------
 Moving things in linked lists
@@ -211,13 +353,42 @@ Constant-space representations
 ------------------------------
 The object-embedding memory model
 ---------------------------------
+
+The object-embedding memory model eliminates certain failure modes
+from the object-graph memory model.  In its pure form, all allocation
+is static, so there is no chance of any allocation failure.  Embedded
+objects cannot be NULL and cannot be of the wrong type.
+
 Interval arithmetic?
 --------------------
 Arena allocators
 ----------------
+
+If you allocate memory from an arena (or “region”, in MLKit’s term, or
+“pool”, in the terminology of the Apache APR library) that is all
+freed at once, you get constant-time allocation and constant-time
+deallocation.  To eliminate failure and bound time and space usage,
+you then must merely prove a worst-case bound on the allocation of the
+program, and allocate a bigger arena than that.
+
 Functional iteration/concurrency
 --------------------------------
 Hard priority scheduling
 ------------------------
 Wait-free synchronization
 -------------------------
+
+Handling concurrency with locks or monitors introduces unwanted
+coupling between the time bounds of different processes: the
+worst-case execution time of code in a high-priority thread that needs
+to enter a monitor must include the time it needs to wait on whatever
+other thread might currently hold that monitor, which is to say, all
+code that can execute inside that monitor in any thread.  Priority
+inversion, where a thread holding a lock that is blocking a
+high-priority thread has to sleep while an intermediate-priority
+thread runs, is perhaps the most severe manifestation of this problem,
+but it is more general.
+
+Interrupt handlers never use locks, because there is no mechanism to
+put the interrupt handler to sleep until the main program releases the
+lock, then wake it back up again.
