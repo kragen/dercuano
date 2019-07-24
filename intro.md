@@ -83,9 +83,9 @@ scholarly work, rather than scholarly work itself.
 
 ### Size and public-domain dedication ###
 
-On 2019-06-23 as I write this, the Dercuano tarball is 2.8 megabytes
-and contains some 960,000 words in 738 notes,
-about 3300 paperback pages’
+On 2019-07-24 as I write this, the Dercuano tarball is 3.0 megabytes
+and contains some 1.01 million  words in 775 notes,
+about 3500 paperback pages’
 worth of text.  This is about two thirds of the total amount
 of text I have here and intend to include.  I’m still importing notes
 to add to it.
