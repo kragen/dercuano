@@ -1,0 +1,18 @@
+<https://www.youtube.com/watch?v=dobU-b0_L1I> explains that the Saleae
+24MHz logic analyzer and its clones are basically a 48MHz Cypress
+EZ-USB chip hooked up to the USB bus and some I/O pins, but *with the
+program loaded each time you plug it in*.  The 8051 doesn’t have a
+Flash or MRAM for its program.  So you can use it, for example, in the
+way they have designed it, to stream parallel data over USB at its
+maximum sampling rate.
+
+Sigrok comes with an open-source firmware for the Cypress FX2 chips
+called fx2lafw: FX2 logic analyzer firmware.
+
+But you could also download a different program into the peripheral
+when you plug it in, a program to make it do anything else at all, as
+long as it’s plugged in.  You could use it to read sensors, control
+GPIO pins, whatever.  And these chips have a *lot* of pins.
+
+(He does in fact suggest using the Cypress breakout board for exactly
+this.)

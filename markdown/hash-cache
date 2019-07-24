@@ -1,0 +1,14 @@
+A policy rarely used for handling collisions in hash tables: discard
+the old colliding entry!  This is appropriate for using a hash table
+as a cache, e.g. for memoization.  Or push the oldest, or one of the
+older, entries out of a small bucket, of four or eight items, like a
+4-way or 8-way set-associative CPU cache.
+
+If you hash the key twice, so that it hashes into two separate
+buckets — rather like cuckoo hashing — then the chance of survival
+goes up significantly.  You check both buckets before declaring that
+it’s not found.  In this case, you should probably rewrite the entry
+into both buckets when read-accessing it, so that more-often-read
+entries will be erased with lower probability.  This is an alternative
+to using 4-way or 8-way set-associative caches; I suspect it will turn
+out to be more efficient.
