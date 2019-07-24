@@ -117,6 +117,11 @@ way to do it.  However, in the middle of this mess, you don't have
 access to the old stack pointer, which would further complicate access
 to local variables allocated in the stack frame.
 
+The 8080 implicitly uses the stack to handle interrupts, so under most
+circumstances, you’d need to disable interrupts to use the above
+trick; otherwise an interrupt at the wrong moment will overwrite stuff
+before the pointers you’re trying to chase.
+
 Finally, you could use self-modifying code, which takes 32
 cycles — slower and more code than just doing byte-at-a-time access,
 but doesn't trash DE:
