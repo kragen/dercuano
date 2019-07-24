@@ -1,0 +1,11 @@
+A PLL is great for tracking the frequency of a sine wave.  But lots of
+sounds we want to track the pitch of aren’t sine waves; they have
+substantial energy in their harmonics.  The usual chopper PLL approach
+detects phase by multiplying the input signal with a square wave, thus
+convolving its spectrum with a spectrum containing significant third
+and fifth harmonics, but no even harmonics, then low-pass filters the
+result to try to separate out the dc component.
+
+As a possible alternative for software PLLs, maybe you could try using
+the Karplus-Strong string model for your phase detection, using two
+delay lines that differ in length by one sample.

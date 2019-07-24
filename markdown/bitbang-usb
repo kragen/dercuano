@@ -1,0 +1,14 @@
+[An overview of USB][0] says low-speed data is “clocked at 1.50Mb/s
+with a data signalling tolerance of ±1.5% or 15,000ppm” so you can
+clock it with a [ceramic] resonator instead of needing a crystal.
+
+[0]: http://www.beyondlogic.org/usbnutshell/usb2.shtml
+
+AVRs’ internal RC resonators are mostly not quite this precise; even
+at a fixed temperature and voltage and after user calibration, they’re
+rated to vary by 2%, at least on the ATtiny2313.  But on the ATMega
+series (at least the 48/88/168/328 series used in the Arduino),
+they’re rated to ±1% under these circumstances.  So a resonator is
+needed to bitbang low-speed USB on the ATtinies, but maybe not the
+ATMegas.
+
