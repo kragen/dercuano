@@ -142,8 +142,6 @@ address once and load from it many times.
 >         PUSH B        ; i.e., BC
 >         CALL FOO      ; i.e., PUSH PC and then JMP
 > 
-> [1]: https://archive.org/details/8080_and_Z-80_Assembly_Language_Techniques_1981_John_Wiley_and_Sons
-> 
 > Then that subroutine best can get the argument (inconveniently hidden
 > beneath its return address) into a register using `XTHL` (p. 38):
 > 
@@ -151,6 +149,8 @@ address once and load from it many times.
 >         XTHL          ; M[SP], HL := HL, M[SP]; 18 cycles
 > 
 > This also works for return values.
+
+[1]: https://archive.org/details/8080_and_Z-80_Assembly_Language_Techniques_1981_John_Wiley_and_Sons
 
 In summary, on the 8080, it’s dramatically faster to load data from
 memory at statically allocated addresses than at addresses on the
@@ -247,8 +247,8 @@ than the greatest address used by any of their callers’ activation
 records.  This allocates a single static address to every local
 variable.
 
-So, for example, given call chains main[6] -> a[3] -> b[5] -> c[2] and
-a -> d[7] -> c, where the number in brackets is the number of bytes
+So, for example, given call chains main[6] → a[3] → b[5] → c[2] and
+a → d[7] → c, where the number in brackets is the number of bytes
 needed for each activation record, you would allocate main at 0, a at
 6, b and d each at 9, and c at 16.  b and d overwrite the same memory,
 but that’s okay because they’re never running at the same time.  When
