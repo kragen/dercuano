@@ -7,7 +7,13 @@ model they were born in, often along with closures and dynamic typing.
 But these approaches have their drawbacks: almost any part of your
 program can fail or require unbounded time to execute.  Sometimes it
 is useful to write programs that will not fail, even on a computer
-with finite memory, and will make progress in bounded time.
+with finite memory, and will make progress in bounded time.  For
+example, if your user interface stops making progress, your computer
+becomes unusable, even if the rest of its software is working fine
+(see file `real-time-windowing`); and, if the program on a
+microcontroller fails, there is often no sensible way for it to report
+failure, and physical processes it was controlling may run out of
+control, perhaps damaging equipment or killing some of the humans.
 
 The basic incompatibilities are the following:
 
@@ -228,6 +234,8 @@ Note that this approach to tree traversal does not bound the time
 needed for a tree traversal, only the space, and indeed it prevents
 you from killing the traversal process after a timeout to bound the
 traversal time cheaply.
+
+(File `linear-trees` has more thoughts on this.)
 
 Fixed-size queues to permit communication with non-failure-free systems
 -----------------------------------------------------------------------
