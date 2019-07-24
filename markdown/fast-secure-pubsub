@@ -1,4 +1,5 @@
 Suppose you want to implement a fast, secure publish-subscribe
+(“pub-sub”)
 service.  What if you package your message transformation and
 filtering code into individual processes that run and produce a
 result?
@@ -33,6 +34,10 @@ process can memoize a filter rule: `[{"newsgroup": "alt.sex"},
 are not already recorded in the trie — perhaps they inspected an
 additional field, for example, or perhaps there are values of
 “newsgroup” that have not previously been seen.
+
+This is very similar to how transactional memory observes the reads
+being executed by the code in a transaction in order to be able to
+safely detect update conflicts.
 
 I think this is a particular application of Umut Acar’s
 “self-adjusting computation”.

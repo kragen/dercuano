@@ -51,6 +51,9 @@ For example, for TinyOS, a stack depth checker was developed that
 statically verifies the maximum stack depth of a machine-code program.
 (See also file `direct-addressing` for more on how to do this.)
 
+This generalizes to proving arbitrary properties of programs, as was
+done for CompCert and seL4.
+
 Pointer-reversal tree traversal
 -------------------------------
 
@@ -105,7 +108,7 @@ they’re already full of essential data.
 
 Consider this implementation of NREVERSE for lists:
 
-    (defun my-nreverse (list)
+    (defun nreverse (list)
       (loop with next with reversed = nil
          if (null list) return reversed
          do (progn
@@ -209,13 +212,17 @@ Swap is an adequate primitive for expressing such arbitrary
 permutations of pointers, and it guarantees that no pointers are
 duplicated or destroyed.  The pointer permutation in the above
 NREVERSE loop could be thus expressed without temporary variables as
-follows:
+follows, given a SWAPF analogous to SETF:
 
     (swapf reversed (cdr list))
     (swapf list reversed)
 
 However, I do not have faith that such a microscopic approach to
-eliminating failure can scale to a whole computing system.
+eliminating failure can scale to a whole computing system.  In
+particular, a pointer cycle can be cut off from the rest of the object
+graph through such operations, and deciding whether or not that
+happens potentially requires whole-program analysis (or, worse,
+run-time whole-heap analysis).
 
 Note that this approach to tree traversal does not bound the time
 needed for a tree traversal, only the space, and indeed it prevents
@@ -306,6 +313,31 @@ guaranteed bandwidth.)
 Fixed-size object pools
 -----------------------
 
+If a program may be called upon to store some arbitrarily large amount
+of data at once, it cannot be both failure-free and bounded-time;
+however large its memory is, there is always the possibility that it
+will be called upon to store more data than there exists storage on
+the computer it is running on, and then either it must fail, or it
+must wait until more storage becomes available.  So if a program is
+not bounded-space, it cannot execute failure-free in bounded time.
+
+However, if there is an up-front limit to the amount of data the
+program needs to manage, and it’s running on a computer with that much
+memory, it can be failure-free and bounded-time within that limit.
+Moreover, unless defeated by a too-clever-by-half operating system, it
+can verify that amount of memory is available at startup time — so it
+may fail to start up if running on a too-small machine, but then be
+failure-free thenceforth.
+
+Preallocated object pools are a standard strategy for keeping time
+bounds on execution in this context: if your game needs to handle up
+to, say, 64 sprites at a time, you can preallocate and perhaps even
+preinitialize 64 sprite data structures and make a linked list of
+them.  Then, whenever you need to allocate a new sprite, you grab the
+first node on that free list, a constant-time operation; to deallocate
+a sprite, you put it at the head of that list, also a constant-time
+operation.
+
 Anytime algorithms
 ------------------
 
@@ -317,7 +349,8 @@ of progressively closer approximations to a mathematically correct
 answer, can be used as anytime algorithms.
 
 For example, this Python implementation of the method of secants (from
-file `implementation-separation`) is an anytime algorithm.  It tries
+file `implementation-separation`; see also file `genetic-secants`)
+is an anytime algorithm.  It tries
 to find a zero of the scalar function `f` starting from guesses `x0`
 and `x1`, which are in general vectors:
 
@@ -347,6 +380,31 @@ attempt various ways of optimizing it as long as there is time.
 
 Mathematical optimization
 -------------------------
+
+A particular special case of anytime algorithms is the case of
+iterative mathematical optimization algorithms.  Optimization, in this
+sense, is the mathematical problem of calculating the minimum of a
+function; for example, the minimum of *x*² + *x* + 1 is at *x* = -½,
+which can be calculated in closed form; minima of more complex
+functions are more difficult to find, and often we settle for
+local-search results rather than finding the global minimum.
+
+In most cases, the objective is to reduce the function as low as
+possible, rather than rigorously guarantee that no other value is
+lower, and iterative optimization works by finding progressively lower
+and lower values.
+
+So, for example, in SKETCHPAD, while it’s *desirable* to satisfy the
+user’s drawing constraints as quickly as possible, it’s *necessary* to
+redraw the screen frequently in order to remain usable; so the
+relaxation procedure that seeks a satisfying value of the constraints
+runs a few steps before each screen redraw.
+
+Optimization is a fairly general approach to solving “inverse
+problems”, where we have a description of what properties a solution
+would have; optimization algorithms work especially well given a
+*fuzzy* description.
+
 Moving things in linked lists
 -----------------------------
 Constant-space representations
@@ -357,10 +415,40 @@ The object-embedding memory model
 The object-embedding memory model eliminates certain failure modes
 from the object-graph memory model.  In its pure form, all allocation
 is static, so there is no chance of any allocation failure.  Embedded
-objects cannot be NULL and cannot be of the wrong type.
+objects cannot be NULL, cannot be aliased (except via a pointer), and
+cannot be of the wrong type.
+
+I suspect that this is one of the reasons for the empirically-observed
+reliability of C programs — although C has lots of undefined behavior
+and provides ample ways for programmers to shoot themselves in the
+foot, introduce failure, and introduce unbounded time and unbounded
+space, much of a typical C program is not touching those bits of the
+language.  Although C has pointers, substantial parts of C programs
+use object embedding where programs in Java or Python would use
+pointers.
+
+Records and sum types rather than arrays
+----------------------------------------
+
+Every time you index into an array (except with a constant index such
+as a[0]), you have a potential failure: the index may be outside the
+bounds of the array.  Typical static program analysis techniques are
+too weak to prove that this cannot happen.  In some cases this amounts
+to an allocation failure, as in the innumerable stack buffer-overflow
+bugs in 1990s C programs like NCSA httpd.
+
+By contrast, if you have a (non-nullable) pointer to a known type of
+record, accessing the fields of the record is statically safe; it is
+constant-time and cannot produce failures.  The pattern-matching
+approach used in ML allows this approach to extend to arbitrary
+Lisp-style object graphs; the compiler can statically verify that your
+pattern matching is exhaustive, statically ruling out run-time
+failures due to incomplete case analysis.
 
 Interval arithmetic?
 --------------------
+Overflow-safe arithmetic
+------------------------
 Arena allocators
 ----------------
 
@@ -373,10 +461,13 @@ program, and allocate a bigger arena than that.
 
 Functional iteration/concurrency
 --------------------------------
+
+Iteration protocols and per-array operations rather than array indexing
+-----------------------------------------------------------------------
 Hard priority scheduling
 ------------------------
-Wait-free synchronization
--------------------------
+Wait-free and lock-free synchronization
+---------------------------------------
 
 Handling concurrency with locks or monitors introduces unwanted
 coupling between the time bounds of different processes: the
@@ -389,6 +480,153 @@ high-priority thread has to sleep while an intermediate-priority
 thread runs, is perhaps the most severe manifestation of this problem,
 but it is more general.
 
+Moreover, locks can produce deadlock, which results in a program
+failure; global analysis is required to rule deadlock out.
+
 Interrupt handlers never use locks, because there is no mechanism to
 put the interrupt handler to sleep until the main program releases the
-lock, then wake it back up again.
+lock, then wake it back up again.  In some cases, the main program
+uses a lock (often with the big-hammer approach of disabling
+interrupts entirely) to lock out the interrupt handler entirely for a
+short time, but more generally, if the main program is doing something
+that an interrupt-handler execution might interfere with, it maintains
+the shared data in a consistent state the whole time, atomically
+committing its “transaction” at the end, typically with a
+compare-and-swap operation — a commitment which might fail if an
+interrupt handler ran in the meantime, requiring the main program to
+restart its transaction.
+
+This same approach works for multiple threads of a program
+concurrently updating a memory area.  It introduces a soft sort of
+failure — the need to retry a transaction — but, unlike locking
+protocols, it guarantees progress.  In combination with hard priority
+scheduling, it entirely prevents a lower-priority process from slowing
+down a higher-priority process by forcing it to wait.  However, the
+price is that if the lower-priority process can be forced to retry a
+transaction repeatedly, it can no longer guarantee time bounds on its
+execution.
+
+Lock-free and wait-free synchronization algorithms are notoriously
+difficult to implement correctly.
+
+Bounded-time, failure-free restricted virtual machines
+------------------------------------------------------
+
+Earlier I discussed how fixed-size queues can firewall failures and
+unbounded delays from propagating from one domain into another,
+enabling more-sensitive domains to be failure-free and bounded-time
+while less-sensitive domains can be programmed in easier, more general
+ways.  But fixed-size queues can only support a certain kind of
+arm’s-length interaction; in many cases, more intimate levels of
+cooperation are desirable.
+
+Bitcoin Script, BPF, and BPF’s predecessor CSPF are loop-free virtual
+machines; a trusted virtual machine runs untrusted code in a
+timing-sensitive context (an interrupt handler in the case of BPF and
+CSPF!), which is safe only because the execution time is bounded by
+the script size.  This allows fast-and-loose code like tcpdump, or
+your half-assed shell script invoking it, to safely execute code in a
+kernel interrupt context.  And that’s damn cool.
+
+See file `wercam-scriptable-windows` for some thoughts on how to get a
+failure-free, bounded-time GUI with techniques like these.
+
+Abstract interpretation with non-standard semantics
+---------------------------------------------------
+
+However, if you’re writing most of your program in something
+comfortable like JS or whatever, it’s going to feel pretty clumsy to
+have to write part of it in loop-free bytecode for a register machine.
+
+Consider the case of pubsub.  In the most general case, each
+subscriber has some Turing-complete filter function; you apply it to
+every message published to determine whether to deliver that message
+to that subscriber.  It’s often convenient to be able to run these
+filter functions in some kind of centralized message router, so that
+you don’t have to send messages across a network to a subscriber that
+is just going to ignore them.  But then, if the filter function uses
+unbounded space or time, the router might seize up.  (Or it might
+fail.)
+
+(There are some notes in file `fast-secure-pubsub` about how to do
+this by running the filter function in a transactional-memory-like
+sandbox.)
+
+So suppose you have such a client–server pub-sub system, with a client
+library in Python, and you give it this filter function:
+
+    def wanted(message):
+        if message.domain in whitelisted_domains:
+            return True
+        if message.length > 8192 or message.domain in blacklisted_domains:
+            return False
+        return spamminess(message) < spamminess_threshold
+
+Python allows you to override attribute access and comparisons.  This
+allows you to write an object like this:
+
+    class Comparator(object):
+        def __init__(self, desc):
+            self.desc = desc
+
+        def __getattr__(self, attr):
+            return Comparator(self.desc + '.' + attr)
+
+        def __eq__(self, other):
+            print(self.desc, '==', other)
+            return False
+
+        def __gt__(self, other):
+            print(self.desc, '>', other)
+            return False
+
+    if __name__ == '__main__':
+        x = Comparator('x')
+        x.domain in 'this is an example'.split() or x.length > 8192
+
+When executed, this code prints:
+
+    x.domain == this
+    x.domain == is
+    x.domain == an
+    x.domain == example
+    x.length > 8192
+
+That is, the `x` object has access to each of the things it’s being
+compared with, and can choose the result of the comparison.  If you
+invoke the above `wanted` function with such a `Comparator` object, it
+might produce output like the following before, presumably, it crashes
+the `spamminess` function:
+
+    message.domain == gmail.com
+    message.length > 8192
+    message.domain == godaddy.com
+
+A slightly more sophisticated object could allow the caller to choose
+the results of the comparisons, in an effort to probe the tree of
+possible execution paths of the filter function.  In this case, it
+could determine that if the first comparison returns `True`, then the
+filter function returns `True`; if not, but the second or third one
+returns `True`, then the filter function returns `False`; and then
+perhaps the function goes off into further calculations which raise an
+exception and terminate the probing process.
+
+These observations permit the client library to compute a string of
+bytecode for the sort of restricted virtual machine described above, a
+bytecode function that calculates the same results as the filter
+function under some circumstances; this bytecode can then be sent to
+the server to prefilter the set of messages that get sent to the
+client.
+
+I’ve used Python’s operator overloading here because it’s convenient,
+but operator overloading is just a particularly simple way of doing
+abstract interpretation with nonstandard semantics, not the only way.
+It’s not even a particularly good way, in this case; it requires
+restarting the function from the beginning to explore each new
+execution path, and if `whitelisted_domains` is a `set` rather than a
+`list`, it fails silently.
+
+The key relationship here, though, is that the failure-free,
+bounded-time code for the virtual machine produces a conservative
+approximation of the result of the more unrestricted code for the
+unreliable, loosey-goosey CPython virtual machine.

@@ -1,12 +1,6 @@
 Using the method of secants for general optimization
 ====================================================
 
-(This is probably crushingly naïve compared to all the work out there
-on optimization methods I don’t understand yet, like Nelder–Mead,
-Broyden’s method, and the Levenberg–Marquardt algorithm, not to
-mention the stunning successes in recent years with variants of
-gradient descent; but I thought it would be worth writing down.)
-
 The [method of secants] is an algorithm we have been using for some
 3000 years to solve a fairly wide variety of inverse problems, or, to
 our modern way of thinking, find zeroes of a fairly large class of
@@ -36,14 +30,28 @@ However, it needs two guesses to get started instead of one, which
 makes its convergence conditions somewhat more complicated to
 describe.
 
+Some ideas occurred to me about how to use the method of secants, so I
+thought I’d write them down.
+
 I used the method of secants as an extended example in file
 `implementation-separation`.
 
-(Unrelated: the Method of Wecants, a technique for declining to do
+(This is probably crushingly naïve compared to all the work out there
+on optimization methods I don’t understand yet, like Nelder–Mead,
+Broyden’s method, and the Levenberg–Marquardt algorithm, not to
+mention the stunning successes in recent years with variants of
+gradient descent; but I thought it would be worth writing down.)
+
+> (Unrelated: the Method of Wecants, a technique for declining to do
 something you don’t want to do while blaming someone else.)
 
 Vector-domain functions
 -----------------------
+
+The method of secants is normally described as a one-dimensional
+root-finding method, but above, I said that you can generalize the
+domain of the function to be a vector, as suggested by the form of its
+recurrence relation.  What happens in practice if you try that?
 
 Consider *f* : ℝ² → ℝ = λ(*a*, *b*).*a*² + *b*² - 1, a paraboloid
 which is zero everywhere along the unit circle.  If our initial
