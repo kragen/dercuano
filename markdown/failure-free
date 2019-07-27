@@ -1,5 +1,5 @@
-Approaches to failure-free, bounded-space, and bounded-time programming
-=======================================================================
+Patterns for failure-free, bounded-space, and bounded-time programming
+======================================================================
 
 Often, the most convenient way to program a piece of software is to
 use garbage collection, recursion, and the Lisp object-graph memory
@@ -237,6 +237,58 @@ traversal time cheaply.
 
 (File `linear-trees` has more thoughts on this.)
 
+Moving things in linked lists
+-----------------------------
+
+Given an item i that is a member of a linked list and a place p in
+(the same or a different) linked list after which to insert it, you
+can move it to its new position in a failure-free, allocation-free,
+bounded-time fashion:
+
+    node *n = *i;
+    *i = n->next;
+    n->next = *p;
+    *p = n;
+
+This is similar to the pointer-reversal tree-traversal approach
+described in the previous section; the end result is that you have
+permuted the pointers at `n->next`, `p`, and `i`.  It is still
+failure-free even if `n->next` is a NULL pointer, but of course `p`
+and `i` must not be, and `i` must point to a node rather than null.
+
+This operation is very commonly used in contexts like operating-system
+schedulers, where you might use it to move a job between different
+mutually exclusive queues.  If one of the lists is a free list, this
+pattern becomes the next pattern, “fixed-size object pools”.
+
+Fixed-size object pools
+-----------------------
+
+If a program may be called upon to store some arbitrarily large amount
+of data at once, it cannot be both failure-free and bounded-time;
+however large its memory is, there is always the possibility that it
+will be called upon to store more data than there exists storage on
+the computer it is running on, and then either it must fail, or it
+must wait until more storage becomes available.  So if a program is
+not bounded-space, it cannot execute failure-free in bounded time.
+
+However, if there is an up-front limit to the amount of data the
+program needs to manage, and it’s running on a computer with that much
+memory, it can be failure-free and bounded-time within that limit.
+Moreover, unless defeated by a too-clever-by-half operating system, it
+can verify that amount of memory is available at startup time — so it
+may fail to start up if running on a too-small machine, but then be
+failure-free thenceforth.
+
+Preallocated object pools are a standard strategy for keeping time
+bounds on execution in this context: if your game needs to handle up
+to, say, 64 sprites at a time, you can preallocate and perhaps even
+preinitialize 64 sprite data structures and make a linked list of
+them.  Then, whenever you need to allocate a new sprite, you grab the
+first node on that free list, a constant-time operation; to deallocate
+a sprite, you put it at the head of that list, also a constant-time
+operation.
+
 Fixed-size queues to permit communication with non-failure-free systems
 -----------------------------------------------------------------------
 
@@ -318,34 +370,6 @@ queue for outbound packets, and may drop packets at times.  (Most
 commonly B = 0 because the common types of networks do not provide any
 guaranteed bandwidth.)
 
-Fixed-size object pools
------------------------
-
-If a program may be called upon to store some arbitrarily large amount
-of data at once, it cannot be both failure-free and bounded-time;
-however large its memory is, there is always the possibility that it
-will be called upon to store more data than there exists storage on
-the computer it is running on, and then either it must fail, or it
-must wait until more storage becomes available.  So if a program is
-not bounded-space, it cannot execute failure-free in bounded time.
-
-However, if there is an up-front limit to the amount of data the
-program needs to manage, and it’s running on a computer with that much
-memory, it can be failure-free and bounded-time within that limit.
-Moreover, unless defeated by a too-clever-by-half operating system, it
-can verify that amount of memory is available at startup time — so it
-may fail to start up if running on a too-small machine, but then be
-failure-free thenceforth.
-
-Preallocated object pools are a standard strategy for keeping time
-bounds on execution in this context: if your game needs to handle up
-to, say, 64 sprites at a time, you can preallocate and perhaps even
-preinitialize 64 sprite data structures and make a linked list of
-them.  Then, whenever you need to allocate a new sprite, you grab the
-first node on that free list, a constant-time operation; to deallocate
-a sprite, you put it at the head of that list, also a constant-time
-operation.
-
 Anytime algorithms
 ------------------
 
@@ -413,10 +437,20 @@ problems”, where we have a description of what properties a solution
 would have; optimization algorithms work especially well given a
 *fuzzy* description.
 
-Moving things in linked lists
------------------------------
 Constant-space representations
 ------------------------------
+
+Traditional Lisps, Squeak, and newer versions of Python transparently
+overflow integer arithmetic into bignum arithmetic.  This has the
+advantage that the results of integer arithmetic operations are always
+correct, while in many other programming languages, they may be only
+approximate, or they may 
+
+Overflow-safe arithmetic
+------------------------
+Interval arithmetic?
+--------------------
+
 The object-embedding memory model
 ---------------------------------
 
@@ -453,10 +487,6 @@ Lisp-style object graphs; the compiler can statically verify that your
 pattern matching is exhaustive, statically ruling out run-time
 failures due to incomplete case analysis.
 
-Interval arithmetic?
---------------------
-Overflow-safe arithmetic
-------------------------
 Arena allocators
 ----------------
 
