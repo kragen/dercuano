@@ -1,14 +1,57 @@
-Standard FM radio runs from like 87 MHz to like 107 MHz with channels
-every 800 kHz or so.  That’s 20 MHz divided into 800 kHz channels.  If
-an SDR is to pick up all of that 20 MHz at once, it needs to sample at
-10Msps, which is probably feasible with some work — I mean 640×480
-video at 60 fps is 18Msps per color channel, 55Msps in total.
+Could you listen to every FM radio station at once on your PC?
+
+Standard FM radio runs from 87.5 MHz to 108 MHz with channels
+typically every 800 kHz or so in a given geographical area, although
+in theory they can be spaced as close as 200 kHz apart.  That’s
+20.5 MHz divided into 103 200 kHz channels, of which typically about
+25 are used.  If an SDR is to pick up all of that 20.5 MHz at once, it
+needs to sample at 41 Msps or, preferably, substantially more, like
+60 Msps, which is probably feasible with some work — I mean 640×480
+video at 60 fps is 18 Msps per color channel, 55 Msps in total.
+(Direct downconversion sampling may be feasible with some filtering.
+Sampling at baseband would require 215 Msps.)
+
+A couple of different algorithms occurred to me to do this: one using
+a bank of phase-locked loops (“PLLs”) and one using a phase vocoder.
+Both seem likely to be feasible on a desktop PC, but the phase-vocoder
+approach should scale to a larger number of channels more efficiently.
+
+Analyzing channels with PLLs
+----------------------------
 
 But then there’s the issue of how to analyze the channels.  You can of
-course run a PLL on each channel — say, 20/.4 = 80 PLLs in all.  You
-need something like 10–20kHz of audio out of each of those channels,
-so you need frequency information out of each of the PLLs at something
-like 20–40ksps.
+course run a PLL on each channel — say, 25 or 30 PLLs in all.
+Officially FM mono has 15 kHz of audio bandwidth, but unlike in AM, in
+FM there isn’t a simple relationship between audio bandwidth and radio
+bandwidth — a 1 Hz audio signal could be encoded by swinging the
+frequency of the FM carrier back and forth over a “frequency
+deviation” of 1 MHz.  The [frequency deviation actually used is
+±75 kHz][0].  You
+need at least 15 kHz of audio out of each of those channels,
+so you need frequency information out of each of the PLLs at at least
+like 30 ksps.  To decode [FM stereo][1], you need to decode oscillations
+of the carrier frequency at up to 53 kHz, and thus your PLL needs to
+give you a frequency readout at 106 ksps or more.
+
+[0]: https://en.wikipedia.org/wiki/FM_broadcast_band#Deviation_and_bandpass
+[1]: https://en.wikipedia.org/wiki/FM_radio#FM_stereo
+
+The frequency reported by the PLL is always in some sense an average
+over some time period, and that’s what these numbers mean.  If it’s
+“30 ksps” then the frequency needs to be able to slew from -75 kHz to
++75 kHz in 33 μs, a slew rate of 4.5 GHz/s, and the frequency can’t be
+an average over much more than those 33 μs.  If it’s “106 ksps” then
+it’s 16 GHz/s and 9.5 μs.  At 60 Msps, that’s averaging the
+oscillation over 2000 samples for mono and 600 samples for stereo,
+which seems eminently feasible.
+
+This approach requires about 15 operations per sample per PLL, which
+works out to some 400 operations per sample, 24 billion operations per
+second.  It’s possible to implement this without any multiplies at
+all.
+
+Analyzing channels with a phase vocoder
+---------------------------------------
 
 An alternative to using PLLs might be to use a phase vocoder.  This
 amounts to taking an STFT of the signal often enough to reliably
@@ -16,18 +59,30 @@ unwrap the phase — at least three times per cycle of the beat
 frequency, say — with enough frequency resolution to have only one
 sinusoid at most in each frequency bin.
 
-If we use the same 400 kHz spacing, then we need at least the same 80
-frequency bins, so at least 160 samples in the STFT window, say 256;
-but the windows can overlap by as much as you want, and if we’re going
-to use such wide bins, I think we need 1’200’000 STFTs per second,
-which sounds sort of impractical.  60 Msps has 234'375 256-sample
-windows per second, though, so this only includes each sample in 5 or
-6 windows.
+As before, we need to divide the spectrum into frequency bins small
+enough that at most one station is in each, but the FFT bins are
+evenly spaced from 0 up to Nyquist, with one bin for every two samples
+in the window.  We can’t choose the bin center frequencies freely the
+way we could with the PLL approach.
 
-I think that, roughly speaking, this involves (8 = lg 256) · 2 · 5.1
-multiplies per sample, which works out to 82, which means we need 4.9
-billion multiplications per second.  This sounds feasible but very
-challenging.
+If we use about 400 kHz spacing, then we need at least 52 frequency
+bins, so at least 104 samples in the STFT window, say 128, which gives
+us 64 frequency bins, ranging over 30 MHz if we’re at 60 Msps; this
+gives us 468'750 Hz per bin.  But the windows can overlap by as much
+as you want.
+
+A somewhat tricky issue is that, in a phase vocoder, the rate at which
+you need to inspect the phase of each bin is not determined by how
+fast it is changing *frequency* (as in the PLL case), but by how fast
+it is changing *phase*.  In a bin of 468-kHz width, the putative
+partial in the bin can only vary by ±234 kHz from the bin center
+frequency.  This means we need about 600'000 STFT windows per second,
+which thus only overlap by 28 samples.
+
+I think that, roughly speaking, this involves (7 = lg 128) · 2 · 5.1
+multiplies per sample, which works out to 71, which means we need 4.3 billion
+multiplications per second at 60 Msps.  This sounds feasible but very
+challenging.  For a CPU, anyway; it should be easy for a GPU.
 
 (Intel and NASoftware reported in 2011 that a 256-point call to the
 VSIPL function `vsip_ccfftip_f`, which is probably not the fastest FFT
@@ -39,9 +94,27 @@ megaflops, which I guess means each FFT is 10240 operations, or 40
 operations per sample, which is a lot more than the 16 multiplies I
 was guessing.)
 
-By contrast, the PLL approach requires about 15 operations per sample
-per PLL, which works out to some 1200 operations per sample.  That
-sounds more than an order of magnitude worse, but it’s possible to
-implement this without any multiplies at all.  So it might turn out
+That
+sounds almost an order of magnitude better than the PLL approach,
+but it requires multiplies.  So it might turn out
 that the approaches actually have similar efficiency in practice.
 
+You might think to reduce computational load by using a smaller number
+of STFTs per second.  But if you are using fewer STFTs of the same
+size per second, without increasing the size of the STFTs, you lose
+the ability to track frequencies near the edges of the bins; their
+phases vary too fast to be unwrapped, and they alias into frequencies
+closer to the center.  To avoid this, you must increase the size of
+the STFTs exactly proportional to the reduction in the number of
+windows you shingle each second with.  This almost exactly cancels out
+the original reduction in computational load, *except* that now you
+can decode more channels, *and* the logarithmic factor of the FFT
+complexity increases.  So, for example, if you do 1024-sample STFTs
+instead of 128-sample STFTs, you can decode 512 radio channels instead
+of 64, at the cost of about 25% more computation.
+
+This consideration suggests that, for a small number of channels, the
+PLL approach should be more efficient, and for a large number of
+channels, the FFT-based phase vocoder should be more efficient.  They
+just happen to be about equal at about the number of channels that
+exist in FM radio.
