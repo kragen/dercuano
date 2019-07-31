@@ -1,10 +1,15 @@
 So I want to write an immediate-mode GUI library (see file `imgui-tk`)
-for this experimental programming system I’m writing.  But I also want
+for [this experimental programming system I’m writing].  But I also want
 to write a programming language for the purpose, because (see file
 `yeso-notes`) even without the IMGUI library, I’ve written 1500+ lines
 of C for graphical applications, and I feel like a more reasonable
 programming language would make those applications both significantly
 less code and significantly less bug-prone.
+
+[this experimental programming system I’m writing]: https://gitlab.com/kragen/bubbleos
+
+Local-variable pointers and var parameters
+------------------------------------------
 
 IMGUI is a lot easier when I can take addresses of local variables to
 do things like this:
@@ -21,6 +26,9 @@ with a get method and a set method, which is inconvenient if it
 involves changing the definition of the thing you’re trying to change,
 or writing a special-purpose wrapper.  (Common Lisp took a different
 approach.)
+
+Blocks
+------
 
 But C makes IMGUI harder when you have to do things like this:
 
@@ -59,6 +67,9 @@ feel like iterators implemented with block arguments are somewhat
 inferior to first-class sequence objects as in Python and D, but
 they’re relatively passable.
 
+Closures versus var parameters
+------------------------------
+
 In conventional GUI toolkits, a strong argument for first-class
 garbage-collected closures is that it allows you to write
 event-handling code like the above.  In IMGUI, downward-funarg blocks
@@ -84,6 +95,9 @@ that you can’t store them in a local variable or reseat them, and
 at the callsite.  Oberon follows Pascal in this, despite having
 garbage collection and thus no need for the downward-only discipline.
 
+Fuck C, though, seriously
+-------------------------
+
 I really hate C’s single program-wide namespace (give me method
 namespaces and a module system, please), verbose type syntax, lack of
 multiple return values, lack of list comprehensions, lack of any kind
@@ -94,6 +108,9 @@ example are perhaps avoidable in C++, but in C they’d be a consequence
 of the inflexible argument passing.)  I like the fact that in C you
 can copy records by value and avoid aliasing them, just as I like the
 fact that you can alias fields with pointers when you want.
+
+Types and arguments
+-------------------
 
 You probably want optional named arguments for IMGUI; record literals
 are probably fine for that if you can invoke operations on them, and
@@ -124,6 +141,11 @@ wildcardless pattern match that matches on an object of that type.
 I don’t have a completely clear idea of how the kind of value
 references I’d like to be able to pass to things like `ImGui::Combo`
 above should interact with interfaces and heap pointers.
+
+Some C code examples and their Platonic essences
+------------------------------------------------
+
+### Yesomunch ###
 
 Here is some existing code written with Yeso:
 
@@ -161,11 +183,26 @@ Here is what I would like it to look like:
       }
     }
 
+or, with lifetimes or scopes extending from each declaration to an
+implicit end at the enclosing `}`, as in C++, but also including
+loops, something like file `raph-io`:
+
+    use yeso
+
+    {
+      yw_open("munching squares", 1024, 1024, "") -> ywin w;
+      for (int t = 0;; t++);
+      yw_frame(w) -> ypic fb;
+      yp_scanlines(fb) -> int y, ypix *p;
+      for (int x = 0; x < fb.w; x++);
+      p[x] = (t & 1023) - ((x ^ y) & 1023);
+    }
+
 or:
 
-    use xshmu
+    use yeso
 
-    xshmu.window("munching squares", 1024, 1024) w:
+    yeso.window("munching squares", 1024, 1024) w:
         (0..) t:
             w.events:
                 be it Die: return 0
@@ -179,7 +216,7 @@ This looks very much like Ruby, actually, though with Lobster syntax.
 Some improvements over the C version:
 
 0. It’s less than half as much code.
-1. Opening and closing the window is taken care of by the xshmu.open
+1. Opening and closing the window is taken care of by the yeso.open
    function, which passes the window object to the argument block, and
    implicitly closes the window upon exit from that block.  If you
    call it without a block, it returns the window object, and you have
@@ -204,7 +241,9 @@ Block syntax is `arg1, arg2, arg3: INDENT body OUTDENT`, where the
 argument list may be empty.  The special identifier `it`, if mentioned
 in the body, is added as an argument to the argument list.
 
-Here’s a function from my Tetris implementation:
+### Tetris piece rotation ###
+
+Here’s a function from [my Tetris implementation]:
 
     void rotate_piece(char *piece, char piece_rotated[][4], int piece_r)
     {
@@ -239,6 +278,8 @@ Here’s a function from my Tetris implementation:
         }
       }
     }
+
+[my Tetris implementation]: https://gitlab.com/kragen/bubbleos/tree/master/yeso/tetris.c
 
 This converts a 16-byte piece into a 4×4 array of booleans with a
 particular rotation in a pretty crappy way.  Instead:
@@ -293,35 +334,48 @@ expects a block.)  Then you could invoke it like this:
 
 I really miss list comprehensions a lot in C and Golang.
 
-Here’s some annoying code from another xshmu program, makefont.c:
+### Makefont event dispatch ###
 
-    for (xshmu_event *ev; (ev = xshmu_get_event(w));) {
-      if (xshmu_as_die_event(ev)) {
-        xshmu_close(w);
+Here’s some annoying code from another yeso program, [makefont.c]:
+
+    for (yw_event *ev; (ev = yw_get_event(w));) {
+      if (yw_as_die_event(ev)) {
+        yw_close(w);
         free(img.p);
         img.p = 0;
         return 0;
       }
 
-      xshmu_key_event *kev = xshmu_as_key_event(ev);
+      yw_key_event *kev = yw_as_key_event(ev);
       if (kev && kev->down) {
-        if (kev->keysym <= '~') current_char = kev->keysym;
-        if (kev->keysym == xks_shift_l) display_text = 0;
-        if (kev->keysym == xks_left && xoff) xoff -= 128;
-        if (kev->keysym == xks_right) xoff += 128;
-        if (kev->keysym == xks_up && yoff) yoff -= 128;
-        if (kev->keysym == xks_down) yoff += 128;
+        if (kev->keysym <= '~') {
+          current_char = kev->keysym;
+          yp_p2 newsize = font.g[current_char].size;
+          if (newsize.x || newsize.y) defsize = newsize;
+        } else switch(kev->keysym) {
+            #define IF break; case
+            IF yk_shift_l: display_text = 0;
+            IF yk_left: if (off.x) off.x -= 128;
+            IF yk_right: off.x += 128;
+            IF yk_up: if (off.y) off.y -= 128;
+            IF yk_down: off.y += 128;
+            IF yk_pgdn: write_out_the_font(&font, argv[1]);
+          }
       }
-      if (kev && !kev->down && kev->keysym == xks_shift_l) display_text = 1;
 
-      xshmu_mouse_event *mev = xshmu_as_mouse_event(ev);
+      if (kev && !kev->down && kev->keysym == yk_shift_l) display_text = 1;
+
+      yw_mouse_event *mev = yw_as_mouse_event(ev);
       if (mev) {
-        int x = mev->x + xoff, y = mev->y + yoff;
+        yp_p2 xy = yp_p_add(mev->p, off);
         if ((mev->buttons & 1) && !(buttons & 1)) {
-          font.g[current_char].x = x;
-          font.g[current_char].y = y;
-          font.g[current_char].w = 0;
-          update_height(&font, current_char, 0);
+          font.g[current_char].start = xy;
+          font.g[current_char].size.x = defsize.x;
+          update_height(&font, current_char, defsize.y);
+
+    ...
+
+[makefont.c]: https://gitlab.com/kragen/bubbleos/tree/master/yeso/makefont.c
 
 This becomes something like:
 
@@ -347,9 +401,9 @@ This becomes something like:
 
 The cleanup code is taken care of elsewhere by wrappers and deferred
 cleanup functions.  I’m not sure how the keysym names and other
-constructor names are in scope so we don’t have to say `xshmu.Up` or
-indeed `xshmu.Key`; maybe a declaration like `use xshmu.keys as xk`
-would allow us to use `xk.Up` and be adequate.  The name collision
+constructor names are in scope so we don’t have to say `yeso.Up` or
+indeed `yeso.Key`; maybe a declaration like `use yeso.keys as yk`
+would allow us to use `yk.Up` and be adequate.  The name collision
 between `Down` for a keydown event and `Down` for the down-arrow key
 is unfortunate.
 
@@ -441,12 +495,14 @@ compiler for amd64-ELF in Uncorp.  Then I can write a compiler for the
 more usable imperative language above in Uncorp, and then compilers
 and interpreters for higher-level languages in that language.
 
-StoneKnifeForth is 204 lines of code or 132 lines without comments,
+[StoneKnifeForth] is 204 lines of code or 132 lines without comments,
 and compiles a language with 20 primitives.  The 32 or so primitives
 of Uncorp should therefore require something like 300 lines of code,
 per platform.  This is a lot worse than the 104 lines of my
 implementation of Chifir but barely more than my implementation of
 Tetris.
+
+[StoneKnifeForth]: https://github.com/kragen/stoneknifeforth
 
 But wait!  Uncorp also needs to be able to initialize variables by
 putting labeled binary numbers into the executable.  It probably
