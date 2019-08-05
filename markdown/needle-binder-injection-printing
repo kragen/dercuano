@@ -1,0 +1,212 @@
+Another atypical 3-D printing process I’d like to try out: injecting
+binder into a powder bed through an array of needles as they are
+withdrawn from the powder bed.  Unlike normal powder-bed processes,
+this doesn’t require depositing the powder layer by layer or smoothing
+each layer.
+
+Basic single-needle process
+---------------------------
+
+You have a build chamber filled with loose powder.  In the simplest
+form, there is a long hollow hypodermic needle sunk all the way
+through the build chamber.  The needle is filled with a fluid binder,
+like those used in inkjet powder-bed 3-D printing processes.  It is
+withdrawn gradually, during which time the flow of binder through them
+is alternately forced by pressure and stopped by a valve.  This
+results in selectively depositing binder along the path of the needle,
+selectively solidifying the powder bed at the locations where binder
+is being extruded.  When the needle is fully withdrawn, it is moved
+laterally and inserted in the new location, and then the process is
+repeated.
+
+You need to inject enough binder to affect a radius in the powder bed
+equal to at least half the hole spacing.  Assuming the powder-bed
+material is isotropic, this limits your resolution in the along-needle
+axis as well; for example, if the holes are 10 mm apart, you need to
+inject enough binder to spread 5 mm in all directions from the
+insertion point, which probably means you can’t get much better than
+10-mm resolution in the needle-withdrawal direction.  You can probably
+control a small valve at 1 kHz or so (reed relays go up to 30 kHz, and
+inkjet print head pumps are controlled at some 5–20 kHz), so the limit
+on printing speed is then the needle withdrawal speed, unless you’re
+withdrawing the needle at 10 m/s or more.  This speed is probably
+limited by needle breakage.
+
+Multi-needle variants
+---------------------
+
+This can be done with many needles in parallel.  Inserting sixteen
+parallel needles, moved as a single unit in a carriage, offers the
+possibility of printing sixteen times as fast as the single-needle
+process; additionally, if sixteen pixels in one dimension is adequate,
+the movement mechanics can support only two orthogonal axes rather
+than the three needed by the single-needle process.
+
+More generally, if you have enough needles to cover an entire
+dimension of the build chamber, you can use only two orthogonal axes
+of movement.  For example, with 2-mm needle spacing and 100
+100-mm-long needles, you could print a 200 mm by 100 mm by 1000 mm
+print space with a single fast movement axis of a bit over 100 mm
+(probably moving the needles) and a single much slower 1000-mm
+movement axis (probably moving the powder bed).
+
+If you have a larger number of needles, you can print with only a
+single axis of movement; for example, with 20-mm needle spacing and
+144 needles of 120 mm each, you could print a 240 mm by 240 mm by
+120 mm print volume in a single movement.
+
+I suspect machines with large numbers of needles will tend to be
+unreliable, as the larger numbers of needles may experience clogging,
+breakage, and plastic flexion more often.
+
+Layered hybrid
+--------------
+
+Ultimately the needle length will limit positioning precision, due to
+flexions from vibration and random powder-bed anisotropies or
+nonuniformities during insertion; reliability, due to needle breakage;
+and extrusion rate, if that isn’t limited by valve speed, due to
+larger fluid friction in longer needles.
+
+A more complex machine that combines some of the advantages of
+traditional powder-bed 3-D printers with the advantages of this design
+would deposit a thick layers rather than the usual thin layers, insert
+the needles only to the bottom of the new layer, and selectively bind
+that layer in 3-D.  This permits the use of shorter needles at nearly
+the same printing speed.  Some designs of machine may be able to use
+the needle carriage positioning to compact and level the powder bed.
+
+Speed comparison
+----------------
+
+RepRap-descended FDM printers have a precision of about 100 μm and a
+deposition rate of about 20 mm/sec (times 500 μm times 300 μm,
+typically, although this depends on your print settings).  If we
+approximate crudely, this amounts to a “voxel rate” of about 3000
+voxels per second, but you only pay for the part of the build volume
+you’re actually building things in.
+
+This needle-binder-injection printing process can produce about 1000
+voxels per second per needle, so with 16 needles, it should be about
+16000 voxels per second.  However, this includes the unused parts of
+the build volume.  So that variant should be similar to RepRap-style
+printers in its productive capacity; the variants with more needles
+should be faster.
+
+Inkjet-based powder-bed processes like those pioneered by Open3DP
+produce much higher voxel rates, on the order of 100k voxels per
+second.
+
+Needle diameter and packing
+---------------------------
+
+Narrower needles are more flexible and, barring some kind of active
+control, will produce larger positioning errors.  They are also more
+prone to breakage and produce more fluid friction.  However, it’s
+desirable for the powder-bed particles to be larger than the needle
+opening to limit clogging during insertion.
+
+The space occupied by the needles after insertion probably needs to be
+occupied by void spaces between particles in the powder bed before
+insertion.  This limits the needle diameter to a fraction of the hole
+spacing.  This can be partly circumvented, in the designs that need
+more than a single insertion to complete a print, by spacing the
+needles on the carriage much further apart than the holes.  For
+example, printing a 512×512 matrix of 1-mm-apart holes with 16
+needles, the needles can be in a line in a 495-mm-long carriage spaced
+33 mm apart rather than 1 mm apart, and can be moved laterally by 1 mm
+in between insertions rather than 16 mm, so that after printing a
+whole 513-mm-long slab of holes, each needle has made 32 adjacent
+holes rather than 32 holes spaced 16 mm apart interspersed with the
+holes from the other needles.
+
+(Variants: a hexagonal matrix is better than a square matrix, and
+staggering the needle insertion order somewhat, so that subsequent
+holes are not spatially adjacent, is probably better than making holes
+one next to the other.)
+
+Needle design
+-------------
+
+To ameliorate the clogging tradeoff, perhaps the needle opening could
+be smaller than the bore through the center of the needle, unlike the
+usual practice with hypodermic needles.  This would allow the needle
+to have the clog-avoidance capability of a very thin needle, but the
+stiffness and much of the fluid friction of a much thicker one.
+
+A potential problem is that, once the needle is partly withdrawn, the
+empty bore behind it may channel binder being injected into what we
+hoped was higher up, allowing the binder to affect a much larger area
+than desired.  It might be possible to ameliorate this somewhat by
+locating the binder injection ports on the side of the needle, some
+distance away from its tip, like the inflation needle for a
+basketball, rather than its end.  Binder could still diffuse back into
+the channel from the powder bed, but the problem would be less
+serious.
+
+Materials
+---------
+
+Most of the material systems published by Open3DP should work,
+although the viscosity of the liquid binder may be a smaller
+consideration than it was for them.  Not only might this reduce the
+need for alcohol, it opens up the potential of injecting more viscous
+binders such as sodium silicate.
+
+Many of the candidate material systems described in file
+`flux-deposition` and file `powder-bed-3d-printing` are also
+applicable to this form of 3-D printing.  Some of them will not work
+as described because there is no practical solvent to dissolve the
+binder in, but perhaps some of them can be made to work by depositing
+a soluble precursor (such as calcium sulfate instead of calcium
+hydroxide); by including all the reagents and a low-temperature
+organic binder such as carboxymethylcellulose in the powder bed, then
+injecting simply a solvent such as water, then removing unbound powder
+before firing; or by including all the reagents, and injecting a
+suitable solvent and/or catalyst to allow them to react.
+
+However, as I’ve envisioned it here, this device can probably finish a
+print faster (in minutes), so faster-hardening binder systems may be
+worthwhile.  And the needles have the possibility of injecting gases
+as well as liquids; two very interesting gases in this context are CO₂
+and steam.  CO₂ and heat applied with steam might be able to
+accelerate the hardening of slaked lime, which normally takes hours.
+And CO₂ injection is well-known as a way to harden sand that is stuck
+together with unhardened sodium silicate, acting within a few seconds.
+(Afterwards, you can wash off the unhardened sand and sodium silicate
+with water.)  As I suggested in file `powder-bed-3d-printing`,
+possible alternative sources of CO₂ include CaCO₃ and NaHCO₃.
+
+Steam can deliver a great deal of heat very quickly to a fairly
+precisely located position, but of course it heats up the needle to
+100°, or more at greater-than-atmospheric presure.  This means that
+the needle needs to be withdrawn quickly enough so that conduction
+from the needle surface is very small compared to the heat delivered
+by the condensing steam.
+
+Particular cements that might be amenable to fast steam hardening
+include plaster of Paris, hygroscopic salts (such as NaCl, CaCl₂,
+sodium acetate, sodium silicate, or magnesium oxide), and organic gums
+and other organic binders (such as carboxymethylcellulose, gelatin,
+agar, guar gum, and gum arabic).  Under pressure, steam condensation
+can reach high enough temperatures to melt many organic
+thermoplastics, but most of them are vulnerable to hydrolysis and must
+usually be dried before softening with heat.
+
+Needle injection of nonpolar organic solvents like acetone, methyl
+ethyl ketone, ethyl acetate, or alcohol, either in liquid or vapor
+form, might be a reasonable way to cement a powder bed containing
+soluble organic plastics in powder form as a binder.  It might also be
+an effective way to selectively deposit heat within the powder volume
+without subjecting fragile plastic molecules to
+aggressively-hydrolyzing water.
+
+Either reactive gases like H₂S, Cl₂, or SO₂ or solvents might also be
+usable to provoke either hardening chemical reactions, or, in a
+reversal, the destruction of a previously solid binder and the
+selective conversion of remaining inert fillers into powder.  This
+does, however, require that the solid material be sufficiently
+yielding and/or porous to get the needles into it in the first place.
+Selectively dissolving styrofoam with acetone, ethyl acetate, or
+gasoline is one example, though lacking in filler; EVA foam is another
+candidate material.
