@@ -1,0 +1,323 @@
+Sandwich theory is the theory of sandwich structures, which are a kind
+of anisotropic composite material consisting of two stiff “facesheets”
+bonded to a lightweight “core”, like a two-dimensional version of a
+one-dimensional I-beam; corrugated cardboard and drywall are the most
+common examples.  I started reading about this because of an interest
+in cardboard furniture (see file `cardboard-furniture`) and recycled
+materials.
+
+The basic theory
+----------------
+
+### Basic strength-of-materials background ###
+
+When built with materials that aren’t full of cracks, structures
+stressed in tension are generally quite strong, and in a way that
+barely varies with size.  Piano wire (aka music wire — a kind of steel
+used mostly for springs nowadays) has a yield stress of about 2.5 GPa,
+so a platform that can support my 110 kg can be supported by 0.43 mm²
+of piano wire, a wire 0.75 mm thick.  I’d have to sit down on it very
+slowly to not break the wire on impact, and if you just connect the
+wire directly to the platform, it will be kind of tippy; but hanging
+by three or four such wires would be safe:
+
+        ||     ||
+       w||     ||w
+       i|| me  ||i
+       r||  o  ||r
+       e|| /|\ ||e
+       s|| / \ ||s
+        ---------
+        platform
+
+Moreover, this holds whether the wires are connected to the ceiling
+2.6 meters above my floor or to the top of a 100-meter-tall building
+I’m swinging at the base of.  100 meters of four 0.43 mm² piano wires
+would only weigh 1.4 kg, which is not a significant addition to my
+weight; you have to get into kilometers of height before the weight of
+the wire is a significant fraction of what it can support.
+
+There’s a compressive strength that works the same way; if I put a
+10-cm-diameter disk of cardboard under a wooden board and start piling
+weight onto the board, there’s a certain amount of weight above which
+the cardboard will get crushed; let’s say 300 kg, which is in the
+ballpark but not a measured figure.  If you use several different
+disks of the same cardboard, they’ll all crush at about the same
+weight, and moreover that weight doesn’t change even if you stack two
+or three or ten of the disks up; the same 300 kg will suffice to crush
+the stack of ten disks as to crush a single disk.  If you use a bigger
+disk, the weight needed to crush it will go up proportionally.
+
+         weight
+           ##
+          ####
+         ######  
+    ----------------- wood
+      =============
+      ============= disks
+    ----------------------- floor
+
+But if you use smaller and smaller disks (and proportionally smaller
+weights, including the wood), or taller and taller stacks, something
+weird happens.  Well, not weird if you have any experience with
+material objects, but different.  Once the stack gets taller than a
+certain limit — say, around ten times its width, for
+cardboard — taller and taller stacks can support less and less weight.
+So I can stand on one 10-cm cardboard disk, and I can stand on a stack
+of ten of them, and I can probably stand on the column of 650 of them
+that it would take to reach 2.6 meters, but I definitely cannot stand
+on a column of 100 meters of them.  In fact, I probably can’t even
+build one.  Adding more cardboard to the stack in this way *reduces*
+its compressive strength rather than leaving it unchanged.
+
+I’m not talking about the top of the stack falling over sideways,
+which also gets harder to avoid when the stack is taller; the
+phenomenon I’m talking about happens even if you go into an elevator
+shaft and rest an elevator-shaft-sized wooden platform on top of the
+stack of disks.  I’m talking about *buckling* (*pandeo* in Spanish),
+where the *middle* of the stack bends outwards in some random
+direction and it stops being a linear stack.  Buckling is governed not
+by the compressive strength of the column but by the *rigidity* of the
+column.
+
+Euler worked out the basic math for this.  For compressive forces
+below Euler’s critical value, any small bend in the column, for
+example due to sound waves, gets straightened back out by the column’s
+elasticity.  But once the column is bearing a load over Euler’s
+critical limit, such a small bend will get amplified by the
+compressive stress more and more.  [Euler’s critical load] is
+π²*EI*/(*KL*)², where *E* is the modulus of elasticity of the beam,
+*I* is the least [planar area moment of inertia] of the column’s cross
+section (πr⁴/2 for a solid circle), *L* is the length of the column,
+and K (the “column effective length factor”) varies between ½ and 2;
+it’s ½ in this case because the cardboard disks resting flat on the
+ground and the elevator-shaft platform are not free to rotate.
+
+[Euler’s critical load]: https://en.wikipedia.org/wiki/Buckling
+[planar area moment of inertia]: https://en.wikipedia.org/wiki/List_of_second_moments_of_inertia
+
+Sadly I don’t have the faintest idea what the Young’s modulus of
+corrugated cardboard in lateral compression is, but the things to
+notice about this expression are:
+
+1. It’s inverse-quadratic in *L*, so a column ten times as long can
+   bear only one-hundredth the weight without buckling.
+2. It’s directly proportional to the modulus of elasticity, so a beam
+   that’s made from a material that’s one-third as stiff can only bear
+   one-third the weight without buckling.
+3. It doesn’t involve the *strength* of the cardboard *at all*; it
+   only depends on its *stiffness*.
+4. Compressive and tensile strengths are proportional to the
+   cross-sectional area, but Euler’s critical buckling load is
+   proportional to the area moment of inertia, *not* the
+   cross-sectional area.
+
+Point #1 here means that, normally, large structures fail because of
+buckling before than they fail because of tensile or compressive
+failure, unless they’re made of materials that are full of cracks.
+This means that if you can improve buckling behavior somehow, you can
+dramatically extend the size of structures you can construct.
+
+These last three points are crucial to sandwich theory!  By stiffening
+columns with high-stiffness facesheets, and increasing the moment of
+inertia by moving those facesheets further apart by inflating the core
+(even at the cost of some strength), we can make [sandwich-structured
+composites] that resist buckling enormously more effectively than
+their component materials.
+
+[sandwich-structured composites]: https://en.wikipedia.org/wiki/Sandwich_structured_composite
+
+> There’s also flexural stress.  Sometimes large structures fail
+because of flexural failure — trees dropping branches or blowing over
+in a storm are examples.  Moreover, flexural stress shares with
+buckling the property that you really need a great deal more material
+to resist the load than you would expect — a steel beam that can
+support my weight in flexion is generally going to need a great deal
+more than 0.43 mm² of cross section.  I am going to mostly ignore
+flexural stress, except as it contributes to buckling, because ⓐ the
+same [sandwich-panel] construction that helps with buckling also helps
+with flexural stress, and ⓑ flexural loads for a given beam
+construction only fall inverse-proportional to the characteristic
+dimension of the structure, while buckling loads are
+inverse-proportional to its square, so for large enough structures
+buckling still dominates.
+
+[sandwich-panel]: https://en.wikipedia.org/wiki/Sandwich_panel
+
+#### Cracks ####
+
+The cheapest building materials — earth, brick, other fired-clay
+ceramics, concrete, mortar, glass, plaster of Paris, and often even
+stone — are all full of cracks.  As long as they’re in compression,
+this doesn’t matter, but once they’re in tension, the cracks form
+stress risers that weaken them enormously.  This makes it difficult
+and dangerous to build large structures from them unless they’re
+heavily reinforced with materials with good tensile strength.  Adobe
+is made from earth reinforced with straw, plaster of Paris is commonly
+reinforced with horsehair, and concrete is commonly reinforced with
+steel rebar.  Even so, larger buildings are invariably steel-framed
+rather than relying on the tensile strength of even reinforced
+masonry.
+
+### Basic sandwich-theory background ###
+
+The moment of inertia around the x-axis, *Iₓ*, is ∫∫*y*²*d*x*d*y*
+where the area integrated over is that of the cross-section.  For
+panels, that’s the only one we care about, because the panel is much
+wider than it is thick, so if we take our x-axis parallel to its
+surface, the y-axis moment of inertia is orders of magnitude too big
+to worry about.
+
+This says that if we have some cross-sectional area of material, we
+can increase its moment of inertia proportionally, to an arbitrarily
+high level, by moving it further from the x-axis:
+
+    small moment  large moment
+                    *****
+
+      *****
+    --*****--     --*****--
+      *****
+
+                    *****
+
+The trouble with this is that once we insert empty spaces in the
+middle, it stops being a solid object.  We need to put enough stuff in
+the middle to keep the parts moving together; the stuff in the middle
+is pretty much only stressed in *shear*.  Also, when the column is
+flexing, the facesheet on the inside of the bend is in compression
+merely from the flexing, and that compression can cause *it* to
+buckle.
+
+If we only have one material to work with, we can improve the
+situation by moving almost all the material as far as possible from
+the x-axis in both directions, leaving the rest of the material as
+fine “webs” in between to resist the shear, and we have an I-beam, or
+rectangular tubing, or a channel, or a sort of sandwich panel:
+
+      *****     *****     *****     ***********************
+        *       *   *     *         *   *   *   *   *   *  
+        *       *   *     *         *   *   *   *   *   *  
+    ----*---- --*---*-- --*------ --*---*---*---*---*---*--
+        *       *   *     *         *   *   *   *   *   *  
+        *       *   *     *         *   *   *   *   *   *  
+      *****     *****     *****     ***********************
+
+(This kind of sandwich panel, a single plastic with square channels
+running through it, is in common use for translucent roofing for bus
+stops around here; it’s called “twinwall plastic” when made from
+polycarbonate, and similar sandwich panels made from other plastics
+are called “corrugated plastic”, “corriboard”, or “coroplast”.)
+
+More generally, you can use a different kind of material in the
+middle, maybe one with not much strength of any kind, just enough to
+resist the shear stress.  Incidentally, that shear stress is *also*
+inversely proportional to the distance between the facesheets, so if
+your panel is thick, you can get by with a very wimpy core material.
+You do still need enough tensile and compressive strength provided by
+the cross-sectional area of the facesheets and the core to withstand
+the tensile and compressive stresses on the panel from its edges, but
+in a large structure, that is a much easier problem than preventing
+buckling.
+
+XXX understand the theory
+
+An underappreciated aspect of sandwich panels is that they are not
+only stronger (in flexure and buckling) but also softer than the same
+materials would be if solid.  This can increase their impact strength.
+
+### Common current sandwich-panel examples ###
+
+Single-wall corrugated cardboard, as I said, is the most common kind
+of sandwich panel in daily life.  It has a smooth “linerboard” paper
+on the “outside”, according to [Angela Ben-Eliezer], a corrugated
+paper layer of “flutes”, and a second linerboard paper on the “inside”
+which is not smooth, all glued together, typically with sodium
+silicate.  The linerboard layers play the role of facesheets, while
+the flutes play the role of the core — a highly anisotropic core, in
+this case.
+
+[Angela Ben-Eliezer]: https://youtu.be/o9fSsewMLo
+
+The inner fluted layer is mostly air — typical corrugated cardboard is
+made from paper of about 90–130 g/m², which makes it about 150 μm
+thick, but has a 4-mm-thick fluted layer, so the fluted layer is about
+96% air and 4% paper, and the cardboard as a whole is about 88% air
+and 12% paper.  In fact, only part of the flutes — about half — is in
+the fluted layer itself.  The other half is glued flat to one or the
+other linerboard, making it part of the facesheet.
+
+Double-wall and triple-wall corrugated cardboard is a less common
+material, used for higher-strength applications.  Triple-wall
+cardboard has three layers of flutes and four layers of linerboard,
+and the interesting thing here is that the inner layer of flutes is
+typically substantially thicker than the outer layers.  That is, it’s
+a sandwich panel whose facesheets are themselves sandwich
+panels!  It’s a recursive sandwich!
+
+Drywall is a sandwich of gypsum (plaster of Paris) between two sheets
+of paper.  Unlike the other examples, this isn’t to help it bear
+buckling loads; it’s to give it tensile strength (and thus flexural
+strength) so you can carry it around and drive screws through it,
+instead of shattering the way plaster on lath would do if you treated
+it that way.
+
+Corrugated sheet steel is similar to corrugated cardboard, but just
+the flutes, without the linerboard; it’s just a wavy sheet of steel.
+This is not the most efficient use of material, since the “core”
+consists of roughly as much steel as the “facesheets”, but it’s very
+cheap to make.
+
+Foamcore is a sandwich made of two sheets of paper with styrofoam in
+between, commonly used for architectural models and picture framing.
+
+The Hexayurt is made from sandwich panels sold in the US and some
+other countries for house insulation; these are foamed
+polyisocyanurate with aluminum-flashing facesheets.  Similar
+lightweight rigid sandwich panels made of various materials are common
+insulating materials; when the facesheets are some kind of structural
+board material like OSB or drywall, it’s called a “structural
+insulated panel”.
+
+### Current more exotic examples ###
+
+Fiberglass fabric glued onto the surface of styrofoam is a common
+material for small airplanes, especially model airplanes.
+
+RV enthusiasts have taken to fabricating furniture by cutting
+styrofoam to shape, fitting them together, and coating the surface
+with some kind of stiffener, such as fiberglass window screening
+material stuck to the foam with latex paint.
+
+I’m seeing sandwich panels on some of the bus lines here in Buenos
+Aires; they seem to have polyethylene cores and melamine facesheets.
+
+Cement board has been a common building material for decades; it’s a
+sandwich with a cellulose-reinforced portland cement core and
+glass-fiber mesh facesheets.  It’s kind of like drywall, but a lot
+stiffer; it’s useful as an underlayment to keep tile floors laid over
+wood from breaking when the wood flexes.
+
+Common FDM 3-D printing slicers will, by default, fill the interior of
+the model (whatever its shape) with a honeycomb, thus making it a sort
+of three-dimensional quasi-sandwich-panel.  This is mostly to cut down
+printing time, but it also helps to compensate for PLA’s abysmal
+impact strength.
+
+In aerospace, sandwiches with sheet-metal facesheets and metal
+honeycomb cores are common.
+
+The Grenfell Tower fire in 2017, which killed 72 people, about a
+quarter of those present, was caused in large part by the use of
+Arconic Reynobond PE sandwich panels, with aluminum facesheets around
+a polyethylene core (not, I think, foam), which were covering an
+150-mm-thick layer of polyisocyanurate foam under a ventilation space.
+
+Candidates for upcycling garbage into sandwich panels
+-----------------------------------------------------
+
+Styrofoam and cardboard are the two most obvious candidate materials,
+but many others are possible.  boPET, as in discarded chip bags and
+one of the layers in TetraPak drink boxes, is fairly stiff.
+
+microcellular polyethylene
