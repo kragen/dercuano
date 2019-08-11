@@ -1,0 +1,234 @@
+I read the 2007 "[$1 recognizer]" paper the other day.  It describes a
+simple "unistroke recognizer" you can implement in 100 lines of code
+or so to experiment with pen-based gestures, like PalmPilot Graffiti;
+they report on a user study on an Itsy (or rather an iPAQ) where it
+compared reasonably well to a couple of other stroke recognition
+algorithms popular in the research literature.
+
+[$1 recognizer]: http://faculty.washington.edu/wobbrock/pubs/uist-07.01.pdf
+
+It occurred to me that something like the $1 recognizer might be a
+viable solution to my problem in file `dercuano-drawings`, namely, how
+to illustrate the notes in Dercuano without using either too much of
+my time or too many bytes.
+
+The $1 recognizer algorithm
+---------------------------
+
+For the $1 recognizer, a pen gesture consists of a sequence of (x, y)
+points; its task is to match this sequence against a collection of
+"template" gestures and provide a list of gestures that match most
+closely.
+
+The first point in the sequence is where the pen first touched the
+tablet, and the others are samples of the pen's position taken over
+time until it is lifted.  These trace out some kind of more or less
+continuous curve on the display, but the position of each individual
+point along that curve is just a matter of how far the pen had gotten
+when the sampling clock fired.
+
+So, the first thing the algorithm does is resample the curve to a
+uniform point spacing, using a fixed, predetermined number of points
+that is the same for every gesture.  They found that numbers in the
+range 64-256 worked best.  The resampling algorithm they used is
+fairly naive, just linearly interpolating between points.  This step
+normalizes the drawing speed and the relative phase of the sampling
+clock and the drawing operations, so that exactly the same curve
+traced at different speeds will result in very nearly the same set of
+points.
+
+People are also not absolutely precise about the angle, position,
+scale, and aspect ratio of their pen gestures, so the next steps in
+the algorithm are to try to normalize out these features.  The points
+are rotated around their centroid so that the gesture starting point
+is at 0 degrees.  The X and Y coordinates are then given independent
+affine transforms to fit them into a predefined 1x1 bounding box, thus
+eliminating variations of position, scale, and aspect ratio.  Finally,
+this normalized sequence of points is compared against each
+(normalized) template by calculating the average Euclidean distance
+between corresponding points --- not once, but with a series of
+different candidate rotations using golden-section search, based on
+their observation that the rotation-distance function had no local
+minima on correct matches.
+
+Remarkably, they reported 99% accuracy on a vocabulary of 16 unistroke
+symbols in their tests, varying very little with stroke speed; the
+fastest strokes were around half a second, so this amounts to around 8
+bits per second of input bandwidth.
+
+The nature of diagrams
+----------------------
+
+Diagrams have a few freehand lines, but are mostly symbolic --- aside
+from textual labels, they mostly consist of many repetitions of a
+relatively small number of different symbols, at different positions,
+orientations, and sometimes scales or aspect ratios.  So bubble charts
+contain bubbles, connecting lines, and arrowheads; circuit diagrams
+contain resistors, capacitors, inductors, grounds, horizontal and
+vertical wires, rectangles representing chips, junctions, and so on;
+various kinds of diagrams contain different kinds of boxes.  Some of
+these kinds of symbols can be freely rotated, while others cannot.
+Other variations between different instances of the same symbol are
+usually random and need not be stored.
+
+Also, diagrams commonly contain significant topology, quite aside from
+their possibly significant geometry, and often it's helpful to "snap"
+certain connection points together, and if a symbol is later moved, to
+update connected symbols so that they remain connected.
+
+Diagrams in such a form can be quite reasonably represented as a set
+of references to symbols, each associated with a position,
+orientation, scale, and possibly aspect ratio.  The symbols themselves
+can possibly be shared between multiple diagrams or embedded in one
+diagram.
+
+Drawing diagrams with pen gestures
+----------------------------------
+
+It occurs to me that a pen gesture interface is probably one of the
+most straightforward ways to create diagrams; it offers the
+possibility of smoothly scaling from a pure sketching interface to a
+much more formal interface.  The basic idea is that you put a series
+of strokes on a canvas, and the system (initially devoid of symbol
+definitions) tries to figure out which strokes belong to the same
+symbol, using something like the $1 recognizer; when it gets it wrong,
+you correct it after the fact.
+
+By translating, rotating, and scaling the graphic for each symbol to
+match the original stroke you input it with, the system redraws your
+diagram.  By remembering all of your strokes, it gradually improves
+the definition of each symbol, improving the appearance of your
+diagram, without overly interfering with the sketching process.
+
+Furthermore, you can explicitly edit symbols; for example, in a
+circuit diagram, you might want your ordinary wire symbols to be only
+horizontal or vertical, so you might want non-rotatable horizontal and
+vertical line symbols.  A small vocabulary of such non-rotatable
+symbols (boxes, ellipses, lines, arrowheads) would be adequate for
+many quick diagramming tasks.  You might want to add or move
+attachment points, add synonym templates, toggle rendering of noise,
+add additional rendered decorations you don't need to sketch
+explicitly (including other symbols, as in file `recursive-curves`),
+and so on.
+
+If you were to write text in such an interface, it would ideally
+discover the relatively small number of letters you were using and
+represent your "diagram" as a list of letters and their positions.
+
+Aside from the above fuzzy spectrum between defining symbols and
+freehand drawing, you'd probably want the usual kinds of drawing
+operations: undo, redo, move, rotate, scale, multiple selection, and
+so on.
+
+### Doing it on hand-computer touchscreens ###
+
+Realizing such a fluent interface with the non-ideal hardware
+available is a substantial challenge.  In practice multitouch
+cellphone touchscreens are what I have available, and these have
+relatively crude touchstart and touchend resolution, although they're
+fairly precise during the touch (and some of them are even fast, like
+60 Hz, while others are more like 10 Hz); moreover, they have major
+finger occlusion problems.
+
+Using the quasimodal multitouch ideas outlined in file
+`interactive-calculator`, file `two-thumb-quasimodal`, and file
+`interactive-geometry`, I think this can be overcome: a transparent
+virtual stylus projects from your finger upon first touch, and a
+button elsewhere on the display starts the ink running out of it.
+This allows you to reposition the stylus before you start drawing and
+stop drawing before you lift your finger, and it greatly reduces the
+finger-occlusion problem.  It also conflicts less with the
+now-standard one-finger-drag scrolling gesture.
+
+### Rounding ###
+
+For Dercuano, as mentioned in file `dercuano-drawings`, I want to
+round off coordinates to reduce the amount of space they take up in
+the rendered output, although more bloat can be accepted in the source
+code.  Symbol definitions that have been drawn many times offer a way
+to do this: the Platonic location of a point whose drawn location is
+highly variable the various times I drew the symbol can be safely
+rounded to any convenient precision that doesn't take it too far
+outside the zone where it's being drawn.  Moreover, maybe we should
+weight that point less heavily when we're matching templates.  The
+user should have the option as to whether to draw that point with
+per-symbol-instance noise or not.
+
+Other points whose position can be interpolated to reasonable
+precision (either with a spline or with a line) also do not need to be
+stored for graphical display.
+
+The problem of coming up with a minimal-length description of a
+polyline that stays within the usual limits of drawn instances of the
+symbol is an optimization problem that can be solved using the usual
+kinds of search approaches for offline optimization problems.
+
+### Repetition ###
+
+If you draw the same symbol several times in a row, perhaps in a
+linear or circular path with systematic variation in position, angle,
+or size, it's possible that you would like to continue drawing more of
+it; since the system is categorizing each stroke as a symbol and
+redrawing it, a reasonable thing for it to do in such a case is to
+offer further repetitions, perhaps in a different color, with a slider
+to accept one or more of those repetitions.
+
+Improving the $1 recognizer
+---------------------------
+
+The $1 recognizer mostly tries to normalize rather than using search,
+but even so, the researchers apparently found it necessary to use
+search for angular alignment to get competitive results.  In some
+cases, they seem to have used fairly fragile statistics in order to
+keep the algorithm accessible to mathematically naïve users: the
+normalization of X and Y coordinates using the bounding box means that
+noise in the X coordinate of the single leftmost and rightmost points
+will be distributed across all the points, and the
+linear-interpolation resampling scheme guarantees that such noise will
+occur.
+
+The search used for the optimal rotation is the old-fashioned
+golden-section search algorithm, which has the advantage of being
+derivative-free, but has quite slow convergence (slower than binary
+chop!) and also makes rather strong assumptions about the input.
+
+Another issue with the algorithm is that it doesn't really permit any
+kind of indexing of the templates; if you are matching each new
+unistroke against a database of 10,000 64-point templates, it is going
+to take 640,000 Euclidean-distance computations.
+
+One approach to improving the algorithm would be to use more robust
+statistics.  For example, you could use the standard deviation or
+quantiles to determine the X and Y scaling factors, and you could use
+an angle that depends in some way on all the points instead of just
+the first point to get the initial rotation.
+
+Perhaps a simpler approach, though, is to use a generic optimization
+algorithm.  The function to optimize is already present: it's the
+average Euclidean distance from the points of the transformed input
+stroke to the corresponding points of the template stroke.  The
+objective is to find the transformation that minimizes it; the
+translation in X and Y, rotation around some arbitrary center, and
+scaling in X and Y, form five continuously variable parameters out of
+the six in an arbitrary 2-D affine transformation.  (The sixth missing
+parameter is diagonal shear, and I'm not sure it should be omitted.)
+With modern automatic differentiation, it should be straightforward to
+use a generic optimization algorithm like Adam or a quasi-Newton
+method to search this parameter space for the best fit.  This would
+probably result in a much simpler algorithm, and possibly a faster one
+as well.
+
+This also allows extreme aspect ratios and rotations to be penalized
+in a smoother fashion than the original $1-recognizer algorithm.
+
+Using a better resampling algorithm would probably help somewhat as
+well.
+
+This doesn't help much with indexing, but perhaps absurdly-downsampled
+versions of the gesture and templates could be used to get a linear
+speedup on to searching a large index of candidate glyphs --- like 4
+or 8 points.  Some kind of interval-arithmetic categorization or
+something is needed if you're going to get a superlinear speedup ---
+some way to put a lower bound on the best distance to any template in
+a given group, so that you can avoid iterating over the templates in
+the group.

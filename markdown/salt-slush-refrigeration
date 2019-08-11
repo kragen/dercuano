@@ -19,3 +19,111 @@ refrigerator, but now I’m not sure you can.  It seems like the
 movement of mass into the eutectic phase is kind of unrecoverable by
 freezing and melting.  Maybe you could separate them with a pressure
 swing or by distillation.
+
+Frozen salt water as a freezer thermal reservoir
+------------------------------------------------
+
+(This comes from a discussion with SpeedEvil on Freenode.)
+
+But suppose you have a conventional freezer, cooled using a
+conventional refrigeration approach like the compression-condensation
+cycle or an ammonia-absorption cycle, and you'd like some resilience
+against problems --- either power outages, as in file
+`balcony-battery`, or mechanical failures.  A phase-change thermal
+reservoir inside the freezer is one way to achieve this.
+
+However, just putting water bottles in the freezer is suboptimal.
+Normally the freezer is at -20° or so, and the water bottles won't
+melt until 0°, which means that all your food also heats up to 0°,
+possibly allowing it to spoil or get soggy.  A lower-temperature
+phase-change material would work better, ideally something that melts
+just above the freezer's normal temperature, like about -18° or so.
+
+You could try using just near-eutectic NaCl salt water, but you run
+the risk that, with repeated freeze-thaw cycles, it will separate ---
+I didn't understand this until SpeedEvil explained it to me.
+
+Suppose it's a little lower in salt content than the eutectic 27%.
+Low-salt-content crystals will freeze first, concentrating the salt in
+the remaining solution, and at -20°, you will be left with a large
+amount of lower-salt-content crystals floating on top of the remaining
+very-nearly-eutectic solution at the bottom.  If this system (because
+"mess" sounds too unappealing) melts, the higher-salt-content water is
+denser and thus will tend to stay at the bottom, although there will
+be a small amount of diffusion at the boundary layer.  If it then
+refreezes, the same thing will happen again, but this time the
+initially-freezing crystals will be even lower in salt content, and
+thus will freeze at an even higher temperature.
+
+Repeated cycles of this will eventually separate the mixture into a
+large amount of very-nearly-eutectic mix at the bottom, which never
+freezes, and a small amount of very-nearly-pure water at the top,
+which freezes far too easily, separated by a very thin diffusion
+layer.
+
+I think one possible cure is to make it a little *higher* in salt
+content than the eutectic 27%, so that the crystals that freeze first
+are higher in salt content than the eutectic, concentrating water in
+the bottom.  (I'm assuming that the crystals will still be water
+crystals and not salt; if not, this won't work!)  This way, when the
+system melts again, the denser, saltier water liberated from the
+crystals at the top of the solution will not be stable in that
+position --- it will produce convection cells that carry it back
+toward the bottom of the tank.  This should provide some mixing, but
+I'm not sure if it will be enough.
+
+Another possible cure, of course, is to use an impeller or a spoon to
+mix the liquid when there is liquid.
+
+A third possibility is to immobilize the whole solution in some kind
+of gel, such as agar, so that the crystals cannot float or sink.  This
+way, the physical distance between the different phases of crystals
+remains small enough to prevent diffusion.  Over time, though, I think
+crystal formation in repeated freeze cycles will cut the gel matrix to
+shreds.
+
+A fourth possibility is to use a Peltier cooler on top of the
+salt-water tank inside the freezer to drop it an extra 2° relative to
+the rest of the freezer.  This is a relatively small temperature
+difference and a small heat flux, so the Peltier cooler should be
+relatively efficient, although its waste heat does add to the
+freezer's load.
+
+A fifth possibility is to find another material whose aqueous solution
+has a slightly warmer eutectic point, one toward the bottom end of the
+freezer's normal temperature range.  There are an abundance of
+inexpensive and nontoxic salts, acids, and bases that might work.
+Surely there is a database of their eutectic points somewhere.
+
+A sixth possibility is to just run the freezer a bit cooler, perhaps
+cooling the brine tank directly and arranging things so that heat from
+the outer walls diffuses first through the food and then into the
+brine tank, thus keeping the food a bit warmer than the brine tank.
+
+Why freezer thermal stores are important
+----------------------------------------
+
+Solar photovoltaic energy is on track to be by far the cheapest source
+of energy to date, but energy storage --- especially kilowatt-scale
+energy storage --- is not cheap.  If you can run your freezer only on
+sunny days, when energy is abundant, you can save yourself or your
+municipality the need to use scarce cloudy-day or scarcer nighttime
+energy to keep your food cold.  The kind of phase-change thermal
+reservoir discussed above is about two or four orders of magnitude
+cheaper than batteries, which are still US$100 to US$200 per kilowatt
+hour (US$30 to US$60 per megajoule).
+
+Why do I say such a thermal store would be cheaper?  According to file
+`climate-control`, water's heat of fusion is 333 kJ/kg, so 3 kg per
+megajoule --- at the US$0.58/kℓ cost for expensive reverse-osmosis
+water from Sorek cited in file `desalination-comment`, water costs
+US$0.0017 per 3 liters and thus per megajoule.  Adding a controlled
+amount of salt might add a bit to that cost, but I don't think it's
+more than an order of magnitude.  According to file `minimal-food`,
+supermarket salt cost AR$41.65 per kg in 2012 when AR$16 was US$1, so
+that's almost US$3 per kg, or US$1 per 3-kg megajoule; but I'm pretty
+sure bulk rock salt is at least one order of magnitude cheaper than
+that.
+
+A freezer designed for use in this way would probably be a bit larger
+than the freezers we currently use.
