@@ -11,9 +11,12 @@ circularly symmetric) and very fast to compute (as a cascade of box
 filters and/or separable X and Y Gaussian blurs).  It’s the *only*
 circularly symmetric separable convolution kernel.
 
-However, on my laptop, the time budget for fullscreen full-resolution
-60fps video is 8 ns per pixel.  So I think this is probably feasible
+On my laptop, the time budget for fullscreen full-resolution
+60-fps video is 8 ns per pixel.  So I think this is probably feasible
 on a GPU with enough work, but not on a CPU.
+
+However, I have found some algorithms that are probably only
+*slightly* too slow, and are much faster than the state of the art.
 
 Candidate approaches
 --------------------
@@ -303,6 +306,141 @@ polygonal bokeh.  In particular, a pentagon with a point pointed up or
 down can be decomposed into two trapezoids, one degenerate in the
 sense that it is a triangle.
 
+#### Convolving with a 32×32 pentagon with 600 pixels in 26 additions and subtractions ####
+
+Here’s a regular pentagon computed to fit into a 32×32 square:
+
+     . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . . . 1 1 1 . . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . . 1 1 1 1 1 . . . . . . . . . . . . . .
+     . . . . . . . . . . . . 1 1 1 1 1 1 1 1 1 . . . . . . . . . . . .
+     . . . . . . . . . . . 1 1 1 1 1 1 1 1 1 1 1 . . . . . . . . . . .
+     . . . . . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . . . . . .
+     . . . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . . . .
+     . . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . . .
+     . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . .
+     . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . .
+     . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . .
+     . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 .
+     . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . .
+     . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . .
+     . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . .
+     . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . .
+     . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . .
+     . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . .
+     . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . .
+     . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . .
+     . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . .
+     . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . .
+     . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . .
+     . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . .
+     . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . .
+     . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . .
+     . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . .
+     . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . .
+     . . . . . . . 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 . . . . . . .
+     . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+And here is the sparse delta kernel you would need to compute the
+convolution of the above with an image from a horizontal prefix sum of
+that image:
+
+     . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . . .-1 . . 1 . . . . . . . . . . . . . .
+     . . . . . . . . . . . . . .-1 . . . . 1 . . . . . . . . . . . . .
+     . . . . . . . . . . . .-1 . . . . . . . . 1 . . . . . . . . . . .
+     . . . . . . . . . . .-1 . . . . . . . . . . 1 . . . . . . . . . .
+     . . . . . . . . . .-1 . . . . . . . . . . . . 1 . . . . . . . . .
+     . . . . . . . .-1 . . . . . . . . . . . . . . . . 1 . . . . . . .
+     . . . . . . .-1 . . . . . . . . . . . . . . . . . . 1 . . . . . .
+     . . . . .-1 . . . . . . . . . . . . . . . . . . . . . . 1 . . . .
+     . . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . .
+     . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . 1 . .
+     .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1
+     . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 .
+     . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 .
+     . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 .
+     . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . 1 . .
+     . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . 1 . .
+     . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . . . 1 . .
+     . . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . .
+     . . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . .
+     . . . .-1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . .
+     . . . . .-1 . . . . . . . . . . . . . . . . . . . . . . 1 . . . .
+     . . . . .-1 . . . . . . . . . . . . . . . . . . . . . . 1 . . . .
+     . . . . .-1 . . . . . . . . . . . . . . . . . . . . . . 1 . . . .
+     . . . . .-1 . . . . . . . . . . . . . . . . . . . . . . 1 . . . .
+     . . . . . .-1 . . . . . . . . . . . . . . . . . . . . 1 . . . . .
+     . . . . . .-1 . . . . . . . . . . . . . . . . . . . . 1 . . . . .
+     . . . . . .-1 . . . . . . . . . . . . . . . . . . . . 1 . . . . .
+     . . . . . . .-1 . . . . . . . . . . . . . . . . . . 1 . . . . . .
+
+Since the left and right edges are the same in mirror image, I will
+just deal with the right edge.
+
+The upper right edge consists of these 11 lines:
+
+     1 . . . . . . . . . . . . . .
+     . 1 . . . . . . . . . . . . .
+     . . . 1 . . . . . . . . . . .
+     . . . . 1 . . . . . . . . . .
+     . . . . . 1 . . . . . . . . .
+     . . . . . . . 1 . . . . . . .
+     . . . . . . . . 1 . . . . . .
+     . . . . . . . . . . 1 . . . .
+     . . . . . . . . . . . 1 . . .
+     . . . . . . . . . . . . 1 . .
+     . . . . . . . . . . . . . . 1
+
+I broke this down to the following, using a greedy algorithm:
+
+                                                1 . . . . . . .
+                           . . . . . .          . . . . . . . .
+               1 . . .     . . . . . .          . . . . . . . .
+    (  1 .  ∘  . . . .  +  . . . . . .   )  ∘   . . . . . . . .   +  the last 1
+       . 1     . . . 1     . . . . . .          . . . . . . . .
+                           . . . . . 1          . . . . . . . 1
+
+That’s five additions per pixel.  The lower right edge is similar:
+
+     . . . . . 1
+     . . . . . 1
+     . . . . . 1                                 . . . . .
+     . . . . 1 .                                 . . . . .
+     . . . . 1 .                                 . . . . .
+     . . . . 1 .                       . . 1     . . . . .
+     . . . 1 . .                       . . .     . . . . .
+     . . . 1 . .     1        . 1      . . .     . . . . .
+     . . . 1 . .  =  1  ∘  (  . .  ∘   . . .  +  . . . . .  )  +  the last 1
+     . . 1 . . .     1        . .      . . .     . . . . .
+     . . 1 . . .              1 .      . . .     . . . . .
+     . . 1 . . .                       1 . .     . 1 . . .
+     . . 1 . . .                                 . . . . .
+     . 1 . . . .                                 . . . . .
+     . 1 . . . .                                 . . . . .
+     . 1 . . . .                                 1 . . . .
+     1 . . . . .
+
+This works out to seven additions per pixel, so the whole right edge
+can be done in 12 additions per pixel; the left edge can then be done
+in 12 more, and the two subtracted, for a total of 26 operations per
+pixel, including the original prefix-sum calculation.
+
+Not bad for a 600-tap bokeh kernel calculated to fit into 1024 pixels!
+
+Plausibly, these numbers might scale linearly with the number of sides
+in the polygon, and logarithmically with the size of the kernel.
+
+McGraw’s singular-value-decomposition algorithm (see below) could
+probably produce a reasonable approximation of the same bokeh with a
+rank-3 reduced matrix; this amounts to summing three separable 32×32
+filters, each requiring 64 multiply-accumulates, for a total of 192
+multiply-accumulates.  It has the advantage of not being limited to
+flat bokeh, but the additional disadvantage that its results are only
+approximate.
+
 ### Pipelining ###
 
 As described in file `dsp-pipeline`, in cases where your dataflow
@@ -333,6 +471,10 @@ infect neighboring pixels, but might still look okay.
 
 Previous work
 -------------
+
+The chord-decomposition and trapezoid algorithms above don’t seem to
+have been published before, and in significant cases they seem to be
+dramatically more efficient than published algorithms.
 
 [Efficiently Simulating the Bokeh of Polygonal
 Apertures](http://ivizlab.sfu.ca/papers/cgf2012.pdf) (McIntosh,
