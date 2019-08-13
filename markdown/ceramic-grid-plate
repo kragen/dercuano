@@ -1,0 +1,197 @@
+Printed circuits on fired-clay ceramic
+======================================
+
+Suppose you want to fabricate a grid of wires, like for a capacitive
+touchscreen.  In theory there are lots of ways you can do this:
+etching or electroless plating of printed circuit boards (especially
+including flex), weaving insulated wires (ideally multistranded) into
+a flexible cloth, slicing aluminized mylar into ribbons and then
+gluing the ribbons onto paper, drawing graphite lines on both sides of
+a sheet of paper, etc., but I wanted to focus on the case of glazed
+ceramic.
+
+The basic touchpad design
+-------------------------
+
+Let’s say you start by making a bisque ceramic plate with a bunch of
+narrow gold-leaf ribbons running in parallel across it.  Then you can
+add an engobe or other glaze on top of those ribbons (except, perhaps,
+along one edge where you are going to attach electrodes), then another
+set of ribbons running across that, perpendicular to the first.  With
+the proper choice of glaze, this new set of ribbons will be insulated
+from the first set by the glaze.  If you then want them to be
+insulated from the world, you can do a second glaze firing of the
+plate with another, lower-melting glaze on top of the ribbons, again
+with the possible exception of one edge.
+
+This procedure should give you a grid of capacitively-coupled wires
+whose coupling is dependent on you touching the plate.  This is also
+potentially useful as a macroscopic ROM: if you add some conductive
+paint to the surface at some junctions, it can act to increase the
+capacitive coupling at those junctions, thus representing information.
+Under suitable circumstances, this reader might even be able to
+capacitively read heavy graphite marks on paper.
+
+Concrete calculations
+---------------------
+
+Consider the case where each layer of glaze is 100 μm thick and has a
+relative permittivity of 5 (that of glass — see file
+`coffee-humidity-sensing`), the ribbons are 1 mm wide and 5 mm apart,
+and you place a conductive circle of 11 mm in diameter over one of
+these junctions.  The capacitance ε A / d between the wires without
+the circle is 5 ε₀ 1 mm² / 100 μm = 0.44 pF, a capacitance small
+enough to be hard to measure.  (ε₀, the vacuum permittivity, is about
+8.85 picofarads / meter.)  The capacitance between the upper wire and
+the circle is 5 ε₀ 11 mm² / 100 μm ≈ 4.9 pF, and the capacitance
+between the lower wire and the circle is 5 ε₀ 11 mm² / 200 μm ≈
+2.4 pF.  So the series capacitance between the two wires is 1.62 pF,
+about four times larger than the capacitance without the conductive
+thing.
+
+Detecting an extra 1.2 pF in a circuit usually requires a relatively
+carefully built measurement circuit to keep stray capacitances from
+drifting, but it’s entirely feasible.  A thinner glaze or one with
+higher permittivity, or wider ribbons, would provide larger
+capacitances which would be even easier to measure; but wider ribbons
+would also reduce the relative difference in capacitance between the
+finger-present and finger-absent states.  A thicker glaze would
+probably necessitate either high-permittivity ingredients or wider
+ribbons.
+
+At 10 MHz, which is a convenient frequency, 1.62 pF gives a capacitive
+reactance of (2πfC)⁻¹ = 9.8 kΩ, while 0.44 pF gives 36 kΩ.  These
+numbers are large compared to the expected resistance of the wires in
+the plate: according to file `paper-foil-relays`, gold’s resistivity
+is 2.44×10⁻⁸ Ωm, so a 1 mm × 100 nm × 100 mm wire is 24.4 Ω.  (See
+file `spark-particulate-sieve` for information on metal thicknesses.)
+But they are small compared to the input impedance of any random
+op-amp.
+
+Other conductors
+----------------
+
+Gold leaf has the advantages of being cheap and of not oxidizing, even
+when ceramic is being fired.  (Most of the ceramic I’ve done was fired
+at 1020° (see file `ceramics-notes`) but porcelain can be fired at up
+to 1400°; some earthenware made from ferrous clay can be fired as low
+as 600°.)  I have the impression that the usual pottery gilding
+technique is somewhat more complicated than merely gluing gold leaf to
+the greenware or bisqueware before a firing, but I’m not sure why.
+
+Some oxides are also conductive; indium tin oxide is the one commonly
+used for transparent conductors in LCDs, but zinc oxide and some heavy
+metal titanates are also semiconductors.  Yttria-stabilized zirconia
+is conductive at high enough temperatures, and was formerly used as an
+incandescent element in Nernst lamps, and silicon carbide, though not
+an oxide, oxidizes slowly enough to survive ceramic firing.  Some of
+these might be practical to deposit on the surface as part of a glaze,
+but I suspect that others would dissolve in the common glazes.
+
+If you’re firing in a sufficiently reducing atmosphere, you may be
+able to use powdered copper or copper oxide to get copper traces
+rather than gold leaf; for uses like printed circuits, this could
+offer immensely higher conductivity.  (Gold is very nearly as
+conductive as copper, but gold’s cost advantage in this context would
+come from being able to use a very thin layer of it, which gives it
+substantial resistance.)  Carbon and many different metals might work
+in a reducing atmosphere.
+
+Applications other than touchpads and ROMs
+------------------------------------------
+
+Of course you can solder other components to the traces thus produced
+and make a more or less conventional printed-circuit board, though
+perhaps at somewhat higher cost.
+
+The HP 9100 used a ROM design somewhat similar to the above, but using
+inductive coupling rather than capacitive coupling, and using a
+now-traditional multilayer printed-circuit board rather than layers of
+ceramic glaze.  Such an inductive ROM could totally work, and
+inductive sensing could also be used to detect the proximity of
+ferromagnetic materials rather than conductive ones.
+
+The traditional reason for applying gold leaf to thin sheets of
+vitrified silicon dioxide was for a burglar alarm: the gold leaf
+running around the outside of a glass window was part of a Wheatstone
+bridge, and either breaking it along with the glass, or shorting it
+out to avoid breaking it, would change its resistance enough to
+trigger the alarm.  So you could use such embedded conductors for
+detecting not only touch but also breakage.
+
+The resistance calculated above for the gold-leaf traces is in a range
+that would be usable for resistance heating, although common pottery
+is somewhat fragile to thermal shock, so the heating would need to be
+fairly slow.  (I suspect this can be improved in the body of the
+pottery by foaming, but I don’t know how to improve it in the glaze.)
+The gold itself will withstand fairly high temperatures.  Silicon
+carbide and zirconia are other promising materials for printed
+heaters.
+
+An induction coil, for example for a pancake motor, can be printed on
+a ceramic surface in this way.  If it’s to be used for high-power
+applications like motors, cooking, or other bulk heating, rather than
+sensing, you probably want the lower resistances achievable more
+cheaply with copper.
+
+Gold leaf’s extreme thinness could conceivably be used to fabricate
+extremely fine circuit details, if you can pattern it finely enough.
+For example, you could imagine traces of 100 nm thickness, as above,
+but only 100 nm width rather than 1 mm, spaced 100 nm apart.  This
+would provide 5 parallel conductors per micron, so a 10-mm-diameter
+circle could contain a spiral pancake coil of 50’000 turns, which
+would be a fairly sensitive detector of varying magnetic fields.
+
+The (presumably) high resistance and high dielectric strength of the
+glaze could enable electrostatic-like fields, perhaps capable of
+moving macroscopic objects such as bits of aluminum foil.  According
+to file `capacitance`, fused quartz doesn’t break down until 30 MV/m;
+if the glaze is 10 MV/m, you could safely use voltages of up to about
+1000 V with the 100-μm glaze thickness I guessed at above.
+
+By exposing spark gaps on the surface of the plate, not placing glaze
+over them, you could fabricate a kind of multiplexed matrix display.
+Probably you could only illuminate one spark gap at a time, and you’d
+probably need a few hundred volts to reliably get a spark going in
+air.  Unlike conventional printed-circuit boards, glazed ceramic will
+not become conductive when you arc across it (there’s nothing to char)
+and the gases produced by the spark will not attack it; however, the
+plasma will gradually vaporize it, and perhaps more importantly,
+vaporize the spark-gap contacts, especially if they are thin gold
+leaf.  Also, the device produces nitrogen oxides and ozone.
+
+Since arcing produces substantial UV, you could possibly get pixels of
+different colors by depositing different fluorescent colored dyes
+under different spark gaps.
+
+Selectively generating arcs as you sweep paper across the ceramic
+could be used to selectively char the paper, thus printing on it,
+though not in an archival-safe manner.
+
+Glow/corona discharge in air might permit longer life than arcing.
+Such spatially selective application of glow discharge in air could be
+useful not only for making visible images with light but also for
+selectively activating chemically-inert surfaces such as glass or
+polyethylene, or selectively initiating polymerization or ozone
+bleaching.
+
+Glow discharge in a low-pressure inert-gas atmosphere, of course,
+gives you a neon bulb.  I think that’s also how gas-plasma displays
+work.
+
+Such exposed pairs of contacts are also, of course, how rubber-dome
+keyboards work, at lower voltages than those needed for spark gaps;
+these can usually be operated by touching them with fingers as well.
+
+Air-quartz flash bulbs are the gold standard for short non-laser light
+pulses for high-speed photography; such a spark gap over
+(largely-quartz) fired clay amounts to something similar to an
+air-quartz flash bulb.  Aside from the uses in stroboscopy, an array
+of such spark gaps firing in a raster sequence produces short flashes
+of light emanating from different points; by focusing these through a
+lens onto an object, they scan a spot of light across it in a fashion
+similar to a flying-spot TV camera, but without moving parts.  The
+resulting waveform of reflected light detected at some point P
+produces an image of the scene as seen through the lens, as if
+illuminated from point P.  (See file
+`flying-spot-reilluminatable-stage` for more thoughts on this.)

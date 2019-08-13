@@ -3,10 +3,10 @@ with a realistic camera-like bokeh, like a flat circle or hexagon or
 octagon or something, with a diameter in the neighborhood of like 32
 pixels or more.
 
-By “flat” I mean that, within the area of the bokeh, the transfer
+By “flat” I mean that, within the area of the bokeh, the output transfer
 function is almost constant.  (And, outside, it’s zero.)  This is very
 different from the Gaussian blur that is such a popular effect on
-computers, which has the advantage that it’s isotropic (the PSF is
+computers, which has the advantage that it’s isotropic (the PSF/OTF is
 circularly symmetric) and very fast to compute (as a cascade of box
 filters and/or separable X and Y Gaussian blurs).  It’s the *only*
 circularly symmetric separable convolution kernel.
@@ -15,14 +15,30 @@ However, on my laptop, the time budget for fullscreen full-resolution
 60fps video is 8 ns per pixel.  So I think this is probably feasible
 on a GPU with enough work, but not on a CPU.
 
-A box filter is pretty fast, and it has the desirable camera-like
+Candidate approaches
+--------------------
+
+### Downsampled bokeh computation ###
+
+Some of the algorithms described below may produce a bokeh whose edge
+is unrealistically sharp, or sharp in a way that is undesirable under
+some circumstances, or has visible aliasing artifacts.  One way to
+ameliorate these problems is to downsample the image (using an
+algorithm more sophisticated than nearest-neighbor, but even
+decimating a first-order box filter ought to be sufficient), compute
+the bokeh, and then upsample the computed bokeh (with at least a
+second-order box filter).  This of course also reduces the
+computational load of computing the bokeh itself.
+
+### Box filters ###
+
+A box filter is pretty fast (using a prefix sum†), and it has the desirable camera-like
 flatness, but I’ve never seen a camera with a rectangular bokeh.  You
 could use a set of 32 one-dimensional box filters for the bokeh on 32
 scan lines, adding together the results, and that would work, but it
-might be pretty slow.  Maybe if you use another stage of box filter to
-blur the image to hide jaggies, maybe you could get by with 16 or 10
-of them.  Also, maybe you could use the vertical symmetry to only have
-to compute each scan-line box filter once.
+might be pretty slow.
+(However, see the section below about “chord decomposition” for ways
+to improve this approach.)
 
 And of course you can affinely texture-map the image to rotate it,
 box-filter the rotated version, and then texture-map it back to
@@ -31,7 +47,8 @@ indeed an arbitrary parallelogram.
 
 But is there some efficient way to get even, say, a paraxial
 trapezoid?  With, like, less than a separate box filter for every 2–4
-scan lines?
+scan lines?  (Yes, see the section below about efficient convolution
+with horizontal trapezoids.)
 
 If you have successfully achieved two bokeh filters, one of which is
 entirely contained in the other, you can subtract one from the other
@@ -43,30 +60,87 @@ perspective rather than just an affine transformation.  This is a
 useful approach to get a bokeh of spatially varying size in general:
 spatially transform the image, apply the bokeh, and transform it back.
 
+(See also the McIntosh et al. paper below for a hack that gives
+incorrect, but visually plausible, results for many interesting
+bokehs.)
+
+### Rounded corners by composing with hollow-circle convolution ###
+
 A possibly useful approach to round the corners of the bokeh without
 blurring its edges much: add a stage to the bokeh pipeline whose PSF
-is a small hollow circle, e.g.
+is a small hollow circle, e.g., this 28-pixel 11×11 circle, using `.`
+for 0:
 
-    0 0 0 0 1 1 1 0 0 0 0
-    0 0 1 1 0 0 0 1 1 0 0
-    0 1 0 0 0 0 0 0 0 1 0
-    0 1 0 0 0 0 0 0 0 1 0
-    1 0 0 0 0 0 0 0 0 0 1
-    1 0 0 0 0 0 0 0 0 0 1
-    1 0 0 0 0 0 0 0 0 0 1
-    0 1 0 0 0 0 0 0 0 1 0
-    0 1 0 0 0 0 0 0 0 1 0
-    0 0 1 1 0 0 0 1 1 0 0
-    0 0 0 0 1 1 1 0 0 0 0
+    . . . . 1 1 1 . . . .
+    . . 1 1 . . . 1 1 . .
+    . 1 . . . . . . . 1 .
+    . 1 . . . . . . . 1 .
+    1 . . . . . . . . . 1
+    1 . . . . . . . . . 1
+    1 . . . . . . . . . 1
+    . 1 . . . . . . . 1 .
+    . 1 . . . . . . . 1 .
+    . . 1 1 . . . 1 1 . .
+    . . . . 1 1 1 . . . .
 
 This can be achieved with the difference of two one-dimensional box
-filters per distinct scan line.  Note that in this case there are only
+filters (using prefix sums) per distinct scan line.  Note that in this case there are only
 four distinct scan lines, although there are 11 scan lines in total.
+
+However, there’s a more efficient way to compute this.  We can divide
+the circle into slices of similar scan lines, then compute these
+slices with the composition of some sparse kernels without using
+prefix sums.  For example, consider this slice of the above circle:
+
+    . 1 . . . . . . . 1 .
+    . 1 . . . . . . . 1 .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . 1 . . . . . . . 1 .
+    . 1 . . . . . . . 1 .
+
+This convolution can be computed efficiently by the following
+composition of convolution kernels with three additions per pixel,
+plus an appropriate change of coordinates:
+
+    1  ∘  1 . . . . . . . 1  ∘  1
+    1                           .
+                                .
+                                .
+                                .
+                                1
+
+The composition of the transposes of these kernels compute the
+transposed slice:
+
+    . . 1 1 . . . 1 1 . .             1
+    . . . . . . . . . . .             .
+    . . . . . . . . . . .             .
+    . . . . . . . . . . .             .
+    . . . . . . . . . . .  =  1 1  ∘  .  ∘  1 . . . . 1
+    . . . . . . . . . . .             .
+    . . . . . . . . . . .             .
+    . . . . . . . . . . .             .
+    . . 1 1 . . . 1 1 . .             1
+
+The central slices also need three additions per pixel:
+
+    1 . . . . . . . . . 1      1
+    1 . . . . . . . . . 1  =   1  ∘  1 . . . . . . . . . 1
+    1 . . . . . . . . . 1      1
 
 This might be useful in combination with some of the jaggy approaches,
 and an alternative that might work well for that in the case of an
 octagonal bokeh might be a 45° rotated hollow square, achieved through
 a difference of rotated box filters.
+
+This works out to 3 and 3 additions for the horizontal and vertical
+central slices and 3 and 3 additions for the other two slices, plus 3
+more additions to sum them all together, a total of 15 pixel
+additions.
+
+### Brute-force: Fourier convolution! ###
 
 Finally, maybe doing the bokeh convolution in frequency space is the
 best available option.  However, on my laptop’s CPU, an FFT of a
@@ -74,14 +148,224 @@ best available option.  However, on my laptop’s CPU, an FFT of a
 is 312 ns per pixel.  Much smaller FFTs should be significantly
 faster, but slightly larger FFTs (like a screenful) should be slightly
 slower (though for some reason 1024×1024 is actually often much slower
-on my laptop, possibly because of other CPU-intensive things I'm
+on my laptop, possibly because of other CPU-intensive things I’m
 running).
 
-<http://ivizlab.sfu.ca/papers/cgf2012.pdf> uses min between rotated
+### Chord decomposition and per-scanline box filters ###
+
+Consider a filled version of the 11-pixel hollow circle above:
+
+    . . . . 1 1 1 . . . .
+    . . 1 1 1 1 1 1 1 . .
+    . 1 1 1 1 1 1 1 1 1 .
+    . 1 1 1 1 1 1 1 1 1 .
+    1 1 1 1 1 1 1 1 1 1 1
+    1 1 1 1 1 1 1 1 1 1 1
+    1 1 1 1 1 1 1 1 1 1 1
+    . 1 1 1 1 1 1 1 1 1 .
+    . 1 1 1 1 1 1 1 1 1 .
+    . . 1 1 1 1 1 1 1 . .
+    . . . . 1 1 1 . . . .
+
+If we wanted to convolve with that filled circle, we could do it by
+convolving the following 12×11 sparse kernel (see file
+`sparse-filters`) with a horizontal prefix sum of the pixels, thus
+applying a one-pixel-tall box filter to each scan line:
+
+     . . . .-1 . . 1 . . . .
+     . .-1 . . . . . . 1 . .
+     .-1 . . . . . . . . 1 .
+     .-1 . . . . . . . . 1 .
+    -1 . . . . . . . . . . 1
+    -1 . . . . . . . . . . 1
+    -1 . . . . . . . . . . 1
+     .-1 . . . . . . . . 1 .
+     .-1 . . . . . . . . 1 .
+     . .-1 . . . . . . 1 . .
+     . . . .-1 . . 1 . . . .
+
+In this form this would require 22 additions and subtractions per
+pixel, but this, in turn, can be decomposed into pipelines of sparse
+kernels in a very similar way to that applied to the hollow circle
+above:
+
+     .-1 . . . . . . . . 1 .
+     .-1 . . . . . . . . 1 .                                    1
+     . . . . . . . . . . . .                                    .
+     . . . . . . . . . . . .  =  -1 . . . . . . . . 1  ∘  1  ∘  .
+     . . . . . . . . . . . .                              1     .
+     .-1 . . . . . . . . 1 .                                    1
+     .-1 . . . . . . . . 1 .
+
+I think that, decomposed in this way, this circle decomposes into four
+kinds of scan lines; from the top, these require 2, 2, 3, and 3
+per-pixel additions and subtractions each, plus the addition per pixel
+needed to compute the prefix sum.  This works out to 11 operations per
+pixel, which is pretty good for a 121-pixel convolution kernel.
+
+> This is closely analogous to the Urbach–Wilkinson algorithm for
+erosion and dilation described in file `bresenham-erosion`, with a few
+differences: Urbach and Wilkinson need to use a cascade of
+exponentially growing kernels rather than a simple prefix sum because
+of the inverseless nature of the max and min operations; and, because
+summation is not idempotent the way max and min are, overlap is
+significant to convolution in a way that it is not to the
+morphological operations.  For example, 1 1 1 1 ∘ 1 0 0 1 = 1 1 1 1 1
+1 1 when it comes to erosion or dilation, but 1 1 1 2 1 1 1 for
+convolution.
+
+This approach generalizes to arbitrarily-shaped flat bokehs using, at
+most, two subtractions and additions per “chord” (Urbach and
+Wilkinson’s term) of the convolution kernel.  This should scale
+adequately to things like pentagonal bokeh.
+
+In some cases, DAGs, rather than strict pipelines, of sparse kernels
+may be advantageous.  For example, it wouldn’t be unusual to have two
+blocks of lines that were both 3 pixels tall; a single vertical 1 1 1
+kernel applied to the horizontal prefix sum can be shared among
+both of them.  And consider the kernel 1 0 0 0 1; this can be
+implemented as `p[x] += p[x+4]`, and in this form it represents a
+convolution which could, for example, convert a convolution with 1 0 0
+1 into a convolution with 1 0 0 1 1 0 0 1.  But if instead we do `p[x]
++= q[x+4]`, we can get the pixels we’re adding in from some other
+image — if previously p is the convolution with 1 0 0 1, as before,
+and q is the original image, then this will convert p into the
+convolution with 1 0 0 1 1.  Furthermore, I suspect it may be the most
+efficient way to compute that convolution.
+
+Above I suggested computing bokeh on a downsampled version of the
+image to get blurry edges.  An alternative is to compute the bokeh at
+full resolution, but using a jaggy approximation to a circle made out
+of a stack of rectangles, say 3 pixels tall, using 2-D box filters on
+a 2-D prefix sum; then a final blur pass might hide the worst of the
+resulting jaggies.
+
+If the bokeh kernel has reflection symmetry around a vertical axis
+rather than a horizontal axis — for example, a pentagon with a point
+on top or on the bottom — it may be worthwhile to do all these
+computations using a vertical prefix sum in order to take advantage of
+that symmetry.
+
+### Efficient convolution with (some) horizontal trapezoids using prefix sums ###
+
+Consider this convolution kernel:
+
+    -1 . . . . . . . . 1
+     .-1 . . . . . . 1 .
+     . .-1 . . . . 1 . .
+     . . .-1 . . 1 . . .
+
+Composed with a horizontal prefix sum, this kernel computes the
+convolution with a 4-scanline-high trapezoid whose top and bottom are
+horizontal.  But the tricks used above to divide circles into slices
+will avail us nothing here.  However, barring overflow, the
+convolution with that kernel is clearly equivalent to the sum of
+convolutions with these two kernels:
+
+    -1 . . .      . . . . . . . . . 1
+     .-1 . .      . . . . . . . . 1 .
+     . .-1 .  +   . . . . . . . 1 . .
+     . . .-1      . . . . . . 1 . . .
+
+And this can be computed more efficiently as follows, with five
+additions and subtractions per pixel, plus some changes of
+coordinates:
+
+                        . . 1              1 . .
+    . . . . . . . 1  ∘  . . .  -   1 .  ∘  . . .
+    . . . . . . 1 .     1 . .      . 1     . . 1
+
+This trick will work for trapezoid boundary lines of some angles, but
+maybe others are more problematic.  Consider this decomposition to
+five per-pixel additions, similar to some of those discussed in file
+`bresenham-erosion`:
+
+    1 . . .
+    1 . . .                     1 . .
+    1 . . .        . .          . . .
+    . 1 . .        . .   1      . . .
+    . 1 . .  =  (  . . + 1  ) ∘ . . .
+    . . 1 .        . 1   1      . . .
+    . . 1 .        . 1          . . 1
+    . . 1 .              
+    . . . 1
+    . . . 1
+
+Very nice, right?  At first I thought you were fucked if the last scan
+line of the kernel is missing, but you can handle that just by
+subtracting it off.  I don’t have a fully general algorithm for
+finding efficient decompositions of this kind.
+
+Since you can decompose any polygon into horizontal trapezoids in this
+fashion, using at most one trapezoid per polygon vertex, this
+potentially provides an efficient way to convolve with arbitrary flat
+polygonal bokeh.  In particular, a pentagon with a point pointed up or
+down can be decomposed into two trapezoids, one degenerate in the
+sense that it is a triangle.
+
+### Pipelining ###
+
+As described in file `dsp-pipeline`, in cases where your dataflow
+topology *is* a strict pipeline of filters, and your filters only
+reach a limited distance into the past, you can pipeline them all into
+a single pass over a shared buffer, preserving just enough of the
+results of each stage in the pipeline to allow the next stage to run.
+This is especially important for low-computational-intensity
+algorithms like those explored here, because (at least on the CPU)
+it’s likely that the algorithms’ bottleneck will be memory bandwidth
+rather than the amount of time to add pixels together or whatever.
+Tiling is another related strategy for improving locality.
+
+### Floored Gaussian subtraction ###
+
+Lenses with spherical aberration commonly produce bokeh that is not
+completely flat; for example, it might be brighter or dimmer in the
+center.  The above algorithms mostly cannot reproduce this, although
+the hollow-circle convolution will produce a brighter edge.
+
+Maybe, to get a brighter or dimmer center, you could apply a Gaussian
+blur to the image (say, a third-order box filter) and add or subtract
+the attenuated blurred image from the bokeh image, using saturating
+subtraction when subtracting to prevent the creation of negative
+pixels where the support of the Gaussian extends beyond that of the
+bokeh.  This is pretty imperfect since the darkness still leaks out to
+infect neighboring pixels, but might still look okay.
+
+Previous work
+-------------
+
+[Efficiently Simulating the Bokeh of Polygonal
+Apertures](http://ivizlab.sfu.ca/papers/cgf2012.pdf) (McIntosh,
+Riecke, and DiPaola 2012) uses min between rotated
 and skewed box filters to get fairly realistic hexagonal and octagonal
 bokeh, also varying it with the depth of field and using max to get
-star-shaped polygons.  This does produce detectable artifacts, but
-they are fairly minimal.
-<https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf> used
-low-rank linear approximations to get linear approximations of
-arbitrary bokeh shapes.
+star-shaped polygons.  This does produce visible artifacts, but
+they are fairly minimal.  It cannot produce polygons with odd numbers
+of sides.
+
+[Fast Bokeh Effects Using Low-Rank Linear
+Filters](https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf)
+(McGraw, 2014) used “low-rank linear approximations” to get linear
+approximations of arbitrary bokeh shapes, but I don’t fully understand
+it yet.  It criticizes the above paper as follows:
+
+> McIntosh et al. [17] present a novel approach that is capable of
+> generating polygonal bokeh, but their method has several
+> restrictions that ours does not: the kernel is of uniform intensity
+> throughout, the bokeh shape must be a union or intersection of
+> parallelograms, and large overlapping bokeh do not blend properly.
+
+In a way, it’s similar to the various decomposition-based approaches I
+described above.  He seems to treat the rows and columns of the PSF as
+the rows and columns of a matrix, and then uses the singular value
+decomposition to find a “best” rank-*N* approximation of that matrix
+in the sense of having the smallest Frobenius norm; this amounts to
+approximating the kernel as a sum of separable filter kernels.  You
+could think of this as approximating each column of the filter kernel
+as a linear combination of *N* principal-component columns, which are
+chosen to represent as much column-to-column variation as possible.
+
+† Prefix sums are also known as scan or addition scan (`+\` in APL),
+sum tables, integral images, cumulative sums, and summed area tables
+(SATs), the last especially when the prefix sum is taken along both
+the X and Y dimensions.
