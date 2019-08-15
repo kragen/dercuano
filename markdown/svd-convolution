@@ -8,8 +8,8 @@ McGraw; it was extensively investigated in the 1970s and 1980s.  It’s
 an absolutely astounding technique, and I think it has much broader
 applicability than is widely appreciated.
 
-Much of the below is somewhat speculative because *I haven’t actually
-tried the algorithm yet*.  It’s very possible I’m misunderstanding its
+Much of the below is somewhat speculative because *I've only just
+tried the algorithm*.  It’s very possible I’m misunderstanding its
 limitations.  But it gives me the first general attack on the problem
 in `sparse-filters`, and I have a lot of reading to do!
 
@@ -100,32 +100,38 @@ more detail.  One reason it isn’t applied more broadly is that it’s
 computationally pretty expensive.  And that’s where the earthshaking
 discovery of SVD convolution comes in!
 
-SVD convolution
----------------
+Singular-value decomposition convolution
+----------------------------------------
+
+XXX This section is repetitive
 
 The amazing SVD convolution algorithm uses a “low-rank linear
 approximation” to approximate convolutions of an image with arbitrary
 kernels.  I first ran across it in [Fast Bokeh Effects Using Low-Rank
 Linear
 Filters](https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf)
-(McGraw, 2014), where it’s used to simulate camera bokeh.  The best
-summary in that paper seems to be on p. 4:
-
-> Our low rank filter approach for bokeh effects is to approximate an
-> arbitrary filter kernel as a sum of separable kernels.
+(McGraw, 2014), where it’s used to simulate camera bokeh.  The basic
+idea is that you approximate an arbitrary filter kernel, as McGraw
+says, with a sum of a few separable kernels, which you derive by using
+SVD (see below for a brief explanation if you’re as naïve about linear
+algebra as I am) on the original kernel.  Usually most of the singular
+values are very small, so you can throw them out.
 
 The algorithm treats the rows and columns of the point spread function
 you want to approximate as the rows and columns of a matrix, and then
 uses the singular-value decomposition to find a “best” rank-*N*
-approximation of that matrix; this amounts to approximating the kernel
-as a sum of separable filter kernels.  You could think of this as
+approximation of that matrix.  You could think of this as
 approximating each column of the filter kernel as a linear combination
 of *N* principal-component columns, which are chosen to represent as
-much column-to-column variation as possible.
+much column-to-column variation as possible.  (Or analogously for rows.)
 
 There is nothing in SVD convolution that is specifically limited to
 bokeh; it is a very general technique for efficiently approximating
-any arbitrary two-dimensional convolution!
+any arbitrary two-dimensional convolution!  The speedup you can get
+without unreasonable degradation depends very much on the kernel
+you’re trying to approximate, but very often kernels contain
+sufficient similarity between rows or columns to permit an excellent
+approximation with only a few separable terms.
 
 SVD convolution is specifically two-dimensional, because it relies on
 the singular-value decomposition (SVD) to compute the *N* separable
@@ -175,6 +181,10 @@ in the sense of the Frobenius norm — that is, in the sense of
 differing by a matrix with the smallest Frobenius norm (the sum of
 squares of all the elements).
 
+In Numpy the SVD is found at numpy.linalg.svd, which is a wrapper
+around LAPACK’s `*gesdd`, which mostly works by calling `*bdsdc`, both
+by Ming Gu and Huan Ren.  (The `*` is the data type in question.)
+
 ### Separable filters ###
 
 A separable filter is a two-dimensional convolution you can compute by
@@ -195,6 +205,10 @@ convolution uses 11 multiply-accumulates on intermediate-image pixels
 in the same column to calculate each pixel of the final image — 22 in
 all.)
 
+It turns out that doing this pair of 1-D convolutions is equivalent to
+doing a 2-D convolution with the outer product of the two convolution
+kernels, as you can easily calculate.
+
 There are three very popular separable 2-D filters: box filters,
 double-exponential filters, and Gaussian filters.  Box filters and
 double-exponential filters are popular because you can calculate them
@@ -206,6 +220,15 @@ they get applied pretty often in wildly inappropriate ways.  The most
 common way to approximate a Gaussian filter is actually to run a few
 iterations of one of the other two, which works because of the Law of
 Large Numbers.
+
+Since the outer product of two vectors *u* ⊗ *v* is separable in this
+way, and any matrix product **UV** is a sum of separable terms — each
+the outer product of a column of **U** and the corresponding row of
+**V** — any decomposition of your convolution kernel into a product of
+two matrices gives you a way to express it as a sum of separable
+kernels.  The outstanding advantage of SVD is that it gives us a
+decomposition where *as much as possible* of the result comes from *as
+few as possible* of these outer-product terms.
 
 History
 -------
@@ -221,7 +244,7 @@ Design of Multistage Separable Planar Filters”, in 1971:
 > implementation as ordinary planar convolutional filters becomes
 > computationally inefficient.  It is possible to expand the given
 > coefficient matrix into a finite and convergent sum of matrix-valued
-> stages.  each stage can be separated with no error into the product
+> stages.  Each stage can be separated with no error into the product
 > of an *m*-length column vector multiplied into an *n*-length row
 > vector, where *m* is the number of rows and *n* is the number of
 > columns of the original filter array.  Substantial savings in
@@ -266,8 +289,245 @@ Of all of the above, I find Lee’s dissertation to be by far the most
 readable, perhaps in part because it’s jargon-compatible with me.  The
 earlier work largely uses terminology I find confusing, and the later
 work assumes familiarity with the earlier work.  The Treitel–Shanks
-paper is a close second, despite the foreign jargon, because it’s very
+paper is a close second, despite the alien jargon, because it’s very
 well written, but of course it only covers developments up to 1971.
+
+A toy example
+-------------
+
+With Numpy and SciPy, it’s pretty easy to test the algorithm out; the
+following took me about half an hour with IPython.  It’s probably
+better to use IPython or Jupyter, with `%pylab inline`, so you can use
+`matshow` to see the values as images.
+
+First, let’s compute a flat circular convolution kernel, like a
+typical camera bokeh:
+
+    >>> import scipy.signal
+    >>> import numpy.linalg
+    >>> import numpy
+    >>> r = range(-8, 9)
+    >>> x, y = numpy.meshgrid(r, r)
+    >>> circle = (x**2 + y**2 < 64)
+    >>> # matshow(circle)
+    >>> print('\n'.join(''.join(map(str, 0 + row)) for row in circle))
+    00000000000000000
+    00000111111100000
+    00011111111111000
+    00111111111111100
+    00111111111111100
+    01111111111111110
+    01111111111111110
+    01111111111111110
+    01111111111111110
+    01111111111111110
+    01111111111111110
+    01111111111111110
+    00111111111111100
+    00111111111111100
+    00011111111111000
+    00000111111100000
+    00000000000000000
+
+Let’s generate an image to convolve with that circle kernel — all zero
+except for a couple of bright points at (2, 2) and (8, 13).  Numpy
+array coordinates are in (row, column) order, which is to say, (y, x).
+
+    >>> p = numpy.zeros((16, 16))
+    >>> p[2, 2] = 3
+    >>> p[8, 13] = 2
+    >>> # matshow(p)
+    >>> p
+    array([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 3., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 2., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])
+
+We can do the convolution with brute force using
+scipy.signal.convolve2d:
+
+    >>> perfect = scipy.signal.convolve2d(p, circle)
+    >>> # matshow(perfect)
+    >>> print('\n'.join(''.join(map(str, row.astype(int))) for row in perfect))
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000003333333000000000000000000
+    00000333333333330000000000000000
+    00003333333333333000000000000000
+    00003333333333333000000000000000
+    00033333333333333300000000000000
+    00033333333333333300000000000000
+    00033333333333333322222220000000
+    00033333333333335522222222200000
+    00033333333333355522222222220000
+    00033333333333355522222222220000
+    00033333333333555522222222222000
+    00003333333333555222222222222000
+    00003333333333555222222222222000
+    00000333333333552222222222222000
+    00000003333333222222222222222000
+    00000000000000222222222222222000
+    00000000000000222222222222222000
+    00000000000000022222222222220000
+    00000000000000022222222222220000
+    00000000000000002222222222200000
+    00000000000000000022222220000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    >>> perfect.max(axis=0)
+    array([0., 0., 0., 3., 3., 3., 3., 3., 3., 3., 3., 3., 3., 3., 5., 5., 5.,
+           5., 2., 2., 2., 2., 2., 2., 2., 2., 2., 2., 2., 0., 0., 0.])
+
+Now let’s compute the same result using SVD convolution instead.
+
+As it happens, at 17×17, the circle only has four distinct nonzero
+columns, so, considered as a matrix, its rank is 4.  Consequently, it
+has four nonzero singular values, not counting rounding errors:
+
+    >>> u, s, v = numpy.linalg.svd(circle)
+    >>> s
+    array([1.33371921e+01, 3.01484321e+00, 2.04182621e+00, 1.36417508e+00,
+           3.34375584e-16, 1.28668530e-16, 7.48637395e-17, 3.74505958e-17,
+           5.96041076e-32, 4.06050202e-33, 3.67797309e-33, 5.31269989e-34,
+           2.72274806e-49, 1.79207201e-49, 1.91581056e-50, 0.00000000e+00,
+           0.00000000e+00])
+
+numpy.linalg.svd gives us **Σ** as a vector, as seen above, and **V**
+in its transposed form ready to multiply.  So we can, for example,
+reconstruct a rank-3 approximation of the circle and measure its error
+as follows:
+
+    >>> circle3 = (u[..., :3] * s[:3]).dot(v[:3, ...])
+    >>> # matshow(circle3)
+    >>> ((circle3 - circle)**2).sum(), (circle**2).sum()
+    (1.8609736397047545, 193)
+
+We can use the same brute-force approach to convolve this
+approximation with the image, which doesn’t save us any computation
+time, but does validate that the low-rank approximation, this sum of
+three separable kernels, does some kind of a reasonable approximation:
+
+    >>> approx3 = scipy.signal.convolve2d(p, circle3)
+    >>> # matshow(approx3)
+    >>> approx3.max(axis=1)
+    array([0.        , 0.        , 0.        , 2.96621523, 3.09214447,
+           3.28014338, 3.28014338, 3.09214447, 3.09214447, 3.23906193,
+           4.69144233, 5.27890672, 5.27890672, 5.06351288, 5.34157302,
+           5.34157302, 4.46037644, 2.96621523, 2.06142965, 2.06142965,
+           2.18676225, 2.18676225, 2.06142965, 1.97747682, 0.        ,
+           0.        , 0.        , 0.        , 0.        , 0.        ,
+           0.        , 0.        ])
+    >>> print('\n'.join(''.join(map(str, (row + 0.5).astype(int))) # rounding
+                        for row in approx3))
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000003333333000000000000000000
+    00001223333333221000000000000000
+    00002333333333332000000000000000
+    00002333333333332000000000000000
+    00033333333333333300000000000000
+    00033333333333333300000000000000
+    00033333333333333322222220000000
+    00033333333333345522222222210000
+    00033333333333355522222222220000
+    00033333333333355522222222220000
+    00033333333333555522222222222000
+    00002333333333554222222222222000
+    00002333333333554222222222222000
+    00001223333333443122222222222000
+    00000003333333221222222222222000
+    00000000000000222222222222222000
+    00000000000000222222222222222000
+    00000000000000022222222222220000
+    00000000000000022222222222220000
+    00000000000000012222222222210000
+    00000000000000000022222220000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+    00000000000000000000000000000000
+
+So now let’s try the algorithm more or less for real.  First, we
+convolve each column of **U** with each row of our picture `p`, thus
+getting one horizontally-convolved intermediate image for each term of
+our approximation.  There’s probably a way to do this purely with
+Numpy without using Python interpretive `for` looping:
+
+    >>> hterms = numpy.array([[s[j] * numpy.convolve(u[..., j], p[i])
+                           for i in range(len(p))]
+                          for j in range(len(u[0]))])
+    >>> #matshow(hterms[0])
+
+Here are a couple of rows from the first approximation term:
+
+    >>> hterms[0][1:3]
+    array([[  0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ],
+           [  0.        ,   0.        ,   0.        ,  -6.00495857,
+             -9.16629667, -10.54084337, -10.54084337, -11.44132655,
+            -11.44132655, -11.44132655, -11.44132655, -11.44132655,
+            -11.44132655, -11.44132655, -10.54084337, -10.54084337,
+             -9.16629667,  -6.00495857,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ,
+              0.        ,   0.        ,   0.        ,   0.        ]])
+
+Then we can convolve each row of `v` (**V\***) with each *column* of
+its corresponding intermediate image, thus generating a stack of
+images that are the terms of our approximation; the sum of the first
+three of these is equal to the result of our brute-force convolution
+with the approximation from earlier, except for rounding error:
+
+    >>> terms = numpy.array([numpy.array([numpy.convolve(v[j], hterm.T[i])
+                             for i in range(len(hterm.T))]).T
+                            for j, hterm in enumerate(hterms)])
+    >>> approx3_fast = terms[0:3].sum(axis=0)
+    >>> # matshow(approx3_fast)
+    >>> abs(approx3_fast - approx3).max()
+    4.884981308350689e-15
+
+And, because our kernel in this case is only of rank 4, the rank-4
+approximation, summing four separable kernels, is exactly equal to the
+correct convolution result, again except for rounding error:
+
+    >>> abs(terms[0:4].sum(axis=0) - perfect).sum()
+    4.3509640335059885e-13
+
+I say that was *more or less* for real because I calculated all the
+terms, not just the first four terms that I used, and I was using
+interpretive loops rather than trying to get `convolve2d` to do
+one-dimensional convolutions, so running it exactly as above on a
+larger image would be *slower* than the brute-force approach.
 
 Direct applications
 -------------------
@@ -386,3 +646,48 @@ results.
 reasonably efficiently by using the PageRank algorithm on **M\*M** and
 **MM\*** to get their largest eigenvectors, rather than computing the
 full SVD.)
+
+### On prefix-sum images ###
+
+One of the annoying features of the low-rank approximations produced
+by SVD is that they don’t deal very well with diagonal edges or
+gradients in the kernel.  I wonder if you could “precondition” the
+image by running horizontal and vertical prefix sums on it (allowing
+wraparound on overflow) and apply compensating finite-difference
+operators *on the kernel* before computing the SVD approximation.
+Without the approximation step, this would be precisely equivalent,
+because the integration and differentiation operators cancel, and
+convolution is associative.  But perhaps by removing the large-scale
+structure from the kernel, leaving more local differences, the SVD
+approximation would have less error.
+
+As an extreme example, consider a kernel like this contrived rank-5
+specimen:
+
+     1  2  3  4  5
+     2  4  6  8 10
+     3  6  9 12 15
+     4  8 12 16 20
+     5 10 15 20 25
+
+Upon applying a horizontal backward differences operator to it (the
+inverse of horizontal prefix sum), you get this rank-1 result:
+
+     1  1  1  1  1
+     2  2  2  2  2
+     3  3  3  3  3
+     4  4  4  4  4
+     5  5  5  5  5
+
+And on differencing that vertically, you get this singular matrix:
+
+     1  1  1  1  1
+     1  1  1  1  1
+     1  1  1  1  1
+     1  1  1  1  1
+     1  1  1  1  1
+
+This kernel is clearly much easier to represent.
+
+I’m very much not sure that this would help, though; I think it
+depends on the kinds of features you find in kernels.
