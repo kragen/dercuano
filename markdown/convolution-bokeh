@@ -488,8 +488,13 @@ of sides.
 [Fast Bokeh Effects Using Low-Rank Linear
 Filters](https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf)
 (McGraw, 2014) used “low-rank linear approximations” to get linear
-approximations of arbitrary bokeh shapes, but I don’t fully understand
-it yet.  It criticizes the above paper as follows:
+approximations of arbitrary bokeh shapes.  The best summary seems to be on
+p. 4:
+
+> Our low rank filter approach for bokeh effects is to approximate an
+> arbitrary filter kernel as a sum of separable kernels.
+
+It criticizes the above paper as follows:
 
 > McIntosh et al. [17] present a novel approach that is capable of
 > generating polygonal bokeh, but their method has several
@@ -498,14 +503,16 @@ it yet.  It criticizes the above paper as follows:
 > parallelograms, and large overlapping bokeh do not blend properly.
 
 In a way, it’s similar to the various decomposition-based approaches I
-described above.  He seems to treat the rows and columns of the PSF as
-the rows and columns of a matrix, and then uses the singular value
-decomposition to find a “best” rank-*N* approximation of that matrix
-in the sense of having the smallest Frobenius norm; this amounts to
-approximating the kernel as a sum of separable filter kernels.  You
-could think of this as approximating each column of the filter kernel
-as a linear combination of *N* principal-component columns, which are
-chosen to represent as much column-to-column variation as possible.
+described above.  He treats the rows and columns of the PSF as
+the rows and columns of a matrix, and then uses singular value
+decomposition to find a “best” rank-*N* approximation of that matrix;
+the vectors corresponding to the largest singular values then provide
+separable filters whose sum approximates the original filter kernel.
+
+This is a very interesting approach to the problem of convolution in
+general, and it turns out there’s a fair bit of research on it,
+although you wouldn’t know that from reading McGraw’s paper; see file
+`svd-convolution` for details.
 
 † Prefix sums are also known as scan or addition scan (`+\` in APL),
 sum tables, integral images, cumulative sums, and summed area tables

@@ -1,3 +1,33 @@
+I think convolution, even the ordinary linear kind, is potentially an
+underappreciated abstraction for computer systems architecture.  A
+well-chosen abstraction is a sort of “bowtie knot” in the dependency
+graph: the services it provides can, on one hand, be implemented in
+many different ways, and on the other, can be used for many different
+applications.  This allows the indiscriminate and highly productive
+combination of any of *N* different implementations with any of *M*
+different applications.  Successful large-scale examples include the
+Internet Protocol, the C programming language, the SQL query language,
+the i386 instruction set, the POSIX API, and more narrowly the
+filesystem interface.
+
+This note focuses on underappreciated *applications* of convolution,
+but there are also underappreciated *implementations* of convolution.
+It doesn’t touch on generalizations of convolution such as
+morphological operations or convolutional neural networks.
+
+(See also the convolution section of file `powerful-primitives`, the
+notes about mathematical morphology in file `bresenham-erosion`, and
+notes on efficient algorithms in file `convolution-bokeh` and file
+`mcgraw-convolution`.)
+
+Music
+-----
+
+Convolution is of course widely used in computer music for things like
+reverb and frequency selection, but even broader applications are
+imaginable, especially once we consider time–frequency
+representations.
+
 Consider synthesizing a xylophone melody.  The score is a
 time-frequency representation of the music: at certain moments, there
 begins a note of a certain pitch with a certain amplitude.  This is a
@@ -48,17 +78,33 @@ result will have the frequency content of the original continuous
 sound, frequency-broadened by the time restriction of the window,
 multiplied by white noise, which has little effect.  This should allow
 you to provide arbitrary amplitude envelopes to an arbitrary
-continuous sound, within the limits set by the bandwidth-
-responsiveness tradeoff.  (If your window is about 64ms, your
-frequencies will be uncertain by around 15Hz, and your .)
+continuous sound, within the limits set by the
+bandwidth-responsiveness tradeoff.  Variations of this effect are
+widely used in music under the name of “vocoders”, though usually they
+don’t literally use a windowed sample of a continuous sound.  (If your
+window is about 64 ms, your frequencies will be uncertain by around
+15 Hz, and the sharpness of time-domain variation in the “carrier”
+sound will be diminished by about 64 ms.)
 
-Or consider rendering text on a sc
+Graphics
+--------
 
+Convolution is also widely used in graphics, but largely to apply
+visual effects like blurring and sharpening.
 
+### Text rendering ###
 
+Consider rendering text on a screen.  You can treat this as the
+convolution of a “window codepoints signal” and a “font signal”, each
+three-dimensional.  The “window codepoints signal” has an impulse at
+(*x*, *y*, *c*) precisely when the character with codepoint *c* should
+appear at (*x*, *y*); the “font signal” has the color at (*x*, *y*,
+-*c*) of pixel (*x*, *y*) for the glyph of codepoint *c*.  Convolving
+these two signals produces a three-dimensional signal whose (*x*, *y*,
+0) plane is the desired text display.
 
-If the signal representing the original font is two-dimensional, you
-can space the glyphs farther apart than the width of the window; the
+If the signal representing the original font is instead two-dimensional, you
+can merely space the glyphs farther apart than the width of the window; the
 convolution output is then a very large two-dimensional surface
 containing the text of the window and also a large number of scrambled
 copies of the text of the window.  The original window codepoints
@@ -108,6 +154,9 @@ ink color by convolving with the appropriate pen.  (And of course you
 can convolve with a small sphere or horizontal ellipsoid to thicken
 the outlines of outline fonts.)
 
+3-D modeling
+------------
+
 There’s an existing body of knowledge in rendering convolutional
 surfaces, that is, implicit surfaces defined by level sets of the
 convolution of some fixed “kernel function” with a skeleton of a 3-D
@@ -115,3 +164,5 @@ model.  This involves an additional level of nonlinearity between the
 convolutional operation and the image you see: rather than smoothly
 varying between opaque and transparent, with the nonlinearity imposed
 by the tendency of nearby objects to nonlinearly obscure faraway ones.
+
+This can perhaps be applied to the text-rendering problem.

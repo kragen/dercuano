@@ -1,0 +1,388 @@
+The miraculous low-rank SVD approximate convolution algorithm
+=============================================================
+
+When reading papers for file `convolution-bokeh`, I ran across a paper
+by Tim McGraw on a powerful convolution algorithm.  The algorithm took
+me a while to understand, and it turns out it isn’t original to
+McGraw; it was extensively investigated in the 1970s and 1980s.  It’s
+an absolutely astounding technique, and I think it has much broader
+applicability than is widely appreciated.
+
+Much of the below is somewhat speculative because *I haven’t actually
+tried the algorithm yet*.  It’s very possible I’m misunderstanding its
+limitations.  But it gives me the first general attack on the problem
+in `sparse-filters`, and I have a lot of reading to do!
+
+The profound and wide-ranging importance of convolution
+-------------------------------------------------------
+
+The *convolution theorem* is one of the most important theorems in the
+theory of signals (in the sense of “digital signal processing” or
+“Signals & Systems”, not in some kind of semiotic sense).  It says
+that any linear, shift-invariant system is fully characterized by its
+impulse response, because you can add up a bunch of shifted and scaled
+copies of that impulse response to compute its response to some
+arbitrary signal.  (Or, in continuous domains, integrate.)  This has
+applications both theoretical, in proving theorems generally
+applicable to linear, shift-invariant systems, and applied, in
+computing the result of a linear, shift-invariant system through one
+or another convolution algorithm.
+
+Significant linear, shift-invariant systems include nearly all
+acoustic systems (in the time domain), circuits made of linear
+components (voltage sources, current sources, resistors, transmission
+lines, capacitors, and inductors — or their idealized versions,
+anyway), nearly all optical systems in the time domain, and imaging
+optics in the spatial domain as well.  Many systems that are not in
+fact linear or shift-invariant can be locally approximated as linear
+shift-invariant systems, though not all.  (You can’t get the Doppler
+effect out of a locally-shift-invariant model, for example.)
+
+Furthermore, because convolution in the space or time domain is
+equivalent to pointwise multiplication in the frequency or Fourier
+domain, we can do things like frequency filtering, blurring, and
+sharpening by using convolution.
+
+That point about “sharpening” deserves some sharpening.  In theory,
+any convolution with no zeroes in the frequency domain, which is
+mathematically almost all convolutions, has an inverse
+convolution — you just take the reciprocal in the frequency domain and
+Bob’s your auntie!  In theory this means that you can undo the
+degradation caused by almost any known convolution (for example,
+defocus blur) by applying an inverse convolution, a process known as
+“deconvolution”.  However that inverse does not in general have a
+finite impulse response.  And, because some frequency-domain
+components of the original convolution may be very small indeed — the
+high-frequency components of a blur, for example — their reciprocals
+can be very large, which makes the problem ill-conditioned — that any
+noise in those frequencies will be enormously amplified by the inverse
+filter.  [Wiener filters] are the usual compromise solution to this
+problem.
+
+[Wiener filters]: https://en.wikipedia.org/wiki/Wiener_filter
+
+> In two dimensions the impulse response is sometimes called the “point
+spread function”, and sometimes, especially in imaging optics, it’s
+also called the “output transfer function”.  In the context of
+computing a convolution it’s also called a “kernel”.  Older papers
+sometimes call it the “response function” or “amplitude response”.
+
+Also, the probability distribution of a sum of random variables is the
+convolution of the probability distribution of the individual random
+variables, from which you should be able to see that convolution is
+commutative and associative.  The damned thing just pops up
+everywhere!
+
+### Convolution defined mathematically ###
+
+Mathematically, the definition of discrete convolution is almost
+comically simple; using \* for convolution:
+
+> (*f* \**g*)*ₜ* = Σ*ᵢ fᵢ gₜ*₋*ᵢ* = Σ*ᵢ fₜ*₋*ᵢ gᵢ*
+
+Here *i* ranges over all possible values and *t* might be some
+*D*-dimensional index as well as just an integer.  For example, when
+we’re convolving images, it’s an (*x*, *y*) pair.  *g* might be the
+impulse response (the “kernel”) of some system we’re simulating on
+input *f*.  (You can easily verify that, if *f*₀ = 1 and *fₜ* = 0 for
+all other *t* — that is, *f* is a discrete unit impulse — it merely
+reproduces *g*.)
+
+(Continuous convolution is the same thing but with an integral.)
+
+### Yay convolution! ###
+
+Despite this extremely broad spectrum of existing applications, I
+think convolution is actually an underappreciated operation that could
+be applied much more widely than it is.  See the “convolution” section
+of file `powerful-primitives` and file `convolution-applications` for
+more detail.  One reason it isn’t applied more broadly is that it’s
+computationally pretty expensive.  And that’s where the earthshaking
+discovery of SVD convolution comes in!
+
+SVD convolution
+---------------
+
+The amazing SVD convolution algorithm uses a “low-rank linear
+approximation” to approximate convolutions of an image with arbitrary
+kernels.  I first ran across it in [Fast Bokeh Effects Using Low-Rank
+Linear
+Filters](https://web.ics.purdue.edu/~tmcgraw/papers/dof_mcgraw_2014.pdf)
+(McGraw, 2014), where it’s used to simulate camera bokeh.  The best
+summary in that paper seems to be on p. 4:
+
+> Our low rank filter approach for bokeh effects is to approximate an
+> arbitrary filter kernel as a sum of separable kernels.
+
+The algorithm treats the rows and columns of the point spread function
+you want to approximate as the rows and columns of a matrix, and then
+uses the singular-value decomposition to find a “best” rank-*N*
+approximation of that matrix; this amounts to approximating the kernel
+as a sum of separable filter kernels.  You could think of this as
+approximating each column of the filter kernel as a linear combination
+of *N* principal-component columns, which are chosen to represent as
+much column-to-column variation as possible.
+
+There is nothing in SVD convolution that is specifically limited to
+bokeh; it is a very general technique for efficiently approximating
+any arbitrary two-dimensional convolution!
+
+SVD convolution is specifically two-dimensional, because it relies on
+the singular-value decomposition (SVD) to compute the *N* separable
+filters whose sum is the least-squares-closest rank-*N* approximation
+to the original filter kernel.  Each of these filters is represented
+by a pair of vectors, one a horizontal convolution kernel and one a
+vertical convolution kernel, whose outer product is a matrix that is
+the convolution kernel of the composition of those convolutions.  The
+sum of the *N* of these matrices corresponding to the *N* largest
+singular values forms the optimal approximation.
+
+In the bokeh paper, McGraw typically got visually very good results
+with bokeh kernel approximations of rank 3 or greater.
+
+### Singular-value decomposition (SVD) ###
+
+(You can probably skip this if you know linear algebra well, but I
+don’t.)
+
+Singular-value decomposition is a generalization of eigendecomposition†
+to nonsquare matrices; it decomposes some arbitrary matrix *M* as a
+product of three matrices **M** = **UΣV\***, where **U** and **V** are
+orthogonal (or more generally unitary) and **Σ** is diagonal.  One of
+many interesting ways to view the result is as a series of
+least-squares-optimal approximations of the original matrix whose
+terms are *separable* matrices, meaning that they can be expressed as
+the outer product of some pair of vectors.  Specifically, they are the
+outer products of corresponding columns of **U** and **V**, scaled by
+the members of the diagonal of **Σ**; because in general a matrix
+product **AB** can be seen as the sum of the outer products of the
+columns of **A** with the corresponding rows of **B**.
+
+†*Eigendecomposition* is the decomposition of a square matrix using
+its *eigenvectors*, a term whose only advantage is as a shibboleth for
+exposing Malcolm Gladwell — the Spanish term *autovector* is much more
+informative.  I only mentioned this because if you already know about
+eigenvectors, the above explanation of SVD will be easier to
+understand.
+
+Since those columns of **U** and **V** are unit vectors, the elements
+of **Σ** are what tell you how big the contribution of each of these
+separable matrices is to the final matrix sum, so you can get the best
+*N*-term approximation by taking the columns corresponding to the *N*
+largest elements of **Σ**, which are by convention ordered to be
+first.  It turns out that this is the optimal *N*-term approximation
+in the sense of the Frobenius norm — that is, in the sense of
+differing by a matrix with the smallest Frobenius norm (the sum of
+squares of all the elements).
+
+### Separable filters ###
+
+A separable filter is a two-dimensional convolution you can compute by
+first doing a one-dimensional convolution on each row and then doing a
+one-dimensional convolution on each column of that result.  (Or vice
+versa, since, as it turns out, convolutions commute.)  This is great
+because if you have a convolution kernel that is *w*×*h* and you try
+to calculate the convolution by brute force, you need *w*·*h*
+multiply-accumulates per pixel, but you can do a separable filter with
+just *w* + *h* multiply-accumulates per pixel.  So if you have an
+11×11 kernel you can get by with 22 multiply-accumulates instead of
+121.  Big win!
+
+(That is, your horizontal one-dimensional convolution uses 11
+multiply-accumulates on pixels in the same scan line to calculate each
+pixel of the intermediate image, and then the vertical one-dimensional
+convolution uses 11 multiply-accumulates on intermediate-image pixels
+in the same column to calculate each pixel of the final image — 22 in
+all.)
+
+There are three very popular separable 2-D filters: box filters,
+double-exponential filters, and Gaussian filters.  Box filters and
+double-exponential filters are popular because you can calculate them
+in just a few operations per pixel, like, about three along each axis.
+Gaussian filters are popular because they’re circularly symmetric, and
+they’re the *only* separable circularly symmetric filters; also, there
+are a fair number of physical phenomena with Gaussian behavior, but
+they get applied pretty often in wildly inappropriate ways.  The most
+common way to approximate a Gaussian filter is actually to run a few
+iterations of one of the other two, which works because of the Law of
+Large Numbers.
+
+History
+-------
+
+As I said above, SVD convolution was explored extensively in the 1970s
+and 1980s.  The seminal paper is probably Treitel and Shanks, “The
+Design of Multistage Separable Planar Filters”, in 1971:
+
+> A two-dimensional, or planar, digital filter can be described in
+> terms of its planar response function, which is in the form of a
+> matrix of weighting coefficients, or filter array.  In many
+> instances the dimensions of these matrices are so large that their
+> implementation as ordinary planar convolutional filters becomes
+> computationally inefficient.  It is possible to expand the given
+> coefficient matrix into a finite and convergent sum of matrix-valued
+> stages.  each stage can be separated with no error into the product
+> of an *m*-length column vector multiplied into an *n*-length row
+> vector, where *m* is the number of rows and *n* is the number of
+> columns of the original filter array.  Substantial savings in
+> computer storage and speed result if the given filter array can be
+> represented with a tolerably small error by the first few stages of
+> the expansion.  Since each constituent stage consists of two
+> vector-valued functions, further computational economies accrue if
+> the one-dimensional sequences described by these vectors are in turn
+> approximated by one-dimensional recursive filters.  Two geophysical
+> examples have been selected to illustrate how the present design
+> techniques may be reduced to practice.
+
+The paper doesn’t use the term “singular-value decomposition”, perhaps
+because it was new at the time, instead explaining how to derive the
+SVD from eigendecomposition.  By 1975 papers were using the term.
+
+In 1980 Sang Uk Lee did his dissertation on it, “Design of SVD/SGK
+Convolution Filters for Image Processing”, citing Treitel and Shanks
+1971 and also Twogood and Mitra’s 1977 “Computer-Aided Design of
+Separable Two-Dimensional Digital Filters”, which also cites Treitel
+and Shanks.  Andreas Antoniou and what I assume are his students, such
+as Wu-Sheng LU and Hui-Ping WANG, continued publishing on the subject
+through the 1980s, and, for example, in 1990 published “Design of
+Two-Dimensional FIR Digital Filters by Using the Singular-Value
+Decomposition”, in which they find ways to further modify the filter
+to decrease the computational load, one using LU decomposition.
+
+Mitra, Grosen, and Neuvo published a couple of papers in 1985 on
+extending the algorithm to one-dimensional signals by partitioning
+them into equal-sized chunks.
+
+Work continues today, perhaps at a reduced pace; Atkins, Strauss, and
+Zhang published “Approximate convolution using partitioned truncated
+singular value decomposition filtering for binaural rendering” in 2013
+on a way to filter audio to produce the binaural sensation of space,
+and in 2014 McGraw published the paper where I learned about the
+technique.  McGraw doesn’t cite this earlier work and seems to be
+unaware of it; he may have invented the technique independently 40
+years later.
+
+Of all of the above, I find Lee’s dissertation to be by far the most
+readable, perhaps in part because it’s jargon-compatible with me.  The
+earlier work largely uses terminology I find confusing, and the later
+work assumes familiarity with the earlier work.  The Treitel–Shanks
+paper is a close second, despite the foreign jargon, because it’s very
+well written, but of course it only covers developments up to 1971.
+
+Direct applications
+-------------------
+
+SVD convolution can be applied directly to sharpening and blurring
+images, to Wiener filtering of images that have been corrupted by
+suboptimal optics, to object recognition and convolutional feature
+extraction in images, and to computing approximations of the
+performance of optical systems.  In the context of mathematical
+optimization, for example of simulated optical systems, a
+computationally inexpensive approximation is immensely valuable,
+because it allows many more optimization cycles to run.
+
+For applications like object recognition in images, it’s common to
+have many more candidate filter kernels than images.  In this case, it
+might be more productive to use a low-rank approximation of the
+original image rather than of the filter kernels, which is guaranteed
+to work because convolution is commutative.
+
+Extensions
+----------
+
+What useful extensions of SVD convolution might be possible, but
+aren’t simply straightforward applications of it?
+
+### To more dimensions ###
+
+The *D*-dimensional equivalent problem is well-posed: find *N*
+sequences of *D* vectors whose *D*-dimensional outer products sum to
+form the optimal approximation to the original *D*-dimensional
+convolution kernel.  It can’t be solved directly with SVD, but maybe
+there’s a way to apply SVD more indirectly to a couple of dimensions
+at a time, or maybe you could use a recursive iterative-approximation
+algorithm that subtracts off the *D*-dimensional outer product of the
+average vectors of the residual along each dimension.  If not, I’m
+optimistic that, e.g., gradient-descent variants like Adam or
+quasi-Newton methods are sufficiently powerful to find a good
+solution.
+
+I ran across a 2009 paper by Oseledets and Tyrtyshnikov, “Breaking the
+curse of dimensionality, or how to use SVD in many dimensions”, which
+explains something called “the *Tree-Tucker* format” using “Tucker
+decomposition”; this sounds similar to the above.  I haven’t finished
+reading it.
+
+### To one dimension ###
+
+If *D* = 1, then the problem as posed above is trivial: the
+convolution kernel is a vector, and it is its own best vector
+approximation, *N* = 1.  To get a more useful result, we would need to
+find a way of somehow approximating the convolution with shorter
+vectors.
+
+One possibility is to “word-wrap” or “raster” a one-dimensional
+time-domain sequence of *a*·*b* points into a two-dimensional signal
+of dimensions *a* × *b* where *a* is small compared to the size of our
+desired kernel, ideally close to its square root.  Then you raster the
+kernel analogously into an *a* × *c* shape.  If you do wraparound onto
+the previous and next *a*-element “scan line”, a two-dimensional
+convolution on these two-dimensional signals is precisely the same
+thing as the original one-dimensional convolution.  If the kernel has
+substantial periodicity, the way bandpass convolution filters do, SVD
+may yield a good low-rank approximation if *a* is a multiple of its
+period.  But if the columns of the kernel are perfectly uncorrelated,
+no good low-rank approximation will exist.
+
+So, computing the original time-domain convolution by brute force
+required *ac* multiply-accumulates per sample, and now we can do it in
+*a* + *c* multiply-accumulates per sample per term — if we’re using a
+rank-3 approximation, 3(*a* + *c*) multiply-accumulates per sample.
+This is a win if 3(*a* + *c*) < *ac* — if *a* ≈ *c*, that’s roughly
+6*a* < *a*², which is true if *a* > 6, or more generally, is more than
+twice the rank of the approximation.
+
+Unwrapping the above computation back into one dimension, we can view
+each term of this algorithm as first doing a size-*a* one-dimensional
+convolution, then a *sparse* size-*ac* one-dimensional convolution,
+with *c* taps at intervals of *a*.
+
+(I think all of the above is in the Atkins et al. paper from 2013 that
+I mentioned above, but I haven’t really read it yet.)
+
+A key observation here is that there’s no particular reason for these
+terms to use the same value of *a*, and in fact it’s probably
+advantageous for them to use *different* values of *a*, because the
+first pass using *a*₀ will probably suck up most of the energy at
+frequencies that fit neatly into *a*₀ — the residual error will be
+particularly low around those frequencies.  So it might be a good idea
+to use a sequence of strides *a*₁, *a*₂, etc., zero-padding the kernel
+if necessary, to get a better “low-rank” approximation.  The
+autocorrelation function of the residual kernel is probably a good
+guide to picking those strides, although this greedy algorithm might
+not produce optimal results.
+
+Also, since this reduces one linear convolution to two or more cheaper
+linear convolutions, it can be applied recursively — for example, you
+could reduce a 1000-tap kernel to a 10-tap kernel and a 100-tap
+kernel, then reduce the 100-tap kernel to two 10-tap kernels.  This is
+clearly cheaper to compute if you’re only using the first vector from
+the SVD, but you might need more than one!  If you use more, we’re not
+talking about *two* 10-tap kernels in the final stage, but about
+*many* final 10-tap kernels — 4 of them if you use two components each
+time.  Still a big win — 2·10 + 4·10 + 4·10 = 100, much less than
+1000 — but less so.
+
+If you do this kind of recursive decomposition (which, incidentally,
+can also be used on the one-dimensional kernels that result from the
+two-dimensional algorithm), the SVD no longer gives you fully optimal
+results, because you aren’t precisely using the first principal
+components — you’re using some approximation to them, leaving some
+extra error.  This suggests that some kind of iterative algorithm like
+the greedy algorithm described above will probably produce better
+results.
+
+(I think you can probably approximate the first principal component
+reasonably efficiently by using the PageRank algorithm on **M\*M** and
+**MM\*** to get their largest eigenvectors, rather than computing the
+full SVD.)
