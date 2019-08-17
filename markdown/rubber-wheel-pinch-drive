@@ -1,0 +1,129 @@
+I ran across some discarded stroller wheels on the way home, which I
+resisted the temptation to bring home.  They had hard rubber around
+the outer rim (of about 200-mm diameter and 20-mm thickness), and it
+occurred to me that a motor shaft pressed directly against that outer
+rim would be an effective way to drive it with a fairly large
+mechanical advantage for mobile robotics.
+
+Pressing the motor shaft against the wheel
+------------------------------------------
+
+Suppose we mount a motor above the wheel with its axis parallel to the
+wheel and its 10-mm-diameter shaft running across the top, held in one
+bearing on each side of the wheel, each of which is pressed toward the
+wheel axis by some kind of mounting preload, thus pressing the shaft
+into the rubber.  Steel on rubber has a frictional coefficient around
+1, so the bearing radial load needs to be a bit larger than the
+maximum drive force we need to be able to apply to the wheel.  And we
+have about a 20:1 mechanical advantage in the torque sense (but 1:1 in
+the sense of linear motion).
+
+Let's say the robot weighs 10_kg and thus 98_N, so we want at least
+30_N of force to be able to handle reasonable slopes with some
+reasonable acceleration and deceleration.  With the 5-mm radius of the
+shaft, we need 0.15_N_m of torque from the motor, or 0.11 foot-pounds
+in medieval units.  This is a reasonably large amount of torque; many
+small electric motors cannot provide it.  Ten watts at 30_N is 330_mm
+per second, a very slow walking sort of speed, at which speed the
+wheel would be turning 1.9 revolutions per second (113_rpm), and our
+hypothetical 10-mm-diameter shaft 38 revolutions per second
+(2300_rpm), which is not an outrageously low speed for a modern small
+motor, but somewhat lower than optimal.  Also, the 10-mm shaft is
+enormously larger than most small motors have.
+
+So it would be nice to be able to use a smaller shaft in this way,
+thus getting more mechanical advantage and not needing to attach a
+thicker shaft to the motor.  But if we take a shaft that's much
+thinner than 10_mm, mount it through bearings on both sides of the
+wheel 20_mm apart, and press down on the bearings with, say, 50_N or
+100_N of force, the shaft will probably bend in the middle, yielding,
+and be ruined.
+
+A 10-watt NMB motor
+-------------------
+
+I don't know what a typical motor in this power range is like these
+days, but on the strength of Digi-Key having 221 of them in stock,
+I'll consider the Minebea DIA42B 10W 31A as a representative.
+Digi-Key charges US$33 for it, which seems high.
+
+The DIA42B 10W is a ten-watt 24-volt BLDC motor optimized for 500-3500
+rpm (running up to 4000_rpm with no load at 300_mA), and although it's
+only rated for ten watts, it's also rated for ten amps.  It weighs 150
+grams and it's 42×42_mm with a 6-mm-diameter shaft.  It has a
+100-pulse-per-revolution rotary encoder.  The torque curve on p. 13 of
+the datasheet shows it at almost 6000 rpm at no load, 60_mN_m of
+torque at 3500_rpm, 90_mN_m of torque at 2000_rpm, 100_mN_m of torque
+at 1000_rpm, and about 105_mN_m at its 500-rpm minimum speed.  At
+these high torques it's sucking up to 2 amps of current, so if you
+keep it up it'll burn up; what I think is its top sustainable current
+of about 400_mA would give you about 20% to 40% of those torques,
+about 20_mN_m.
+
+At the surface of its 6-mm-diameter shaft, 20_mN_m works out to 6.7_N,
+which is significantly lower than 30_N but would still permit
+significant robot movement, especially if the robot ends up lighter
+than suggested above.  Clearly gearing it up further by using a
+thicker shaft would be bad!
+
+Rollers
+-------
+
+So, how could we press this 6-mm shaft against the wheel, other than
+running it between bearings 20_mm apart on opposite sides of the
+wheel?  We could press it onto the wheel by backing it with two
+rollers, not themselves in contact, which trap it in a triangle of
+compression between the wheel and the rollers.
+
+But the rollers can't be very large.  If they're 6_mm in diameter
+themselves, then they could be as far as 180° apart viewed from the
+motor shaft before they hit the wheel, but then we haven't really
+solved the problem, just reduced it by a factor of 2 or 3.  If we make
+them larger, we can improve that situation, but soon they hit the
+wheel.
+
+However, if we make the rollers out of stacks of parallel discs with
+spacers between them on a shaft, like hard disk platters, we can
+*overlap* them, though not arbitrarily far.  If the shaft diameter
+approaches zero, each disc of roller A can extend to the center of
+roller B, and vice versa; with a physically plausible shaft diameter,
+they need to be somewhat further out.  The discs could be, for
+example, 1.4_mm in thickness with a 1.6_mm space between them, with
+somewhat rounded edges, so that the 6-mm shaft only needs to span
+spans of about 2_mm unsupported from one direction.
+
+For example, you could imagine 16-mm-diameter discs on 9-mm shafts
+(including the spacers), yielding 11_mm distance from roller center to
+motor-shaft center and 13_mm distance between roller centers
+(including ½_mm of clearance).  This means that the motor shaft center
+will be sqrt(11² - 6½²) mm or about 8.87_mm away from the
+roller-center-to-roller-center axis.  This means that the bottom of
+the motor shaft will be 11.87 mm from the
+roller-center-to-roller-center axis, while the roller edges are only
+8_mm from it, so they won't touch the wheel.  They could even be a
+little bigger than that.
+
+Bigger rollers would mean not only more stiffness but also improved
+leverage to overcome the friction in the rollers' bearings, and thus
+less friction loss.
+
+A quadcopter motor
+------------------
+
+Consider a higher-powered modern BLDC motor, the Turnigy BC2836-8
+quadcopter motor I used as my example in file `drone-cutting`.  It has
+a 4-millimeter shaft and delivers 336 watts at 15000 rpm on 14 volts;
+this suggests an output force of almost 100 newtons at the surface of
+the 4-mm shaft --- ample to drive the wheel in this way, but
+definitely needing something like this roller system.
+
+If you try using the same two rollers, the motor shaft center will be
+sqrt(10² - 6½²) mm or about 7.6 mm from the
+roller-center-to-roller-center axis, and the shaft edge 9.6 mm from
+it, slightly over the 8_mm of the rollers themselves.
+
+Multiple motors
+---------------
+
+You could reasonably easily connect multiple motors to the same wheel
+in this fashion, just clamping them on around its upper rim.
