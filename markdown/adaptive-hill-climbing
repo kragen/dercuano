@@ -1,0 +1,225 @@
+When writing file `rubber-wheel-pinch-drive` I got confused with some
+basic trigonometry, trying to solve a triangle with the law of
+cosines† to find the intersection of two circles.  So, impatient, I
+figured I’d solve the problem with brute force instead, so I wrote the
+following implementation of hill-climbing with random restarts for
+scalar functions of general vector spaces:
+
+    def search(f, p, restarts=30, steps=30):
+        best = None
+        for start in range(restarts):
+            current = p()
+            current_badness = f(current)
+
+            for size in range(20):
+                for i in range(steps):
+                    new = current + p() * 4**(4-size)
+                    new_badness = f(new)
+                    if new_badness < current_badness:
+                        current, current_badness = new, new_badness
+
+            if best is None or best[1] > current_badness:
+                best = current, current_badness
+
+Here `p` is a function that yields a vector from the domain of `f`,
+which returns a real.
+
+At first this didn’t work very well because I had erroneously provided
+a guess function `p` that was always non-negative, so each restart
+would progressively step from the neighborhood of 0 to the
+neighborhood of the correct solution and then get stuck.
+Nevertheless, it was able to find a reasonably good solution (and then
+I realized how to solve the problem in closed form without
+trigonometry).
+
+† The law of cosines is *c*² = *a*² + *b*² - 2*ab* cos γ, where γ is
+the angle opposite the side with length *c*.
+
+Robustness
+----------
+
+Random restarts in general make metaheuristic search algorithms more
+robust; indeed, even the simplest possible metaheuristic search
+algorithm, “choose a random point”, becomes workable with random
+restarts.
+
+In this implementation, the restarts aren’t very random.
+
+I tried to make the implementation somewhat robust against `p`
+functions of the wrong magnitude, as you can see; the algorithm tries
+a range of different exponentially-spaced sizes.  Now that I’m using a
+non-broken `p`, this results in finding a solution correct to ten
+decimal places, which is pretty good for hill climbing.  But the
+particular orders of magnitude I chose are kind of arbitrary;
+basically I was just hoping they’d cover the right range.
+
+It occurred to me that you can make it more robust against `p` guesses
+of the wrong order of magnitude by updating `size` incrementally,
+using a procedure like the following: when you find a step that
+improves the guess, try half that same step or twice that same step.
+If that improves the guess further, then multiply `size` by 2 or ½,
+respectively, before the next iteration.  This way, if your step size
+is about right, `size` will experience a random walk around it, but if
+it’s much too small (you’re stepping around a locally flat linear
+region of the cost function) then `size` will grow exponentially,
+while if it’s much too large (you’re rocketing out of the basin with
+all the solutions in it) it will diminish exponentially.  This won’t
+deal very well with the kinds of long, narrow valleys that
+gradient-descent variants like Adam are optimized for.
+
+By the same token, you could make it robust against a `p` function
+like the one I provided by trying a step of -*p* when *p* makes the
+situation worse.  That way, if you’re in a relatively flat region, you
+can make progress by just shifting into reverse.  Trying this actually
+gives you another crucial piece of information: if going both ways
+makes it worse, there’s a good chance you’re in a local optimum with a
+step size that is too big to have a good chance of sharpening the
+optimum.
+
+You could implement this as follows, though this code is a bit
+repetitive:
+
+    def climb(f, step):
+        size, growth, here = 1, 2, step()
+        cost = f(here)
+
+        while True:
+            yield here, cost  # This may be the same as last time
+
+            where = size * step()
+            new = here + where
+            new_cost = f(new)
+            if new_cost > cost:
+                where = -1 * where
+                new = here + where
+                new_cost = f(new)
+
+            if new_cost > cost:
+                size /= 2
+                continue
+
+            where *= growth
+            grown_new = here + where
+            grown_new_cost = f(grown_new)
+            if grown_new_cost < new_cost:
+                new, new_cost = grown_new, grown_new_cost
+                size *= growth
+            else:
+                growth = 1/growth
+
+            here, cost = new, new_cost
+
+This is able to find a good approximation of the intersection of two
+circles in “only” 128 iterations, using the following definitions,
+even when the answer is several orders of magnitude away from the
+starting step size:
+
+    def distance(p1, p2):
+        return ((p1 - p2)**2).sum()**0.5
+
+    def circles(c1, r1, c2, r2):
+        def badness(guess):
+            return ((distance(guess, c1) - r1)**2 +
+                    (distance(guess, c2) - r2)**2)
+        return badness
+
+    step = lambda: numpy.random.rand(2) - 0.5
+
+### Handling higher-dimensional spaces and valleys ###
+
+However, its adaptive step size will screw it in higher-dimensionality
+spaces, since when it’s in a valley or saddle point where most
+directions are bad, it will tend to diminish the step size and find a
+point on the valley floor very precisely.  Perhaps a better approach
+would be to diminish step sizes by a smaller amount that depends on
+the dimensionality, so that if there’s at least one good direction,
+the step size will remain constant on average.
+
+To escape this trap, you could have different behavior when expanding
+the step size than when reducing it: keep increasing the step size
+without increasing the step direction until the situation stops
+getting better.  That is, walk along the line of the step by 2, 4, 8,
+16, 32, etc., times the size of the initial step, rather than just 2
+times.  This will tend to ricochet you between the walls of a canyon,
+and eliminates the bias in the step-size random walk toward smallness,
+since any single lucky step in the right direction can increase the
+step size arbitrarily.
+
+This is similar to the three-dimensional optimization strategy Dave
+Long tells me some bacteria use: flagella forward while things are
+improving, flagella backward (resulting in random tumbling) while
+things are getting worse.
+
+In cases like those Adam and AdaGrad and the like are designed for,
+where the best step size varies enormously among different dimensions,
+you might want to hill-climb along one dimension at a time, so that
+you can use a separate step size for each dimension.  This also
+potentially permits the use of Acar’s “self-adjusting computation” and
+similar generic incrementalization algorithms to speed up function
+evaluation.  (See the section in file `powerful-primitives` on
+incremental or self-adjusting computation.)  Unfortunately, this means
+that you’ll never make any further progress once you reach the floor
+of a diagonal valley.  In *n* dimensions, there are 2*n*
+dimension-aligned directions a valley can descend in, but 2*ⁿ*
+precisely diagonal orientations, so in some sense that’s a much harder
+problem.
+
+So, for example, the above routine handles this somewhat pathological
+problem reasonably well, although it takes it several hundred
+iterations; note the incorrect step function:
+
+    c = (3, 1e10, 4, 17, -5)
+    climb(lambda g: ((g-c)**2).sum(), lambda: numpy.random.random(5))
+
+But it handles this version much worse, requiring hundreds of
+thousands or possibly millions of iterations to solve it — it
+gradually exponentially converges on the right answer, but taking
+about 80'000 iterations per order of magnitude:
+
+    climb(lambda g: (((g-c)*(1,1,100,1,1))**2).sum(),
+          lambda: numpy.random.random(5))
+
+This induces a steep valley along the third dimension, and so the
+deltas in the other dimensions like the second and fourth dimensions
+suffer a drastically reduced step size, slowing their convergence
+enormously (from the outlandish values they took to get close to the
+optimum along the second dimension).
+
+It finally found a solution accurate to two decimals on every
+dimension in iteration 886'803, after about 15 or 20 minutes of
+CPython interpretation:
+
+    886803 [  3.00416293e+00   1.00000000e+10   3.99999237e+00   1.70599240e+01
+      -4.95000939e+00] 0.0177569891399
+
+It goes about four times as fast with a non-buggy step function,
+converging to that same precision in only 207'804 generations:
+
+    207804 [  3.02129932e+00   1.00000000e+10   3.99999109e+00   1.70184720e+01
+      -5.04976604e+00] 0.021740755647
+
+I haven’t tried the above extensions to deal with the problem yet.
+
+Relationship to other kinds of optimization algorithms
+------------------------------------------------------
+
+See also file `genetic-secants` for a different generic
+derivative-free solver for scalar functions of general vector spaces,
+that one for zeroes instead of minima.  I think both of these are only
+going to be reasonably fast for problems of low dimensionality, but I
+think hill-climbing suffers exponentially from high dimensionality,
+while the method of secants (like gradient-descent variants) will
+suffer only linearly from it.
+
+Of course, you can find local minima of a computable continuous
+function by using automatic differentiation on it and using the method
+of secants to find a zero of its derivative.
+
+Although the above implementations are not, hill-climbing is
+applicable to functions on discrete spaces without any kind of
+comparability between elements, such as graphs or strings of symbols.
+(That’s the domain.  The range still needs to be comparable.)  The
+method of secants requires divisibility and zeroes.  Hill-climbing
+also only requires comparability from its cost function — it takes no
+notice of its absolute magnitudes, just which values are higher and
+lower — and this *is* true of the implementations above.
