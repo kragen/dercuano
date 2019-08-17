@@ -1,3 +1,6 @@
+Robust hill climbing in vector spaces using adaptive step sizes
+===============================================================
+
 When writing file `rubber-wheel-pinch-drive` I got confused with some
 basic trigonometry, trying to solve a triangle with the law of
 cosines† to find the intersection of two circles.  So, impatient, I
@@ -35,8 +38,8 @@ trigonometry).
 † The law of cosines is *c*² = *a*² + *b*² - 2*ab* cos γ, where γ is
 the angle opposite the side with length *c*.
 
-Robustness
-----------
+Making hill-climbing in vector spaces more robust
+-------------------------------------------------
 
 Random restarts in general make metaheuristic search algorithms more
 robust; indeed, even the simplest possible metaheuristic search
@@ -63,18 +66,15 @@ is about right, `size` will experience a random walk around it, but if
 it’s much too small (you’re stepping around a locally flat linear
 region of the cost function) then `size` will grow exponentially,
 while if it’s much too large (you’re rocketing out of the basin with
-all the solutions in it) it will diminish exponentially.  This won’t
-deal very well with the kinds of long, narrow valleys that
-gradient-descent variants like Adam are optimized for.
+all the solutions in it) it will diminish exponentially.
 
 By the same token, you could make it robust against a `p` function
 like the one I provided by trying a step of -*p* when *p* makes the
-situation worse.  That way, if you’re in a relatively flat region, you
+situation worse.  That way, if you’re in a relatively non-curved region, you
 can make progress by just shifting into reverse.  Trying this actually
 gives you another crucial piece of information: if going both ways
-makes it worse, there’s a good chance you’re in a local optimum with a
-step size that is too big to have a good chance of sharpening the
-optimum.
+makes it worse, there’s a good chance you’re in a local optimum, using a
+step size that is too big to have a good chance of improving your position.
 
 You could implement this as follows, though this code is a bit
 repetitive:
@@ -125,7 +125,7 @@ starting step size:
 
     step = lambda: numpy.random.rand(2) - 0.5
 
-### Handling higher-dimensional spaces and valleys ###
+### Handling valleys, saddles, and higher-dimensional spaces ###
 
 However, its adaptive step size will screw it in higher-dimensionality
 spaces, since when it’s in a valley or saddle point where most
@@ -198,7 +198,102 @@ converging to that same precision in only 207'804 generations:
     207804 [  3.02129932e+00   1.00000000e+10   3.99999109e+00   1.70184720e+01
       -5.04976604e+00] 0.021740755647
 
-I haven’t tried the above extensions to deal with the problem yet.
+The flagella-style variant described above improves on this by about a
+factor of 7:
+
+    28607 [  2.96086659e+00   1.00000000e+10   4.00023842e+00   1.69373547e+01
+      -4.95732860e+00] 0.0155987598959
+
+That’s using the following implementation, which additionally is
+slightly simpler and only does one loss-function evaluation per
+iteration, instead of up to three:
+
+    def climb(f, step):
+        size, here = 1, step()
+        cost = f(here)
+
+        while True:
+            yield here, cost
+
+            where = size * step()
+            new = here + where
+            new_cost = f(new)
+            if new_cost > cost:
+                size /= -2
+                continue
+
+            # We found a promising direction; swim!
+            while True:
+                yield new, new_cost
+                where *= 2
+                new_new = here + where
+                new_new_cost = f(new_new)
+                if new_new_cost < new_cost:
+                    new, new_cost = new_new, new_new_cost
+                    size *= 2
+                else:
+                    break
+
+            here, cost = new, new_cost
+
+And this harness code:
+
+    from __future__ import division, print_function
+    import numpy
+
+    if __name__ == '__main__':
+        c = (3, 1e10, 4, 17, -5)
+        for i, (x, q) in enumerate(climb(lambda g: (((g-c)*(1,1,100,1,1))**2).sum(),
+                                         lambda: numpy.random.random(5) - 0.5)):
+            print(i, x, q)
+
+As before, it takes four times as long if we leave out the `- 0.5`:
+
+    92241 [  3.04962626e+00   1.00000000e+10   3.99985342e+00   1.69648044e+01
+      -4.97438500e+00] 0.00457665876023
+
+Applied to the circle-intersection problem from before, it typically
+takes more iterations, like around 30 instead of around 10.  (This is
+probably a somewhat smaller penalty than it sounds like, since the
+circle-intersection code from earlier is often doing two or three
+loss-function evaluations per iteration.)
+
+It solves this geometric square model to a precision of 1e-6 typically
+in 1000 to 3000 iterations:
+
+    def square_constraints(points):
+        p1, p2, p3, p4 = points[0:2], points[2:4], points[4:6], points[6:]
+        side1 = p2 - p1
+        side2 = p3 - p2
+        side3 = p4 - p3
+        side4 = p1 - p4
+        return (side1.dot(side2)**2 + side2.dot(side3)**2 + side3.dot(side4)**2
+                + side4.dot(side1)**2
+                + ((side1**2).sum() - 5**2)**2
+                + ((side2**2).sum() - (side3**2).sum())**2
+        )
+
+    climb(square_constraints, lambda: 10 * (numpy.random.rand(8) - 0.5))
+
+Without the fourth perpendicularity constraint, though, it converges
+very slowly, and the things it converges to don’t look like squares.
+One sample result with the fourth perpendicularity constraint left
+out:
+
+    141071 [ 2.76119227 -2.36547768 -1.36787743  0.45423421 -1.35017868  0.48015388
+     -1.33188753  0.50622078] 9.99823404211e-07
+
+This has minuscule and nearly equal `side2` and `side3` (lengths about
+0.032), whose dot product is consequently also very small even though
+they’re very nearly parallel, being perpendicular to the
+nearly-parallel `side1` and `side4`.  This allows `side1` and `side4`
+to minimize the function by becoming more and more nearly equal and
+opposite.  It pays to be cautious when defining cost functions, since
+optimization algorithms will exploit whatever vulnerabilities they can
+find!
+
+I haven’t tried the per-dimension step-size approach above yet, though
+it would surely help for these examples.
 
 Relationship to other kinds of optimization algorithms
 ------------------------------------------------------
