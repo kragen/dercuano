@@ -1,0 +1,161 @@
+Complex linear regression (in the field ℂ of complex numbers)
+=============================================================
+
+In file `$1-recognizer-diagrams` I speculated that applying linear
+regression to vectors of complex numbers might be a good way to match
+user interface gestures such as strokes to templates, since a linear
+function in ℂ amounts to a translation, rotation, and scaling.  But I
+can’t find any discussion of doing linear regression on complex
+numbers.
+
+So I’m going to solve that problem here.
+
+The stroke-matching problem
+---------------------------
+
+Suppose we have a sequence of points representing a stroke the user
+has drawn with their pen or a finger on a pen computer — whether
+something like the Fly Pen, something like the HP Itsy, something like
+a Wacom graphics tablet, or something like a modern Android computer.
+We want to determine how far this sequence is from being “the same as”
+a stored template representing, say, the letter “B”, so we can see
+which of several stored templates it’s closest to and thus determine
+the user’s intent.
+
+Let’s suppose the sequence of points has already been resampled to
+regular spatial intervals, with the same number of points as the
+template (128 or something), so pairing up corresponding points is
+trivial.
+
+The simplest thing that could possibly work is to take the sum of
+absolute differences of coordinates between corresponding points: Σ*ᵢ*
+|*xₜᵢ* - *xₛᵢ*| + |*yₜᵢ* - *yₛᵢ*|, where *i* ranges over the number of
+points, *xₜ* and *yₜ* are the coordinates of the template points, and
+*xₛ* and *yₛ* are the coordinates of the stroke points.  This loss
+function tells us how far the stroke is from being a “B” or whatever.
+
+This may work under some circumstances, but it has some problems:
+
+1. The user may have written the stroke in a different *position* than
+   the template, introducing *translational error* into all of the
+   components of the loss function.
+
+2. The user may have written the stroke in a different *orientation*,
+   introducing *rotational error* into most of the components of the
+   loss function, except those points in the center.
+
+3. The user may have written the stroke at a different *size*,
+   introducing *scaling error* into most of the components of the loss
+   function, again, except for those in the center.  Moreover the
+   scaling may be nonuniform — the user may have stretched the stroke
+   horizontally, vertically, or diagonally without intending to do
+   so — introducing *skewing error*.
+
+4. Using the absolute difference means that an error of, say, 5 pixels
+   diagonally, will count as 7 pixels; this introduces a *anisotropic
+   bias* into the loss function which makes it harder to cleanly
+   separate, for example, Bs from non-Bs.
+
+5. Using the absolute difference means that an error of 20 pixels
+   counts as just four times a 5-pixel error.  But, generally, if the
+   user really did intend to draw a B, four 5-pixel errors are much
+   more probable than a single 20-pixel error.  This, similarly, makes
+   it harder to cleanly separate Bs from non-Bs.  Using the absolute
+   difference represents an implied probability distribution of errors
+   that is exponential.
+
+The “$1 recognizer” paper I was writing about has some solutions to
+these: translate the stroke so its centroid is at the origin to
+eliminate translational error, rotate it so that the start point is at
+a fixed angle to eliminate rotational error, rescale it nonuniformly
+horizontally and vertically so that its bounding box has size 1 in
+each dimension to eliminate scaling and skewing error, and use the sum
+of Euclidean distances rather than the sum of absolute differences to
+eliminate anisotropic bias.  (They still have problem #5, unless I’m
+imagining things and it isn’t really a problem.)  As I wrote in file
+`$1-recognizer-diagrams`, this procedure seems unduly sensitive to
+noise.
+
+But it occurred to me that this was very similar to the problem of
+linear regression, only with complex numbers.  If we represent each
+point (*x*, *y*) as a complex number (*x* + *jy*), then rotation and
+*uniform* scaling around the origin are merely multiplication by a
+complex number, and translation is merely adding a complex number.  So
+if the stroke is precisely a translated, uniformly scaled rotation of
+the template, then there exist some complex numbers *m* and *b* such
+that ∀*i*: *xₛᵢ* + *jyₛᵢ* = *m*(*xₜᵢ* + *jyₜᵢ*) + *b*.  Let’s
+abbreviate the stroke point *i* as *sᵢ* = *xₛᵢ* + *jyₛᵢ* and the
+template point *i* as *tᵢ* = *xₜᵢ* + *jyₜᵢ*, so that this becomes just
+∀*i*: *sᵢ* = *mtᵢ* + *b*.  And if the points of the stroke are
+perturbed slightly from those positions, then there exist complex
+numbers *m* and *b* that give a small sum Σ*ᵢ* |*mtᵢ* + *b* - *sᵢ*|²
+(the **L**² norm of the vector *mt⃗* + *b⃗* - *s⃗*, where all the
+components of vector *b⃗* are equal); that residual sum tells us how
+much error there is in the approximation, and by finding *m* and *b*
+to minimize that sum, we can find something that is in some sense the
+best fit.
+
+This is precisely the everyday problem of linear regression, but in
+the field ℂ of complex numbers, rather than the usual field ℝ of real
+numbers.  The squared modulus solves problems #4 (anisotropy) and #5
+(nonuniform weighting), implying a Gaussian distribution of errors,
+which is probably a reasonable approximation even if not precisely
+correct; and, at least in ℝ, it makes the optimization problem easy by
+making it convex and differentiable in closed form.
+
+If we can find the ideal rotation, scaling, and translation in this
+way, we can conceivably find a better fit than the one the “$1
+recognizer” finds, and maybe we can find it more efficiently, too,
+especially if we can calculate it in closed form rather than using
+golden-section search to heuristically approximate the optimal
+rotation.  We’d still need to stretch the stroke up front to correct
+for nonuniform scaling (skewing error), perhaps by calculating the
+*x*–*y* covariance matrix of its points.
+
+This is easier than the more general problem of trying to match up two
+sets of possibly rotated, translated, and scaled points, such as star
+tracking, because the correspondence between the points is provided up
+front — it comes from the temporal sequence of points in the stroke.
+
+Existing work on complex linear regression
+------------------------------------------
+
+Abdul Ghapor Hussin, Norli Anida Abdullah and Ibrahim Mohamed wrote a
+2010 paper called [“A Complex Regression Model”][2] about using linear
+regression with complex variables to predict “circular variables” such
+as the direction from which waves are hitting a buoy.  I don’t really
+understand their derivation.
+
+Math.stackexchange.com users [Naetmul and
+hans](https://math.stackexchange.com/questions/1783397/complex-mathbb-c-least-squares-derivation)
+have written up the general solution for finding a
+least-squares-optimal approximate solution to the linear system
+**A**_x⃗_ = _b⃗_ in complex numbers.  I don’t think I can transform the
+linear regression problem into this problem, because the output has
+too many degrees of freedom — I’m looking for a pair (*m*, *b*)
+regardless of how many input points there are, while that problem
+takes the matrix **A** and the vector _b⃗_ as given, then tries to find
+the vector _x⃗_ that gets you closest to it in the subspace defined by
+**A**.  This amounts to projecting _b⃗_ onto that subspace and then
+figuring out where you are in it.
+
+[2]: http://www.ukm.my/jsm/pdf_files/SM-PDF-39-3-2010/22%20Abdul%20Ghapor.pdf
+
+Finding the least-squares solution to the univariate complex linear regression problem
+--------------------------------------------------------------------------------------
+
+So we want to find argmin<sub>*m*, *b* ∈ ℂ²</sub> Σ*ᵢ* |*mtᵢ* + *b* -
+*sᵢ*|².  Although the complex modulus |·| isn’t differentiable
+everywhere, the modulus squared |·|² is, and therefore so is the whole
+sum.  So we should be able to find all of its extrema by finding where
+its partial derivatives with respect to *m* and *b* are zero.  And, if
+the situation is like the situation in ℝ, the derivative will only
+have a single zero, and it will be the minimum; intuitively, a similar
+situation ought to obtain here.
+
+Let’s define Δ*ᵢ* = *mtᵢ* + *b* - *sᵢ*, so we’re trying to minimize
+Σ*ᵢ* |Δ*ᵢ*|², so we set ∇[Σ*ᵢ* |Δ*ᵢ*|²] = 0, so Σ*ᵢ* ∇|Δ*ᵢ*|² = 0,
+which is to say that Σ*ᵢ* ∂|Δ*ᵢ*|²/∂*m* = 0 and Σ*ᵢ* ∂|Δ*ᵢ*|²/∂*b* =
+0, which are two problems we can solve separately.  ∂|Δ*ᵢ*|²/∂*m* =
+(d|Δ*ᵢ*|²/dΔ*ᵢ*)(∂Δ*ᵢ*/∂*m*), and similarly for *b*, ∂|Δ*ᵢ*|²/∂*b* =
+(d|Δ*ᵢ*|²/dΔ*ᵢ*)(∂Δ*ᵢ*/∂*b*)
