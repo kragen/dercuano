@@ -21,7 +21,7 @@ points; its task is to match this sequence against a collection of
 closely.
 
 The first point in the sequence is where the pen first touched the
-tablet, and the others are samples of the pen's position taken over
+tablet, and the others are samples of the pen’s position taken over
 time until it is lifted.  These trace out some kind of more or less
 continuous curve on the display, but the position of each individual
 point along that curve is just a matter of how far the pen had gotten
@@ -72,7 +72,7 @@ Other variations between different instances of the same symbol are
 usually random and need not be stored.
 
 Also, diagrams commonly contain significant topology, quite aside from
-their possibly significant geometry, and often it's helpful to "snap"
+their possibly significant geometry, and often it’s helpful to "snap"
 certain connection points together, and if a symbol is later moved, to
 update connected symbols so that they remain connected.
 
@@ -107,7 +107,7 @@ vertical line symbols.  A small vocabulary of such non-rotatable
 symbols (boxes, ellipses, lines, arrowheads) would be adequate for
 many quick diagramming tasks.  You might want to add or move
 attachment points, add synonym templates, toggle rendering of noise,
-add additional rendered decorations you don't need to sketch
+add additional rendered decorations you don’t need to sketch
 explicitly (including other symbols, as in file `recursive-curves`),
 and so on.
 
@@ -116,7 +116,7 @@ discover the relatively small number of letters you were using and
 represent your "diagram" as a list of letters and their positions.
 
 Aside from the above fuzzy spectrum between defining symbols and
-freehand drawing, you'd probably want the usual kinds of drawing
+freehand drawing, you’d probably want the usual kinds of drawing
 operations: undo, redo, move, rotate, scale, multiple selection, and
 so on.
 
@@ -125,7 +125,7 @@ so on.
 Realizing such a fluent interface with the non-ideal hardware
 available is a substantial challenge.  In practice multitouch
 cellphone touchscreens are what I have available, and these have
-relatively crude touchstart and touchend resolution, although they're
+relatively crude touchstart and touchend resolution, although they’re
 fairly precise during the touch (and some of them are even fast, like
 60 Hz, while others are more like 10 Hz); moreover, they have major
 finger occlusion problems.
@@ -148,9 +148,9 @@ the rendered output, although more bloat can be accepted in the source
 code.  Symbol definitions that have been drawn many times offer a way
 to do this: the Platonic location of a point whose drawn location is
 highly variable the various times I drew the symbol can be safely
-rounded to any convenient precision that doesn't take it too far
-outside the zone where it's being drawn.  Moreover, maybe we should
-weight that point less heavily when we're matching templates.  The
+rounded to any convenient precision that doesn’t take it too far
+outside the zone where it’s being drawn.  Moreover, maybe we should
+weight that point less heavily when we’re matching templates.  The
 user should have the option as to whether to draw that point with
 per-symbol-instance noise or not.
 
@@ -167,14 +167,56 @@ kinds of search approaches for offline optimization problems.
 
 If you draw the same symbol several times in a row, perhaps in a
 linear or circular path with systematic variation in position, angle,
-or size, it's possible that you would like to continue drawing more of
+or size, it’s possible that you would like to continue drawing more of
 it; since the system is categorizing each stroke as a symbol and
 redrawing it, a reasonable thing for it to do in such a case is to
 offer further repetitions, perhaps in a different color, with a slider
 to accept one or more of those repetitions.
 
+### Interpolation ###
+
+One of the attractive features of resampling all the strokes to a
+uniform number of points is that it makes it easy to interpolate
+between them, for example, linearly.  In drawing editing, this could
+be used for several different things:
+
+1. By defining a subspace from two or more templates, you can draw a
+   stroke that indicates simultaneously a location in that
+   *N*-dimensional subspace as well as a location, rotation, scale,
+   skew, and stretch in the display space.  In this case, the final
+   operation from the $1 recognizer of calculating the sum of
+   Euclidean distances to measure the distance from a stroke to a
+   template is replaced by projecting your stroke onto that subspace,
+   then measuring its distance from that projection.
+
+2. By using two or three templates to define a subspace of one or two
+   dimensions, you can map an area of the display to a subspace of the
+   many-dimensional stroke space.  By dragging around this subspace,
+   you can explore variations within that space to instantiate in your
+   drawing.
+
+3. By drawing a path through such a subspace, you can define an
+   *animation*.  This may work better with a K-nearest-neighbors kind
+   of interpolation so that you can place more than three templates
+   into a two-dimensional space.  This path might be drawn
+   synchronously as a draft animation plays — unlike the stroke used
+   for stroke recognition, its timing *is* important.
+
+4. Of course you can also do animations morphing strokes with standard
+   tweening functions such as ease-in/ease-out and linear
+   interpolation.
+
+5. When doing repetition, as described in the previous section, if the
+   repetitive strokes map onto one of the one-dimensional subspaces
+   found between existing templates, they could indicate a gradual
+   transition; for example, a series of curved lines gradually
+   becoming more straight could indicate a morphing progression that
+   could be continued to straightness and possibly beyond.
+
 Improving the $1 recognizer
 ---------------------------
+
+### Alternative template matching algorithms ###
 
 The $1 recognizer mostly tries to normalize rather than using search,
 but even so, the researchers apparently found it necessary to use
@@ -192,10 +234,11 @@ golden-section search algorithm, which has the advantage of being
 derivative-free, but has quite slow convergence (slower than binary
 chop!) and also makes rather strong assumptions about the input.
 
-Another issue with the algorithm is that it doesn't really permit any
-kind of indexing of the templates; if you are matching each new
-unistroke against a database of 10,000 64-point templates, it is going
-to take 640,000 Euclidean-distance computations.
+(An alternative way to match against a template that is insensitive to
+translation, scaling, and rotation, though not aspect ratio, would be
+least-squares linear regression in ℂ, the complex-number field.  I've
+never done linear regression in ℂ, but I think it’s a straightforward
+extension of linear regression in ℝ.)
 
 One approach to improving the algorithm would be to use more robust
 statistics.  For example, you could use the standard deviation or
@@ -204,14 +247,14 @@ an angle that depends in some way on all the points instead of just
 the first point to get the initial rotation.
 
 Perhaps a simpler approach, though, is to use a generic optimization
-algorithm.  The function to optimize is already present: it's the
+algorithm.  The function to optimize is already present: it’s the
 average Euclidean distance from the points of the transformed input
 stroke to the corresponding points of the template stroke.  The
 objective is to find the transformation that minimizes it; the
 translation in X and Y, rotation around some arbitrary center, and
 scaling in X and Y, form five continuously variable parameters out of
 the six in an arbitrary 2-D affine transformation.  (The sixth missing
-parameter is diagonal shear, and I'm not sure it should be omitted.)
+parameter is diagonal shear, and I’m not sure it should be omitted.)
 With modern automatic differentiation, it should be straightforward to
 use a generic optimization algorithm like Adam or a quasi-Newton
 method to search this parameter space for the best fit.  This would
@@ -224,11 +267,27 @@ in a smoother fashion than the original $1-recognizer algorithm.
 Using a better resampling algorithm would probably help somewhat as
 well.
 
-This doesn't help much with indexing, but perhaps absurdly-downsampled
+### Indexing ###
+
+Another issue with the algorithm is that it doesn’t really permit any
+kind of indexing of the templates; if you are matching each new
+unistroke against a database of 10,000 64-point templates, it is going
+to take 640,000 Euclidean-distance computations.
+
+The above hacks
+don’t help much with indexing, but perhaps absurdly-downsampled
 versions of the gesture and templates could be used to get a linear
 speedup on to searching a large index of candidate glyphs --- like 4
 or 8 points.  Some kind of interval-arithmetic categorization or
-something is needed if you're going to get a superlinear speedup ---
+something is needed if you’re going to get a superlinear speedup ---
 some way to put a lower bound on the best distance to any template in
 a given group, so that you can avoid iterating over the templates in
 the group.
+
+Alternatively, you might be able to use linear-algebra techniques to
+speed up the search; if a smallish number of low-dimensional subspaces
+nearly contain most of the templates (as determined by PCA on subsets
+of the templates), you can project a user stroke onto each of those
+subspaces to find out which are plausible candidates (and which are
+too far away), then perhaps use a k-d tree on the remaining principal
+components.
