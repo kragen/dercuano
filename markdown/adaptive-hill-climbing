@@ -1,11 +1,15 @@
-Robust hill climbing in vector spaces using adaptive step sizes
-===============================================================
+Robust local search in vector spaces using adaptive step sizes, and thoughts on extending quasi-Newton methods
+==============================================================================================================
+
+(Probably nothing in here is novel; it just documents my own
+exploration of the space of local search algorithms in vector spaces,
+which is well known, but not to me.)
 
 When writing file `rubber-wheel-pinch-drive` I got confused with some
 basic trigonometry, trying to solve a triangle with the law of
 cosines† to find the intersection of two circles.  So, impatient, I
 figured I’d solve the problem with brute force instead, so I wrote the
-following implementation of hill-climbing with random restarts for
+following implementation of local search with random restarts for
 scalar functions of general vector spaces:
 
     def search(f, p, restarts=30, steps=30):
@@ -38,7 +42,7 @@ trigonometry).
 † The law of cosines is *c*² = *a*² + *b*² - 2*ab* cos γ, where γ is
 the angle opposite the side with length *c*.
 
-Making hill-climbing in vector spaces more robust
+Making local search in vector spaces more robust
 -------------------------------------------------
 
 Random restarts in general make metaheuristic search algorithms more
@@ -52,7 +56,7 @@ I tried to make the implementation somewhat robust against `p`
 functions of the wrong magnitude, as you can see; the algorithm tries
 a range of different exponentially-spaced sizes.  Now that I’m using a
 non-broken `p`, this results in finding a solution correct to ten
-decimal places, which is pretty good for hill climbing.  But the
+decimal places, which is pretty good for such a simple local search algorithm.  But the
 particular orders of magnitude I chose are kind of arbitrary;
 basically I was just hoping they’d cover the right range.
 
@@ -125,7 +129,7 @@ starting step size:
 
     step = lambda: numpy.random.rand(2) - 0.5
 
-### Handling valleys, saddles, and higher-dimensional spaces ###
+### Handling valleys (ridges), saddles, and higher-dimensional spaces ###
 
 However, its adaptive step size will screw it in higher-dimensionality
 spaces, since when it’s in a valley or saddle point where most
@@ -135,12 +139,17 @@ would be to diminish step sizes by a smaller amount that depends on
 the dimensionality, so that if there’s at least one good direction,
 the step size will remain constant on average.
 
+(“Valleys” here are “ridges” in the usual hill-climbing metaphor,
+because here we’re trying to *minimize* a cost function, while “hill
+climbing” is trying to *maximize* your altitude.)
+
 To escape this trap, you could have different behavior when expanding
 the step size than when reducing it: keep increasing the step size
-without increasing the step direction until the situation stops
+without changing the step direction until the situation stops
 getting better.  That is, walk along the line of the step by 2, 4, 8,
 16, 32, etc., times the size of the initial step, rather than just 2
-times.  This will tend to ricochet you between the walls of a canyon,
+times, doing a crude line search once a promising direction is found.
+This will tend to ricochet you between the walls of a canyon,
 and eliminates the bias in the step-size random walk toward smallness,
 since any single lucky step in the right direction can increase the
 step size arbitrarily.
@@ -152,7 +161,7 @@ things are getting worse.
 
 In cases like those Adam and AdaGrad and the like are designed for,
 where the best step size varies enormously among different dimensions,
-you might want to hill-climb along one dimension at a time, so that
+you might want to use *hill climbing* — searching along one dimension at a time, so that
 you can use a separate step size for each dimension.  This also
 potentially permits the use of Acar’s “self-adjusting computation” and
 similar generic incrementalization algorithms to speed up function
@@ -164,14 +173,15 @@ dimension-aligned directions a valley can descend in, but 2*ⁿ*
 precisely diagonal orientations, so in some sense that’s a much harder
 problem.
 
-So, for example, the above routine handles this somewhat pathological
+As an example of how relative scales on different dimensions matter,
+the above routine handles the following somewhat pathological
 problem reasonably well, although it takes it several hundred
 iterations; note the incorrect step function:
 
     c = (3, 1e10, 4, 17, -5)
     climb(lambda g: ((g-c)**2).sum(), lambda: numpy.random.random(5))
 
-But it handles this version much worse, requiring hundreds of
+But it handles the following version much worse, requiring hundreds of
 thousands or possibly millions of iterations to solve it — it
 gradually exponentially converges on the right answer, but taking
 about 80'000 iterations per order of magnitude:
@@ -185,7 +195,7 @@ suffer a drastically reduced step size, slowing their convergence
 enormously (from the outlandish values they took to get close to the
 optimum along the second dimension).
 
-It finally found a solution accurate to two decimals on every
+On one run, it finally found a solution accurate to two decimals on every
 dimension in iteration 886'803, after about 15 or 20 minutes of
 CPython interpretation:
 
@@ -310,7 +320,8 @@ Of course, you can find local minima of a computable continuous
 function by using automatic differentiation on it and using the method
 of secants to find a zero of its derivative.
 
-Although the above implementations are not, hill-climbing is
+Although the above implementations are not, hill-climbing
+and other kinds of local search are
 applicable to functions on discrete spaces without any kind of
 comparability between elements, such as graphs or strings of symbols.
 (That’s the domain.  The range still needs to be comparable.)  The
@@ -318,3 +329,51 @@ method of secants requires divisibility and zeroes.  Hill-climbing
 also only requires comparability from its cost function — it takes no
 notice of its absolute magnitudes, just which values are higher and
 lower — and this *is* true of the implementations above.
+
+Thoughts on quasi-Newton methods
+--------------------------------
+
+For *regular* problems like the examples above, quasi-Newton methods
+would probably work better, but require differentiating the cost
+function.  With the advent of automatic differentiation, this is no
+longer a lot of work, but doing automatic differentiation on
+pure-Python functions like the above generally requires using
+forward-mode automatic differentiation, which is painfully slow.
+Reverse-mode automatic differentiation is dramatically faster for this
+sort of thing, but generally requires your program to be written
+differently.
+
+As I said in file `genetic-secants`, quasi-Newton methods require the
+maintenance of an approximation of the Hessian, and for functions of
+high-dimensional spaces, the Hessian is fucking humongous.  A thing
+that has surely been tried, but that I haven't seen discussed, and
+which intuitively seems like it should work better for
+high-dimensional optimization problems, is using automatic
+differentiation to compute the gradient of the function to get a
+*direction* to move in, but then, rather than moving in that direction
+by an amount proportional to the *magnitude* of the gradient (as
+gradient-descent methods do), use automatic differentiation to compute
+the *second* derivative of the loss function *along that line*, which
+is a single number rather than a matrix of *N*² values (for a domain
+of dimensionality *N*) like the Hessian.  Then you can use a
+Newton–Raphson step to figure out how far to move along that line:
+divide the first derivative (the dot product of the gradient and the
+direction) by the second derivative, thus extrapolating the distance
+to the point at which the gradient would fall to zero if the Hessian
+were constant over that region.
+
+The appealing thing here is that gradient descent has linear
+convergence (i.e., the logarithm of the approximation error falls
+linearly with the number of iterations) while under appropriate
+circumstances Newton’s method has quadratic convergence (i.e., the
+logarithm of the approximation error falls proportional to the square
+of the number of iterations).  I’m not entirely sure whether Nesterov
+accelerated gradient descent, gradient descent with momentum, Adam,
+etc., achieve a better order of convergence, but I think they don’t.
+
+This would be big if true (see file `big-if-true` and file
+`top-algorithms`) which means that it, given how obvious it is, it
+probably doesn’t work, or else I’m misunderstanding how quasi-Newton
+methods work, and they already do this.  But it will be interesting to
+find out why not.
+
