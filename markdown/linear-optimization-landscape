@@ -1,0 +1,176 @@
+I started auditing an “operations research” class at the UBA this
+quatrimester.  It’s largely focused on linear programming, which is to
+say, optimizing linear functions subject to linear constraints, but
+the class also covers some other linear-programming topics.
+
+I’m particularly interested in optimization algorithms, as I’ve said a
+few times before, because they potentially raise the level of
+abstraction in programming — rather than specifying how to compute
+something, you just specify how to recognize if something is the thing
+you wanted to compute, and then let some kind of generic solver figure
+out how to solve the problem.  That’s what earned them such a
+prominent place in file `powerful-primitives`.
+
+Overview of linear programming
+------------------------------
+
+Linear programming is a particularly popular subset of mathematical
+optimization because there are well-known algorithms for solving it
+that scale to fairly large numbers of decision variables, and it
+provides a useful approximation for many economically important
+problems.  It’s so popular that sometimes it overshadows the rest of
+mathematical optimization — many books purportedly about mathematical
+optimization consist almost entirely of material on linear
+optimization, with perhaps a short section at the end on nonlinear
+optimization.
+
+I’ve tended to be a bit prejudiced against linear optimization because
+the real world is never perfectly linear and because I felt that
+linear constraints weren’t very expressive.  But, now that I’m taking
+this class, I’m starting to appreciate the expressiveness of linear
+programming — especially “mixed integer” linear programming, an
+extension of pure linear programming in which some of your decision
+variables are constrained to integer values.
+
+As the lp\_solve documentation summarizes it:
+
+> The linear programming (LP) problem can be formulated as: Solve A·x >=
+ V₁, with V₂·x maximal. A is a matrix, x is a vector of (nonnegative)
+ variables, V₁ is a vector called the right hand side, and V₂ is a
+ vector specifying the objective function.
+
+> An integer linear programming (ILP) problem is an LP with the
+ constraint that all the variables are integers.  In a mixed integer
+ linear programming (MILP) problem, some of the variables are integer
+ and others are real.
+
+There are several algorithms known for solving linear optimization
+problems, of which the oldest and most-widely-used is George Dantzig’s
+“simplex algorithm”, despite its worst-case exponential complexity.
+
+The software landscape
+----------------------
+
+As I understand it, here’s the way things are.  Probably I will revise
+this a lot once I actually get to trying stuff.
+
+Typically, as an end-user, you solve linear optimization problems by
+writing your problem in an “algebraic modeling language” such as GNU
+MathProg or “GMPL” (a dialect of a popular proprietary modeling
+language called “AMPL”) or ZIMPL; the modeling-language processor
+compiles your model (including data files, which it might pull from a
+database) into a standard format (such as “MPS”, “LP”, or “nl”),
+generally expanding it considerably, and submits it to a “solver”,
+such as glpsol.
+
+Unfortunately, the most popular modeling-language processors and
+solvers are all proprietary; proprietary CPLEX, now owned by IBM, is
+the most popular solver, with proprietary SCIP second, and proprietary
+AMPL is the most popular modeling-language processor; there is an
+excellent AMPL book by Brian Kernighan (et al., but “Kernighan” is a
+sufficient recommendation) which also serves as an introduction to
+linear programming.  Both CPLEX and SCIP are free for institutional
+academic use but not to independent researchers; I don’t know about
+AMPL.  So we can forget about these.
+
+### Modeler–solver interface ###
+
+Most of the time the modeler talks to the solver through a file in
+some standardized file format; MPS is the most popular such format, a
+punched-card-based format originally designed for IBM’s Mathematical
+Programming System/360.  LP, sometimes called “CPLEXLP” because of its
+origins in CPLEX, is a more-readable but less-widely-supported format.
+
+Some solvers, such as GLPK, also have bindings that allow you to call
+them from your program without preparing an input file for them to
+parse.
+
+### GLPK ###
+
+GLPK, a C library, is the thousand-pound gorilla of linear
+optimization systems; Octave is built with it, and there are bindings
+to it in Java, Python, and R.  The GLPK project includes the
+modeling-language processor for the popular language GNU MathProg, and
+also solvers for the revised simplex method, the primal-dual interior
+point method, and the branch-and-bound method.
+
+It is said to support MPS and LP format files, but I don’t know if
+that’s for input, output, or both.
+
+It was originally released in 2000, but has been under active
+development ever since; there is a Wikibook about it.
+
+### lp\_solve ###
+
+lp\_solve is a simplex-method solver, using branch-and-bound for mixed
+integer programming, that can read MPS format files.  I think it also
+supports LP and other formats.
+
+### NLopt ###
+
+NLopt is a *non*linear optimization library, so it probably doesn’t
+really belong in this list, but in theory it should be able to solve
+linear optimization problems too, as a special case; it will be
+interesting to compare it.  It has bindings in C, C++, Fortran,
+Octave, Python, Guile, and R.
+
+### ZIMPL ###
+
+ZIMPL is a modeling language from the same academic research
+institute, the Zuse Institute Berlin, that wrote the solver SCIP, but
+ZIMPL is free software, while SCIP is not.  It’s mostly compatible
+with GNU MathProg.  It started out as Thorsten Koch’s Ph.D. thesis in
+2004, ZIB-Report 04-58, “Rapid Mathematical Programming”.
+(“Mathematical programming” is a synonym for “mathematical
+optimization”.)
+
+The ZIMPL language appears to be more or less at the same level of
+abstraction as GMPL, but with arguably nicer syntax and the ability to
+parse CSV files to get model parameters.  So for example in ZIMPL you
+might say
+
+    minimize cost: 12 * x1
+        + sum a in A : u[a] * y[a];
+    subto oneness: sum a in A : u[a] == 1;
+    subto nonnegative: forall a in A : y[a] >= 0;
+
+(though maybe you need `<a>` rather than `a` before `in`?) while in
+AMPL/GMPL I think you would say
+
+    minimize cost: 12 * x1
+        + sum {a in A} u[a] * y[a];
+    subject to Oneness: sum {a in A} u[a] = 1;
+    subject to Nonnegative {a in A}: y[a] >= 0;
+
+It can produce MPS and LP files, as well as something called
+“Polynomial IP”.
+
+The user guide makes it sound like it operates entirely in batch mode.
+
+### libisl ###
+
+The documentation says:
+
+> isl is a library for manipulating sets and relations of integer points
+ bounded by linear constraints. Supported operations on sets include
+ intersection, union, set difference, emptiness check, convex hull,
+ (integer) affine hull, integer projection, and computing the lexicographic
+ minimum using parametric integer programming. It also includes an ILP solver
+ based on generalized basis reduction.
+
+I have it on my laptop because GCC depends on it, God knows for what.
+It sounds scarily powerful.
+
+### COIN CLP/CBC ###
+
+The COIN project is an Apache project for making operations-research
+results reproducible by basing them on open-source software.  It
+includes the solvers CLP and CBC.
+
+### Octave ###
+
+Although Octave is mostly a matrix computation system, it includes
+support for linear programming, as well as quadratic programming,
+general nonlinear programming, and linear least-squares solution of
+matrices.  Unfortunately documentation for them is missing from the
+manual!
