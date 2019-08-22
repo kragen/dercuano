@@ -174,3 +174,58 @@ support for linear programming, as well as quadratic programming,
 general nonlinear programming, and linear least-squares solution of
 matrices.  Unfortunately documentation for them is missing from the
 manual!
+
+Hacks to expand what you can do with a linear optimizer
+-------------------------------------------------------
+
+The description from lp\_solve makes linear optimization sound really
+weak and limiting:
+
+> Solve **A**·*x⃗* >= V⃗₁, with V⃗₂·*x⃗* maximal.
+
+And, in some ways, it is; but as I’m learning in this class, there are
+standard hacks for turning a much larger variety of problems into
+linear problems.
+
+### Minimizing vs. maximizing ###
+
+The simplest hack is switching between minimizing and maximizing.  The
+lp\_solve definition above might suggest that you can’t minimize
+things, but of course when *x⃗* is chosen to make V⃗₂·*x⃗* minimal, then
+(-1 · V⃗₂) · *x⃗* is maximized.  Moreover, its maximal value is
+precisely the opposite of the minimal value for V⃗₂·*x⃗*; so if your
+solver wants to maximize, you can just flip the sign on its objective
+vector and the objective result, and you can minimize.
+
+### Mixing >= with <= ###
+
+Similarly, **A**·*x⃗* >= V⃗₁ suggests that all your constraints must
+have decision variables on the left side of a “>=”.  But that’s silly;
+the constraint 2*x*₃ >= 4, for example, is equivalent to -2*x*₃ <= -4.
+So by flipping the signs on a row of the matrix and the corresponding
+limit, you can effectively get both <= and >= constraints in the same
+matrix.  And that’s how you can get criteria like 1 <= 2*x*₃ + 3*x*₄
+<= 2.
+
+### Decision variables on both sides ###
+
+Similarly, if you have a criterion like 2*x*₃ <= 3*x*₄ + 1, you might
+think that doesn’t fit into the **A**·*x⃗* >= V⃗₁ mold.  But all you
+have to do is subtract 3*x*₄ from both sides — 2*x*₃ - 3*x*₄ <=
+1 — and Bob’s your auntie!
+
+### Equality constraints ###
+
+Similarly, if you have an *equality* criterion like 3*x*₅ = 4*x*₇ -
+2*x*₉, you can convert it into two *inequalities* — 3*x*₅ <= 4*x*₇ -
+2*x*₉ and 3*x*₅ >= 4*x*₇ - 2*x*₉ — which can only be simultaneously
+true when strict equality is satisfied.  This reduces the
+dimensionality of your feasible region below the full dimensionality
+of the decision-variable space, though that’s not a problem for the
+simplex method.
+
+### Binary gates ###
+
+### Absolute values ###
+
+### Piecewise-linear functions ###
