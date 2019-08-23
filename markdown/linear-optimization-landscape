@@ -57,13 +57,12 @@ this a lot once I actually get to trying stuff.
 Typically, as an end-user, you solve linear optimization problems by
 writing your problem in an “algebraic modeling language” such as GNU
 MathProg or “GMPL” (a dialect of a popular proprietary modeling
-language called “AMPL”) or ZIMPL; the modeling-language processor
+language called “AMPL”) or ZIMPL; the model translator
 compiles your model (including data files, which it might pull from a
 database) into a standard format (such as “MPS”, “LP”, or “nl”),
-generally expanding it considerably, and submits it to a “solver”,
-such as glpsol.
+generally expanding it considerably, and submits it to a “solver”.
 
-Unfortunately, the most popular modeling-language processors and
+Unfortunately, the most popular model translators and
 solvers are all proprietary; proprietary CPLEX, now owned by IBM, is
 the most popular solver, with proprietary SCIP second, and proprietary
 AMPL is the most popular modeling-language processor; there is an
@@ -73,50 +72,162 @@ linear programming.  Both CPLEX and SCIP are free for institutional
 academic use but not to independent researchers; I don’t know about
 AMPL.  So we can forget about these.
 
-### Modeler–solver interface ###
+### Modeler–solver interfaces ###
 
-Most of the time the modeler talks to the solver through a file in
+Most of the time the model translator talks to the solver through a file in
 some standardized file format; MPS is the most popular such format, a
 punched-card-based format originally designed for IBM’s Mathematical
-Programming System/360.  LP, sometimes called “CPLEXLP” because of its
+Programming System/360.  LP, sometimes called “CPLEX LP” because of its
 origins in CPLEX, is a more-readable but less-widely-supported format.
 
-Some solvers, such as GLPK, also have bindings that allow you to call
+Linear-programming solvers have been around considerably longer than
+algebraic modeling languages, so both MPS and LP are designed for
+humans to write, but MPS is designed badly.
+
+(There are actually two different, incompatible MPS formats: the
+original fixed-field MPS format from the 1960s, and a slightly less
+bletcherous "free-form" 1980s version.)
+
+Here's a small LP file that GLPK is able to accept and solve (the
+optimum is z = 1, y = 0.33...).
+
+    Maximize
+     x: + 2 y + 3 z
+    Subject To
+     a: + 2 z + 3 y <= 3
+    Bounds
+     0 <= y <= 4
+     0 <= z <= 1
+    End
+
+You can save that in `foo.lp` and solve it with GLPK by running
+`glpsol --lp foo.lp -o foo.out`.  You can transate it to MPS with
+`glpsol --lp foo.lp --wmps foo.mps`.
+
+Some solvers, such as GLPK's, also have bindings that allow you to call
 them from your program without preparing an input file for them to
-parse.
+parse; and the COIN-OR project has written a standard API called "Osi"
+for doing this with many different solvers.
 
 ### GLPK ###
 
 GLPK, a C library, is the thousand-pound gorilla of linear
 optimization systems; Octave is built with it, and there are bindings
-to it in Java, Python, and R.  The GLPK project includes the
-modeling-language processor for the popular language GNU MathProg, and
+to it in Java, Python, and R.  The GLPK package includes the
+model translator for the popular
+algebraic modeling language GNU MathProg (aka GMPL), and
 also solvers for the revised simplex method, the primal-dual interior
 point method, and the branch-and-bound method.
 
-It is said to support MPS and LP format files, but I don’t know if
-that’s for input, output, or both.
+It supports MPS and LP format files for both input
+and output, and can even translate between them, as well as generating
+them with the GMPL model translator.
 
-It was originally released in 2000, but has been under active
+GLPK was originally released in 2000, but has been under active
 development ever since; there is a Wikibook about it.
+
+Here's a GMPL version of the example LP file above, with additional
+directives to solve it and display the results:
+
+    var y >= 0, <= 4;
+    var z >= 0, <= 1;
+    maximize x: 2*y + 3*z;
+    subject to a: 2*z <= 3 - 3*y;
+    solve;
+    display x, y, z;
+    end;
+
+If you save this as `min.mod` you can run `glpsol -m min.mod` to get
+the solution, or `glpsol -m min.mod --wlp min.lp` to get a slightly
+expanded version of the LP file above.  Pitfall: if it's gzipped, like
+most of the examples that come with GLPK, `glpsol` will uncompress it
+to run it, but at least the version I have dies with a spurious "read
+error".
+
+This example is somewhat freer-form than the LP file (there's an
+inequality with decision variables on both sides, for example), but to
+really show the advantages of an algebraic modeling language like
+GMPL, we need a bigger model.
 
 ### lp\_solve ###
 
 lp\_solve is a simplex-method solver, using branch-and-bound for mixed
-integer programming, that can read MPS format files.  I think it also
-supports LP and other formats.
+integer programming, which supports the MPS file format.  Early
+versions were proprietary, but recent versions are free software.
 
-### NLopt ###
+I had some trouble getting it to interoperate with GLPK or ZIMPL.  I
+*did* eventually get it to read an MPS file generated by ZIMPL, and I
+think I know why the GLPK-generated version was failing; my example
+problem (given in GMPL and LP format above) is a maximization problem,
+not a minimization problem.  Upon translating it to MPS with `zimpl -t
+mps min.zpl` (see below), ZIMPL issued the following warning:
 
-NLopt is a *non*linear optimization library, so it probably doesn’t
-really belong in this list, but in theory it should be able to solve
-linear optimization problems too, as a special case; it will be
-interesting to compare it.  It has bindings in C, C++, Fortran,
-Octave, Python, Guile, and R.
+    --- Warning: Objective function inverted to make
+                 minimization problem for MPS output
+
+And then lp\_solve was able to solve it with `lp_solve -mps min.mps`,
+and indeed the value of the objective function was -3.66...7 rather
+than 3.66...7.  So I guess that the problem was that MPS doesn't have
+a way to say you're trying to maximize the objective function, not
+minimize it.
+
+With this in mind, I was then able to solve the free-form MPS file I
+had generated with `glpsol -m min.mod --wfreemps min.fmps` by using
+`lp_solve -max -fmps min.fmps`, `-max` being an `lp_solve` flag to
+override this.  (I imagine the GLPK-generated fixed MPS file would
+also have worked, but ZIMPL overwrote it.)
+
+lp\_solve has its own "LP format" which is not the same as the CPLEX
+LP format used by GLPK and ZIMPL, leading to much confusion on my
+part.  The documentation does explain this:
+
+> The lp-format is lpsolves native format to read and write lp
+  models. Note that this format is not the same as the CPLEX LP format
+  (see CPLEX lp files) or the Xpress LP format (see Xpress lp files)
+
+I was able to translate the file from MPS to this incompatible LP
+format with `lp_solve -max -fmps min.fmps -wlp min.lps.lp`:
+
+    /* min */
+
+    /* Objective function */
+    max: +2 y +3 z;
+
+    /* Constraints */
+    a: +3 y +2 z <= 3;
+
+    /* Variable bounds */
+    y <= 4;
+    z <= 1;
+
+This can be reduced to the following, a format which is quite
+reasonable for writing by hand, and still work as input to lp\_solve:
+
+    max: +2 y +3 z;
+    a: +3 y +2 z <= 3;
+    y <= 4;
+    z <= 1;
+
+Unfortunately nothing but lp\_solve supports this format.  (But I
+think it can translate it to MPS format.)
+
+In theory lp\_solve supports CPLEX LP format with the flags `-rxli
+xli_CPLEX` to read or `-wxli xli_CPLEX` to write, but I think the
+Debian package failed to include the relevant module, so this doesn't
+work.  (If you really needed to do this, you could use GLPK to
+translate from LP to MPS (free MPS at least) so lp\_solve can handle
+it.)
+
+lp\_solve even supposedly has an "xli" to read GMPL, presumably linked
+with GLPK.
+
+Like GLPK, lp\_solve also has an API as well as file formats --- in C,
+Java, and Free Pascal.
 
 ### ZIMPL ###
 
-ZIMPL is a modeling language from the same academic research
+ZIMPL, the Zuse Institute Mathematical Programming Language,
+is a modeling language from the same academic research
 institute, the Zuse Institute Berlin, that wrote the solver SCIP, but
 ZIMPL is free software, while SCIP is not.  It’s mostly compatible
 with GNU MathProg.  It started out as Thorsten Koch’s Ph.D. thesis in
@@ -143,9 +254,22 @@ AMPL/GMPL I think you would say
     subject to Nonnegative {a in A}: y[a] >= 0;
 
 It can produce MPS and LP files, as well as something called
-“Polynomial IP”.
+“Polynomial IP”.  Beware, it generates the name for its output file
+from the name of the input file, and so it will overwrite any existing
+file of the corresponding name.
 
-The user guide makes it sound like it operates entirely in batch mode.
+Here's a translation of the tiny model used as examples earlier into
+ZIMPL:
+
+    var y >= 0;
+    var z >= 0;
+    maximize x: 2*y + 3*z;
+    subto a: 2*z <= 3 - 3*y;
+    subto ym: y <= 4;
+    subto zm: z <= 1;
+
+If saved as `foo.zpl`, you can convert it to LP format with `zimpl
+foo.zpl`, writing the output to `foo.lp`.
 
 ### libisl ###
 
@@ -158,14 +282,25 @@ The documentation says:
  minimum using parametric integer programming. It also includes an ILP solver
  based on generalized basis reduction.
 
-I have it on my laptop because GCC depends on it, God knows for what.
+I have it on my laptop because GCC depends on it, apparently for
+a newish loop optimization framework internal to GCC called Graphite.
 It sounds scarily powerful.
 
 ### COIN CLP/CBC ###
 
 The COIN project is an Apache project for making operations-research
 results reproducible by basing them on open-source software.  It
-includes the solvers CLP and CBC.
+includes the solvers CLP, CBC, and SYMPHONY, which last requires an
+underlying linear-programming solver like CLP.  I haven't yet figured
+out how to use any of them.
+
+### NLopt ###
+
+NLopt is a *non*linear optimization library, so it probably doesn’t
+really belong in this list, but in theory it should be able to solve
+linear optimization problems too, as a special case; it will be
+interesting to compare it.  It has bindings in C, C++, Fortran,
+Octave, Python, Guile, and R.
 
 ### Octave ###
 
@@ -185,7 +320,9 @@ weak and limiting:
 
 And, in some ways, it is; but as I’m learning in this class, there are
 standard hacks for turning a much larger variety of problems into
-linear problems.
+linear problems.  Some of these are done for you automatically by
+model translators for algebraic modeling languages, while others
+aren't.
 
 ### Minimizing vs. maximizing ###
 
