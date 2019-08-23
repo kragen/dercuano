@@ -1,7 +1,7 @@
 I started auditing an “operations research” class at the UBA this
 quatrimester.  It’s largely focused on linear programming, which is to
 say, optimizing linear functions subject to linear constraints, but
-the class also covers some other linear-programming topics.
+the class also covers some other non-linear-programming topics.
 
 I’m particularly interested in optimization algorithms, as I’ve said a
 few times before, because they potentially raise the level of
@@ -16,7 +16,9 @@ Overview of linear programming
 
 Linear programming is a particularly popular subset of mathematical
 optimization because there are well-known algorithms for solving it
-that scale to fairly large numbers of decision variables, and it
+that scale to fairly large numbers of decision variables
+(the variables the optimization algorithm
+is allowed to decide on a value for to reach the optimum), and it
 provides a useful approximation for many economically important
 problems.  It’s so popular that sometimes it overshadows the rest of
 mathematical optimization — many books purportedly about mathematical
@@ -34,8 +36,8 @@ variables are constrained to integer values.
 
 As the lp\_solve documentation summarizes it:
 
-> The linear programming (LP) problem can be formulated as: Solve A·x >=
- V₁, with V₂·x maximal. A is a matrix, x is a vector of (nonnegative)
+> The linear programming (LP) problem can be formulated as: Solve **A**·*x* >=
+ V₁, with V₂·*x* maximal. **A** is a matrix, *x* is a vector of (nonnegative)
  variables, V₁ is a vector called the right hand side, and V₂ is a
  vector specifying the objective function.
 
@@ -51,34 +53,34 @@ problems, of which the oldest and most-widely-used is George Dantzig’s
 The software landscape
 ----------------------
 
-As I understand it, here’s the way things are.  Probably I will revise
-this a lot once I actually get to trying stuff.
-
 Typically, as an end-user, you solve linear optimization problems by
 writing your problem in an “algebraic modeling language” such as GNU
 MathProg or “GMPL” (a dialect of a popular proprietary modeling
 language called “AMPL”) or ZIMPL; the model translator
 compiles your model (including data files, which it might pull from a
-database) into a standard format (such as “MPS”, “LP”, or “nl”),
+database) into a standard format (such as “MPS”, “LP”, or `.nl` --- see below),
 generally expanding it considerably, and submits it to a “solver”.
 
 Unfortunately, the most popular model translators and
 solvers are all proprietary; proprietary CPLEX, now owned by IBM, is
 the most popular solver, with proprietary SCIP second, and proprietary
-AMPL is the most popular modeling-language processor; there is an
+AMPL is the most popular model translator; there is an
 excellent AMPL book by Brian Kernighan (et al., but “Kernighan” is a
 sufficient recommendation) which also serves as an introduction to
 linear programming.  Both CPLEX and SCIP are free for institutional
 academic use but not to independent researchers; I don’t know about
 AMPL.  So we can forget about these.
 
-### Modeler–solver interfaces ###
+### Modeler–solver interfaces (MPS, Osi, `.nl`, and LP) ###
 
 Most of the time the model translator talks to the solver through a file in
 some standardized file format; MPS is the most popular such format, a
 punched-card-based format originally designed for IBM’s Mathematical
 Programming System/360.  LP, sometimes called “CPLEX LP” because of its
-origins in CPLEX, is a more-readable but less-widely-supported format.
+origins in CPLEX, is a more-readable but less-widely-supported format;
+and AMPL, a popular but proprietary algebraic modeling language,
+defined its own `.nl` format, mentioned earlier, that has been
+interfaced to a wide variety of solvers.
 
 Linear-programming solvers have been around considerably longer than
 algebraic modeling languages, so both MPS and LP are designed for
@@ -109,7 +111,7 @@ them from your program without preparing an input file for them to
 parse; and the COIN-OR project has written a standard API called "Osi"
 for doing this with many different solvers.
 
-### GLPK ###
+### GLPK (modeling language and solver) ###
 
 GLPK, a C library, is the thousand-pound gorilla of linear
 optimization systems; Octave is built with it, and there are bindings
@@ -149,7 +151,7 @@ inequality with decision variables on both sides, for example), but to
 really show the advantages of an algebraic modeling language like
 GMPL, we need a bigger model.
 
-### lp\_solve ###
+### lp\_solve (solver) ###
 
 lp\_solve is a simplex-method solver, using branch-and-bound for mixed
 integer programming, which supports the MPS file format.  Early
@@ -224,7 +226,7 @@ with GLPK.
 Like GLPK, lp\_solve also has an API as well as file formats --- in C,
 Java, and Free Pascal.
 
-### ZIMPL ###
+### ZIMPL (modeling language) ###
 
 ZIMPL, the Zuse Institute Mathematical Programming Language,
 is a modeling language from the same academic research
@@ -236,8 +238,8 @@ with GNU MathProg.  It started out as Thorsten Koch’s Ph.D. thesis in
 optimization”.)
 
 The ZIMPL language appears to be more or less at the same level of
-abstraction as GMPL, but with arguably nicer syntax and the ability to
-parse CSV files to get model parameters.  So for example in ZIMPL you
+abstraction as GMPL, but with arguably nicer syntax.
+So for example in ZIMPL you
 might say
 
     minimize cost: 12 * x1
@@ -271,7 +273,11 @@ ZIMPL:
 If saved as `foo.zpl`, you can convert it to LP format with `zimpl
 foo.zpl`, writing the output to `foo.lp`.
 
-### libisl ###
+Since ZIMPL and GMPL are so similar in their capabilities, but GMPL is
+bundled with the popular GLPK solver, I don't know what the advantage
+of using ZIMPL would be.
+
+### libisl (ILP solver) ###
 
 The documentation says:
 
@@ -282,11 +288,15 @@ The documentation says:
  minimum using parametric integer programming. It also includes an ILP solver
  based on generalized basis reduction.
 
-I have it on my laptop because GCC depends on it, apparently for
-a newish loop optimization framework internal to GCC called Graphite.
-It sounds scarily powerful.
+I have it on my laptop because GCC depends on it, apparently for a
+newish loop optimization framework internal to GCC called Graphite.
+It sounds scarily powerful.  Unlike the others, it's specifically
+intended for *integer* optimization, with no support for
+continuous-domain optimization.
 
-### COIN CLP/CBC ###
+Needless to say, it doesn't interoperate with the others.
+
+### COIN CLP/CBC/SYMPHONY (solvers) ###
 
 The COIN project is an Apache project for making operations-research
 results reproducible by basing them on open-source software.  It
@@ -294,7 +304,7 @@ includes the solvers CLP, CBC, and SYMPHONY, which last requires an
 underlying linear-programming solver like CLP.  I haven't yet figured
 out how to use any of them.
 
-### NLopt ###
+### NLopt (solver) ###
 
 NLopt is a *non*linear optimization library, so it probably doesn’t
 really belong in this list, but in theory it should be able to solve
@@ -302,13 +312,31 @@ linear optimization problems too, as a special case; it will be
 interesting to compare it.  It has bindings in C, C++, Fortran,
 Octave, Python, Guile, and R.
 
-### Octave ###
+### Octave (programming environment) ###
 
 Although Octave is mostly a matrix computation system, it includes
 support for linear programming, as well as quadratic programming,
 general nonlinear programming, and linear least-squares solution of
-matrices.  Unfortunately documentation for them is missing from the
-manual!
+matrices.
+
+### Pyomo (modeling embedded DSL) ###
+
+Pyomo, formerly "Coopr", is an algebraic modeling language like ZIMPL
+or GMPL, but realized as an embedded DSL in Python, or perhaps more
+accurately, a Python API, with the concepts closely matching those of
+ZIMPL or GMPL.  It supports linear optimization and also quadratic
+optimization, general nonlinear optimization, etc.  It's able to read
+model parameters from data files in GMPL format, but not to read GMPL
+models.
+
+Pyomo can use GLPK, CBC, or some undocumented set of other solvers.
+
+### FLOPC++ (modeling embedded DSL) ###
+
+FLOPC++ --- another part of the COIN-OR project --- is, similarly, an
+algebraic modeling language realized as an embedded DSL in C++.  I
+haven't tried it but it looks like roughly the same level of pain as
+Pyomo.  It can at least use CBC.
 
 Hacks to expand what you can do with a linear optimizer
 -------------------------------------------------------
@@ -334,28 +362,40 @@ precisely the opposite of the minimal value for V⃗₂·*x⃗*; so if your
 solver wants to maximize, you can just flip the sign on its objective
 vector and the objective result, and you can minimize.
 
+As mentioned earlier, ZIMPL will do this when generating an MPS file,
+since apparently MPS can't express whether you want to maximize or
+minimize your objective function, and so lp\_solve assumes you want to
+minimize.
+
 ### Mixing >= with <= ###
 
 Similarly, **A**·*x⃗* >= V⃗₁ suggests that all your constraints must
 have decision variables on the left side of a “>=”.  But that’s silly;
-the constraint 2*x*₃ >= 4, for example, is equivalent to -2*x*₃ <= -4.
+the constraint 2*y* >= 4, for example, is equivalent to -2*y* <= -4.
 So by flipping the signs on a row of the matrix and the corresponding
 limit, you can effectively get both <= and >= constraints in the same
-matrix.  And that’s how you can get criteria like 1 <= 2*x*₃ + 3*x*₄
+matrix.  And that’s how you can get criteria like 1 <= 2*y* + 3*z*
 <= 2.
+
+Indeed, even the CPLEX LP format supports this directly for decision
+variables:
+
+    Bounds
+     0 <= y <= 4
+     0 <= z <= 1
 
 ### Decision variables on both sides ###
 
-Similarly, if you have a criterion like 2*x*₃ <= 3*x*₄ + 1, you might
+Similarly, if you have a criterion like 2*y* <= 3*z* + 1, you might
 think that doesn’t fit into the **A**·*x⃗* >= V⃗₁ mold.  But all you
-have to do is subtract 3*x*₄ from both sides — 2*x*₃ - 3*x*₄ <=
+have to do is subtract 3*z* from both sides — 2*y* - 3*z* <=
 1 — and Bob’s your auntie!
 
 ### Equality constraints ###
 
-Similarly, if you have an *equality* criterion like 3*x*₅ = 4*x*₇ -
-2*x*₉, you can convert it into two *inequalities* — 3*x*₅ <= 4*x*₇ -
-2*x*₉ and 3*x*₅ >= 4*x*₇ - 2*x*₉ — which can only be simultaneously
+Similarly, if you have an *equality* criterion like 3*p* = 4*q* -
+2*r*, you can convert it into two *inequalities* — 3*p* <= 4*q* -
+2*r* and 3*p* >= 4*q* - 2*r* — which can only be simultaneously
 true when strict equality is satisfied.  This reduces the
 dimensionality of your feasible region below the full dimensionality
 of the decision-variable space, though that’s not a problem for the
