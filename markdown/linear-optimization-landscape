@@ -11,6 +11,8 @@ you wanted to compute, and then let some kind of generic solver figure
 out how to solve the problem.  That’s what earned them such a
 prominent place in file `powerful-primitives`.
 
+<!-- https://neos-guide.org/Optimization-Guide -->
+
 Overview of linear programming
 ------------------------------
 
@@ -30,7 +32,8 @@ I’ve tended to be a bit prejudiced against linear optimization because
 the real world is never perfectly linear and because I felt that
 linear constraints weren’t very expressive.  But, now that I’m taking
 this class, I’m starting to appreciate the expressiveness of linear
-programming — especially “mixed integer” linear programming, an
+programming — especially “mixed integer” linear programming
+("MIP" or occasionally "MILP"), an
 extension of pure linear programming in which some of your decision
 variables are constrained to integer values.
 
@@ -67,9 +70,18 @@ the most popular solver, with proprietary SCIP second, and proprietary
 AMPL is the most popular model translator; there is an
 excellent AMPL book by Brian Kernighan (et al., but “Kernighan” is a
 sufficient recommendation) which also serves as an introduction to
-linear programming.  Both CPLEX and SCIP are free for institutional
-academic use but not to independent researchers; I don’t know about
+linear programming.  Both CPLEX and SCIP are gratis for institutional
+academic use (we are using SCIP in the class)
+but not to independent researchers; I don’t know about
 AMPL.  So we can forget about these.
+
+Anyone can use most of this software in batch mode for free, for
+optimization jobs of up to 16 megabytes of input, 3 GB of RAM, and 8
+hours of run time, on the [NEOS server](https://neos-server.org/neos/)
+at the Wisconsin Institute for Discovery at UW Madison, including
+AMPL, ZIMPL, CPLEX, SCIP, CLP, CBC, Gurobi, CBC, and SYMPHONY, but not
+including GLPK or lp\_solve, perhaps because it doesn't consider them
+"state of the art".
 
 ### Modeler–solver interfaces (MPS, Osi, `.nl`, and LP) ###
 
@@ -103,15 +115,15 @@ optimum is z = 1, y = 0.33...).
     End
 
 You can save that in `foo.lp` and solve it with GLPK by running
-`glpsol --lp foo.lp -o foo.out`.  You can transate it to MPS with
-`glpsol --lp foo.lp --wmps foo.mps`.
+`glpsol --check --lp foo.lp -o foo.out`.  You can transate it to MPS with
+`glpsol --check --lp foo.lp --wmps foo.mps`.
 
 Some solvers, such as GLPK's, also have bindings that allow you to call
 them from your program without preparing an input file for them to
 parse; and the COIN-OR project has written a standard API called "Osi"
 for doing this with many different solvers.
 
-### GLPK (modeling language and solver) ###
+### GLPK (modeling language (GMPL/MathProg) and solver) ###
 
 GLPK, a C library, is the thousand-pound gorilla of linear
 optimization systems; Octave is built with it, and there are bindings
@@ -121,14 +133,18 @@ algebraic modeling language GNU MathProg (aka GMPL), and
 also solvers for the revised simplex method, the primal-dual interior
 point method, and the branch-and-bound method.
 
+MathProg is a subset of the AMPL language mentioned above, including
+nearly all the facilities of AMPL for defining optimization problems,
+but without statements like `include`, `model`, and `data`.
+
 It supports MPS and LP format files for both input
 and output, and can even translate between them, as well as generating
-them with the GMPL model translator.
+them with the MathProg model translator.
 
 GLPK was originally released in 2000, but has been under active
 development ever since; there is a Wikibook about it.
 
-Here's a GMPL version of the example LP file above, with additional
+Here's a MathProg version of the example LP file above, with additional
 directives to solve it and display the results:
 
     var y >= 0, <= 4;
@@ -149,7 +165,46 @@ error".
 This example is somewhat freer-form than the LP file (there's an
 inequality with decision variables on both sides, for example), but to
 really show the advantages of an algebraic modeling language like
-GMPL, we need a bigger model.
+MathProg, we need a bigger model.  For example, here's an
+integer-linear-programming sudoku solver I wrote this afternoon:
+
+    param N default 9;
+    set S := 1..N;
+    param SW 'square width' default 3;
+    set G 'givens' default {};
+    param givenrow {G};
+    param givencol {G};
+    param givenchoice {G};
+
+    var X { S, S, S } binary;
+
+    maximize pleasure: 69;
+
+    rows {col in S, choice in S}: sum {row in S} X[row, col, choice] = 1;
+    mutex {row in S, col in S}: sum {choice in S} X[row, col, choice] = 1;
+    cols {row in S, choice in S}: sum {col in S} X[row, col, choice] = 1;
+    squares {bigrow in 0..SW-1, bigcol in 0..SW-1, choice in S}:
+        sum {row in 1..SW, col in 1..SW}
+            X[bigrow * SW + row, bigcol * 3 + col, choice] = 1;
+    givens {j in G}: X[givenrow[j], givencol[j], givenchoice[j]] = 1;
+
+`glpsol --check --wlp sudoku.lp -m sudoku.mod` translates this 16-line
+MathProg model into a CPLEX LP file of 2000+ lines, beginning as
+follows:
+
+    \* Problem: sudoku *\
+
+    Maximize
+     pleasure: 0 X(1,1,1)
+    \* constant term = 69 *\
+
+    Subject To
+     rows(1,1): + X(1,1,1) + X(2,1,1) + X(3,1,1) + X(4,1,1) + X(5,1,1)
+     + X(6,1,1) + X(7,1,1) + X(8,1,1) + X(9,1,1) = 1
+     rows(1,2): + X(1,1,2) + X(2,1,2) + X(3,1,2) + X(4,1,2) + X(5,1,2)
+     + X(6,1,2) + X(7,1,2) + X(8,1,2) + X(9,1,2) = 1
+     rows(1,3): + X(1,1,3) + X(2,1,3) + X(3,1,3) + X(4,1,3) + X(5,1,3)
+     + X(6,1,3) + X(7,1,3) + X(8,1,3) + X(9,1,3) = 1
 
 ### lp\_solve (solver) ###
 
@@ -160,7 +215,7 @@ versions were proprietary, but recent versions are free software.
 I had some trouble getting it to interoperate with GLPK or ZIMPL.  I
 *did* eventually get it to read an MPS file generated by ZIMPL, and I
 think I know why the GLPK-generated version was failing; my example
-problem (given in GMPL and LP format above) is a maximization problem,
+problem (given in MathProg and LP format above) is a maximization problem,
 not a minimization problem.  Upon translating it to MPS with `zimpl -t
 mps min.zpl` (see below), ZIMPL issued the following warning:
 
@@ -176,8 +231,8 @@ minimize it.
 With this in mind, I was then able to solve the free-form MPS file I
 had generated with `glpsol -m min.mod --wfreemps min.fmps` by using
 `lp_solve -max -fmps min.fmps`, `-max` being an `lp_solve` flag to
-override this.  (I imagine the GLPK-generated fixed MPS file would
-also have worked, but ZIMPL overwrote it.)
+override this.  GLPK can also generate fixed MPS files lp\_solve can
+read with its `-mps` flag.
 
 lp\_solve has its own "LP format" which is not the same as the CPLEX
 LP format used by GLPK and ZIMPL, leading to much confusion on my
@@ -217,14 +272,25 @@ In theory lp\_solve supports CPLEX LP format with the flags `-rxli
 xli_CPLEX` to read or `-wxli xli_CPLEX` to write, but I think the
 Debian package failed to include the relevant module, so this doesn't
 work.  (If you really needed to do this, you could use GLPK to
-translate from LP to MPS (free MPS at least) so lp\_solve can handle
+translate from LP to MPS so lp\_solve can handle
 it.)
 
-lp\_solve even supposedly has an "xli" to read GMPL, presumably linked
+lp\_solve even supposedly has an "xli" to read MathProg, presumably linked
 with GLPK.
+
+lp\_solve seems to be much weaker than GLPK's solvers; I have an
+underconstrained 9x9 Sudoku puzzle, using the above solver, here that
+GLPK can solve in 4.1 seconds, but lp\_solve has been chewing on it
+now for five hours and hasn't solved it yet.  The two projects started
+about the same time, but GLPK has seen continued development.  I
+suspect that any current interest in lp\_solve is largely because GLPK
+is GPL, so you can't build proprietary software with it, while
+lp\_solve is LGPL, so you can.
 
 Like GLPK, lp\_solve also has an API as well as file formats --- in C,
 Java, and Free Pascal.
+
+XXX move this section down
 
 ### ZIMPL (modeling language) ###
 
@@ -275,7 +341,21 @@ foo.zpl`, writing the output to `foo.lp`.
 
 Since ZIMPL and GMPL are so similar in their capabilities, but GMPL is
 bundled with the popular GLPK solver, I don't know what the advantage
-of using ZIMPL would be.
+of using ZIMPL would be --- except that the proprietary solver SCIP
+has ZIMPL built in, and so it's more convenient to use SCIP with ZIMPL
+than with MathProg.
+
+### CMPL (modeling language ###
+
+[CMPL](https://github.com/coin-or/Cmpl) is another algebraic modeling
+language from the COIN-OR project, GPLv3 licensed, bundled with an IDE
+called Coliop; it can use the CBC or GLPK solvers, as well as
+proprietary solvers.  It also includes Java and Python interfaces,
+presumably as a sort of embedded DSL.  The project mailing list seems
+consistently very low traffic since 2011.
+
+I haven't tried it yet, although it looks like it might address some
+of my annoyances.
 
 ### libisl (ILP solver) ###
 
@@ -300,9 +380,108 @@ Needless to say, it doesn't interoperate with the others.
 
 The COIN project is an Apache project for making operations-research
 results reproducible by basing them on open-source software.  It
-includes the solvers CLP, CBC, and SYMPHONY, which last requires an
-underlying linear-programming solver like CLP.  I haven't yet figured
-out how to use any of them.
+includes the solvers CLP, CBC, and SYMPHONY; CBC and SYMPHONY require an
+underlying linear-programming solver like CLP; it also defined an API
+called "Osi", the Open Solver Interface, as an alternative to the
+file-format interfaces described earlier.  I haven't yet figured out
+how to use them effectively yet.
+
+These three solvers are the only free solvers I've found on the NEOS
+server.
+
+I've been able to solve minimization MPS problems with CLP using `clp
+foo.mps` but solving maximization problems or seeing the actual
+results requires a slightly more elaborate command:
+
+    $ clp solar.mps -maximize -dualsimplex -solution solar.solution
+
+If you apply this to an MPS file containing an integer-programming
+problem like the Sudoku solver given above, you get garbage, because
+CLP finds a continuous solution instead of an integer solution.  There
+is a similar `cbc` executable which has an `-branch` option to avoid
+this:
+
+    $ cbc sudoku.mps -dualsimplex -branch -solution sudoku.solution
+
+This finds an answer which appears to be correct, using binary
+variables as Garns intended, in about one second.  By contrast, with
+GLPK, `glpsol --mps sudoku.mps --output sudoku.sol` finds a solution
+in 4 seconds.  The [CBC user's
+guide](https://www.coin-or.org/Cbc/index.html) explains in detail how
+CBC supports integer variables but does not explain how to use the
+`cbc` executable.
+
+It seems that CLP, CBC, and COIN-OR in general have stagnated somewhat
+since John J. Forrest, the primary author of CLP and CBC, has retired
+from IBM Research around 2005; there's mojibake in the [CLP User
+Guide](https://www.coin-or.org/Clp/userguide/clpuserguide.html) and
+the CBC User Guide, for example.  CLP and CBC are primarily intended
+to be invoked via an API, but they support MPS input.
+
+CLP, and perhaps COIN-OR as a whole, descends from a proprietary IBM
+product called OSL, "Optimization Solutions and Library", [which had
+its last release in
+2000](http://web.archive.org/web/20040203204705/http://www-306.ibm.com/software/data/bi/osl/news.html)
+and [was withdrawn in
+2003](http://web.archive.org/web/20040510211307/http://www-306.ibm.com:80/software/data/bi/osl/news.html)
+with a recommendation that users switch to COIN-OR:
+
+> For those customers considering options in the area of Optimization,
+  IBM is strongly recommending the use of the open-source COIN
+  solution. Much of the IBM Research Division's efforts in
+  Optimization for the past few years (along with effort from many
+  others in the open-source community) have gone into developing and
+  enhancing COIN. It has progressed to the point where IBM Research
+  feels that COIN is equal or superior to OSL in most respects....and
+  COIN is very competitive functionally and from a performance
+  viewpoint with other commercially available Optimization offerings.
+
+According to the user guide, running `make unitTest` builds an
+executable called `clp` which can be used as a standalone solver with
+MPS input.  Presumably the `cbc` executable is similar.
+
+### DSDP (solver) ###
+
+The abstract of the DSDP tech report (ANL/MCS-TM-277) says:
+
+> DSDP implements the dual-scaling algorithm for semidefinite
+  programming. The source code if[sic] this interior-point solver,
+  written entirely in ANSI C, is freely available. The solver can be
+  used as a subroutine library, as a function within the MATLAB
+  environment, or as an executable that reads and writes to
+  files. Initiated in 1997, DSDP has developed into an efficient and
+  robust general purpose solver for semidefinite programming. Although
+  the solver is written with semidefinite programming in mind, it can
+  also be used for linear programming and other constraint cones.
+
+Apparently [semidefinite
+programming](https://en.wikipedia.org/wiki/Semidefinite_programming)
+is some kind of generalization of linear programming:
+
+> All linear programs can be expressed as SDPs, and via hierarchies of
+  SDPs the solutions of polynomial optimization problems can be
+  approximated. ... A linear programming problem is one in which we
+  wish to maximize or minimize a linear objective function of real
+  variables over a polytope. In semidefinite programming, we instead
+  use real-valued vectors and are allowed to take the dot product of
+  vectors; nonnegativity constraints on real variables in LP (linear
+  programming) are replaced by semidefiniteness constraints on matrix
+  variables in SDP (semidefinite programming).
+
+The [paper that introduced semidefinite
+programming](https://web.stanford.edu/~boyd/papers/sdp.html) gives
+further context.
+
+> Semidefinite programming unifies several standard problems (eg,
+  linear and quadratic programming) and finds many applications in
+  engineering. Although semidefinite programs are much more general
+  than linear programs, they are just as easy to solve. Most
+  interior-point methods for linear programming have been generalized
+  to semidefinite programs.
+
+This all sounds great, but, to me at least, it is not at all apparent
+how to use the `dsdp5` command to solve a linear program.  The
+documentation is all for the library's C API, and so are the examples.
 
 ### NLopt (solver) ###
 
