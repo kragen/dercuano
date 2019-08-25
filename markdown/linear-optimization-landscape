@@ -42,7 +42,8 @@ this class, I’m starting to appreciate the astounding expressiveness of linear
 programming — especially “mixed integer” linear programming
 ("MIP" or occasionally "MILP"), an
 extension of pure linear programming in which some of your decision
-variables are constrained to integer values.
+variables are constrained to integer values, which is more expressive but
+enormously more difficult to solve.
 
 As the lp\_solve documentation summarizes it:
 
@@ -296,8 +297,8 @@ with GLPK.
 
 lp\_solve seems to be much weaker than GLPK's solvers; I have an
 underconstrained 9x9 Sudoku puzzle, using the above solver, here that
-GLPK can solve in 4.1 seconds, but lp\_solve has been chewing on it
-now for 10 hours and hasn't solved it yet.  The two projects started
+GLPK can solve in 4.1 seconds, but lp\_solve chewed on it
+for 22 hours without solving it before I killed it.  The two projects started
 about the same time, but GLPK has seen continued development.  I
 suspect that any current interest in lp\_solve is largely because GLPK
 is GPL, so you can't build proprietary software with it, while
@@ -656,8 +657,88 @@ dimensionality of your feasible region below the full dimensionality
 of the decision-variable space, though that’s not a problem for the
 simplex method.
 
-### Binary gates with big M ###
+### Binary gates with big *M* ###
+
+A common nonlinearity that can be handled fairly easily by integer
+linear programming is a sort of "something-or-nothing" criterion; for
+example, with solar panels, the amount of power you can produce at a
+site (and thus money you can make) is proportional to the amount of
+panel area installed at the site, but to produce any power at all at
+the site, you need to run power lines to the site, which has some
+fixed cost.
+
+If you have some upper limit *M* on the power you can produce, you can
+multiply that upper limit by a binary variable *W* that encodes
+whether or not a site is active; for example, in MathProg notation:
+
+    param M {s in Sites} := available_area[s] * power_per_area;
+    var W {s in Sites}, binary;
+    subject to power_installation {s in Sites}:
+        0 <= panels_installed[s] <= W[s] * M[s];
+
+When *Ws* is 0, this forces `panels_installed[s]` to also be 0; when
+*Ws* is 1, `panels_installed[s]` can have any value at all, as long as
+it's less than *M*, which was chosen to be large enough not to be a
+restriction in practice.  (Solvers can suffer precision problems if
+*M* is too many orders of magnitude larger than the actual values of
+the variable, though.)
+
+Then, you can use this variable W in your objective function to take
+into account the installation cost.
+
+(I mean "gate" in the sense of something that can block something else
+from happening, not in the sense of a NAND gate.)
 
 ### Absolute values ###
 
+A much cooler trick that doesn't even require dropping back to integer
+linear programming is encoding absolute values.  Suppose one of the
+terms of an objective function you're trying to *minimize* is the
+absolute value of some linear function *f* of your decision variables,
+|*f*(*x*)|.  That's not linear, or even differentiable, because it
+changes direction abruptly when *f*(*x*) = 0, so you can't solve it
+directly with a linear solver.  What you can do is replace |*f*(*x*)|
+with a new variable *t* which is constrained to be greater than or
+equal to |*f*(*x*)| using two new constraints: *t* >= *f*(*x*) and
+*t* >= -*f*(*x*).  This ensures that *t* >= |*f*(*x*)|, which, in
+conjunction with the minimization criterion, forces *t* = |*f*(*x*)|,
+and again, Bob's your auntie!
+
+When you're trying to *maximize* a sum including |*f*(*x*)|, which is
+a more unusual thing to do, this becomes trickier; you must drop back
+to mixed integer programming and introduce a binary variable *W* and
+maximum *M* bound and use a variant of the binary-gate trick to
+prevent *t* from ever being strictly greater than *f*(*x*), with *t* -
+*f*(*x*) <= *WM* and *t* - (-*f*(*x*)) <= (1-*W*)*M*.
+
+### Mutual exclusion ###
+
+As demonstrated in the Sudoku example above, you can use a simple sum
+condition to require that precisely one of a set of options be chosen:
+*W*1 + *W*2 + *W*3 = 1.
+
 ### Piecewise-linear functions ###
+
+Mutual exclusion allows you to use piecewise-linear functions in your
+linear constraints and objectives.  You can't do this in the obvious
+way --- *W*1 *f*1(*x*) + *W*2 *f*2(*x*) + *W*3 *f*3(*x*), with the
+*fi* being the linear pieces --- because it wouldn't be linear.  But
+you can introduce new "abscissa" variables *z*1, *z*2, *z*3 that are
+gated by the *Wi* and restricted to their own regions: 3*W*1 <= *z*1
+<= 6*W*1, for example, restricts *z*1 to [3, 6] when *W*1 is 1, and 0
+otherwise.  Then *f*1(*z*1) + *f*2(*z*2) + *f*3(*z*3) gives you the
+piecewise-linear function you wanted, and *z*1 + *z*2 + *z*3 gives you
+its abscissa, which perhaps you want to constrain to be equal to *x*.
+
+This is a variant of the binary-gate trick that requires no big *M*.
+
+This has the disadvantage that if your piecewise-linear function is
+discontinuous, it ceases to be a *function* at the discontinuities; it
+can take two different values.
+
+(I think there's also a way to make a *convex downwards, continuous*
+piecewise-linear function out of absolute values without involving
+integer linear programming, in the case where you're minimizing, but I
+haven't seen it worked out yet.)
+
+### Rational expressions where the denominator has known sign ###
