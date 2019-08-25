@@ -13,12 +13,16 @@ something, you just specify how to recognize if something is the thing
 you wanted to compute, and then let some kind of generic solver figure
 out how to solve the problem.  That’s what earned them such a
 prominent place in file `powerful-primitives`.  And it turns out that
-linear-optimization solvers, as they're called, are the most developed
+linear-optimization solvers, as they’re called, are the most developed
 family of optimization algorithms out there.
 
 Other useful overviews of the space can be found in the [NEOS Server
 Optimization Guide](https://neos-guide.org/Optimization-Guide) and the
 [GLPK Wikibook](https://en.wikibooks.org/wiki/GLPK).
+
+I’m paying as little attention as possible to proprietary software
+here, but unavoidably need to mention it periodically simply because
+it has played such a central role in this space.
 
 Overview of linear programming
 ------------------------------
@@ -40,7 +44,7 @@ the real world is never perfectly linear and because I felt that
 linear constraints weren’t very expressive.  But, now that I’m taking
 this class, I’m starting to appreciate the astounding expressiveness of linear
 programming — especially “mixed integer” linear programming
-("MIP" or occasionally "MILP"), an
+(“MIP” or occasionally “MILP”), an
 extension of pure linear programming in which some of your decision
 variables are constrained to integer values, which is more expressive but
 enormously more difficult to solve.
@@ -57,12 +61,18 @@ As the lp\_solve documentation summarizes it:
  linear programming (MILP) problem, some of the variables are integer
  and others are real.
 
-(Some formulations additionally specify that all *xi* are nonnegative,
+(Some formulations additionally specify that all *xᵢ* are nonnegative,
 which turns out to matter very little.)
 
 There are several algorithms known for solving linear optimization
 problems, of which the oldest and most-widely-used is George Dantzig’s
 “simplex algorithm”, despite its worst-case exponential complexity.
+Many newer solvers instead use the “interior-point method”, which has
+worst-case polynomial complexity for continuous linear optimization.
+(Most mature solvers support both.)  However, for mixed integer linear
+programming, they all must fall back on exponential-time search
+procedures, usually “branch-and-cut” procedures (also known as
+“branch-and-bound”).
 
 The software landscape
 ----------------------
@@ -72,7 +82,7 @@ writing your problem in an “algebraic modeling language” such as GNU
 MathProg or “GMPL” (a dialect of a popular proprietary modeling
 language called “AMPL”) or ZIMPL; the model translator
 compiles your model (including data files, which it might pull from a
-database) into a standard format (such as “MPS”, “LP”, or `.nl` --- see below),
+database) into a standard format (such as “MPS”, “LP”, or `.nl` — see below),
 generally expanding it considerably, and submits it to a “solver”.
 
 Unfortunately, the most popular model translators and
@@ -94,19 +104,20 @@ hours of run time,
 thanks to the Wisconsin Institute for Discovery at UW Madison;
 the NEOS server has
 AMPL, ZIMPL, CPLEX, SCIP, CLP, CBC, Gurobi, CBC, and SYMPHONY, but not
-including GLPK or lp\_solve, perhaps because it doesn't consider them
-"state of the art".
+including GLPK or lp\_solve, perhaps because it doesn’t consider them
+“state of the art”.
 
 XXX I really need a diagram!
 
 ### Modeler–solver interfaces (MPS, Osi, `.nl`, and LP) ###
 
-Most of the time the model translator talks to the solver through a file in
+Often the model translator talks to the solver through a file in
 some standardized file format; MPS is the most popular such format, a
 punched-card-based format originally designed for IBM’s Mathematical
 Programming System/360.  LP, sometimes called “CPLEX LP” because of its
 origins in CPLEX, is a more-readable but less-widely-supported format;
-and AMPL, a popular but proprietary algebraic modeling language,
+and AMPL, a popular but proprietary algebraic modeling language
+(compatible with GLPK’s MathProg),
 defined its own `.nl` format, mentioned earlier, that has been
 interfaced to a wide variety of solvers.
 
@@ -116,9 +127,9 @@ humans to write, but MPS is designed badly.
 
 (There are actually two different, incompatible MPS formats: the
 original fixed-field MPS format from the 1960s, and a slightly less
-bletcherous "free-form" 1980s version.)
+bletcherous “free-form” 1980s version.)
 
-Here's a small LP file that GLPK and CBC are able to accept and solve (the
+Here’s a small LP file that GLPK and CBC are able to accept and solve (the
 optimum is z = 1, y = 0.33...).
 
     Maximize
@@ -134,9 +145,9 @@ You can save that in `foo.lp` and solve it with GLPK by running
 `glpsol --lp foo.lp -o foo.out`.  You can transate it to MPS with
 `glpsol --check --lp foo.lp --wmps foo.mps`.
 
-Most solvers, including GLPK's, also have bindings that allow you to call
+Most solvers, including GLPK’s, also have bindings that allow you to call
 them from your program without preparing an input file for them to
-parse; and the COIN-OR project has written a standard API called "Osi"
+parse; and the COIN-OR project has written a standard API called “Osi”
 for doing this with many different solvers.
 
 ### GLPK (modeling language (GMPL/MathProg) and solver) ###
@@ -145,7 +156,7 @@ GLPK, a C library, is the thousand-pound gorilla of linear
 optimization systems; Octave is built with it, and there are bindings
 to it in Java, Python, and R.  The GLPK package includes the
 model translator for the popular
-algebraic modeling language GNU MathProg (aka GMPL), and
+algebraic modeling language GNU MathProg (*aka* GMPL), and
 also solvers for the revised simplex method, the primal-dual interior
 point method, and the branch-and-bound method.
 
@@ -158,9 +169,10 @@ and output, and can even translate between them, as well as generating
 them with the MathProg model translator.
 
 GLPK was originally released in 2000, but has been under active
-development ever since; there is a Wikibook about it.
+development ever since; there is a Wikibook about it, linked above in
+the introduction.
 
-Here's a MathProg version of the example LP file above, with additional
+Here’s a MathProg version of the example LP file above, with additional
 directives to solve it and display the results:
 
     var y >= 0, <= 4;
@@ -173,15 +185,15 @@ directives to solve it and display the results:
 
 If you save this as `min.mod` you can run `glpsol -m min.mod` to get
 the solution, or `glpsol -m min.mod --wlp min.lp` to get a slightly
-expanded version of the LP file above.  Pitfall: if it's gzipped, like
+expanded version of the LP file above.  Pitfall: if it’s gzipped, like
 most of the examples that come with GLPK, `glpsol` will uncompress it
-to run it, but at least the version I have dies with a spurious "read
-error".
+to run it, but at least the version I have dies with a spurious “read
+error”.
 
-This example is somewhat freer-form than the LP file (there's an
+This example is somewhat freer-form than the LP file (there’s an
 inequality with decision variables on both sides, for example), but to
 really show the advantages of an algebraic modeling language like
-MathProg, we need a bigger model.  For example, here's an
+MathProg, we need a bigger model.  For example, here’s an
 integer-linear-programming sudoku solver I wrote this afternoon:
 
     param N default 9; set S := 1..N; param SW 'square width' default 3;
@@ -218,9 +230,9 @@ follows:
      rows(1,3): + X(1,1,3) + X(2,1,3) + X(3,1,3) + X(4,1,3) + X(5,1,3)
      + X(6,1,3) + X(7,1,3) + X(8,1,3) + X(9,1,3) = 1
 
-There's a SciTe-based IDE called
-[Gusek](http://gusek.sourceforge.net/) I haven't tried.  I've often
-had a lot of trouble debugging my models, and I wonder if it might
+There’s a SciTe-based IDE for GLPK called
+[Gusek](http://gusek.sourceforge.net/) I haven’t tried.  I’ve often
+had a lot of trouble debugging my MathProg models, and I wonder if it might
 help.
 
 ### lp\_solve (solver) ###
@@ -241,8 +253,8 @@ mps min.zpl` (see below), ZIMPL issued the following warning:
 
 And then lp\_solve was able to solve it with `lp_solve -mps min.mps`,
 and indeed the value of the objective function was -3.66...7 rather
-than 3.66...7.  So I guess that the problem was that MPS doesn't have
-a way to say you're trying to maximize the objective function, not
+than 3.66...7.  So I guess that the problem was that MPS doesn’t have
+a way to say you’re trying to maximize the objective function, not
 minimize it.
 
 With this in mind, I was then able to solve the free-form MPS file I
@@ -251,7 +263,7 @@ had generated with `glpsol -m min.mod --wfreemps min.fmps` by using
 override this.  GLPK can also generate fixed MPS files lp\_solve can
 read with its `-mps` flag.
 
-lp\_solve has its own "LP format" which is not the same as the CPLEX
+lp\_solve has its own “LP format” which is not the same as the CPLEX
 LP format used by GLPK, ZIMPL, CLP, and CBC, leading to much confusion on my
 part.  The documentation does explain this:
 
@@ -287,24 +299,24 @@ think it can translate it to MPS format.)
 
 In theory lp\_solve supports CPLEX LP format with the flags `-rxli
 xli_CPLEX` to read or `-wxli xli_CPLEX` to write, but I think the
-Debian package failed to include the relevant module, so this doesn't
+Debian package failed to include the relevant module, so this doesn’t
 work.  (If you really needed to do this, you could use GLPK to
 translate from LP to MPS so lp\_solve can handle
 it.)
 
-lp\_solve even supposedly has an "xli" to read MathProg, presumably linked
+lp\_solve even supposedly has an “xli” to read MathProg, presumably linked
 with GLPK.
 
-lp\_solve seems to be much weaker than GLPK's solvers; I have an
+lp\_solve seems to be much weaker than GLPK’s solvers; I have an
 underconstrained 9x9 Sudoku puzzle, using the above solver, here that
 GLPK can solve in 4.1 seconds, but lp\_solve chewed on it
 for 22 hours without solving it before I killed it.  The two projects started
 about the same time, but GLPK has seen continued development.  I
 suspect that any current interest in lp\_solve is largely because GLPK
-is GPL, so you can't build proprietary software with it, while
+is GPL, so you can’t build proprietary software with it, while
 lp\_solve is LGPL, so you can.
 
-Like GLPK, lp\_solve also has an API as well as file formats --- in C,
+Like GLPK, lp\_solve also has an API as well as file formats — in C,
 Java, and Free Pascal.
 
 XXX move this section down
@@ -321,17 +333,16 @@ with GNU MathProg.  It started out as Thorsten Koch’s Ph.D. thesis in
 optimization”.)
 
 The ZIMPL language appears to be more or less at the same level of
-abstraction as GMPL, but with arguably nicer syntax.
+abstraction as MathProg, but with arguably nicer syntax.
 So for example in ZIMPL you
 might say
 
     minimize cost: 12 * x1
-        + sum a in A : u[a] * y[a];
-    subto oneness: sum a in A : u[a] == 1;
-    subto nonnegative: forall a in A : y[a] >= 0;
+        + sum <a> in A : u[a] * y[a];
+    subto oneness: sum <a> in A : u[a] == 1;
+    subto nonnegative: forall <a> in A : y[a] >= 0;
 
-(though maybe you need `<a>` rather than `a` before `in`?) while in
-AMPL/GMPL I think you would say
+while in AMPL/MathProg you would say
 
     minimize cost: 12 * x1
         + sum {a in A} u[a] * y[a];
@@ -343,7 +354,7 @@ It can produce MPS and LP files, as well as something called
 from the name of the input file, and so it will overwrite any existing
 file of the corresponding name.
 
-Here's a translation of the tiny model used as examples earlier into
+Here’s a translation of the tiny model used as examples earlier into
 ZIMPL:
 
     var y >= 0;
@@ -356,11 +367,20 @@ ZIMPL:
 If saved as `foo.zpl`, you can convert it to LP format with `zimpl
 foo.zpl`, writing the output to `foo.lp`.
 
-Since ZIMPL and GMPL are so similar in their capabilities, but GMPL is
-bundled with the popular GLPK solver, I don't know what the advantage
-of using ZIMPL would be --- except that the proprietary solver SCIP
-has ZIMPL built in, and so it's more convenient to use SCIP with ZIMPL
+Since ZIMPL and MathProg are so similar in their capabilities, but MathProg is
+bundled with the popular GLPK solver, I don’t know what the advantage
+of using ZIMPL would be — except that the proprietary solver SCIP
+has ZIMPL built in, and so it’s more convenient to use SCIP with ZIMPL
 than with MathProg.
+
+The biggest difference I’ve found so far between ZIMPL and MathProg,
+actually, is that MathProg lets you specify things to do after the
+solution is found, at least when you’re using the GLPK solver.  This
+way you can present the solution in a more readable form.  My Sudoku
+solver above, for example, has half a page of code tagged onto the end
+to display an ASCII-art Sudoku board.  To do the same thing with SCIP
+and ZIMPL, I ended up writing a Python script to match regexps against
+the SCIP output.
 
 ### CMPL (modeling language) ###
 
@@ -372,7 +392,7 @@ presumably as a sort of embedded DSL.  The [project mailing
 list](https://list.coin-or.org/pipermail/cmpl/2017-November/thread.html)
 seems consistently very low traffic since 2011.
 
-I haven't tried it yet, although it looks like it might address some
+I haven’t tried it yet, although it looks like it might address some
 of my annoyances.
 
 ### MiniZinc (modeling language) ###
@@ -380,7 +400,7 @@ of my annoyances.
 [MiniZinc](https://www.minizinc.org/) is a constraint modeling
 language that is not limited to linear constraints; it can use CBC as
 a solver, as well as MinisatID, proprietary SCIP, and over a dozen
-other solvers.  I haven't tried it yet.
+other solvers.  I haven’t tried it yet.
 
 ### libisl (ILP solver) ###
 
@@ -395,11 +415,11 @@ The documentation says:
 
 I have it on my laptop because GCC depends on it, apparently for a
 newish loop optimization framework internal to GCC called Graphite.
-It sounds scarily powerful.  Unlike the others, it's specifically
+It sounds scarily powerful.  Unlike the others, it’s specifically
 intended for *integer* optimization, with no support for
 continuous-domain optimization.
 
-Needless to say, it doesn't interoperate with the others.
+Needless to say, it doesn’t interoperate with the others.
 
 ### COIN CLP/CBC/SYMPHONY (solvers) ###
 
@@ -407,14 +427,14 @@ The COIN project is an Apache project for making operations-research
 results reproducible by basing them on open-source software.  It
 includes the solvers CLP, CBC, and SYMPHONY; CBC and SYMPHONY require an
 underlying linear-programming solver like CLP; it also defined an API
-called "Osi", the Open Solver Interface, as an alternative to the
-file-format interfaces described earlier.  I haven't yet figured out
+called “Osi”, the Open Solver Interface, as an alternative to the
+file-format interfaces described earlier.  I haven’t yet figured out
 how to use SYMPHONY yet.
 
-These three solvers are the only free solvers I've found on the NEOS
+These three solvers are the only free solvers I’ve found on the NEOS
 server.
 
-I've been able to solve minimization MPS problems with CLP using `clp
+I’ve been able to solve minimization MPS problems with CLP using `clp
 foo.mps` but solving maximization problems or seeing the actual
 results requires a slightly more elaborate command:
 
@@ -431,7 +451,7 @@ this:
 This finds an answer which appears to be correct, using binary
 variables as Garns intended, in about half a second.  By contrast,
 with GLPK, `glpsol --mps sudoku.mps --output sudoku.sol` finds a
-solution in 4 seconds.  The [CBC user's
+solution in 4 seconds.  The [CBC user’s
 guide](https://www.coin-or.org/Cbc/index.html) explains in detail how
 CBC supports integer variables but does not explain how to use the
 `cbc` executable; Prof. Haroldo Gambini Santos wrote a short separate
@@ -441,7 +461,7 @@ in 2011; it recommends the simpler
 
     $ cbc sudoku.mps solve solu sudoku.solution
 
-which seems to be equivalent.  Without the "solve" command (or the
+which seems to be equivalent.  Without the “solve” command (or the
 lower-level `dualsimplex` and `branch` commands in the version above),
 `cbc` will still be happy to write `sudoku.solution`, but it may
 contain no solution, or only a solution of the linear relaxation of
@@ -451,17 +471,21 @@ On a more complex problem, unfortunately, I got CBC to dump core with
 this command.  The other command worked better but I think it may not
 have actually given the right answer.
 
+A nice feature of CBC is that if you kill it with ^C it responds by
+displaying information about the process it’s made so far on the
+problem (and then, as you would expect, exiting).
+
 CBC also accepts input in CPLEX LP format.
 
 It seems that CLP, CBC, and COIN-OR in general have stagnated somewhat
 since John J. Forrest, the primary author of CLP and CBC, has retired
-from IBM Research around 2005; there's mojibake in the [CLP User
+from IBM Research around 2005; there’s mojibake in the [CLP User
 Guide](https://www.coin-or.org/Clp/userguide/clpuserguide.html) and
 the CBC User Guide, for example.  CLP and CBC are primarily intended
 to be invoked via an API, but they support MPS input.
 
 CLP, and perhaps COIN-OR as a whole, descends from a proprietary IBM
-product called OSL, "Optimization Solutions and Library", [which had
+product called OSL, “Optimization Solutions and Library”, [which had
 its last release in
 2000](http://web.archive.org/web/20040203204705/http://www-306.ibm.com/software/data/bi/osl/news.html)
 and [was withdrawn in
@@ -470,7 +494,7 @@ with a recommendation that users switch to COIN-OR:
 
 > For those customers considering options in the area of Optimization,
   IBM is strongly recommending the use of the open-source COIN
-  solution. Much of the IBM Research Division's efforts in
+  solution. Much of the IBM Research Division’s efforts in
   Optimization for the past few years (along with effort from many
   others in the open-source community) have gone into developing and
   enhancing COIN. It has progressed to the point where IBM Research
@@ -481,6 +505,10 @@ with a recommendation that users switch to COIN-OR:
 According to the user guide, running `make unitTest` builds an
 executable called `clp` which can be used as a standalone solver with
 MPS input.  Presumably the `cbc` executable is similar.
+
+(I suspect IBM acquired ILOG and thus CPLEX around 2003; the
+announcement above suggests that it was maybe a bit after 2003, since
+it doesn’t mention CPLEX.)
 
 ### DSDP (solver) ###
 
@@ -523,7 +551,7 @@ further context.
 
 This all sounds great, but, to me at least, it is not at all apparent
 how to use the `dsdp5` command to solve a linear program.  The
-documentation is all for the library's C API, and so are the examples.
+documentation is all for the library’s C API, and so are the examples.
 
 ### NLopt (solver) ###
 
@@ -553,15 +581,15 @@ solvers.
 It *also* has a semidefinite programming module, using CVXOPT as the
 default (and by default only supported) solver.
 
-I haven't tried it.
+I haven’t tried it.
 
-### Parma Polyhedra Library "PPL" (solver) ###
+### Parma Polyhedra Library “PPL” (solver) ###
 
 The GPL C++ [Parma Polyhedra
 Library](https://www.bugseng.com/parma-polyhedra-library) provides a
 kind of generalization of mixed integer linear programming that I
-don't fully understand, especially suited for static analysis of
-hardware systems, with APIs in C, Java, OCaml, and Prolog.  I haven't
+don’t fully understand, especially suited for static analysis of
+hardware systems, with APIs in C, Java, OCaml, and Prolog.  I haven’t
 tried it.  The comprehensive user guide says a lot of things like
 this:
 
@@ -575,27 +603,27 @@ CVXOPT is a GPL3+ library for Python under active development since
 2004; it is intended for convex optimization but provides a lot of
 general numerical functionality, including interfaces to GLPK, plus
 its own solvers for linear and quadratic optimization (under the
-rubric "cone programming"), as well as nonlinear optimization and
-semidefinite programming.  I haven't tried it but I assume it is
+rubric “cone programming”), as well as nonlinear optimization and
+semidefinite programming.  I haven’t tried it but I assume it is
 suitable for writing your models in too.
 
 ### Pyomo (modeling embedded DSL) ###
 
-Pyomo, formerly "Coopr", is an algebraic modeling language like ZIMPL
-or GMPL, but realized as an embedded DSL in Python, or perhaps more
+Pyomo, formerly “Coopr”, is an algebraic modeling language like ZIMPL
+or MathProg, but realized as an embedded DSL in Python, or perhaps more
 accurately, a Python API, with the concepts closely matching those of
-ZIMPL or GMPL.  It supports linear optimization and also quadratic
-optimization, general nonlinear optimization, etc.  It's able to read
-model parameters from data files in GMPL format, but not to read GMPL
+ZIMPL or MathProg.  It supports linear optimization and also quadratic
+optimization, general nonlinear optimization, etc.  It’s able to read
+model parameters from data files in MathProg format, but not to read MathProg
 models.
 
 Pyomo can use GLPK, CBC, or some undocumented set of other solvers.
 
 ### FLOPC++ (modeling embedded DSL) ###
 
-FLOPC++ --- another part of the COIN-OR project --- is, similarly, an
+FLOPC++ — another part of the COIN-OR project — is, similarly, an
 algebraic modeling language realized as an embedded DSL in C++.  I
-haven't tried it but it looks like roughly the same level of pain as
+haven’t tried it but it looks like roughly the same level of pain as
 Pyomo.  It can at least use CBC.
 
 Hacks to expand what you can do with a linear optimizer
@@ -604,38 +632,39 @@ Hacks to expand what you can do with a linear optimizer
 The description from lp\_solve makes linear optimization sound really
 weak and limiting:
 
-> Solve **A**·*x⃗* >= V⃗₁, with V⃗₂·*x⃗* maximal.
+> Solve **A**_x⃗_ ≥ V⃗₁, with V⃗₂·*x⃗* maximal.
 
 And, in some ways, it is; but as I’m learning in this class, there are
 standard hacks for turning a much larger variety of problems into
 linear problems.  Some of these are done for you automatically by
 model translators for algebraic modeling languages, while others
-aren't.
+aren’t.
 
 ### Minimizing vs. maximizing ###
 
 The simplest hack is switching between minimizing and maximizing.  The
 lp\_solve definition above might suggest that you can’t minimize
 things, but of course when *x⃗* is chosen to make V⃗₂·*x⃗* minimal, then
-(-1 · V⃗₂) · *x⃗* is maximized.  Moreover, its maximal value is
+(-1 V⃗₂) · *x⃗* is maximized.  Moreover, its maximal value is
 precisely the opposite of the minimal value for V⃗₂·*x⃗*; so if your
 solver wants to maximize, you can just flip the sign on its objective
 vector and the objective result, and you can minimize.
 
 As mentioned earlier, ZIMPL will do this when generating an MPS file,
-since apparently MPS can't express whether you want to maximize or
-minimize your objective function, and so lp\_solve assumes you want to
+since apparently MPS can’t express whether you want to maximize or
+minimize your objective function, and so given just an MPS file,
+GLPK, lp\_solve, CLP, and CBC assume you want to
 minimize.
 
-### Mixing >= with <= ###
+### Mixing ≥ with ≤ ###
 
-Similarly, **A**·*x⃗* >= V⃗₁ suggests that all your constraints must
-have decision variables on the left side of a “>=”.  But that’s silly;
-the constraint 2*y* >= 4, for example, is equivalent to -2*y* <= -4.
+Similarly, **A**_x⃗_ ≥ V⃗₁ suggests that all your constraints must
+have decision variables on the left side of a “≥”.  But that’s silly;
+the constraint 2*y* ≥ 4, for example, is equivalent to -2*y* ≤ -4.
 So by flipping the signs on a row of the matrix and the corresponding
-limit, you can effectively get both <= and >= constraints in the same
-matrix.  And that’s how you can get criteria like 1 <= 2*y* + 3*z*
-<= 2.
+limit, you can effectively get both ≤ and ≥ constraints in the same
+matrix.  And that’s how you can get criteria like 1 ≤ 2*y* + 3*z*
+≤ 2.
 
 Indeed, even the CPLEX LP format supports this directly for decision
 variables:
@@ -646,16 +675,16 @@ variables:
 
 ### Decision variables on both sides ###
 
-Similarly, if you have a criterion like 2*y* <= 3*z* + 1, you might
-think that doesn’t fit into the **A**·*x⃗* >= V⃗₁ mold.  But all you
-have to do is subtract 3*z* from both sides — 2*y* - 3*z* <=
+Similarly, if you have a criterion like 2*y* ≤ 3*z* + 1, you might
+think that doesn’t fit into the **A**_x⃗_ ≥ V⃗₁ mold.  But all you
+have to do is subtract 3*z* from both sides — 2*y* - 3*z* ≤
 1 — and Bob’s your auntie!
 
 ### Equality constraints ###
 
 Similarly, if you have an *equality* criterion like 3*p* = 4*q* -
-2*r*, you can convert it into two *inequalities* — 3*p* <= 4*q* -
-2*r* and 3*p* >= 4*q* - 2*r* — which can only be simultaneously
+2*r*, you can convert it into two *inequalities* — 3*p* ≤ 4*q* -
+2*r* and 3*p* ≥ 4*q* - 2*r* — which can only be simultaneously
 true when strict equality is satisfied.  This reduces the
 dimensionality of your feasible region below the full dimensionality
 of the decision-variable space, though that’s not a problem for the
@@ -664,7 +693,7 @@ simplex method.
 ### Binary gates with big *M* ###
 
 A common nonlinearity that can be handled fairly easily by integer
-linear programming is a sort of "something-or-nothing" criterion; for
+linear programming is a sort of “something-or-nothing” criterion; for
 example, with solar panels, the amount of power you can produce at a
 site (and thus money you can make) is proportional to the amount of
 panel area installed at the site, but to produce any power at all at
@@ -680,40 +709,40 @@ whether or not a site is active; for example, in MathProg notation:
     subject to power_installation {s in Sites}:
         0 <= panels_installed[s] <= W[s] * M[s];
 
-When *Ws* is 0, this forces `panels_installed[s]` to also be 0; when
-*Ws* is 1, `panels_installed[s]` can have any value at all, as long as
-it's less than *M*, which was chosen to be large enough not to be a
+When *Wₛ* is 0, this forces `panels_installed[s]` to also be 0; when
+*Wₛ* is 1, `panels_installed[s]` can have any value at all, as long as
+it’s less than *M*, which was chosen to be large enough not to be a
 restriction in practice.  (Solvers can suffer precision problems if
 *M* is too many orders of magnitude larger than the actual values of
 the variable, though.)
 
-Then, you can use this variable W in your objective function to take
+Then, you can use this variable *W* in your objective function to take
 into account the installation cost.
 
-(I mean "gate" in the sense of something that can block something else
+(I mean “gate” in the sense of something that can block something else
 from happening, not in the sense of a NAND gate.)
 
 ### Absolute values ###
 
-A much cooler trick that doesn't even require dropping back to integer
+A much cooler trick that doesn’t even require dropping back to integer
 linear programming is encoding absolute values.  Suppose one of the
-terms of an objective function you're trying to *minimize* is the
+terms of an objective function you’re trying to *minimize* is the
 absolute value of some linear function *f* of your decision variables,
-|*f*(*x*)|.  That's not linear, or even differentiable, because it
-changes direction abruptly when *f*(*x*) = 0, so you can't solve it
-directly with a linear solver.  What you can do is replace |*f*(*x*)|
+|*f*(*x⃗*)|.  That’s not linear, or even differentiable, because it
+changes direction abruptly when *f*(*x⃗*) = 0, so you can’t solve it
+directly with a linear solver.  What you can do is replace |*f*(*x⃗*)|
 with a new variable *t* which is constrained to be greater than or
-equal to |*f*(*x*)| using two new constraints: *t* >= *f*(*x*) and
-*t* >= -*f*(*x*).  This ensures that *t* >= |*f*(*x*)|, which, in
-conjunction with the minimization criterion, forces *t* = |*f*(*x*)|,
-and again, Bob's your auntie!
+equal to |*f*(*x⃗*)| using two new constraints: *t* ≥ *f*(*x⃗*) and
+*t* ≥ -*f*(*x⃗*).  This ensures that *t* ≥ |*f*(*x⃗*)|, which, in
+conjunction with the minimization criterion, forces *t* = |*f*(*x⃗*)|,
+and again, Bob’s your auntie!
 
-When you're trying to *maximize* a sum including |*f*(*x*)|, which is
+When you’re trying to *maximize* a sum including |*f*(*x⃗*)|, which is
 a more unusual thing to do, this becomes trickier; you must drop back
 to mixed integer programming and introduce a binary variable *W* and
 maximum *M* bound and use a variant of the binary-gate trick to
-prevent *t* from ever being strictly greater than *f*(*x*), with *t* -
-*f*(*x*) <= *WM* and *t* - (-*f*(*x*)) <= (1-*W*)*M*.
+prevent *t* from ever being strictly greater than *f*(*x⃗*), with *t* -
+*f*(*x⃗*) ≤ *WM* and *t* - (-*f*(*x⃗*)) ≤ (1-*W*)*M*.
 
 ### Mutual exclusion ###
 
@@ -722,27 +751,32 @@ condition to require that precisely one of a set of options be chosen:
 *W*1 + *W*2 + *W*3 = 1.
 
 ### Piecewise-linear functions ###
-
+ 
 Mutual exclusion allows you to use piecewise-linear functions in your
-linear constraints and objectives.  You can't do this in the obvious
-way --- *W*1 *f*1(*x*) + *W*2 *f*2(*x*) + *W*3 *f*3(*x*), with the
-*fi* being the linear pieces --- because it wouldn't be linear.  But
-you can introduce new "abscissa" variables *z*1, *z*2, *z*3 that are
-gated by the *Wi* and restricted to their own regions: 3*W*1 <= *z*1
-<= 6*W*1, for example, restricts *z*1 to [3, 6] when *W*1 is 1, and 0
-otherwise.  Then *f*1(*z*1) + *f*2(*z*2) + *f*3(*z*3) gives you the
-piecewise-linear function you wanted, and *z*1 + *z*2 + *z*3 gives you
+linear constraints and objectives.  You can’t do this in the obvious
+way — *W*₁ *f*₁(*x*) + *W*₂ *f*₂(*x*) + *W*₃ *f*₃(*x*), with the
+*fᵢ* being the linear pieces — because it wouldn’t be linear.  But
+you can introduce new “abscissa” variables *z*₁, *z*₂, *z*₃ that are
+gated by the *Wᵢ* and restricted to their own regions: 3*W*₁ ≤ *z*₁
+≤ 6*W*₁, for example, restricts *z*₁ to [3, 6] when *W*₁ = 1, and 0
+otherwise.  Then *f*₁(*z*₁) + *f*₂(*z*₂) + *f*₃(*z*₃) gives you the
+piecewise-linear function you wanted, and *z*₁ + *z*₂ + *z*₃ gives you
 its abscissa, which perhaps you want to constrain to be equal to *x*.
 
 This is a variant of the binary-gate trick that requires no big *M*.
+
+(I've written it here with single scalars *zᵢ*, but you can extend it
+to piecewise-linear functions of multiple variables in a few different
+ways.)
 
 This has the disadvantage that if your piecewise-linear function is
 discontinuous, it ceases to be a *function* at the discontinuities; it
 can take two different values.
 
-(I think there's also a way to make a *convex downwards, continuous*
+(I think there’s also a way to make a *convex downwards, continuous*
 piecewise-linear function out of absolute values without involving
-integer linear programming, in the case where you're minimizing, but I
-haven't seen it worked out yet.)
+integer linear programming, in the case where you’re minimizing, but I
+haven’t seen it worked out yet.)
 
-### Rational expressions where the denominator has known sign ###
+### Ratios between linear forms where the denominator has known sign ###
+
