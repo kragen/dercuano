@@ -1,0 +1,450 @@
+Can you bitbang wireless communication between AVRs?  How about AM-radio energy harvesting?
+===========================================================================================
+
+Today, someone on Freenode ##electronics was asking about wireless
+communications between AVR microcontrollers with only passive
+components, so I was interested in the available energy for harvesting
+and possibilities for low-power RF communication.  I started reading
+about [ferrite loopstick antennas][0] and thinking about energy
+harvesting from broadcast AM radio (as suggested by user Bga3 on
+Freenode ##electronics).  These antennas are normally useful up to
+about 5 or 10 MHz and can be salvaged from old AM radios; more exotic
+ferrite mixes are viable up to 50 MHz.
+
+[0]: https://ham.stackexchange.com/questions/1156/whats-an-appropriate-core-material-for-a-loopstick-antenna
+
+As mentioned in file `arduino-radio` and file `avr-radio`, the usual
+AM radio band is around 0.5 MHz to around 1.7 MHz.  I don’t think the
+AVR is the best choice for this kind of thing, since it’s fairly
+power-hungry and slow, but even the AVR should work.  The AVR has PWM
+generation circuits that can generate frequencies up to 8 MHz, so some
+degree of amplitude modulation at a few hundred kHz should be doable.
+
+Available AM radio energy
+-------------------------
+
+[The highest power available for broadcast radio station licensing in
+the US is 50 kW][2], while there are many 10-kW radio stations around.
+So let’s suppose you’re located 10 km from ten isotropic 10-kW AM
+transmitters, which would seem to be a common situation in urban
+areas.  Each contributes about 8 μW/m² of radiation (10 kW spread over
+a sphere of area 1.26 × 10⁹ m²), for a total of 80 μW/m².  But you
+can’t collect all of that energy because loopstick antennas are
+inefficient.  Still, μW-scale energy harvesting seems like it should
+be feasible.  And of course crystal radios were powered entirely from
+AM radio waves, and had enough power to be audible, if barely.
+
+[2]: https://en.wikipedia.org/wiki/List_of_50_kW_AM_radio_stations_in_the_United_States
+
+Related work
+------------
+
+Research has been done on [designing loopstick antennas to be tunable
+(Chris Trask, “An Active Ferrite Rod Antenna with Remote Tuning”][1]
+with a high Q factor by setting up a resonance between the antenna
+inductance and some varactors.
+
+[1]: https://pdfs.semanticscholar.org/e26c/6c3bc4bf58dcd6e20fec1377fc6a57c98743.pdf
+
+[Zungeru et al. describe several previous RF energy harvesting systems
+in the μW range][3]; [Xie et al. 2012][4] report harvesting 82 μW
+using a 10-meter-long horizontal antenna, even though that was just a
+dipole, and one with the wrong polarization, at that.
+
+[3]: https://arxiv.org/pdf/1208.4439.pdf
+[4]: https://www.tandfonline.com/doi/abs/10.1163/156939311798072144
+
+The Xie paper contains circuit diagrams and various plots of output
+voltages, currents and powers.  The circuit was extremely simple!  One
+end of the antenna was hooked up to a parallel-resonant LC tank (with,
+ideally, infinite impedance to ground at the resonant frequency) with
+a “multi-stages doubler rectifier” hooked up across the inductor
+(Figure 4 shows that this is a Cockcroft–Walton generator made out of
+six 1N60 germanium Schottkies and six 0.1-μF caps), feeding an energy
+storage capacitor to which the microcontroller is directly connected.
+They report getting 14 volts out of the damned thing — *before* the
+Cockcroft–Walton 6× multiplier!  There in Xi’an, there’s apparently a
+300-kW station 23 km from their site, but they got more power from a
+50-kW station at 8.5 km — that’s where the 14 V came from.  (But it’s
+only 1.2 V without the resonant tank.)
+
+[Leon-Gil et al. 2018, “Medium and Short Wave RF Energy Harvester for
+Powering Wireless Sensor Networks”, CC-BY][5] also used a resonant
+tank circuit and a Cockcroft–Walton generator to step up their antenna
+voltage, but this one of 6 stages, using a center-tapped loopstick
+configuration.  (Note that the PDF of the paper is not readable with
+libpoppler; xpdf can read it.)  (They also mention that TV
+broadcasting stations are up to a megawatt in the US, 20× stronger
+than AM broadcast stations, but are not available in rural areas.)
+
+[5]: https://www.mdpi.com/1424-8220/18/3/768/pdf
+
+Leon-Gil et al. also stacked up layers of ferrite in order to get a
+giant 60 mm × 60 mm antenna cross-sectional area in a compact volume,
+because (they say, I trust) the radiation resistance of the antenna is
+jointly proportional to the square of the area and the number of
+turns.  They also point out that diode parasitic capacitances provide
+an AC leakage path that limits the total voltage available from a
+Cockcroft–Walton generator, which I hadn’t thought of; these
+parasitics decrease with back-biased voltage, but need to be small
+compared to the intended capacitance.  They used BAT85 diodes, which
+specify a 200-mV voltage drop and 5-pF junction capacitance, and found
+that 10-nF capacitors or larger were needed to avoid inefficiency.
+
+They reported 1.5 volts at the input to their Cockcroft–Walton
+generator and 8 V at its output, providing about 60 μW into a 1-MΩ
+output impedance — quite impressive for the 100-mm-long antenna they’re
+using, 100× shorter than the wire in the Xie paper!  They report a
+3.2% antenna efficiency.
+
+They report that using the center-tapped Cockcroft–Walton
+configuration doubled their output power over what they describe as a
+“half-wave” configuration, but I suspect that this is because they
+were only using half of their winding when they were testing the
+“half-wave” configuration.  In a Falstad simulation, I see in-phase
+current and voltage both positive and negative in the configuration
+they describe as “half-wave”, so I think their description is
+erroneous.
+
+Low-power electronics design
+----------------------------
+
+How much power do you really need to harvest in order to have a usable
+computer?
+
+I’ve written a fair bit on low-power computers in file
+`keyboard-powered-computers`, file `low-power-micros`, and file
+`stm32`, and just today I encountered `renesas-rl78`, although that
+was disappointing in the end.  The summary is that you can get useful
+amounts of computation at around 1 μW, which is a bit smaller than the
+self-discharge current of a CR2032 coin cell, which contains about
+2.2 kJ.  [Understanding Capacitor Leakage to Make Smart Things Run
+Longer][a] explains that you have to be careful to ensure your bypass
+capacitors don’t have more leakage than that if you’re designing, say,
+a passive IR sensor designed to run for ten years maintenance-free
+from a coin cell, but that you can do it by using capacitors rated for
+10× higher voltages than you need, which will be larger.
+
+[a]: https://passive-components.eu/understanding-capacitor-leakage-to-make-smart-things-run-longer/
+
+Linear regulators dissipate the voltage difference between the input
+voltage you get and the output voltage you want; this is wasteful if
+there is a large difference.  Below I suggest using a buck converter
+so that your power usage is the same regardless of the input
+voltage — this works by drawing current less of the time when the
+input voltage is higher.  But buck converters require a minimal
+quiescent current to remain stable, which is also wasteful.  A
+possible solution is to use a linear regulator in sleep mode, then
+turn on the buck converter when waking up.
+
+Xie et al. used 1N60 germanium Schottkies.  Germanium diodes are a bit
+exotic nowadays, but the 1N60 is specified to have a threshold voltage
+of only about 250 mV.  Schottkies in general have high leakage
+currents, and Taitron lists their 1N60P as leaking up to 50 μA, which
+would be disastrous for this application, but apparently they didn’t
+observe such high leakages.  Regular *junction* germanium diodes, on
+the other hand, have a threshold voltage of around 300 mV, and would
+be ideal.
+
+Aside from low-leakage capacitors, low-self-discharge batteries,
+avoiding power supplies with high quiescent current, low-leakage
+diodes, and using low-power chips, it seems like the main trick to
+low-power design is to use a low duty cycle — keep your chip asleep
+most of the time.  This means you can’t be running either a radio or
+any other kind of ADC at high speed all the time.  With typical wakeup
+times of 5 μs in modern microcontrollers, though, you could reasonably
+wake up 1000 times a second and still keep the duty cycle below 1%.
+
+If you can hear a radio station around 10 μW/m², then it ought to be
+able to broadcast a signal around 100 μW and be audible on radios in
+the same room.  Of course this requires a duty cycle of 1% or less if
+you’re only harvesting 1 μW.  This suggests that you can probably use
+the same antenna for harvesting and transmission — you perhaps must
+switch off the harvesting circuit during transmission, but that will
+only reduce the power harvested by 1% or so.  You might want a shorter
+winding, or a center tap, to reduce the antenna’s impedance, improving
+its efficiency at low voltages.
+
+You could try the Xie et al. circuit or the Leon-Gil circuit without
+the resonant tank (thus receiving all frequencies indiscriminately) or
+perhaps with a few different parallel tanks in series to ground (thus,
+I think, receiving just those particular frequencies).  Perhaps a
+better idea is to use an RF transformer on the input side to step up
+the antenna voltage to a more reasonable level; with a loopstick
+antenna this can be effected simply by having MOAR TURNS on the
+antenna.
+
+Variable-gain energy-harvesting Cockcroft–Walton generators
+-----------------------------------------------------------
+
+I had a silly idea that maybe you could get a variable multiplication
+factor out of a Cockcroft–Walton generator, and thus a sort of analog
+MPPT circuit, by adding some more diodes to it, bypassing the later
+stages when the output storage capacitor voltage is low.  Such diodes
+are relatively harmless but turn out not to be useful — they never
+conduct, even though their voltage drops are lower than the voltage
+drops of the chains of diodes they bypass.  That’s because all the
+capacitors in the Cockcroft–Walton generator charge simultaneously and
+discharge simultaneously, across cycles.  (Within a single AC
+oscillation, they charge and discharge at different times.)
+
+I *think* the effect is that if you load a Cockcroft–Walton
+generator’s output so that it never approaches its maximum possible
+voltage, you in effect decrease its impedance.  Assuming the input
+voltage is large compared to the sum of the diode drops, if you load
+it so heavily that only the output capacitor ever develops any charge,
+it becomes effectively a long diode, a half-wave rectifier; then, if
+you let it charge, its AC impedance gradually increases toward,
+ideally, ∞, because there is no purely capacitive path through
+it — all the paths through it go through the diodes.
+
+I don’t understand why it was that the Leon-Gil experiment needed
+0.01-μF capacitors; calculations based on capacitor impedance suggest
+that even a much smaller capacitor should have been sufficient, given
+the 1-MHz frequency and the total output current of about 6–8 μA
+(62 μW ÷ 8 V, or 8 V ÷ 1.5 MΩ).
+
+The Cockcroft–Walton generator’s distributed capacitance works as
+energy storage; you can draw it down in a balanced fashion by
+temporarily drawing a larger current from the output.  A buck
+regulator running from the Cockcroft–Walton output could efficiently
+handle a wide range of input voltages and thus enable efficient
+circuit operation from very low amounts of stored energy up to very
+high amounts.
+
+As the capacitors become fully charged, the power factor
+shrinks — there is only current at the very peak of the wave.  This
+suggests that, in the absence of resonance, higher output can be
+maintained from a Cockcroft–Walton generator that isn’t fully charged.
+For example, with a multiply-by-six configuration — six diodes and six
+capacitors — if the input voltage is a 10-volt-peak AC wave, and the
+output voltage is 30 volts (feeding, say, a buck regulator producing a
+2.0-volt power supply for a microcontroller), then whenever the wave
+is over 5 volts, the power supply will draw charging current, thus
+harvesting energy in phases from 30° to 150°, then 210° to 330°, ⅔ of
+a full cycle.  If the output voltage is allowed to rise to 40 volts,
+it will only be charging for 54% of the cycle, and if allowed to rise
+to 50 volts, only 37%.
+
+(I’m not sure if this depends on how the capacitance is distributed
+throughout the circuit.)
+
+The above was observed simulating the circuit with a source with 500 Ω
+of internal impedance (because a more realistic amount made it charge
+very slowly, as you’d expect).  Upon simulating with low source
+impedance, the charging current peaks happen right after the input
+voltage crosses zero, and indeed at first have periods of time where
+the circuit returns power to the source — as you would expect from a
+capacitive load.  This ceases once the output voltage has risen to the
+input peak voltage plus the combined voltage drops of the capacitors.
+
+It seems like a little input series inductance would do some good for
+the circuit’s power factor and power dissipation — with 7 100-nF
+capacitors and 7 300mV Schottky diodes at 500 kHz, it charges more
+than twice as fast (for the first 25 cycles, which get it to about 5×
+the input voltage) with a 2.2-μH inductor in series with its input.
+Probably better to err on the low side there with a 1-μH inductor or
+an 0.47-μH, though — the asymptote at low inductances (or low
+frequencies) is just the situation described above, while the
+asymptote at high inductances or high frequencies is that zero energy
+gets into the circuit.
+
+Suppose the input voltage source has very low impedance; what limits
+the power it can supply?  I think it’s just the amount of charge that
+gets loaded into all the capacitors each cycle, so it’s proportional
+to frequency and proportional to the square of the input
+voltage — it’s just the impedance of the straight capacitive path to
+the output, plus a diode.
+
+I think this means that the Cockcroft–Walton generator is a good
+approximation to the circuit I was trying to find in file
+`constant-current-switching-capacitor-charging`!  It isn’t exactly an
+MPPT circuit, since its impedance starts too low, rises past the
+maximum power point, and then keeps rising; but all of the input
+energy is either dissipated in the diodes or stored in the capacitors,
+and with the inductor it even avoids wasteful inrushes.
+
+Here’s a Falstad circuit for simulating a 7-stage Cockcroft–Walton
+generator:
+
+    $ 1 5.0000000000000004E-8 1.8479586061009856 56 5.0 50
+    v 432 416 432 576 0 1 500000.0 2.0 0.0 0.0 0.5
+    d 432 336 528 176 1 0.3
+    c 432 336 624 336 0 1.0000000000000001E-7 -0.07696510389787246
+    c 624 336 816 336 0 1.0000000000000001E-7 -0.07127146119106348
+    c 816 336 1008 336 0 1.0000000000000001E-7 -0.06854028985446714
+    c 528 176 720 176 0 1.0000000000000001E-7 -0.06854028985446775
+    c 720 176 912 176 0 1.0000000000000001E-7 -0.07127146119106291
+    c 912 176 1104 176 0 1.0000000000000001E-7 -0.07696510389786876
+    d 528 176 624 336 1 0.3
+    d 624 336 720 176 1 0.3
+    d 720 176 816 336 1 0.3
+    d 816 336 912 176 1 0.3
+    d 912 176 1008 336 1 0.3
+    d 1008 336 1104 176 1 0.3
+    c 1104 176 1104 576 0 1.0E-7 0.12035737918464492
+    w 1104 576 432 576 0
+    w 1104 176 1216 176 0
+    w 1104 576 1216 576 0
+    g 432 576 432 624 0
+    r 432 336 432 416 0 500.0
+    x 239 377 407 380 0 12 internal source impedance
+    r 1216 576 1216 336 0 100.0
+    s 1216 176 1216 336 0 1 true
+    x 1262 461 1289 464 0 12 load
+    o 7 512 0 290 320.0 0.4 0 -1
+    o 2 512 0 290 320.0 0.4 0 -1
+    o 16 1 0 35 0.15625 9.765625E-5 1 -1
+    o 0 1 0 35 9.353610478917778 0.005846006549323612 1 -1
+    o 16 64 0 35 0.3125 9.765625E-5 2 -1
+
+Something in the neighborhood of 6 stages is probably optimal for this
+purpose, and a maximum voltage of 50 volts is probably also a good
+idea (to avoid needing high-voltage components), so you should
+probably step up the antenna voltage to about 8 volts (with an RF
+transformer, if necessary) and maybe limit it with a small zener for
+safety.
+
+Passive signaling
+-----------------
+
+Above I suggested transmitting AM audio at 100 μW or so for the sake
+of communicating to humans using ordinary AM radios, [which has been
+done on a battery][6].  But suppose we only want to communicate with
+other energy-harvesting nodes?
+
+Some work has been done on passive signaling using Wi-Fi for sensor
+motes and even passive sensors, analogous to Theremin’s masterwork,
+The Thing.  As I understand it, the mechanism is that if you have an
+antenna tuned to a particular frequency feeding into a load (such as a
+Cockcroft–Walton generator), you absorb some energy at that frequency;
+if you disconnect the load, the radio waves reflect from the antenna
+(perhaps with a phase shift) instead of being absorbed.  So someone in
+the vicinity listening on that frequency can detect that you’ve turned
+the antenna off.
+
+Suppose it’s possible to get reasonable antenna efficiency across a
+wide range of frequencies, like the whole AM band, as would be ideal
+for energy harvesting, and so you can be absorbing tens of microwatts
+as the Leon-Gil experiment did, or even more.  To a nearby observer
+“tuned” to the same set of frequencies, temporarily disconnecting your
+harvesting input would be precisely as observable as beginning to
+transmit noise at those same tens of microwatts.  In effect, this
+amounts to a time-domain radio transmitter with 100%
+efficiency — “111% efficiency” if your power supply is 90% efficient.
+This is probably an order of magnitude or more better than you could
+do by actually transmitting a signal, but the range will be very
+limited, because you can’t concentrate power harvested over time at a
+particular moment.
+
+If you want to transmit, say, four meters, by failing to absorb 50 μW
+and instead reflecting it isotropically, your lack of signal will be
+noted as 250 nW/m² at that four-meter range (assuming far-field
+radiation, which isn’t actually correct — at 1 MHz, where the
+wavelength is 300 m, energy can bounce back and forth between the
+nonlistener and the observer of nonlistening some 37 times per
+oscillation, so I think the near-field coupling can be stronger than
+this).  This is about 320x lower than the “background noise” we’re
+assuming of 80 μW/m², although it seems likely that Leon-Gil et
+al. were more strongly irradiated than that.  This is a SNR of -22 dB
+and accordingly requires at least 22 dB of coding gain to establish
+communication; each additional factor of 10 in distance adds another
+20 dB.
+
+(Unfortunately I don’t know how to calculate near-field
+electromagnetic coupling to a reasonable degree of precision; I’m
+pretty sure it’s stronger is all.)
+
+The Shannon–Hartley formula is that the channel capacity in bits per
+second is *C* = *B* lg (1 + *S*/*N*), where *B* is the bandwidth in
+Hertz, *S* is the signal power, and *N* is the (additive white
+Gaussian) noise power.  So in this case it’s 1.2 MHz · lg (1 + 1/320),
+which is basically 1.2 MHz · 1/(320 ln(2)), or about 5.4 kbps.  In
+theory, this drops by a factor of 100 with every factor of 10 in
+distance, in the limit: 54 bps at 40 meters, 0.54 bps at 400 meters,
+0.0054 bps at 4 km.  I think this is hit harder by the near-field
+effects, though — you get terrible antenna efficiency with an antenna
+that’s a tiny fraction of a wavelength in length (it reabsorbs almost
+all of what it emits, in a sense), so the situation is orders of
+magnitude worse.
+
+Down here in the power-limited regime, it doesn’t really matter
+whether your signal is spread over 100 kHz or 1 MHz or 10 MHz — if you
+spread it over ten times as much bandwidth, you also get ten times as
+much noise, which compensates to within a small rounding error.  But
+if you narrow the signal to, say, 10 kHz, you start to see an effect:
+10 kHz · lg (1 + 1/2.7) ≈ 4.6 kbps — you’re entering the
+bandwidth-limited regime.  This is counterproductive from the point of
+view of power efficiency — you get less bits per joule that way.
+
+The power input circuit I simulated above generates very substantial
+harmonic distortion (though less so with a bit of PFC
+inductance) — the sharp current edges from the diodes turning on are
+potentially quite noticeable, and I think the strongest signals would
+probably be the second and fourth harmonics.
+
+[6]: https://forum.arduino.cc/index.php?topic=88422.0
+
+Measuring input
+---------------
+
+Suppose you have something like the above setup and you want to
+periodically measure the energy in the radio spectrum, perhaps because
+you are trying to decode a signal sent by another such node.  You have
+to be careful because the total amount of signal is small enough that
+the normally-negligible bias currents of analog inputs could consume a
+significant fraction of your harvested power!  A low duty cycle might
+be adequate.
+
+The voltages, however, are large enough that you probably want to
+divide them down — the original input voltage can be as high as 8
+volts and you want to divide it down to, say, 1.1 volts or less.
+Maybe you could use some kind of capacitive divider that you then
+rectify and analog-filter the output from, with a multi-megohm
+resistive path in parallel with it to prevent unequal leakage in the
+capacitors from introducing a DC bias.
+
+Active signaling
+----------------
+
+If your device is powered by energy harvesting from AM radio, the
+average bit rate you can achieve via active signaling is necessarily
+lower — the power you would have passively reflected must instead be
+harvested an used to power a radio transmitter, which is typically
+less than 20% efficient.  However, you can save up that energy and
+transmit it in bursts, possibly in a frequency band where this is a
+legal thing to do, and possibly at a predetermined hour so that the
+intended destination node will be listening.  (Sort of like FidoNet
+“mail hour”: whatever its other hours of operation, you would leave
+your FidoNet node turned on during your zone’s “mail hour” so that
+other nodes could call it and deliver its waiting mail.)  So if you’re
+harvesting 50 μW, you could save up 4.3 joules in a day, and transmit,
+say, 300 mJ of radio energy during a single second, thus transmitting
+at 300 mW — a million times stronger than the passive near-field
+communications numbers above, and thus in theory able to transmit a
+thousand times as far.
+
+(Elaine Chao explained to me that she wrote such a time-domain
+multiplexing system for the Motes project at Berkeley — as I
+understand it, each node listened in a particular
+fairly-coarse-grained time slot, and transmitted in the time slots of
+the nodes it wanted to talk to.)
+
+Saving up 4.3 joules requires somewhere to put it, though.  If you try
+to put it in ½CV² with V ≤ 50 V, you need C ≥ 3400 μF, which is a hell
+of a lot of capacitance — and, in particular, the electrolytic
+capacitors that are the best bets for this kind of massive capacitance
+are leaky as shit.
+
+It’s clear, though, that long-distance communication needs either some
+kind of highly directional reception, a better power source, extremely
+infrequent communication, much bigger antennas, or all of the above.
+Frequency bands like the one I’ve been talking about are ideal for
+over-the-horizon communication because of skywave propagation.
+
+(As mentioned above, though, the 20× larger energy available from TV
+stations is a potential better power source, and their higher
+frequencies would avoid the need for bulky ferrites; PV cells are
+another possibility, as a 21%-efficient 10 cm × 10 cm cell can
+generate 2.1 watts in full sun — that’s 2,100,000 μW, enabling four
+orders of magnitude higher communication bandwidth.)

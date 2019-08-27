@@ -1,0 +1,213 @@
+the misleadingly-touted low-power Renesas RL78 microcontroller line
+===================================================================
+
+[The RL78/G12 datasheet][0] describes a low-power 16-bit 31-MIPS
+24 MHz microcontroller, supported by GCC.  At first glance, **it
+appears to run under 100 pJ per instruction, but this is not true**;
+my calculations from inspecting the datasheet and the Hardware User’s
+Manual suggest more like 450 pJ per instruction, nearly twice the
+230 pJ/insn that excited me about the STM32L0 in file `stm32` — and
+the STM32’s instructions are 32-bit instructions!
+
+These are my notes from reading the datasheet and some other sources.
+
+[Wikipedia tells me][4] it descends from the NEC 78K0R, which descends
+from the 8-bit [78K/0][5], which NEC launched in 1986.  The “G” in
+“RL78/G12” is “general-purpose” as opposed to LCDs, industrial, or
+automotive use.
+
+[The R5F10278ANA#W5 member of the family][b] costs US$2.01 in quantity
+1, US$0.986 in quantity 1000, at Digi-Key, with almost 5000 in stock.
+This is the version with 24 pins, 8 KiB of program Flash, 2 KiB of
+data Flash, and 768 bytes of RAM.
+
+[0]: https://www.renesas.com/us/en/doc/products/mpumcu/doc/rl78/r01ds0193ej0220_rl78g12.pdf
+[b]: https://www.digikey.com/product-detail/en/renesas-electronics-america/R5F10278ANA-W5/R5F10278ANA-W5CT-ND/9169595
+[5]: https://en.wikipedia.org/wiki/78K
+
+Supporting hardware
+-------------------
+
+It runs on a single power supply, which can be 1.8 to 5.5 V, and
+includes a ±1% on-chip oscillator, which can do up to 24 MHz.  So you
+don’t need a ceramic resonator; you need a crystal if you need tighter
+timing than that.  (The lower-end R5F103 line is ±5%.)
+
+If you do use an external crystal, you’re limited to 20 MHz, or 8 MHz
+if you’re under 2.7 V.  I don’t see anything about being able to use a
+32.768 kHz crystal, which would be ideal for precisely timed sleeps.
+
+CPU
+---
+
+It’s a 16-bit architecture with a 1-megabyte address space, 2–16 KiB
+of program Flash (rewritable 1000 times), in some cases 2 KiB of data
+Flash (rewritable 1,000,000 times if you only care about 1-year data
+retention, or 10,000 times for 20 years), and 0.25 to 2 KiB of on-chip
+RAM, and 8 8-bit general-purpose registers — comparable to an AVR in
+power and the 8086 in convenience, so programming it in C seems like a
+reasonable thing to do.  (And there are four register banks,
+presumably like the Z80, for interrupt handling and other task
+switching.)  It says it’s CISC, but also that it has a 3-stage
+pipeline.
+
+Oh geez.  The registers are “AX”, “BC”, “DE”, and “HL”.  Then it has
+ES, CS, 8-bit registers “A”, “X”, “B”, “C”, “D”, “E”, “H”, and “L”, a
+carry flag, an auxiliary carry flag (!), a PC, and an SP.  The memory
+map starts with interrupt vectors.  This thing is damn close to being
+an 8080.  There’s an “ES:” instruction prefix (a la 8086 segment
+overrides) and a register bank select (a la Z80).  Unlike the 8080, it
+has indexed addressing modes (no Z80-style IX and IY, though).  And,
+yes, there are instruction timings — mostly 1 or 2 clocks, or 4 or 5
+clocks if you’re accessing Flash.
+
+It’s maybe not totally surprising NEC copied Intel; I had an NEC V20
+IBM-compatible once.
+
+Unlike the 8086, the ES and CS registers are shifted by *8* bits
+before forming the effective address, not *4*.
+
+The INC and DEC operations don't affect the carry flag, but they do
+affect the zero flag.
+
+The instruction set listing (without opcodes) takes 17 pages, but
+mostly that’s because they listed the large number of addressing modes
+separately (since they vary by instruction), so MOV takes up 2½ pages.
+Seems like it’s probably on the order of a Z80 in complexity.
+
+The general-purpose registers (all four banks!) are mapped into
+memory.  Also, code and data are in the same memory space — no
+AVR-style Harvardry here.
+
+It includes a 32×32→32-bit multiplier but no floating-point.  It’s
+mapped into memory as a device.  (All the devices are memory-mapped;
+there are no IN and OUT instructions.)
+
+The smallest chips in the family, the ones with only 2 KiB of program
+Flash, can’t reprogram their own Flash under program control.  The
+others can.
+
+The interrupt system has multiple priorities, four hardware and one
+software.
+
+There’s a *separate* [“RL78 Family User’s Manual: Software”][6], which
+I haven’t read; it has instruction maps in it.
+
+[4]: https://en.wikipedia.org/wiki/RL78
+[6]: https://www.renesas.com/us/en/doc/products/mpumcu/doc/rl78/r01us0015ej0220_rl78.pdf
+
+Power usage
+-----------
+
+This is the main attraction!  But it turns out to be false.  It's
+actually specified to be worse than an STM32L0!
+
+It says “basic operation” at 24 MHz is 1.5 mA, but “normal operation”
+is 3.3–5.0 mA; these numbers do not depend on voltage, except that
+running at 24 MHz at all requires you to be at 2.7 V or more.  3.3 mA
+÷ 24 MHz is 138 μA/MHz, twice the 63 μA/MHz touted on the datasheet’s
+front page, but maybe they were talking about “basic operation”, which
+is not defined, but apparently only possible at 24 MHz.  Lower-speed
+numbers do not use lower currents per MHz, but they do use lower
+voltages; low-speed 8-MHz mode is 1.2–1.8 mA, at either 2 V or 3 V.
+This is slightly worse — 150–230 μA/MHz — but uses less power (300
+pJ/cycle rather than 370) because of the lower voltage.
+
+Moreover, the “31 DMIPS at 24 MHz” on the front page is also
+misleading.  **This is not a superscalar chip**; at best it can run
+one instruction per cycle, and many instructions take 2 cycles.  It
+might really manage 16 million instructions per second.
+
+That means those 300 pJ/cycle are really 450 pJ/insn!  That’s almost
+*twice* what the STM32L0 claims in its datasheet.  (I probably ought
+to verify its claims.)
+
+They also have modes HALT (110–1210 μA, leaves clocks running) and
+STOP (0.19–2.20 μA, doesn’t leave clocks running).  Restarting the
+clock after STOP can take a while.
+
+These power numbers generally don’t include peripherals, including the
+timers needed to wake up.  The low-speed on-chip oscillator uses
+0.20 μA, the interval timer 0.02 μA, and the watchdog timer 0.22 μA.
+The ADC uses 500–1700 μA.
+
+Leakage current is specified as ±1 μA per pin, which is enough to be
+worrisome.  (Presumably you could use external multi-megohm resistors
+to cut down on that.)
+
+“[RL78/G12 User’s Manual][3]” documents SNOOZE mode, which, using the
+on-chip oscillator, makes it possible to trigger ADC conversions from
+a timer without waking the CPU, or to receive UART or SPI data.
+
+[3]: https://www.renesas.com/us/en/doc/products/mpumcu/doc/rl78/r01uh0200ej0220-rl78g12.pdf?key=f401aa89134140ce2e8c584b674848e5
+
+In STOP mode you can use the interval time and watchdog timer, but not
+the PWM-generating timer array.  Ports remain latched.
+
+As for “Basic operation”?  Not documented anywhere.  Maybe they’re
+running a NOP loop or something.
+
+Peripherals
+-----------
+
+It has three timers (an interval timer, a timer array with 4–8
+channels, and one that is a watchdog), I²C, a 4Mbps UART, 12Mbps “CSI”
+(which appears to be Renesas’s name for SPI), and a rather sad ADC.
+The timers can run from a low-speed 15-kHz (±15%) on-chip clock, which
+I assume is to save power while sleeping for an interval.  Some of its
+pins are N-channel open-drain for 5-volt tolerant I/O.
+
+There’s a DMA controller that can be used for the ADC, SPI, and even
+GPIO ports.
+
+The ADC has 11 channels, but only 10 bits, and it needs 39 μs to
+complete a conversion (except in low-voltage mode, when it needs 95).
+The internal voltage reference is specified as 1.38–1.50 V, which is I
+guess ±9%, and it has a temperature sensor that’s 3.6 mV/°C, which I
+guess you can select as an ADC input, with 25° being 1.05 V.  It seems
+like this means that measuring the temperature against the internal
+reference has an error of ±24°, which is unusable except for emergency
+shutdown.
+
+It has a lot of interrupt lines, like, 15 or so.  Presumably this is
+also to facilitate waking from sleep.
+
+It can source 20 mA or sink 10 mA per pin (40 mA absolute maximum), up
+to a maximum of sourcing 140 mA or sinking 100 mA (170 mA absolute
+maximum), plus some other minor restrictions.  Also it has loosely
+specified pullups (10–100 kΩ) on chip.
+
+The timers can be clocked from off-chip data.
+
+Development tools
+-----------------
+
+FreeRTOS and ChibiOS/RT run on it.
+
+GCC supports the R78 line.  There’s a note in the datasheet about an
+“on-chip debug function” in the datasheet but it just says it’s
+“provided”; I don’t know if it’s provided with free software.
+
+There is some documentation of programming waveforms.  It has a
+“TOOL0” pin with a dedicated UART which can be used to reprogram the
+device via serial data at 115,200 baud, 250 kbaud, 500 kbaud, or 1
+Mbaud.  The hardware user’s manual refers me to “RL78 Microcontrollers
+(RL78 Protocol A) Programmer Edition Application Note (R01AN0815),”
+which presumably means that the programming protocol is public and so
+probably someone has implemented it.
+
+Conclusions
+-----------
+
+The RL78/G12 looks like a reasonable 16-bit microcontroller, if a bit
+anemic; it’s broadly comparable to an AVR, but faster, and uses much
+less power than an AVR does.  In a lot of ways it looks like “the 8088
+done right”, and if there’s a version of the chip with more RAM, it
+might be reasonable to do a self-hosting development environment on
+it.
+
+However, in the usual cross-compilation context, it seems hard to
+justify choosing an RL78 over an ARM Cortex-M chip like the STM32L0,
+which uses half the power, runs more than twice as fast, has
+first-class debugging support in free software (maybe the RL78 has
+that too?), and has more pins and an ADC that runs 110 times as fast.
