@@ -5,7 +5,7 @@ Today, someone on Freenode ##electronics was asking about wireless
 communications between AVR microcontrollers with only passive
 components, so I was interested in the available energy for harvesting
 and possibilities for low-power RF communication.  I started reading
-about [ferrite loopstick antennas][0] and thinking about energy
+about [ferrite loopstick antennas][0] and energy
 harvesting from broadcast AM radio (as suggested by user Bga3 on
 Freenode ##electronics).  These antennas are normally useful up to
 about 5 or 10 MHz and can be salvaged from old AM radios; more exotic
@@ -39,6 +39,8 @@ AM radio waves, and had enough power to be audible, if barely.
 Related work
 ------------
 
+### Trask on loopstick antennas ###
+
 Research has been done on [designing loopstick antennas to be tunable
 (Chris Trask, “An Active Ferrite Rod Antenna with Remote Tuning”][1]
 with a high Q factor by setting up a resonance between the antenna
@@ -46,12 +48,19 @@ inductance and some varactors.
 
 [1]: https://pdfs.semanticscholar.org/e26c/6c3bc4bf58dcd6e20fec1377fc6a57c98743.pdf
 
+### Zungeru *et al.* ###
+
 [Zungeru et al. describe several previous RF energy harvesting systems
-in the μW range][3]; [Xie et al. 2012][4] report harvesting 82 μW
+in the μW range][3].
+
+[3]: https://arxiv.org/pdf/1208.4439.pdf
+
+### Xie *et al.* 2012 ###
+
+[Xie et al. 2012][4] report harvesting 82 μW
 using a 10-meter-long horizontal antenna, even though that was just a
 dipole, and one with the wrong polarization, at that.
 
-[3]: https://arxiv.org/pdf/1208.4439.pdf
 [4]: https://www.tandfonline.com/doi/abs/10.1163/156939311798072144
 
 The Xie paper contains circuit diagrams and various plots of output
@@ -68,7 +77,9 @@ Cockcroft–Walton 6× multiplier!  There in Xi’an, there’s apparently a
 50-kW station at 8.5 km — that’s where the 14 V came from.  (But it’s
 only 1.2 V without the resonant tank.)
 
-[Leon-Gil et al. 2018, “Medium and Short Wave RF Energy Harvester for
+### Leon-Gil *et al.* 2018 ###
+
+[Leon-Gil *et al.* 2018, “Medium and Short Wave RF Energy Harvester for
 Powering Wireless Sensor Networks”, CC-BY][5] also used a resonant
 tank circuit and a Cockcroft–Walton generator to step up their antenna
 voltage, but this one of 6 stages, using a center-tapped loopstick
@@ -79,11 +90,12 @@ than AM broadcast stations, but are not available in rural areas.)
 
 [5]: https://www.mdpi.com/1424-8220/18/3/768/pdf
 
-Leon-Gil et al. also stacked up layers of ferrite in order to get a
+Leon-Gil *et al.* also stacked up layers of ferrite in order to get a
 giant 60 mm × 60 mm antenna cross-sectional area in a compact volume,
 because (they say, I trust) the radiation resistance of the antenna is
 jointly proportional to the square of the area and the number of
-turns.  They also point out that diode parasitic capacitances provide
+turns, and, astonishingly, not dependent on the length of the rod.
+They also point out that diode parasitic capacitances provide
 an AC leakage path that limits the total voltage available from a
 Cockcroft–Walton generator, which I hadn’t thought of; these
 parasitics decrease with back-biased voltage, but need to be small
@@ -105,6 +117,40 @@ were only using half of their winding when they were testing the
 current and voltage both positive and negative in the configuration
 they describe as “half-wave”, so I think their description is
 erroneous.
+
+### Dyo *et al.* 2013 ###
+
+Dyo et al. at the University of Bedfordshire wrote “Design of a
+ferrite rod antenna for harvesting energy from medium wave broadcast
+signals” in 2013 (doi: 10.1049/joe.2013.0126).  They used an 8-stage
+Cockcroft–Walton generator made out of Schottkies driven from a
+loopstick antenna with an LC resonator tuned to a local 150 kW radio
+station at 909 MHz; in simulation they generated over 1000 μW, up to
+9 km away, but apparently they only tested it by powering a 3 μW
+clock.  Their paper is the only one of the ones I’m summarizing here
+that has a decent review of the existing work in the field, including
+the Xie et al. paper.
+
+They point out that actually the length of the rod does matter, and
+the peak for a cylindrical rod is when the rod is 20 times as long as
+its diameter; its effective permeability rises almost linearly from
+aspect ratios of 1 to 10, half of the ideal aspect ratio of 20, nearly
+doubling its value; it gains another 10% going from 10 to 20.
+
+They report a cost-optimized antenna design: they ended up with a
+10-mm-diameter ferrite rod that was 200 mm long (a size you might find
+in a normal AM radio), with 50–500 turns of litz wire wrapped around
+the middle of it, depending on how weak the signal was — weaker
+signals needed inverse-proportionally more turns to get the same
+output voltage.  For a sufficiently weak signal, the coil’s
+self-resonant frequency falls low enough that the design is no longer
+viable.
+
+Strangely, their optimization results table reports that wire length
+*s* varied from 67 meters to 787 meters.  These are consistently about
+45× the wire length I calculate via *nπD*, where *n* is the number
+of turns and *D* is the diameter.  This seems to be a result of their
+using 45-strand litz wire.
 
 Low-power electronics design
 ----------------------------
@@ -172,7 +218,15 @@ I think, receiving just those particular frequencies).  Perhaps a
 better idea is to use an RF transformer on the input side to step up
 the antenna voltage to a more reasonable level; with a loopstick
 antenna this can be effected simply by having MOAR TURNS on the
-antenna.
+antenna, as Dyo et al. did, but only up to a point, so a
+transmission-line transformer or two to step the voltage up might be a
+reasonable option.
+
+Stepping up the input voltage with a transformer should allow the use
+of regular signal diodes (which reportedly leak about three orders of
+magnitude less than Schottkies) or even special low-leakage types
+(which leak about three orders of magnitude less than regular signal
+diodes).
 
 Variable-gain energy-harvesting Cockcroft–Walton generators
 -----------------------------------------------------------
@@ -254,15 +308,99 @@ the power it can supply?  I think it’s just the amount of charge that
 gets loaded into all the capacitors each cycle, so it’s proportional
 to frequency and proportional to the square of the input
 voltage — it’s just the impedance of the straight capacitive path to
-the output, plus a diode.
+the output, plus a diode.  (Except if the output voltage is lower than
+the instantaneous input voltage, when its impedance is the Vf of the
+the string of diodes.)
 
 I think this means that the Cockcroft–Walton generator is a good
 approximation to the circuit I was trying to find in file
-`constant-current-switching-capacitor-charging`!  It isn’t exactly an
-MPPT circuit, since its impedance starts too low, rises past the
+`constant-current-switching-capacitor-charging`!  Suppose you limit
+the output of a six-stage device to 50 V (with a “zener” avalanche
+diode or whatever).  Then it will transmit power with reasonable
+efficiency from the input to the 50-volt output for an input AC
+voltage anywhere in the range of about 10 volts to 50 volts (peak),
+and furthermore for an output DC voltage anywhere in the range from
+just below the input peak voltage up to those 50 volts — it’s like a
+transformer that dynamically changes its turns ratio according to the
+current draw!  Like, uh, a switchmode power supply.  More stages will
+increase the diode losses but, for a sufficiently high output voltage,
+will reduce the required input voltage.
+
+It isn’t exactly an MPPT circuit, since its impedance starts too low
+(though, unlike a simple rectifier charging a storage cap,
+not near zero), rises to the
 maximum power point, and then keeps rising; but all of the input
 energy is either dissipated in the diodes or stored in the capacitors,
-and with the inductor it even avoids wasteful inrushes.
+and with a little input inductance, it even avoids wasteful inrushes.
+
+Disregarding diode capacitance, you can model the basic
+characteristics of a Cockcroft–Walton generator as follows.
+
+> *Vₒᵤₜ* ≤ *N*(*Vᵢₙ* - *V<sub>f</sub>*)  
+> *P<sub>f</sub>* = *NV<sub>f</sub> Iₒᵤₜ*  
+> *Pᵣ* = *VₒᵤₜIᵣ*  
+> *Pₒᵤₜ* = *VₒᵤₜIₒᵤₜ* = ∫*VᵢₙIᵢₙ*d*t*/Δ*t* + *P<sub>f</sub>* + *Pᵣ*
+
+*V<sub>f</sub>* is the forward voltage drop of a diode at the low
+currents we’re dealing with here, around 600 mV for a 1N4001 or 300 mV
+for a Schottky.  *P<sub>f</sub>* is the total power loss from the
+diode voltage drops for forward current; *Pᵣ* is the total power loss
+from diode leakage resulting in reverse current; *N* is the number of
+stages, each containing a diode and a capacitor; *Iᵣ* is each diode’s
+average reverse current.  *Vᵢₙ* above is variably the peak voltage of
+the AC waveform (in the first inequality) and the instantaneous
+voltage in the integral.
+
+The first thing to notice here is that if *Vᵢₙ* < *V<sub>f</sub>*, the
+circuit won’t work at all, regardless of how many stages it has, and
+that’s why so many of these papers use Schottky diodes; and if *Vᵢₙ* >
+*V<sub>f</sub>*, it will, again regardless of the number of
+stages — and that’s how the humans first split the atom.
+
+Second, the *forward* power losses in the circuit are proportional to
+the number of stages.  So if you have six 600 mV stages, they’re going
+to drop 3.6 volts; if your output voltage is 3.6 volts then you are
+going to lose half of your energy inside the generator.  You should
+probably use less stages.  The *reverse* or leakage losses, though,
+actually *decrease* with the number of stages, for fixed input
+voltage, output voltage, and load current, because the diodes leak
+less when that fixed output voltage are divided across more stages.
+(This seems to contradict results in the Leon-Gil *et al.* paper, so I
+may have gotten something wrong.)
+
+So, with few enough stages, the losses will be dominated by reverse
+losses, and you should use low-leakage diodes; and with enough stages,
+they will be dominated by forward losses, and you should use
+low-*V<sub>f</sub>* diodes, even if they could leak more.
+
+The leakage currents in the diodes depend on the reverse-bias voltage,
+and the reverse voltage across any diode varies interestingly.  It is
+always less than the peak-*to-peak* voltage of the AC input, but it
+varies during the cycle, and in a way that depends on circuit load.
+If the circuit gets fully charged, all the diodes are always
+reverse-biased or anyway not forward-biased enough to conduct any
+more, and so they see the full AC waveform with just enough DC bias to
+make it never quite conduct, or conduct just enough to compensate for
+reverse-biased-diode leakage; so, for example, if you're using 600-mV
+diodes and the input is a 10-volt-peak (7.1 V rms) sine wave, each
+diode sees a reverse-biased voltage oscillating between -19.4 V and
++0.6 V.
+
+When the current isn’t fully charged, the diode sees a sine wave
+that’s *clipped*: the negative bias is more moderate, so when the
+voltage tries to rise above its threshold, it starts conducting and
+clips the peak off the voltage wave; and the wave’s trough voltage
+gets clipped by the diodes that conduct during the opposite half
+cycle.
+
+Since diode leakage currents increase, very roughly, exponentially
+with the reverse-bias voltage, probably nearly all of the leakage will
+happen at the trough of the wave, and the wave spends nearly half of
+its time there.  So, for example, if you have a 6-stage circuit whose
+output voltage is currently 24 volts, each diode has -8 volts across
+it half the time.  So if each diode leaks 25 nA at a reverse bias of 8
+volts, the whole circuit will leak about 12.5 nA and 0.3 μW.  (This is
+a normal number for a silicon signal junction diode.)
 
 Here’s a Falstad circuit for simulating a 7-stage Cockcroft–Walton
 generator:
@@ -303,7 +441,7 @@ purpose, and a maximum voltage of 50 volts is probably also a good
 idea (to avoid needing high-voltage components), so you should
 probably step up the antenna voltage to about 8 volts (with an RF
 transformer, if necessary) and maybe limit it with a small zener for
-safety.
+safety.  (Or build the damned thing out of zeners.)
 
 Passive signaling
 -----------------
@@ -448,3 +586,35 @@ frequencies would avoid the need for bulky ferrites; PV cells are
 another possibility, as a 21%-efficient 10 cm × 10 cm cell can
 generate 2.1 watts in full sun — that’s 2,100,000 μW, enabling four
 orders of magnitude higher communication bandwidth.)
+
+Packaging for durability
+------------------------
+
+PVC plumbing pipe is a durable, shock-resistant, sunlight-resistant,
+waterproof, and visually unremarkable package into which you could
+stuff even a fairly thick ferrite rod and attach the device to the
+side of a building; you could reasonably expect it would stay there
+for many years.  To seal the package entirely hermetically, you could
+seal plugs in place some distance inside the ends of the pipe, using,
+for example, silicone, epoxy, or PVC glue.
+
+As a larger-scale alternative to using a ferrite-core loopstick
+antenna, you could use a just-plain-loop antenna, with a coil of wire
+running around a larger area than is feasible to fill with ferrite;
+it, too, could be sealed in PVC pipe, perhaps in a square shape.  Loop
+antennas have nulls perpendicular to the loop plane, so a reasonable
+orientation might be horizontal, since very few high-powered AM radio
+transmitters are near the zenith; for example, you could run the loop
+around the perimeter of a roof.  By enclosing, for example, 100 m² of
+loop area, you can increase the received (or conditionally received)
+power by 5½ orders of magnitude, minus the one or two orders of
+magnitude you lose from not having the ferrite.  This could boost the
+power available to such a system up near a watt.
+
+Since the circuit’s coupling to the environment is magnetic, shielding
+it is not practical, so it could reasonably be embedded in concrete,
+even underground.  The skin depth δ = √(2/ωμσ) is around 16 meters in
+rock, according to David Gibson’s “AM Radio Reception in Caves”, so
+even several meters of earth or concrete would barely weaken it.  So
+burying the loop antenna in a ditch, perhaps armored with concrete, is
+another option to increase the durability of the device.
