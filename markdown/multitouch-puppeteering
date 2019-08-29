@@ -1,0 +1,170 @@
+In file `dercuano-drawings` I’ve talked a bit about possible tools for
+illustrating Dercuano without bloating it, and in file
+`two-thumb-quasimodal` and file `$1-recognizer-diagrams`, among
+others, I talked about possible multitouch interaction idioms that
+could make this more practical.  But now I want to talk a bit about
+possible ways of doing *animations*.
+
+Bret Victor’s turning-leaf animation demo
+-----------------------------------------
+
+Bret Victor’s lecture *Inventing on Principle* contains a demo of a
+prototype multitouch animation application designed to circumvent the
+limitations of things like Flash by, among other things, recording the
+motion paths of fingers and using them to define motion paths for
+cels, not just in position but also other dimensions such as rotation.
+I had never seen an animation program work like this before, but it
+turns out that the pioneering animation program GENESYS already worked
+this way in 1970, I think on the TX-1, though using a light pen rather
+than a capacitive multitouch screen.
+
+There’s a 1970 video of GENESYS on YouTube; watching that and
+*Inventing on Principle* are essential inspirations.
+
+Two-dimensional puppeteering
+----------------------------
+
+GENESYS’s motion paths were essentially recorded puppeteering, but
+were only capable of supplying two dimensions at any given time.  This
+requires an additional pass over the animation to supply other
+information, such as when to switch the image of a character between
+different images — in GENESYS’s case, as in traditional cel animation,
+discrete images, but as I pointed out in file
+`$1-recognizer-diagrams`, morphing between pen strokes is a
+straightforward thing to do.
+
+Dimensions you might want to supply to a character path in an
+animation are nearly unlimited — even with a single sprite image and
+enough computrons to remap space in real time, they could include X,
+Y, rotation, scale, stretch angle and direction, transparency,
+brightness, contrast, tint, and two dimensions of perspective
+distortion.  If an animation character has multiple images available,
+they can be arranged in a multidimensional space using dimensions like
+position-in-stride, mouth openness, age, fury, angel wings, deadness,
+left hand X and Y, right hand X and Y, head position, and
+explodedness, or a smaller number of dimensions could be used with a
+sort of K-nearest-neighbor interpolation instead.
+
+More dimensions
+---------------
+
+In Victor’s demo, he concurrently supplies a third
+dimension — rotation — by using a second concurrent finger.  As I
+noted in file `two-thumb-quasimodal`, this is typically the limit of
+what people do with modern hand computers — although typical screens
+and OSes track up to five touches, it’s unusual for people to use more
+than two at a time.  Moreover, it’s common for one or both of the
+touches to be thumb touches confined to an area near a corner of the
+screen, while the rest of the user’s hand is supporting the computer
+from behind.
+
+(Some of them also track touch size and orientation, but these
+variables are not very controllable, and are not available on all
+touchscreens.)
+
+I think it might be feasible to get people to puppeteer an animated
+characters using two fingers on handles near the character, as with
+pinch-zoom but with less finger occlusion, while their thumb near the
+corner navigates a couple more dimensions of animation space.
+Moreover, more than two handles may be available, so the position at
+which they bring down a second finger onto the screen can indicate
+which dimensions they would like to be puppeteering at that moment.
+
+(Choosing among different candidate characters to puppeteer is another
+reason for using handles positioned near the characters onscreen.)
+
+Some animated characters, like Victor’s leaf, will rotate freely, but
+many characters have a preferred orientation: a car or a text string
+might be horizontal, while a human figure might be vertical.  Even
+rotatable characters might not rotate all the time.  This means that
+with two fingers on handles near the character, the user can both move
+the character freely and continuously vary two more behavioral
+dimensions (rather than zooming and rotating with the second finger),
+such as mouth position and eyebrow position.  The thumb in the corner
+can simultaneously be varying another pair of dimensions or invoking
+other operations.
+
+Marionettes are commonly operated primarily with a 6DoF controller
+consisting of two crossed sticks, with the option to pull additional
+strings with a finger.  The accelerometers in modern hand computers
+similarly offer two more degrees of freedom, which can perhaps be used
+advantageously.
+
+This suggests that it should be possible to use a modern hand computer
+for real-time puppeteering with 8 degrees of freedom varying
+simultaneously in real time, with some of them chosen from among some
+10 to 16.
+
+Interaction with previous recording
+-----------------------------------
+
+The above is perhaps fine for when you’re recording a new animation,
+or puppeteering live for an audience or to play a game, but when
+you’re editing an existing animation, there’s the question of how new
+puppeteering movements interact with the previously recorded ones.
+Perhaps they overwrite them — this should at least be an option — or
+perhaps they normally just add to them.  This is especially
+troublesome if the primary handle you use to select a character to
+puppeteer is also the handle you use to move it around: does that mean
+you have to overwrite the existing movement path in order to add new
+eyebrow movements?  Perhaps there’s a fuzzy transition from merely
+selecting to overriding movements.
+
+We could think of these degrees of freedom as “tracks” that we’re
+recording, like in a multitrack digital audio workstation; as in
+GENESYS and Victor’s demo, we’ll need to be able to see the tracks on
+the screen, select parts of them to be copied, moved, or erased, and
+so on.
+
+Track inference
+---------------
+
+Probably by default some characters should infer tracks like moving
+through walking paces, making jumping motions, breathing, and turning
+to face different directions from lower-dimensionality data, like
+position and movement direction and speed.  Butterflies flutter,
+falling leaves twirl, cars rock back and forth, humanoids turn to face
+the direction they’re walking, toons wind up and screech to a halt,
+balls bounce, frogs hop, and so on.  Users can always control these
+tracks explicitly if they like.
+
+Face tracking
+-------------
+
+An alternative to puppeteering facial expressions with multitouch is
+to use the hand computer’s front camera to detect a human user’s
+facial expressions in real time so they can be used to provide some of
+the tracks.  (Latency may be a problem at present.)  This is most
+intuitive for humanoid character facial expressions, of course, but it
+could be used for a variety of other tracks as well.
+
+Collaborative puppeteering
+--------------------------
+
+Many popular puppets are operated by more than one person
+simultaneously in order to handle more degrees of freedom than a
+traditional marionette, without losing the immediacy of real-time
+performance.  Different people, each using a personal hand computer,
+could also do this.
+
+Dancing in more abstract spaces
+-------------------------------
+
+Of course, interactively defining a time-indexed parametric curve in
+spaces of 16 dimensions or so, with real-time feedback, has many
+applications other than imitating Walt Disney.  Modern video-game
+character models commonly have more dimensions than this, but the
+games have only very clumsy ways of navigating them, navigating from
+slider to slider.  Ad-hoc mathematical models of phenomena — physical
+system simulation, like Victor’s active-filter example in the same
+talk, or otherwise — can easily have that many dimensions to explore.
+Fractal graphics commonly have many continuous parameters.  A music
+synthesizer, too, has many such parameters, and recording how they
+change over time is a crucial part of recording music.  Plots of
+multivariate data can only display a few dimensions at a time; varying
+plot parameters dynamically, as with one of Victor’s other demos in
+the same talk, is useful not only for exploration but also for
+explanation to an audience.
+
+theater lighting
+robot motion planning

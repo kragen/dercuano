@@ -48,6 +48,9 @@ inductance and some varactors.
 
 [1]: https://pdfs.semanticscholar.org/e26c/6c3bc4bf58dcd6e20fec1377fc6a57c98743.pdf
 
+The ARRL Antenna Handbook chapter 4 talks about loop antennas in some
+detail.
+
 ### Zungeru *et al.* ###
 
 [Zungeru et al. describe several previous RF energy harvesting systems
@@ -241,6 +244,8 @@ drops of the chains of diodes they bypass.  That’s because all the
 capacitors in the Cockcroft–Walton generator charge simultaneously and
 discharge simultaneously, across cycles.  (Within a single AC
 oscillation, they charge and discharge at different times.)
+The Cockcroft–Walton generator already gives you a variable voltage
+multiplication factor out of the box!
 
 I *think* the effect is that if you load a Cockcroft–Walton
 generator’s output so that it never approaches its maximum possible
@@ -381,7 +386,7 @@ If the circuit gets fully charged, all the diodes are always
 reverse-biased or anyway not forward-biased enough to conduct any
 more, and so they see the full AC waveform with just enough DC bias to
 make it never quite conduct, or conduct just enough to compensate for
-reverse-biased-diode leakage; so, for example, if you're using 600-mV
+reverse-biased-diode leakage; so, for example, if you’re using 600-mV
 diodes and the input is a 10-volt-peak (7.1 V rms) sine wave, each
 diode sees a reverse-biased voltage oscillating between -19.4 V and
 +0.6 V.
@@ -442,6 +447,20 @@ idea (to avoid needing high-voltage components), so you should
 probably step up the antenna voltage to about 8 volts (with an RF
 transformer, if necessary) and maybe limit it with a small zener for
 safety.  (Or build the damned thing out of zeners.)
+
+Robustness
+----------
+
+Since the available energy may vary over one or more orders of
+magnitude depending on location, radio stations starting up and
+shutting down, time of day, ionosphere propagation, nuclear warfare,
+and so on, it’s probably worthwhile to have some kind of overvoltage
+protection across the antenna.  It likely only needs to be able to
+dissipate milliwatts of power, so a couple of back-to-back small
+“zeners” (avalanche diodes) might be adequate, and maybe a MOV or two
+for nearby lightning strikes or hydrogen bombs or something, plus some
+inductance before the Cockcroft–Walton generator to prevent spikes too
+fast even for the MOV from making it through.
 
 Passive signaling
 -----------------
@@ -586,6 +605,21 @@ frequencies would avoid the need for bulky ferrites; PV cells are
 another possibility, as a 21%-efficient 10 cm × 10 cm cell can
 generate 2.1 watts in full sun — that’s 2,100,000 μW, enabling four
 orders of magnitude higher communication bandwidth.)
+
+Fractal loopstick antennas
+--------------------------
+
+The field strengths we’re talking about here are far too low to
+saturate our ferrite cores.  Some research has focused on optimizing
+the core shape to gather more flux, for example by using a barbell or
+hyperboloid shape, but it seems likely to me that a ferrite core that
+branches out at both ends in a fractal branching pattern, something
+like a pair of sprigs of parsley or a pair of antlers, would have a
+better flux-gathered-to-weight ratio than such solid shapes.
+Fabricating such shapes has not been practical in the past, but you
+ought to be able to do a reasonable job with a ferrite-filled plastic
+system, carrying powdered ferrite or even powdered iron in a small
+amount of something like ABS or PLA.
 
 Packaging for durability
 ------------------------
