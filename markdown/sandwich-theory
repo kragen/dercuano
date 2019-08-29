@@ -30,21 +30,34 @@ by three or four such wires would be safe:
         ---------
         platform
 
+#### Scaling ####
+
 Moreover, this holds whether the wires are connected to the ceiling
 2.6 meters above my floor or to the top of a 100-meter-tall building
-I’m swinging at the base of.  100 meters of four 0.43 mm² piano wires
-would only weigh 1.4 kg, which is not a significant addition to my
+I’m swinging at the base of.  100 meters of four 0.43 mm² piano wires
+would only weigh 1.4 kg, which is not a significant addition to my
 weight; you have to get into kilometers of height before the weight of
 the wire is a significant fraction of what it can support.
+
+As Descartes observed, if we scale up the whole situation instead of
+just the cable length, things get a little worse: a King-Kong-sized
+person ten times my height, width, and breadth would weigh a thousand
+times what I do, about 110 tonnes, while scaling up the cables from
+0.75 mm to 7.5 mm in diameter only strengthens them to be able to
+support 11 tonnes.  You’d need to increase them to 24 mm in diameter
+to support the Kragen Kong.  Still, though, that’s not such an extreme
+departure from uniform scaling.
+
+#### Compressive strength ####
 
 There’s a compressive strength that works the same way; if I put a
 10-cm-diameter disk of cardboard under a wooden board and start piling
 weight onto the board, there’s a certain amount of weight above which
-the cardboard will get crushed; let’s say 300 kg, which is in the
+the cardboard will get crushed; let’s say 300 kg, which is in the
 ballpark but not a measured figure.  If you use several different
 disks of the same cardboard, they’ll all crush at about the same
 weight, and moreover that weight doesn’t change even if you stack two
-or three or ten of the disks up; the same 300 kg will suffice to crush
+or three or ten of the disks up; the same 300 kg will suffice to crush
 the stack of ten disks as to crush a single disk.  If you use a bigger
 disk, the weight needed to crush it will go up proportionally.
 
@@ -56,6 +69,8 @@ disk, the weight needed to crush it will go up proportionally.
       =============
       ============= disks
     ----------------------- floor
+
+#### Buckling ####
 
 But if you use smaller and smaller disks (and proportionally smaller
 weights, including the wood), or taller and taller stacks, something
@@ -74,7 +89,8 @@ I’m not talking about the top of the stack falling over sideways,
 which also gets harder to avoid when the stack is taller; the
 phenomenon I’m talking about happens even if you go into an elevator
 shaft and rest an elevator-shaft-sized wooden platform on top of the
-stack of disks.  I’m talking about *buckling* (*pandeo* in Spanish),
+stack of smaller-than-shaft-size disks.
+I’m talking about *buckling* (*pandeo* in Spanish),
 where the *middle* of the stack bends outwards in some random
 direction and it stops being a linear stack.  Buckling is governed not
 by the compressive strength of the column but by the *rigidity* of the
@@ -96,7 +112,7 @@ ground and the elevator-shaft platform are not free to rotate.
 [Euler’s critical load]: https://en.wikipedia.org/wiki/Buckling
 [planar area moment of inertia]: https://en.wikipedia.org/wiki/List_of_second_moments_of_inertia
 
-Sadly I don’t have the faintest idea what the Young’s modulus of
+Sadly I don’t have the faintest idea what the modulus of elasticity of
 corrugated cardboard in lateral compression is, but the things to
 notice about this expression are:
 
@@ -111,6 +127,8 @@ notice about this expression are:
    cross-sectional area, but Euler’s critical buckling load is
    proportional to the area moment of inertia, *not* the
    cross-sectional area.
+
+#### The consequences for designing large structures ####
 
 Point #1 here means that, normally, large structures fail because of
 buckling before than they fail because of tensile or compressive
@@ -161,7 +179,7 @@ masonry.
 
 ### Basic sandwich-theory background ###
 
-The moment of inertia around the x-axis, *Iₓ*, is ∫∫*y*²*d*x*d*y*
+The moment of inertia around the x-axis, *Iₓ*, is ∫∫*y*²d*x*d*y*
 where the area integrated over is that of the cross-section.  For
 panels, that’s the only one we care about, because the panel is much
 wider than it is thick, so if we take our x-axis parallel to its
@@ -215,7 +233,7 @@ resist the shear stress.  Incidentally, that shear stress is *also*
 inversely proportional to the distance between the facesheets, so if
 your panel is thick, you can get by with a very wimpy core material.
 You do still need enough tensile and compressive strength provided by
-the cross-sectional area of the facesheets and the core to withstand
+the cross-sectional area of the facesheets *and* the core to withstand
 the tensile and compressive stresses on the panel from its edges, but
 in a large structure, that is a much easier problem than preventing
 buckling.
@@ -266,7 +284,11 @@ Corrugated sheet steel is similar to corrugated cardboard, but just
 the flutes, without the linerboard; it’s just a wavy sheet of steel.
 This is not the most efficient use of material, since the “core”
 consists of roughly as much steel as the “facesheets”, but it’s very
-cheap to make.
+cheap to make.  Slightly more elaborate corrugated sheet metal, like
+that used for the walls of shipping containers or aluminum siding,
+uses sharp bends to increase the amount of material in the
+“facesheets” while still being inexpensive to fabricate by bending a
+single sheet.
 
 Foamcore is a sandwich made of two sheets of paper with styrofoam in
 between, commonly used for architectural models and picture framing.
@@ -316,8 +338,249 @@ a polyethylene core (not, I think, foam), which were covering an
 Candidates for upcycling garbage into sandwich panels
 -----------------------------------------------------
 
-Styrofoam and cardboard are the two most obvious candidate materials,
-but many others are possible.  boPET, as in discarded chip bags and
-one of the layers in TetraPak drink boxes, is fairly stiff.
+### Very common materials: styrofoam, cardboard, boPET, TetraPak, beer cans, plywood, sheet metal ###
 
-microcellular polyethylene
+Styrofoam and cardboard are the two most obvious candidate core
+materials, but many others are possible.  boPET, as in discarded chip
+bags and one of the layers in TetraPak drink boxes, is fairly stiff,
+and so boPET and TetraPak are abundant candidates for facesheet
+materials; cardboard is also a good candidate.
+
+Thin aluminum sheet, as from drink cans, is considerably stronger and
+stiffer in tension than either of those; it might make a good
+facesheet.  More broadly, sheet metal is often discarded, and it makes
+a fantastic facesheet material, as do plywood and OSB.
+
+*Expanded* sheet metal — that stuff they use for security grilles and
+transparent nonskid steel stairs — is likely an *excellent* facesheet
+material, but it is only very stiff along one of its axes.
+
+Fabric-backed vinyl is discarded in bulk when billboards are updated
+with new advertising, and it has its merits, but it is sufficiently
+useful that it already tends to get recycled.
+
+### Cloth and circuit-board facesheets ###
+
+Woven cloth (from discarded clothes, mattresses, etc.) is another
+candidate facesheet ingredient — unbroken chains of fibers running in
+long straight lines along the surface will contribute more stiffness
+than the same fibers in a more disordered mass like that of paper.
+Knit cloth would contribute little stiffness by itself, but “nonwoven
+cloth” ought to be intermediate, like paper.  Glass-fiber cloth or
+cloth woven from Kevlar, Nomex, or Spectra would be ideal, but are
+hard to find, except in the form of glass-fiber window screens.  Some
+cloths are probably not suitable: nylon and silk are elastic enough
+that they probably wouldn’t add enough stiffness.
+
+(Aluminum or steel window screens would work too.)
+
+Of course, these materials by themselves need some kind of glue to
+turn them into facesheets.  (See below about glues.)
+
+Discarded circuit boards are extremely stiff: they are made of
+glass-fiber cloth impregnated with a plastic such as phenolic resin.
+They are relatively abundant in the waste stream, and would be ideal.
+
+### Other core materials derivable from garbage ###
+
+Since the core is ideally very thick, it can be made from a quite weak
+material, including plastic foams, especially microcellular foams.  So
+foaming discarded thermoplastics, for example with nitrogen, is a
+potentially very interesting way to upcycle them.
+
+Most organic matter can be reduced to some kind of charcoal by heating
+at high enough temperature without oxygen.  Charcoal is very
+rigid — more so the purer it is — and lightweight, because it’s
+basically a foam.  It might make a very reasonable core material.
+It’s usually full of cracks, so unless you crush it into a powder, its
+tensile strength is very low.  One possible approach to that problem
+is to form the organic matter into a fine *open-cell* foam *before*
+carbonizing it, for example by baking it into bread, and then heating
+and cooling it very slowly.  That might yield a carbon foam with
+reasonable tensile strength but I wouldn’t bet on it.
+
+Carbon black — charcoal formed as smoke rather than in solid form — is
+routinely used to add tensile strength to rubber, for example in car
+tires and shoe soles.  It, too, can be produced from almost any
+organic matter.
+
+### Pretensioning facesheets ###
+
+Facesheets are only strong when in tension; when in compression they
+rely on the core material to support them against buckling.  If
+there’s a way to pretension them somehow, this could increase the
+strength of the whole structure.  One way would be to simply pull on
+the facesheets during the lamination process, so they are stretched
+while the bond is being formed.  Alternatively, some plastics might
+enter into tension when heated, the way PET drink bottles and
+shrinkwrap do.  Another alternative: in cloth aircraft construction,
+after construction, the cloth surface is impregnated with a substance
+called “dope”, which shrinks as it cures, setting up tension in the
+cloth.  Is there a “dope” that could be used to pretension sandwich
+panel facesheets in this way?
+
+Alternatively, if the core material is a closed-cell foam, you might
+be able to pretension the facesheets this the other way around, by
+setting up compression in the foam.  A couple of ways to do this: you
+could assemble the sandwich panel in a chamber under high pressure,
+thus partly collapsing the cells of the foam; or you could arrange for
+air to diffuse through the foam into the cells after assembly, for
+example by baking the foam in a vacuum *before* assembly, long enough
+for a substantial fraction of the air to diffuse out.
+
+Typically the blowing agents diffuse out of the foam after it is
+produced, and this is often considered problematic when it happens
+faster than air diffuses in — it means that the foam contracts shortly
+after fabrication, then later expands again after absorbing air — but
+it produces a critical period during which sandwich-panel fabrication
+would pretension the facesheets.  So, perhaps the same phenomenon
+could be provoked intentionally, either by foaming the plastic with
+the usual blowing agents or by provoking a very volatile gas like
+hydrogen, helium, or methane to diffuse into the foam first.  (A
+chamber full of methane is a lot easier to produce than a vacuum
+chamber, if perhaps more dangerous.)
+
+### Stiff facesheet materials (some weak) ###
+
+Because the primary purpose of the facesheet is increasing *rigidity*,
+not strength, in order to resist buckling, it might make sense to use
+materials with high rigidity and low strength; glass, plaster, and
+cement come to mind.
+
+Generally, filled plastic systems can get a lot of rigidity from the
+filler, so using a high-rigidity filler like rocks, sand, clay,
+cullet, grog, eggshells, carbon, or machining swarf might make sense.
+(The usefulness of such fillers isn’t strictly limited to “plastics”
+as such; they are of course a key part of concrete, mortar, and
+fired-clay ceramics, in which cases they mostly contribute strength
+rather than rigidity.)  Such fillers work better with large aspect
+ratios, so that the individual filler particles can more easily be
+much closer together than their large dimension, so that when the
+material as a whole is stressed in tension or compression, the binder
+between them is stressed in shear over a much larger cross-sectional
+area than that of each interacting filler particle.  This way, most of
+the tensile deformation of the bulk material comes from stretching
+filler particles rather than stretching or shear-deforming the
+less-rigid binder.
+
+A hexagonal, herringbone-brick, or jigsaw-puzzle pattern of facesheet
+tiles, with a little space between them, could provide rigidity
+without causing the facesheet to break when its elastic limit is
+exceeded.
+
+These approaches aren’t viable if ⓐ the core material is so weak that
+you’re depending on the facesheet to provide tensile *strength* as
+well; or ⓑ the sandwich panel is sufficiently stressed in flexion, as
+opposed to buckling, to depend on the facesheet’s strength as well as
+its rigidity.
+
+### Other facesheets ###
+
+Masonite, medium-density fiberboard, wood, paper, PMMA, CDs, wet
+wipes, fabric-softener sheets, and many other things are also
+plausible facesheet materials.
+
+Particle board is made from sawdust pressed into panels under pressure
+with a glue, typically melamine resin or phenolic resin.  This
+approach, possibly with different glues (see below about glues), might
+be feasible for fabricating facesheet panels from a variety of
+waste-stream fiber sources: sawdust, wood shavings, coffee grounds,
+yerba mate, grass clippings, hair clippings, machining swarf, dry
+leaves, chipped prunings, shredded paper, shredded cardboard,
+dehydrated sliced vegetables, fiberglass from demolition (at the risk
+of asbestos), shredded cloth, bagasse, straw, pencil shavings, peanut
+shells, sunflower-seed shells, wicker, or chicken feathers, for
+example.  As mentioned above, adding some high-rigidity fillers like
+sand, clay, cullet, grog, or eggshells may improve the rigidity of the
+resulting material, just as it would a filled plastic system.
+
+(Needless to say, such composite materials could be used for things
+other than sandwich panels, too, or even panels.)
+
+### Glues ###
+
+How can you do the lamination, so the facesheets can’t slide along the
+surface of the core?
+
+You might be able to use just standard modern adhesives: epoxy,
+melamine, and phenolic resins.  But these are entirely impractical to
+obtain from the waste stream, and there are cheaper alternatives.
+
+Some materials can be bonded just with heat, and in some other cases
+you can use small amounts of thermoplastics to bond together layers of
+non-thermoplastic materials, like the EVA in a hot-glue gun.  And, as
+mentioned above, latex paint works well enough under some
+circumstances, but it’s difficult and somewhat dangerous to find
+discarded.  Porous facesheet materials like cloth and window screen
+allow air access to the binder, which is essential for the curing of
+many binders.
+
+In some cases the strength requirement for the adhesive may be low
+enough that even paraffin wax (or polyethylene or PET) could be used
+as a hot-melt adhesive, perhaps with a filler such as clay to stiffen
+it and add strength.  Wet clay also makes an excellent weak adhesive
+which hardens and contracts on drying.
+
+The five traditional adhesives are slaked lime, wheat paste, mucilage,
+hide glue, and birch tar, the first four of which can be made from
+garbage at varying levels of personal risk, or from very inexpensive
+non-garbage materials.  They might work.  Wheat paste and mucilage
+don’t stick very well to nonpolar materials like common plastics, and
+slaked lime is caustic.  Birch tar is probably not practical in the
+modern context.  Most of these need some degree of care to keep them
+from rotting, blue vitriol being a traditional pH-neutral antifungal.
+
+Blood is also sticky and dries hard, due to its albumin content, and
+there’s a lot of animal blood in the waste stream, but for whatever
+reason it isn't widely used as an adhesive, perhaps due to excessive
+clotting.
+
+“Pressure-sensitive” or “constant-tack” adhesives like those used in
+duct tape, packing tape, and postit notes are not really suitable for
+structural use, because, being viscous liquids, they will flow
+continuously if under strain.  They can resist compression, but in
+shear or, especially, tension, they will gradually release their bond.
+In structural applications this is potentially disastrous: weeks,
+months, or years after initial construction of a structure, its
+sandwich panels could delaminate and fail, apparently spontaneously.
+
+Asphalt or pitch, as used in roofing membranes, is on the edge here.
+It’s a viscous liquid, but at room temperature its flow rates are low
+enough that it might be acceptable, if the panels won’t be exposed to
+heat.
+
+Thin-enough porous facesheets could be simply painted with boiled
+linseed oil, but oxygen needs to be able to diffuse to the
+facesheet-core interface to be able to polymerize the oil there.  More
+generally, it might be possible to polymerize such “drying oils” with
+oxidizing agents like sodium percarbonate or ozone.
+
+Some kinds of core or facesheet materials could be welded with a small
+amount of solvent, such as acetone, MEK, or ethyl acetate.  Doing this
+on styrofoam is tricky because the solvent tends to eat the cells it
+touches; perhaps a little vapor, rather than drops of liquid, would do
+the trick.
+
+Such solvents can also be used to make glues from other waste
+plastics, such as PVC pipe or polystyrene foam, peanuts, or food
+containers.
+
+A final, more exotic, glue is sodium silicate, which can be made in
+bulk very inexpensively, simply by boiling quartz in lye; this has the
+benefit of hardening on timescales measured in seconds when gassed
+with CO₂.  As I mentioned above, this is commonly used to make
+corrugated cardboard; it also waterproofs concrete.  (Potassium
+silicate is nearly equivalent.)
+
+### Glueless lamination ###
+
+Since the objective of gluing the lamination interface is resisting
+shear, not tension, the facesheets could also be connected to the core
+by non-adhesive means, such as nails, tacks, staples, or sewing — a
+thread or wire passed repeatedly through holes in the sandwich panel
+to keep the facesheets from sliding relative to the core.  These
+approaches are more practical with fairly rigid facesheets, since in
+between the mechanical attachment points, the facesheet on a side in
+compression must resist buckling on its own without any real support
+from the core.
+

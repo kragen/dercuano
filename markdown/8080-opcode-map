@@ -1,0 +1,229 @@
+An 8080 opcode map in octal
+===========================
+
+The 8008, 8080, 8086, i386, and amd64 instruction sets are,
+unfortunately, usually given in hexadecimal; but they are dramatically
+more readable in octal.  The 8080 opcode map in particular can be
+drawn rather neatly using octal.
+
+i386 and amd64 examples
+-----------------------
+
+Consider this segment of amd64 machine code:
+
+      400575:       ba 02 00 00 00          mov    $0x2,%edx
+      40057a:       be 64 06 40 00          mov    $0x400664,%esi
+      40057f:       bf 01 00 00 00          mov    $0x1,%edi
+      400584:       e8 a7 fe ff ff          callq  400430 <write@plt>
+      400589:       ba 01 00 00 00          mov    $0x1,%edx
+      40058e:       be 41 10 60 00          mov    $0x601041,%esi
+      400593:       bf 00 00 00 00          mov    $0x0,%edi
+      400598:       e8 a3 fe ff ff          callq  400440 <read@plt>
+
+Here it is in octal:
+
+      400575:       272 002 000 000 000             mov    $0x2,%edx
+      40057a:       276 144 006 100 000             mov    $0x400664,%esi
+      40057f:       277 001 000 000 000             mov    $0x1,%edi
+      400584:       350 247 376 377 377             callq  400430 <write@plt>
+      400589:       272 001 000 000 000             mov    $0x1,%edx
+      40058e:       276 101 020 140 000             mov    $0x601041,%esi
+      400593:       277 000 000 000 000             mov    $0x0,%edi
+      400598:       350 243 376 377 377             callq  400440 <read@plt>
+
+Here you can see that, for example, all the “load immediate”
+instructions are "27x", with "x" representing the register: 2 for
+%edx, 6 for %esi, 7 for %edi, and so on.  As it turns out, there are
+precisely 8 registers that can be addressed in this way, corresponding
+to the 8 octal digits.  And these register numbers are consistent
+across instructions; here we can see (in some i386 code, from
+[httpdito](http://canonical.org/~kragen/sw/dev3/server.s)), 0
+representing %eax, 1 representing %ecx, 2 representing %edx again, and
+3 representing %ebx (yes, the numbers are not in the same order as the
+letters):
+
+     804811c:       120                             push   %eax
+     804811d:       122                             push   %edx
+     804811e:       350 354 377 377 377             call   0x804810f
+     8048123:       132                             pop    %edx
+     8048124:       130                             pop    %eax
+    ...
+     8048130:       102                             inc    %edx
+     8048131:       271 353 226 004 010             mov    $0x80496eb,%ecx
+     8048136:       061 333                         xor    %ebx,%ebx
+     8048138:       103                             inc    %ebx
+     8048139:       103                             inc    %ebx
+
+By contrast, in hexadecimal, the immediate-load instruction ba 02 00
+00 00 and the “pop %edx” instruction 5a represent %edx as “a”, while
+“push %edx” and “inc %edx” are 52 and 42 respectively, representing
+%edx as “2”.  Moreover, note that in hexadecimal, both “push” and
+“pop” of registers are “5x”, while in octal they are “12x” and “13x”
+respectively.
+
+So this is the sense in which I say 8086, i386, and amd64 machine code
+are dramatically more readable in octal.  The octal digits correspond
+neatly to the bitfields in the instruction encoding, in most cases.
+But even the 8086 opcode map is rather large.
+
+The 8080 opcode map
+-------------------
+
+By contrast, every 8080 opcode is a single byte, though some are
+followed by one or two bytes of immediate data, so a full opcode table
+is only 256 cells.  It, too, is more comprehensible in octal than in
+hexadecimal, organizing the instruction set into four 64-byte “pages”,
+although it has some cases where an inconveniently-located two-bit
+field identifies one of the 8080’s 16-bit register *pairs* rather than
+a single 8-bit *register*.  A simple permutation of the rows and
+columns ameliorates this.
+
+(Beware!  None of this has been tested, and it would be surprising if
+I had found all the errrors in it.)
+
+The 0xy page is largely register-pair operations, occupying three or
+four columns, with three single-register operations, occupying
+eight columns:
+
+<style>
+.opcodepage { background-color: #ffe; border: 1px solid #eee; padding: 0.5em }
+.opcodepage td {
+    padding: 0.2em;
+    border-left: 1px solid black;
+    border-top: 1px solid black;
+    text-align: center;
+}
+.opcodepage th { min-width: 2.5em }
+.opcodepage th + td { border-left: none }
+.opcodepage th + td.box { border-left: 1px solid black }
+.opcodepage td.sep { border-right: 1px solid black }
+.opcodepage td.boxbottom { border-top: 1px solid black }
+.opcodepage td.top { border-top: none }
+</style>
+
+<table class="opcodepage" cellspacing=0>
+<tr><th colspan=2 rowspan=4>0xy <th colspan=8>x
+<tr><th>B <th>D <th>H <th>M <th>C <th>E <th>L <th>A
+<tr><th>BC <th>DE <th>HL <th>SP <th>BC <th>DE <th>HL <th>SP
+<tr><th>0 <th>2 <th>4 <th>6 <th>1 <th>3 <th>5 <th>7
+<tr><th rowspan=8>y <th>0 <td class=top>NOP <td colspan=7 class=top>-
+<tr><th>2 <td colspan=3>STAX <td class=sep>STA <td colspan=2>LDAX <td>LHLD <td>LDA
+<tr><th>4<td colspan=8>INR (increment register)
+<tr><th>6<td colspan=8>MVI (mov immediate)
+<tr><th>1<td colspan=4 class=sep>LXI <td colspan=4>DAD (double add)
+<tr><th>3<td colspan=4 class=sep>INX <td colspan=4>DCX
+<tr><th>5<td colspan=8>DCR
+<tr><th>7<td>RLC <td>RAC <td>DAA <td class=sep>STC <td>RRC <td>RAR <td>CMA <td>CMC
+</table>
+
+The 1xy page is entirely devoted to the MOV instruction, except for 166,
+which would logically be MOV M, M but is instead HLT.
+
+<table class="opcodepage" cellspacing=0>
+<tr><th colspan=3 rowspan=3>1xy <th colspan=8>x (dest)
+<tr><th>B <th>D <th>H <th>M <th>C <th>E <th>L <th>A
+<tr><th>0 <th>2 <th>4 <th>6 <th>1 <th>3 <th>5 <th>7
+<tr><th rowspan=8>y<br />(src) <th>B <th>0 <td rowspan=5 colspan=3 class=top>MOV
+<tr><th>D <th>2
+<tr><th>H <th>4
+<tr><th>M <th>6 <td class=box>HLT <td class=top>
+<tr><th>C <th>1 <td class=boxbottom>
+<tr><th>E <th>3
+<tr><th>L <th>5
+<tr><th>A <th>7
+</table>
+
+The 2xy page consists of single-operand instructions that implicitly
+act on the accumulator A, but unlike the 0xy page, the operand is in
+the final octal digit, not the middle one.  If laid out consistently
+with the other pages, this makes the instructions columns:
+
+<table class="opcodepage" cellspacing=0>
+<tr><th colspan=3 rowspan=2>2xy <th colspan=8>x
+<tr><th>0 <th>2 <th>4 <th>6 <th>1 <th>3 <th>5 <th>7
+<tr><th rowspan=8>y<br />(src) <th>B <th>0
+    <td class=top rowspan=8>ADD
+    <td class=top rowspan=8>SUB
+    <td class=top rowspan=8>ANA
+    <td class="top sep" rowspan=8>ORA
+    <td class=top rowspan=8>ADC
+    <td class=top rowspan=8>SBB
+    <td class=top rowspan=8>XRA
+    <td class=top rowspan=8>CMP
+<tr><th>D <th>2
+<tr><th>H <th>4
+<tr><th>M <th>6
+<tr><th>C <th>1
+<tr><th>E <th>3
+<tr><th>L <th>5
+<tr><th>A <th>7
+</table>
+
+Finally, the 3xy page contains all the control-flow and stack
+operations, plus some miscellaneous operations; some operate on
+register pairs, some on registers, some on neither.  Three of these
+operations (Rcc, Jcc, Ccc) contain a 3-bit condition-code operand
+instead of a register operand, and the RST instruction contains an
+interrupt vector number.
+
+<table class="opcodepage" cellspacing=0>
+<tr><th colspan=2 rowspan=5>3xy <th colspan=8>x
+<tr><th>B <th>D <th>H <th>M <th>C <th>E <th>L <th>A
+<tr><th>BC <th>DE <th>HL <th>SP <th>BC <th>DE <th>HL <th>SP
+<tr><th>NZ <th>NC <th>PO <th>P <th>Z <th>C <th>PE <th>M
+<tr><th>0 <th>2 <th>4 <th>6 <th>1 <th>3 <th>5 <th>7
+<tr><th rowspan=8>y <th>0 <td class=top colspan=8>Rcc
+<tr><th>2 <td colspan=8>Jcc
+<tr><th>4 <td colspan=8>Ccc
+<tr><th>6<td>ADI <td>SUI <td>ANI <td class=sep>ORI <td>ACI <td>SBI <td>XRI <td>CPI
+<tr><th>1<td colspan=3>POP <td class=sep>POP<br>PSW <td>RET <td>- <td>PCHL <td>SPHL
+<tr><th>3<td>JMP <td>OUT <td>XTHL <td class=sep>DI <td>- <td>IN <td>XCHG <td>EI
+<tr><th>5<td colspan=3>PUSH <td class=sep>PUSH<br>PSW <td>CALL <td colspan=3>-
+<tr><th>7<td colspan=8>RST
+</table>
+
+Why?
+----
+
+The 8080 is interesting to me not just for nostalgic reasons (many of
+my first computers in the 1980s were Z80-based) but because it’s
+nearly the smallest existing computer demonstrably capable of
+self-hosted software development with an assembler and running a
+usable user interface, at least if you have a character generator or
+printer connected to it.  The PDP-8 and LGP-30 are simpler, but John
+Cowan tells me most PDP-8 development was actually done on a PDP-10
+and cross-compiled, as with modern embedded microcontrollers, and the
+LGP-30 was normally programmed in machine code, with the programmer
+doing the “assembly” beforehand with pencil and paper.  By contrast,
+although much significant software for the 8080 was written on a
+PDP-10 (notably Microsoft BASIC), much of it was written under CP/M on
+the 8080 itself.
+
+Wirth’s RISC for Oberon and James Bowman’s J1A Forth CPU are other
+reasonable candidates, and both are fairly inspired designs with much
+simpler instruction sets than the 8080, but I think both require more
+transistors than the 8080, and the available software for them is
+somewhat lacking.
+
+The GreenArrays F18A CPU design requires, I think, fewer transistors
+than the 8080 (certainly the MuP21 did) and has a simpler and much
+more powerful instruction set, but almost no software exists for it,
+and in particular there is no published self-hosted development
+environment, as far as I know.  (The 18-bit address space is nine
+times the size of the 8080’s, but the chips made so far have only 64
+words of RAM per CPU.)
+
+By contrast, the 8080 has existing self-hosted assemblers as well as
+compilers for Turbo Pascal, Fortran, Tiny-C, and BASIC; computer
+algebra systems; display text editors; CP/M, which includes the
+assembler, a rudimentary filesystem, file management utilities, a
+REPL, and a debugger; and at least two free-software operating
+systems — Drew DeVault’s KnightOS and David Givens’s CP/Mish.  Yet you
+can fit the whole 8080 instruction set on a sheet of paper, and its
+full documentation is a 15-page chapter in the Intel manual.
+
+This is an inspiring example of what is possible, even if the 8080
+instruction set itself is kind of clumsy and lame, with the benefit of
+40 years of hindsight.  Its very imperfection is encouraging — it
+shows that even deeply flawed hacks can have enduring value and even
+achieve greatness.
