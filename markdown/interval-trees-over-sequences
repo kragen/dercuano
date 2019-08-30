@@ -1,0 +1,105 @@
+Query evaluation with interval-annotated trees over sequences
+=============================================================
+
+Consider queries of the following forms:
+
+    select * from foo where bar between 80 and 101;
+    select * from foo order by bar limit 10;
+    select * from foo order by abs(bar - 13) desc limit 10;
+    select * from foo where bar between 80 and 101 and baz between 2 and 3;
+    select * from foo order by (bar-10)*(bar-10) + (baz-2)*(baz-2) desc limit 6;
+
+Conventional SQL indices permit answering the first three of these
+with good efficiency, but not the others; conventional SQL query
+optimizers do not produce a reasonable query plan for the third given
+an index on foo.bar, although it is in theory feasible.  Usually
+queries like these are answered with K-d trees or, in the last case in
+case of high dimensionality, ball trees, but these structures occupy
+significant space, and constructing and updating them is
+time-consuming.
+
+An alternative that is somewhat more flexible is to construct a tree
+of substrings over an existing sequence of records, annotated with
+intervals describing the data in each substring.
+
+The interval-annotated-tree data structure
+------------------------------------------
+
+(There is a standard data structure called an "interval tree" which is
+not the same thing, thus the awkward name.)
+
+The underlying data to be queried is a sequence of records, which have
+some attributes.  The tree is a sort of index for some of these
+attributes; each node of the tree pertains to some contiguous
+substring of the overall record sequence, and is annotated with the
+minimum and maximum value for each indexed attribute that occurs
+within the subsequence.  Leaf nodes contain pointers into the sequence
+of records, indicating the start and end of the substring to which
+they pertain; internal nodes, instead, pertain to the union of their
+child nodes, which are disjoint and consecutive.  The root node of the
+tree pertains to the entire sequence.
+
+Different branching factors may be appropriate in different
+situations; if memory is random access, the structure is in theory
+fastest with a branching factor of 2, but with a memory hierarchy, a
+larger branching factor is probably better.
+
+If there is some kind of reasonable locality within the existing
+sequence, this structure can perform as well as a K-d tree, at a much
+lower space cost (since its leaves contain merely pointers into the
+sequence of records).  If there is not, it should perform about as
+well as brute force.
+
+Interval query
+--------------
+
+To find all the records within a given multidimensional interval --- a
+criterion of the form attr0 between min0 and max0 and attr1 between
+min1 and max1 and attr2 between min2 and max2... --- we do a tree
+search from the root, pruning a node from the search when the interval
+annotation on that node can show that none of the records in its
+substring of the sequence can match the query.  In the case where the
+query is on a single attribute and the records are sorted by that
+attribute, this will take O(lg N) time.  So, too, if the records are
+sorted in the order of a traversal of a K-d tree, and the query is on
+a subset of the attributes indexed by that K-d tree, even if the
+branching factor is not the same.
+
+In some cases it may make sense to also halt the traversal when it can
+be determined that *all* the records within a substring match the
+query interval, for example if only a count of the matching records is
+required.
+
+concrete example
+
+conservative approximation of L2 queries
+
+X nearest query; example
+
+alternative structure in file `bresenham-erosion`
+
+XXXX
+----
+
+This generalizes, of course, to the case where leaf nodes contain
+intervals rather than point-values of attributes, but we would expect
+a standard interval tree to perform better in that case, perhaps much
+better.
+
+
+The interesting thing about this structure is that it allows the
+indexing data structure to vary independently of the sort order of the
+records, and indeed for the ordering of the records to vary in
+different parts of the sequence.
+
+update files, reordering, lsm-trees
+
+relevant to file `fast-geo-maps-on-android`
+
+pointer files
+
+To answer a query such as my original example
+
+    select * from foo order by (bar-10)*(bar-10) + (baz-2)*(baz-2) desc limit 6;
+
+we begin by constructing a conservative approximation
