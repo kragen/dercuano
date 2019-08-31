@@ -1,0 +1,276 @@
+Neighbor predictors are a family of predictors in machine learning;
+they work by predicting, from a probe point, some kind of average of
+the points nearest to it.  K-nearest-neighbors, or K-nn, with a
+constant number of nearest points, uniform weights, and the mode as
+the kind of average, is the most common, but there are also
+R-neighborhood algorithms which use all the points within some radius
+R.
+
+When the variable being predicted is continuous, it's called
+*regression*, and it's common to use a weighting function or kernel so
+that points very near the probe point weigh more heavily in the
+average.
+
+Commonly neighbor regression has discontinuities in their predictions
+as the probe point moves around, and this represents suboptimal
+performance, and makes them unusable for some purposes.  For example,
+in file `multitouch-puppeteering` and file `$1-recognizer-diagrams` I
+was looking for a way to morph smoothly between "keyframes" placed at
+arbitrary points in a two-dimensional state space.  So I was looking
+for a way to fix discontinuity in neighbor regression, and one
+occurred to me.  Maybe it's known.
+
+Continuous neighbor regression
+------------------------------
+
+So, consider specifically the case where we're using a weighted mean:
+∑<sub>*i*</sub> *w*(*r*, *x*, *x*(*i*)) *y*(*i*), where
+*x*(*i*) is the position of previously observed point *i*, *x*
+is the position of the newly observed point we're trying to predict,
+*w*(*r*, *a*, *b*) is a weighting function which tells you how
+relevant a point at *b* is for predicting a point at *a* with a
+neighborhood of radius *r*, and *y*(*i*) are the observations
+at the points *x*(*i*) of the variable to be predicted.
+Commonly we normalize by dividing by ∑<sub>*i*</sub> *w*(*r*, *x*,
+*x*(*i*)), particularly when the number of points in the
+neighborhood may vary, and usually the weighting function is a
+shift-invariant kernel of the form *w*(*r*, *a*, *b*) = *v*(*r*, *b* -
+*a*).
+
+Now, in this formulation, you could get discontinuities in three ways.
+First, the radius *r* could change discontinuously as you move
+continuously around the space.  Second, the function *v* might have
+discontinuities, so that either a continuous change in *b* - *a* or a
+continuous change in *r* might give rise to a discontinuity in *v*.
+Third, if a point has nonzero weight when it enters or exits the
+neighborhood, that will also give rise to a discontinuity, unless
+another point simultaneously exits or enters in a way that compensates
+for the discontinuity.
+
+So the simplest way to get neighbor regression to be continuous is to
+use a constant *r* and the kernel function
+
+> *v*(*r*, *c*) = 1 - |*c*|/*r*
+
+so that when points enter or exit the neighborhood window, they do so
+with zero weight, thus producing no discontinuity.
+
+You can use a more elaborate kernel function; the only thing that's
+important is that it be continuous and reach 0 when *r* = |*c*|.
+Usually you want it to be nonnegative, too, and rapid to compute.
+
+Similarly, you can use a varying radius, as long as it varies
+continuously.  The appeal of K-nearest-neighbors (as opposed to
+R-neighbors) is that it becomes more detailed without becoming less
+efficient in areas where you have more data; in Knn, the radius *also*
+varies continuously, as there is never a discontinuity in the distance
+to the Kth-nearest point.
+
+Differentiable neighbor regression
+----------------------------------
+
+The above cone kernel gives a continuous regression function, but its
+derivative has discontinuities when points enter and exit the kernel
+and when they cross its center.
+
+If, additionally, the radius changes *differentiably* with your
+position in the space, the kernel function *v*(*r*, *c*) is
+differentiable as *r* and *c* change differentiably; points enter and
+leave the window with not only zero weight but also zero weight
+*derivative* (with respect to differentiable movement of the probe
+point), then the resulting predictor is also differentiable.
+
+If *v* is purely a function of |*c*|, making it rotationally
+symmetric, it needs to have zero gradient when |*c*| = 0; otherwise it
+will fail to be differentiable at that point.
+
+The simplest way to satisfy this is to use a fixed *r* and a function
+such as the "zero-phase Hanning window"
+
+> *v*(*r*, *c*) = 0.5(1 + cos (π*r*/|*c*|))
+
+which is differentiable and nonnegative, and has zero derivative at
+|*c*| = 0 and |*c*| = *r*, value 1 at *c* = 0, and value 0 at |*c*| =
+*r*.
+
+However, the Hanning window is a bit heavyweight, requiring as it does
+a transcendental function.  A low-degree polynomial function would be
+more desirable; for example
+
+> *v*(*r*, *c*) = 1 - 3*d*<sup>2</sup> + 2*d*<sup>3</sup> (where *d* = |*c*|/*r*)
+
+This can be computed as (2*d* - 3)*d*<sup>2</sup> + 1, requiring a
+doubling, a subtraction, a squaring, a multiplication, and an
+increment.  Like the Hanning window, it is differentiable and
+nonnegative, and has zero derivative at |*c*| = 0 and |*c*| = *r*,
+value 1 at |*c*| = 0, and value 0 at |*c*| = *r*.  Visually it is
+almost impossible to tell the two windows apart; they differ by about
+0.01 at maximum.  (This function is in fact the unique degree-3
+Hermite interpolation of the "Hanning window" at those two endpoints.)
+
+This computational cost estimate is leaving something out, though: the
+cost of computing |*c*|, which requires a square root!
+
+> |*c*| = [∑<sub>*i*</sub> (*x<sub>i</sub>*(*j*)) -
+  *x<sub>i</sub>*)<sup>2</sup>]<sup>0.5</sup>
+
+So let's consider instead the following much cheaper kernel function,
+which has the same desirable properties but without requiring any
+irrational functions:
+
+> *v*(*r*, *c*) = 1 - 2*R* + *R*<sup>2</sup> (where *R* = |*c*|<sup>2</sup>/*r*)
+
+This function, too, looks visually close to the Hanning window (though
+it differs from it by up to about 0.065), is differentiable and
+nonnegative, and has zero derivative at |*c*| = 0 and |*c*| = *r*,
+value 1 at *c* = 0, and value 0 at *c* = *r*.  But it can be evaluated
+by just a doubling, a squaring, a subtraction, and an increment, once
+you have |*c*|<sup>2</sup> = ∑<sub>*i*</sub> (*x<sub>i</sub>*(*j*)) -
+*x<sub>i</sub>*)<sup>2</sup>.  Not only does it avoid the square root,
+it doesn't even require a multiplier!  (Except for the pesky *r* scale
+factor, that is.)
+
+An alternative way to avoid square roots is to use a different
+Minkowski *p*-norm of *c* rather than the Euclidean L<sub>2</sub> norm
+used above, sacrificing pure rotational symmetry but avoiding the
+squaring operations necessary to calculate |*c*| or even
+|*c*|<sup>2</sup>.  The L<sub>1</sub> norm and the L<sub>∞</sub> norm
+are both easier to compute, and in 1-D and 2-D they are equally good
+approximations; in higher dimensionalities the L<sub>∞</sub>-norm ball
+touches the L<sub>2</sub>-norm ball in more places than the
+L<sub>1</sub>-norm ball does, which perhaps makes it a better
+approximation.
+
+You can get a reasonably good approximation of the L<sub>2</sub> norm
+in a variety of cheaper ways.  Taking the maximum of the L<sub>∞</sub>
+norm multiplied by √*d* (where *d* is the number of dimensions) and
+the L<sub>1</sub> norm gives you a somewhat better approximation, as
+does the sum of the L<sub>∞</sub> and L<sub>1</sub> norms, scaled
+appropriately.  At least in two dimensions, the sum of these two
+approximations, again scaled appropriately, is a better approximation
+still.  (All of these approximations are also norms, as is easily
+verified.)
+
+The level set of the L<sub>∞</sub> norm is a hypercube, while the
+level set of the L<sub>1</sub> norm is its dual, a "cross-polytope" or
+"orthoplex" such as an octahedron or 16-cell.  The level sets of the
+other combinations described above are progressively rounder polytopes
+with their vertices all equidistant from the origin.
+
+Most of the above discussion of efficiency concerns minimizing the bit
+operations necessary, as if you were designing circuitry.  If you're
+using a modern CPU or GPU, the computation needed to dispatch an
+instruction absolutely dwarfs the computation needed to multiply two
+numbers or take a square root, so you should just use whatever takes
+the fewest instructions.
+
+Differentiably variable neighborhood radii
+------------------------------------------
+
+The above is perfectly fine for a fixed radius, but at times a
+variable radius might be better, both to avoid deserts with no samples
+to work from (or one sample, resulting in a flat plateau) and to avoid
+well-covered regions where the kernel function blurs out almost all of
+the local detail and additionally demands a lot of work.  But if we
+just use a radius for K nearest neighbors, we inevitably run into
+points where differentiability fails, as our expanding moving circle
+bumps into a new Kth point and starts to contract, leaving an old
+point behind.
+
+So we need some way to compute a differentiably-changing radius that
+still includes about the same number of points.
+
+One way to handle this is to use a fixed-radius kernel to find nearby
+points and see how many there are, or more precisely, what their
+*w*(*r*, *a*, *b*) adds up to.  This is a differentiable quantity, and
+except at zero, so are its reciprocal and the reciprocal of its square
+root.  If it covers a region where the points are distributed more or
+less evenly, we can use that reciprocal square root as a kernel
+radius, and it will tend to cover a more or less consistent number of
+points.
+
+It might be worthwhile to iterate this some fixed number of times,
+such as two: use the sample of points captured by kernel *i* to
+calculate a smaller radius at which to run kernel *i*+1, to calculate
+a smaller radius at which to run kernel *i*+2.
+
+Division by 0 is a constant risk here.  Perhaps for a given set of
+points you could calculate a minimum radius needed to always avoid it.
+
+This approach is commonly called a "balloon estimator".
+
+Interpolation versus regression
+-------------------------------
+
+In machine learning it is typically assumed that the observed values
+are subject to some noise, so predicting them all precisely is
+symptomatic of overfitting and will lead to poor future results.  But
+for some of the applications I have in mind, like animation keyframes
+in an abstract character state space, we really would like to exactly
+hit the given data point --- we want to precisely interpolate a spline
+(in the sense of Levien, not de Boor) rather than fitting a curve to
+noisy data.
+
+All the variants of neighbor regression described above, on a fixed
+set of probe locations and data points, is a sparse linear
+transformation of the data points it's regressing to --- the weight
+values don't depend on the *y*(*i*), just the *x*(*i*).  Moreover, I
+think it tends to be a reasonably-well-conditioned one, at least if
+your neighborhood widths are reasonable.  So determining the set of
+ersatz observations *y*(*i*) we would need for it to precisely predict
+the *actual* given observations *b*(*i*) is simply a matter of solving
+the sparse linear system **A**_y_ = *b*, where the rows of the square
+matrix **A** are computed with *w* on the observation points *x*(*i*).
+Interpolating between *y* and *b* allows you to choose the degree to
+which the surface has a little bit of freedom to suppress noisy
+points.
+
+This turns neighbor-regression algorithms into N-dimensional
+surface-fitting algorithms, and they can be used thus as an
+alternative to NURBS.
+
+It lacks some desirable properties for such surface-fitting
+algorithms; in particular, it lacks locality, in that a change to any
+input point will in general result in changes everywhere on the
+surface, not just near that point.
+
+It should be mentioned that there's an existing standard way of doing
+this, used for example in the sklearn documentation, but it sucks.  It
+is to use *r*/|*c*| as the weight function, which diverges when |*c*|
+= 0, but in that case you're at a sample point and you can just use
+the value of that sample point.  It's continuous close to the sample
+point, but it can have discontinuities when faraway points slip in and
+out of the window; also, it's far from differentiable, with sharp
+spikes at all the sample points.
+
+Vector regression or interpolation
+----------------------------------
+
+Above I've been speaking in terms of observations *y*(*i*) and
+predicted values.  It bears mentioning explicitly that these
+observations are not necessarily scalars such as the height of a
+surface; they might be, for example, vectors of 256 (*x*, *y*) pairs
+describing the path of a pen stroke, as in the application to
+`$1-recognizer-diagrams`.  All the math above works in the same way,
+since the only thing we're ever doing with the *y*(*i*) is forming
+linear combinations of some of them weighted by the normalized weights
+from *w* --- except for the linear-interpolation linear system to be
+solved in the interpolation-versus-regression section above, which
+should be solved separately for each component of the observation
+vector.  For example, solve one **A**_y_ = *b* problem for the *x*
+coordinate of the first point in each pen stroke, then a second
+**A**_y_ = *b* for the *y* coordinate of the first point, then a third
+**A**_y_ = *b* for the *x* coordinate of the second point, and so on.
+
+A note on terminology
+---------------------
+
+My terminology in the above has been fairly inconsistent, both with
+itself and with established terminology.  Knn is normally called
+*k*-NN; the sample points are often called "training examples" rather
+than "samples" and the space they are located in (the independent
+variables) is called the "feature space" and sometimes the "search
+space" with its dimensions being "features"; the regression result is
+a "prediction" of a "property value" for the "object" or "query" or
+"query example" or "test point" (what I sometimes called the probe
+point above).  I should probably go back and fix it.
