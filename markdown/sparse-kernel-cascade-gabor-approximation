@@ -95,7 +95,7 @@ To window the resonance over a given distance, we first use a feedback
 comb filter whose impulse response is an infinite non-decaying
 oscillation:
 
-> *y*[*i*, *j*] = *x*[*i*, *j*] - y[*i*-4*n*, *j*-3*n*]
+> *y*[*i*, *j*] = *x*[*i*, *j*] - *y*[*i*-4*n*, *j*-3*n*]
 
 That is, the pixel (*i*, *j*) of the output *y* is the corresponding
 pixel *x*[*i*, *j*] of the input, minus a *previous output pixel*
@@ -141,6 +141,13 @@ will have the most Gaussian shape if *m* remains the same in all of
 the stages, but this trades off against undesirable quantization in
 the available window sizes.
 
+This is one of the places where you have a little flexibility to go
+beyond the limitations of the basic method; you can use resonators in
+slightly different directions and frequencies to get an intermediate
+overall direction and frequency of oscillation.  But the windowing
+functions must be matched to those precise strides to prevent the
+overall system impulse response from becoming infinite.
+
 The oscillation-axis low-pass filter
 ------------------------------------
 
@@ -184,7 +191,9 @@ That taken care of, we can proceed to the oscillation-axis low-pass
 filter, which is mostly important if *n* is larger than 2 or 3.
 Suppose *n* = 5; now a period of the full oscillation is (40, 30).  We
 can use an orthodox Hogenauer filter along the axis of oscillation to
-suppress harmonics higher than the third; first an integrator:
+suppress harmonics higher than the third; first an integrator
+(calculating a prefix sum along each strided diagonal, also known as a
+sum table, scan, or integral image):
 
 > *y*[*i*, *j*] = *x*[*i*, *j*] + *y*[*i* - 4, *j* - 3]
 
@@ -279,15 +288,21 @@ We can do this with, again, a strided CIC filter, consisting of a
 cascade of an integrator and a feedforward comb, but this time along
 the transverse axis, using a stride rotated 90 degrees:
 
-> *y*[*i*, *j*] = *x*[*i*, *j*] + *y*[*i* + 3, *j* - 4]  
-> *y*[*i*, *j*] = *x*[*i*, *j*] - *x*[*i* + 3*p*, *j* - 4*p*]
+> *y*[*i*, *j*] = *x*[*i*, *j*] + *y*[*i* - 3, *j* + 4]  
+> *y*[*i*, *j*] = *x*[*i*, *j*] - *x*[*i* - 3*p*, *j* + 4*p*]
 
 Here *p* gives the number of strides in the width of (one stage of)
 our window, as *nm* gave the dimension of the Gaussian window in the
 perpendicular direction.
 
 Because of the existing falloff, we may be able to get away with one
-more stage at this point, but we'll probably need two more.
+more stage of this CIC filter at this point,
+but we'll probably need two more.
+
+The direction of blurring can be chosen as either (-3, 4) or (3, -4);
+I chose the first here in order to use previous scan lines rather than
+previous columns, in the interest of making pipelining possible (see
+below.)
 
 So implementing the transverse window requires another six stages,
 each consisting of an addition or subtraction.
@@ -304,8 +319,9 @@ response, although downsampling the image on its way into the pipeline
 would reduce this disparity somewhat.
 
 [I did try it in IPython tonight][1] ([notebook viewer][2]),
-and got a rounder-looking kernel
-with *p* = 30 than the *p* = 60 I suggested above.  In plots it looks
+and got a pretty round-looking kernel with *n* = 5, *m* = 3, *p* = 30,
+and the (4, 3) stride suggested above.
+In plots it looks
 just fine, but of course that's not strong evidence.  I haven't
 calculated its error (that would require figuring out the diameters of
 the Gaussians), but I estimate that in essentially this form it should
@@ -327,25 +343,25 @@ stages need to look pretty far back into the past.  If we suppose *n*
 = 5, *m* = 3, and *p* = 60, for example, the number of scan lines of
 memory needed is as follows:
 
-<table style="text-align: right" cellspacing=3>
-       <tr><th>stage                <th>scan lines
-       <tr><td>resonator 1          <td>15
-       <tr><td>oscillation window 1 <td>90
+<table cellspacing=3>
+       <tr><th>stage                <th>scan lines  <th><i>y</i>[<i>i</i>, <i>j</i>] = <i>x</i>[<i>i</i>, <i>j</i>] +
+       <tr><td>resonator 1          <td>15          <td>-<i>y</i>[<i>i</i> - 4<i>n</i>, <i>j</i> - 3<i>n</i>]
+       <tr><td>oscillation window 1 <td>90          <td>-<i>x</i>[<i>i</i> - 8<i>nm</i>, <i>j</i> - 6<i>nm</i>]
        <tr><td>resonator 2          <td>15
        <tr><td>oscillation window 2 <td>90
        <tr><td>resonator 3          <td>15
        <tr><td>oscillation window 3 <td>90
        <tr><td>resonator 4          <td>15
        <tr><td>oscillation window 4 <td>90
-       <tr><td>heart-stabbing filter<td>5
-       <tr><td>axis LPF integrator 1<td>3
-       <tr><td>axis LPF comb 1      <td>6
+       <tr><td>heart-stabbing filter<td>5           <td><i>x</i>[<i>i</i> - 4<i>n</i>/3, <i>j</i> - 3<i>n</i>/3]
+       <tr><td>axis LPF integrator 1<td>3           <td><i>y</i>[<i>i</i> - 4, <i>j</i> - 3]
+       <tr><td>axis LPF comb 1      <td>6           <td>-<i>x</i>[<i>i</i> - 8, <i>j</i> - 6]
        <tr><td>axis LPF integrator 2<td>3
        <tr><td>axis LPF comb 2      <td>6
-       <tr><td>antialias filter 1   <td>7 (4 kernels)
+       <tr><td>antialias filter 1   <td>7 (4 kernels)<td><i>y</i>[<i>i</i> - 1, <i>j</i>]; -<i>x</i>[<i>i</i> - 8, <i>j</i>]; <i>y</i>[<i>i</i>, <i>j</i> - 1]; -<i>x</i>[<i>i</i>, <i>j</i> - 6]
        <tr><td>antialias filter 2   <td>7 (4 kernels)
-       <tr><td>transverse integrator 1<td>4
-       <tr><td>transverse comb 1      <td>240
+       <tr><td>transverse integrator 1<td>4         <td><i>y</i>[<i>i</i> - 3, <i>j</i> + 4]
+       <tr><td>transverse comb 1      <td>240       <td>-<i>x</i>[<i>i</i> - 3<i>p</i>, <i>j</i> + 4<i>p</i>]
        <tr><td>transverse integrator 2<td>4
        <tr><td>transverse comb 2      <td>240
        <tr><td>transverse integrator 3<td>4
@@ -383,3 +399,62 @@ response but also zero-phase behavior.  To get zero-phase behavior
 back you need to do a second pass backwards, which requires keeping
 the whole result image in memory instead of just part of it.
 
+Multiple Gabor sharing
+----------------------
+
+So, if you're going to do a bunch of Gabor convolutions on the same
+image, what parts of the pipeline should you share between them?
+
+The most computationally intensive (heh) parts of the pipeline are
+those dependent on the frequency and the angle: the resonating
+feedback comb, the oscillation-axis low-pass filter, and (more
+loosely) the antialiasing filter.  These depend on *λ* and *θ*, but
+not *σ* or *γ*.  It might make sense to move these stages, as well as
+the transverse blur's integrators, to the beginning of the pipeline so
+that they can be shared between different window sizes and shapes,
+running the oscillation window and the transverse blur window later,
+which are only six of the 26 stages.  This probably is not practical
+to do in floating-point because of the large magnitudes needed to feed
+the Hogenauer-style cascade of six windowing combs.
+
+The antialiasing filter is applicable over an octave or so of
+frequencies at any angle (although in the above example it's a bit
+longer in one direction than the other), and the transverse-blur
+integrators are applicable for any frequency at a given angle.  They
+can't both go first, though; putting the antialiasing filter first is
+probably better because it allows you to decimate the image
+immediately.
+
+Conclusions
+-----------
+
+Well, really, beginnings... but it seems like this approach to
+approximating convolution with a Gabor wavelet probably works and
+probably is efficient (although my IPython notebook prototype
+certainly is not).  It provides obvious ways to set five of the six
+parameters, but not *ψ*, the phase offset.  This is a little alarming
+because without the phase offset there's no way to get the *complex*
+Gabor wavelet.  It would be surprising if there turned out to be no
+way to do this, but none is obvious to me at the moment.
+
+(The issue is that you want to phase-shift the oscillation by a
+quarter cycle, but without moving the Gaussian window along with it.
+Maybe the solution could be something as simple as a differentiator in
+the direction of oscillation and a compensating constant factor.)
+
+Among the possible applications are approximating an arbitrary
+convolution kernel as a sum of Gabor wavelets.  One possible approach
+to this is analyzing it in different directions and at different
+scales using the Gabor transform or the one-dimensional wavelet
+transform with the Morlet wavelet, choosing a sparse subset of these
+basis functions that could possibly approximate the target kernel
+well, then optimizing the weights of that sparse subset further, under
+a loss function that drives small weights toward zero.
+
+Moreover, there's no particular reason to limit yourself entirely to
+Gabor wavelets when optimizing that approximation; you can include
+other kernels that can be computed efficiently using such sparse
+cascades, such as separable kernels (see file `svd-convolution`), flat
+and especially polygonal kernels (see file `convolution-bokeh`), and,
+using the techniques used above to propagate the Gabor's oscillation
+along a line, line segments.
