@@ -616,3 +616,44 @@ model.  You could quite reasonably have escape sequences that set such
 properties for the current table or (for character-level markup) for
 the span of text following the escape sequence, without importing all
 the complexities of the CSS box model and text-flow algorithms.
+
+Page/column breaks and tables
+-----------------------------
+
+On 2019-09-01, dpk commented on #swhack about the limitations of LaTeX
+tables; reformatted from IRC style, she said:
+
+> This combination of things in LaTeX is annoyingly apparently
+  impossible: multiple-column mode; tables spanning multiple
+  pages/columns; groups of rows within said table which should not be
+  broken apart --- oh, and header rows on the said table which repeat
+  after every column/page break.
+
+> `tabular` (built-in) can't break across multiple pages or columns at
+  all, so you try the `longtable` package.  First thing `longtable`
+  does is complain that it doesn't work in multi-column mode, whether
+  from the `multicol` package or with the built-in `\twocolumn`.
+
+> Some page recommends `supertabular`, which is apparently the
+  predecessor to `longtable` but does work in multi-column mode,
+  because why not remove features from things!  `supertabular` seems
+  to work, but then you notice you have groups of rows in the table
+  (pairs, in my case) that really need to be on the same page/in the
+  same column as one another, no matter what. `supertabular` doesn't
+  appear to support this.
+
+> But, oh look, there's this package that lets you use the `\\*`
+  command instead of `\\` to insert a row break that isn't allowed to
+  cross a page or column break. the package is ... `longtable`.  Which
+  you can't use.
+
+> Then you discover there's a hack to make `longtable` work in
+  multi-column mode, ... but it doesn't support printing the headers
+  of the table anew at the top of each new column.
+
+> So, TL;DR, I am very annoyed.
+
+This combination of requirements is probably a good one to keep in
+mind for designing table-layout systems, since evidently it's a
+combination of features that is difficult to provide if you didn't
+plan for it from the beginning.
