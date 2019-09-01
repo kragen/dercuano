@@ -12,6 +12,10 @@ Next up:
   SPECULATIVE to some things too
 - add more notes
 
+Python 6 problems:
+- link attribute order
+- 1 minute longer estimated reading time
+
 """
 from __future__ import print_function, division
 import cgi
@@ -22,14 +26,19 @@ import re
 import urllib
 import subprocess
 
-try:
-    from urllib.parse import quote_plus, unquote
-except ImportError:
-    from urllib import quote_plus, unquote
-
 import markdown
 
 import relation
+
+try:
+    from urllib.parse import quote_plus, unquote, quote
+except ImportError:
+    from urllib import quote_plus, unquote, quote
+
+try:
+    unicode
+except NameError:
+    unicode = str
 
 
 def ok(a, b):
@@ -57,7 +66,7 @@ class Bundle:
         return 'Dercuano' if not t else t[0]
 
     def get_intro(self):
-        with open(self.filename('intro.md')) as f:
+        with open(self.filename('intro.md'), 'rb') as f:
             return RawHTML(markdown.markdown(f.read().decode('utf-8')))
 
     def _notes(self):
@@ -123,6 +132,7 @@ class Bundle:
         return category_name.replace('-', ' ').capitalize() if not t else t[0]
 
     def category_link(self, category_name, level=1):
+        # XXX maybe we should really reify Category as its own class?
         return a(self.category_title(category_name),
                  href='../' * level + self.category_localpart(category_name))
 
@@ -207,7 +217,7 @@ class Note:
         return 'Note(%r, %r, %r)' % (self.bundle, self.notename, self.source_file)
 
     def link_ley(self, level=1):
-        return a(self.title(), href=("../" * level + urllib.quote(self.localpart())))
+        return a(self.title(), href=("../" * level + quote(self.localpart())))
 
     def date_string(self):
         if self._date_string is None:
@@ -229,20 +239,22 @@ class Note:
 
     def extra_ley(self):
         date = self.date_string()
-        return [' ', date, ' ' if date else '', self.minutes_string()]
+        return ['\n', date, ' ' if date else '', self.minutes_string()]
 
     def minutes_string(self):
         # Wikipedia’s Reading article says “reading for comprehension”
         # is 200–400 words per minute.  I’m going to figure that
         # enough of these notes involve equations and source code that
         # we should halve that.
-        minutes = round(self.word_count() / 150)
+        minutes = int(self.word_count() / 150 + 0.5)  # round() varies Py 2/3
         return '(%d %s)' % (minutes, pluralize('minute', minutes))
 
     def word_count(self):
         if self._word_count is None:
-            with open(self.source_file) as f:
-                self._word_count = sum(1 for line in f for word in line.split())
+            with open(self.source_file, 'rb') as f:
+                self._word_count = sum(1 for line in f
+                                       for word in line.decode('utf-8').split()
+                                       if re.search(r'[a-zA-Z0-9_]', word))
         return self._word_count
 
     def flavor(self):
@@ -270,7 +282,8 @@ class Note:
             body = f.read()
 
         categories = sorted(self.categories(),
-                            key=self.bundle.category_size,
+                            key=tkey(self.bundle.category_size,
+                                     lambda name: name),
                             reverse=True)
         html = note_html(self.bundle, self.title(), self.flavor()(body),
                          div(h2('Topics'),
@@ -283,7 +296,7 @@ class Note:
                          if categories else [])
 
         subtitle = ley(div(self.author(), ', ', self.date_string(),
-                           ' ', self.minutes_string(),
+                           '\n', self.minutes_string(),
                            **{'class': "metadata"}))
         return html.replace('</h1>', '</h1>' + subtitle, 1)
 
@@ -325,7 +338,7 @@ def vomit_html(output_filename, html_contents):
     if isinstance(html_contents, unicode):
         html_contents = html_contents.encode('utf-8')
 
-    with open(output_filename + '.tmp', 'w') as f:
+    with open(output_filename + '.tmp', 'wb') as f:
         f.write(b'<!DOCTYPE html>\n' + html_contents)
 
     os.rename(output_filename + '.tmp', output_filename)
@@ -344,7 +357,8 @@ def category_html(bundle, category_name):
                     h1('Notes concerning “', category_title, '”'),
                     ul([li(note.link_ley(), note.extra_ley(), "\n")
                         for note in sorted(bundle.notes_in_category(category_name),
-                                           key=note_date)
+                                           key=tkey(note_date,
+                                                    lambda note: note.notename))
                         ])))
 
 def note_date(note):
@@ -380,12 +394,16 @@ def index_html(bundle):
                                " (%d notes)" % bundle.category_size(category),
                                "\n")
                             for category in sorted(categories,
-                                                   key=bundle.category_size,
+                                                   key=tkey(bundle.category_size,
+                                                            lambda name: name),
                                                    reverse=True)
                             if len(bundle.notes_in_category(category)) > 1]))
                     if categories else [],
                     script(src="liabilities/addtoc.js"),
     ))
+
+def tkey(*keyfuncs):
+    return lambda d: tuple(k(d) for k in keyfuncs)
 
 def word_count(note):
     return note.word_count()
@@ -421,7 +439,7 @@ class Element:
 
     def render_attrs(self):
         return ' '.join('%s="%s"' % (k, cgi.escape(v, True))
-                        for k, v in self.attrs.items())
+                        for k, v in sorted(self.attrs.items()))  # sort for determinism
 
 def tag(tagname):
     def render(*args, **kwargs):
@@ -457,7 +475,10 @@ def markdown_replacing_links(bundle):
             note = bundle.note_map.get(mo.group(1))
             return ley(note.link_ley()) if note else mo.group(0)
 
-        return ad_hoc_link_re.sub(repl, markdown.markdown(s.decode('utf-8')))
+        if isinstance(s, bytes):
+            s = s.decode('utf-8')
+
+        return ad_hoc_link_re.sub(repl, markdown.markdown(s))
 
     return replace
 
