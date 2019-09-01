@@ -331,8 +331,10 @@ largest *x*.  Well, we can look at the max(x) annotations to figure
 out beneath which node in the set the largest x (say 112) is to be
 found, then recursively trace down through the tree from that node to
 find some record with x = 112.  *Then we remove it from the set*,
-removing the tree node we had found it from and possibly adding that
-node's other children; this leaves us in a position to repeat the
+by removing the tree node we had found it from, adding that
+node's children, if any, and then recursively repeating that
+process for the child node by which we found the record;
+this leaves us in a position to repeat the
 process four more times.  By maintaining the nodes in a priority queue
 ordered by max(x), we can do this update quite efficiently.
 
@@ -367,12 +369,12 @@ computation, rather than just a tree for a given set of substrings.
 
 An alternative structure is the preprocessing for the Urbach-Wilkinson
 erosion algorithm described in file `bresenham-erosion`: given some
-string of pixels, you can compute summary strings of minima of all
+string of pixels, you can compute summary strings of maxima of all
 substrings of 2, 4, 8, 16, 32, etc., pixels, starting at all the
-possible offsets.  Then the minimum of an arbitrary-length substring
+possible offsets.  Then the maximum of an arbitrary-length substring
 can be computed in constant time by finding two
 potentially-overlapping substrings, typically within the same level of
-summary, whose union is the substring you want to find.
+summary, whose union is the you want to find the maximum of.
 
 More briefly, say *S*<sub>0,*j*</sub> is pixel *j* of the string of
 pixels, and define
@@ -381,13 +383,13 @@ pixels, and define
   *S*<sub>*i*-1, *j* + 2<sup>*i*-1</sup></sub>
 
 whenever all of the subscripts are within bounds, and *x* ∨ *y* gives
-the minimum of *x* and *y*.  This gives us the *N*-ary minima
+the maximum of *x* and *y*.  This gives us the *N*-ary maxima
 ∨<sub>*j*</sub> of all the size-2<sup>*i*</sup> substrings
 
 > ∨<sub>*j* ∈ [*m*, *m* + 2<sup>*i*</sup>)</sub> *S*<sub>0, *j*</sub>
   = S<sub>*i*, *m*</sub>
 
-and from that we can compute the minimum of an arbitrary range of
+and from that we can compute the maximum of an arbitrary range of
 pixels as
 
 > ∨<sub>*j* ∈ [*m*, *n*]</sub>*S*<sub>0, *j*</sub> =
@@ -401,23 +403,25 @@ size-2<sup>*a*</sup> substrings.
 If we precompute all the *S*<sub>*i*</sub>, of which there are a
 logarithmic number, we can do this in constant time.
 
-Of course all of the above goes *mutatis mutandis* for maxima rather
-than minima.
+Of course all of the above goes *mutatis mutandis* for minima rather
+than maxima.
 
 An interesting property of this structure is that, without any further
-metadata, we need only logarithmic time to trace any range minimum
+metadata, we need only logarithmic time to trace any range maximum
 thus computed back to one of the pixels where it originated; for
 example, *S*<sub>4, 3</sub> is either equal to *S*<sub>3, 3</sub> or
 it's equal to *S*<sub>3, 11</sub>, and *S*<sub>3, 11</sub> is either
 equal to *S*<sub>2, 11</sub> or to *S*<sub>2, 15</sub>.  By following
 the trail this way, we can figure out where in the range to find the
-minimum pixel value.  In particular, this allows us to find the
-runner-up value in logarithmic time: if it turns out that the minimum
+maximum pixel value.  In particular, this allows us to find the
+runner-up value in logarithmic time: if it turns out that the maximum
 value came from pixel 12, we can split the range into two halves that
-exclude pixel 12 and calculate their minima, one of which is the
+exclude pixel 12 and calculate their maxima, one of which is the
 runner-up.
 
-We can view the interval-annotated-tree structure we started with as a
+This is suggestively similar to the query algorithms described above,
+and as it turns out,
+we can view the interval-annotated-tree structure we started with as a
 sort of decimated version of this layer-cake structure, where we only
 keep *S*<sub>*i*, *j*</sub> if *j* is divisible by
 2<sup>*i*+*k*</sup>, where 2<sup>*k*</sup> gives the number of records
