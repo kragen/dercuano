@@ -6,8 +6,8 @@ the kind of average, is the most common, but there are also
 R-neighborhood algorithms which use all the points within some radius
 R.
 
-When the variable being predicted is continuous, it's called
-*regression*, and it's common to use a weighting function or kernel so
+When the variable being predicted is continuous, it’s called
+*regression*, and it’s common to use a weighting function or kernel so
 that points very near the probe point weigh more heavily in the
 average.
 
@@ -15,18 +15,18 @@ Commonly neighbor regression has discontinuities in their predictions
 as the probe point moves around, and this represents suboptimal
 performance, and makes them unusable for some purposes.  For example,
 in file `multitouch-puppeteering` and file `$1-recognizer-diagrams` I
-was looking for a way to morph smoothly between "keyframes" placed at
+was looking for a way to morph smoothly between “keyframes” placed at
 arbitrary points in a two-dimensional state space.  So I was looking
 for a way to fix discontinuity in neighbor regression, and one
-occurred to me.  Maybe it's known.
+occurred to me.  Maybe it’s known.
 
 Continuous neighbor regression
 ------------------------------
 
-So, consider specifically the case where we're using a weighted mean:
+So, consider specifically the case where we’re using a weighted mean:
 ∑<sub>*i*</sub> *w*(*r*, *x*, *x*(*i*)) *y*(*i*), where
 *x*(*i*) is the position of previously observed point *i*, *x*
-is the position of the newly observed point we're trying to predict,
+is the position of the newly observed point we’re trying to predict,
 *w*(*r*, *a*, *b*) is a weighting function which tells you how
 relevant a point at *b* is for predicting a point at *a* with a
 neighborhood of radius *r*, and *y*(*i*) are the observations
@@ -55,7 +55,7 @@ use a constant *r* and the kernel function
 so that when points enter or exit the neighborhood window, they do so
 with zero weight, thus producing no discontinuity.
 
-You can use a more elaborate kernel function; the only thing that's
+You can use a more elaborate kernel function; the only thing that’s
 important is that it be continuous and reach 0 when *r* = |*c*|.
 Usually you want it to be nonnegative, too, and rapid to compute.
 
@@ -85,7 +85,7 @@ symmetric, it needs to have zero gradient when |*c*| = 0; otherwise it
 will fail to be differentiable at that point.
 
 The simplest way to satisfy this is to use a fixed *r* and a function
-such as the "zero-phase Hanning window"
+such as the “zero-phase Hanning window”
 
 > *v*(*r*, *c*) = 0.5(1 + cos (π*r*/|*c*|))
 
@@ -106,7 +106,7 @@ nonnegative, and has zero derivative at |*c*| = 0 and |*c*| = *r*,
 value 1 at |*c*| = 0, and value 0 at |*c*| = *r*.  Visually it is
 almost impossible to tell the two windows apart; they differ by about
 0.01 at maximum.  (This function is in fact the unique degree-3
-Hermite interpolation of the "Hanning window" at those two endpoints.)
+Hermite interpolation of the “Hanning window” at those two endpoints.)
 
 This computational cost estimate is leaving something out, though: the
 cost of computing |*c*|, which requires a square root!
@@ -114,7 +114,7 @@ cost of computing |*c*|, which requires a square root!
 > |*c*| = [∑<sub>*i*</sub> (*x<sub>i</sub>*(*j*)) -
   *x<sub>i</sub>*)<sup>2</sup>]<sup>0.5</sup>
 
-So let's consider instead the following much cheaper kernel function,
+So let’s consider instead the following much cheaper kernel function,
 which has the same desirable properties but without requiring any
 irrational functions:
 
@@ -127,7 +127,7 @@ value 1 at *c* = 0, and value 0 at *c* = *r*.  But it can be evaluated
 by just a doubling, a squaring, a subtraction, and an increment, once
 you have |*c*|<sup>2</sup> = ∑<sub>*i*</sub> (*x<sub>i</sub>*(*j*)) -
 *x<sub>i</sub>*)<sup>2</sup>.  Not only does it avoid the square root,
-it doesn't even require a multiplier!  (Except for the pesky *r* scale
+it doesn’t even require a multiplier!  (Except for the pesky *r* scale
 factor, that is.)
 
 An alternative way to avoid square roots is to use a different
@@ -152,13 +152,13 @@ still.  (All of these approximations are also norms, as is easily
 verified.)
 
 The level set of the L<sub>∞</sub> norm is a hypercube, while the
-level set of the L<sub>1</sub> norm is its dual, a "cross-polytope" or
-"orthoplex" such as an octahedron or 16-cell.  The level sets of the
+level set of the L<sub>1</sub> norm is its dual, a “cross-polytope” or
+“orthoplex” such as an octahedron or 16-cell.  The level sets of the
 other combinations described above are progressively rounder polytopes
 with their vertices all equidistant from the origin.
 
 Most of the above discussion of efficiency concerns minimizing the bit
-operations necessary, as if you were designing circuitry.  If you're
+operations necessary, as if you were designing circuitry.  If you’re
 using a modern CPU or GPU, the computation needed to dispatch an
 instruction absolutely dwarfs the computation needed to multiply two
 numbers or take a square root, so you should just use whatever takes
@@ -197,7 +197,7 @@ a smaller radius at which to run kernel *i*+2.
 Division by 0 is a constant risk here.  Perhaps for a given set of
 points you could calculate a minimum radius needed to always avoid it.
 
-This approach is commonly called a "balloon estimator".
+This approach is commonly called a “balloon estimator”.
 
 Interpolation versus regression
 -------------------------------
@@ -207,14 +207,14 @@ are subject to some noise, so predicting them all precisely is
 symptomatic of overfitting and will lead to poor future results.  But
 for some of the applications I have in mind, like animation keyframes
 in an abstract character state space, we really would like to exactly
-hit the given data point --- we want to precisely interpolate a spline
+hit the given data point — we want to precisely interpolate a spline
 (in the sense of Levien, not de Boor) rather than fitting a curve to
 noisy data.
 
 All the variants of neighbor regression described above, on a fixed
 set of probe locations and data points, is a sparse linear
-transformation of the data points it's regressing to --- the weight
-values don't depend on the *y*(*i*), just the *x*(*i*).  Moreover, I
+transformation of the data points it’s regressing to — the weight
+values don’t depend on the *y*(*i*), just the *x*(*i*).  Moreover, I
 think it tends to be a reasonably-well-conditioned one, at least if
 your neighborhood widths are reasonable.  So determining the set of
 ersatz observations *y*(*i*) we would need for it to precisely predict
@@ -234,27 +234,27 @@ algorithms; in particular, it lacks locality, in that a change to any
 input point will in general result in changes everywhere on the
 surface, not just near that point.
 
-It should be mentioned that there's an existing standard way of doing
+It should be mentioned that there’s an existing standard way of doing
 this, used for example in the sklearn documentation, but it sucks.  It
 is to use *r*/|*c*| as the weight function, which diverges when |*c*|
-= 0, but in that case you're at a sample point and you can just use
-the value of that sample point.  It's continuous close to the sample
+= 0, but in that case you’re at a sample point and you can just use
+the value of that sample point.  It’s continuous close to the sample
 point, but it can have discontinuities when faraway points slip in and
-out of the window; also, it's far from differentiable, with sharp
+out of the window; also, it’s far from differentiable, with sharp
 spikes at all the sample points.
 
 Vector regression or interpolation
 ----------------------------------
 
-Above I've been speaking in terms of observations *y*(*i*) and
+Above I’ve been speaking in terms of observations *y*(*i*) and
 predicted values.  It bears mentioning explicitly that these
 observations are not necessarily scalars such as the height of a
 surface; they might be, for example, vectors of 256 (*x*, *y*) pairs
 describing the path of a pen stroke, as in the application to
 `$1-recognizer-diagrams`.  All the math above works in the same way,
-since the only thing we're ever doing with the *y*(*i*) is forming
+since the only thing we’re ever doing with the *y*(*i*) is forming
 linear combinations of some of them weighted by the normalized weights
-from *w* --- except for the linear-interpolation linear system to be
+from *w* — except for the linear-interpolation linear system to be
 solved in the interpolation-versus-regression section above, which
 should be solved separately for each component of the observation
 vector.  For example, solve one **A**_y_ = *b* problem for the *x*
@@ -267,10 +267,10 @@ A note on terminology
 
 My terminology in the above has been fairly inconsistent, both with
 itself and with established terminology.  Knn is normally called
-*k*-NN; the sample points are often called "training examples" rather
-than "samples" and the space they are located in (the independent
-variables) is called the "feature space" and sometimes the "search
-space" with its dimensions being "features"; the regression result is
-a "prediction" of a "property value" for the "object" or "query" or
-"query example" or "test point" (what I sometimes called the probe
+*k*-NN; the sample points are often called “training examples” rather
+than “samples” and the space they are located in (the independent
+variables) is called the “feature space” and sometimes the “search
+space” with its dimensions being “features”; the regression result is
+a “prediction” of a “property value” for the “object” or “query” or
+“query example” or “test point” (what I sometimes called the probe
 point above).  I should probably go back and fix it.

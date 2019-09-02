@@ -39,19 +39,19 @@ of several times *σ*, or *σ*/*γ*<sup>2</sup> in the *y*′ direction.
 Sparse approximations
 ---------------------
 
-As mentioned in file `sparse-filters`, I'm looking for ways to get
+As mentioned in file `sparse-filters`, I’m looking for ways to get
 good approximations of convolution filters using networks of small,
 sparse kernels, to reduce the total amount of computation.  In
-particular I'm interested in Hogenauer filters, which is discussed in
+particular I’m interested in Hogenauer filters, which is discussed in
 file `square-wave-filtering`, file `recurrent-comb-cascade`, and file
 `cheap-frequency-detection`, file `bleep`, and similar things.  In
 file `goertzel-minsky-pll-prefix-sums` I describe how you can use
 precise resonators that are not only non-FIR but non-BIBO to very
-efficiently compute precise finite infinite response filters, and I'll
+efficiently compute precise finite infinite response filters, and I’ll
 use that here.
 
 I think a sparse Gabor-filter approximation is particularly
-interesting because of the filter's importance and because of its
+interesting because of the filter’s importance and because of its
 relatively great computational cost.  (But maybe someone already knows
 this algorithm.)
 
@@ -62,7 +62,7 @@ The filter is a composition or pipeline of five major stages, each
 composed of a cascade of small, sparse linear filters.  Because of the
 convenient properties of convolution, the order of all of the
 individual pieces can be reordered as desired, and in particular if
-you're computing several different Gabor filters over the same image
+you’re computing several different Gabor filters over the same image
 with some parameters in common, it may be desirable to move stages
 that are in common between them to the beginning of the processing
 pipeline.
@@ -81,7 +81,7 @@ approximated as a ratio of small integers, as examples of which I will
 use 3 and 4: we are looking for waves whose phase varies not at all in
 the direction (*x*+3, *y*-4), and varies fastest in the direction
 (*x*+4, *y*+3).  Below I will refer to this (4, 3) displacement as the
-"stride".  And I will suppose that the wavelength *λ* we're looking
+“stride”.  And I will suppose that the wavelength *λ* we’re looking
 for can be adequately approximated as an integer multiple of *twice*
 that displacement; that is, at some integer *n*, (*x*+8*n*, *y*+6*n*)
 has a phase precisely 2*π* advanced from the phase at (*x*, *y*).
@@ -127,14 +127,14 @@ Hogenauer filter.
 
 Unlike the integrator in a Hogenauer filter, the response of the
 feedback comb at DC is identically 0, and its amplification factor for
-frequencies that don't precisely align with its resonant frequency is
+frequencies that don’t precisely align with its resonant frequency is
 finite; it only fails to act BIBO if the input data actually does
 contain nonzero energy at precisely the resonant frequency
 (necessarily over infinite space, at least in one direction).  So you
 might be able to get reasonable results using floating point, but
 there are no guarantees there.
 
-That window doesn't look very Gaussian yet, so to fix that, we repeat
+That window doesn’t look very Gaussian yet, so to fix that, we repeat
 the process two or three more times, for a total of six to eight
 atomic kernels each consisting of a single subtraction.  The window
 will have the most Gaussian shape if *m* remains the same in all of
@@ -152,21 +152,21 @@ The oscillation-axis low-pass filter
 ------------------------------------
 
 The above is not yet satisfactory for two reasons.  First, we still
-have the odd harmonics to deal with --- the third, fifth, seventh, and
-so on --- which are exactly the same amplitude as the fundamental,
-since it's an impulse train.  Second, aside from those harmonics,
+have the odd harmonics to deal with — the third, fifth, seventh, and
+so on — which are exactly the same amplitude as the fundamental,
+since it’s an impulse train.  Second, aside from those harmonics,
 looked at precisely along the oscillation axis, the two stages
 described above give us a very nice Gabor wavelet, but at any other
-angle it looks like an impulse --- all frequencies pass unchanged.
+angle it looks like an impulse — all frequencies pass unchanged.
 
 For these two purposes, we need to do some low-pass filtering, some of
 which is transverse to the oscillation axis and is what gives us the
 roundness or ellipticity of our two-dimensional Gaussian window, and
-some of which is parallel to it.  And in particular, if it's possible,
+some of which is parallel to it.  And in particular, if it’s possible,
 we may want to use another feedforward comb filter to stab the third
-harmonic in the heart precisely, because it's going to be the most
+harmonic in the heart precisely, because it’s going to be the most
 troublesome harmonic to handle with general-purpose low-pass
-filtering, since it's only 1.58 octaves above the fundamental, and a
+filtering, since it’s only 1.58 octaves above the fundamental, and a
 filter with its first precise zero at that harmonic will suppress it
 completely, as well as most of its spectral leakage.  The fifth
 harmonic is 2.3 octaves above the fundamental, so a generic low-pass
@@ -176,10 +176,10 @@ Our fundamental has a period (8*n*, 6*n*), so our third harmonic has a
 period (8*n*/3, 6*n*/3).  We can either subtract pixels at this
 displacement or add pixels at half this displacement (4*n*/3, 3*n*/3)
 to completely suppress the third harmonic.  If these offsets are not
-precise, for example because 4*n* isn't divisible by 3, the
-suppression won't be precise either, and a lot more of the third
+precise, for example because 4*n* isn’t divisible by 3, the
+suppression won’t be precise either, and a lot more of the third
 harmonic will survive to be dealt with by the other more generic
-low-pass filtering.  (But we'll get a little bit of bonus transverse
+low-pass filtering.  (But we’ll get a little bit of bonus transverse
 low-pass filtering.)
 
 So the simplest form of our heart-stabbing filter would look like
@@ -210,7 +210,7 @@ We probably want a better rolloff than that; if we repeat it two more
 times, we get 18 dB per octave, which attenuates the fifth harmonic by
 almost 42 dB, and higher harmonics by more.
 
-The usual CIC-filter concerns about passband flatness don't apply
+The usual CIC-filter concerns about passband flatness don’t apply
 here, since we are only trying to select a single frequency and
 frequencies very close to it.
 
@@ -229,7 +229,7 @@ So far, pixels have only ever been combined with other pixels at a
 multiple of the basic stride (4, 3) from them.  This means that every
 pixel in the first three lines of an image is in a separate,
 noninteracting signal, so far; even very high-frequency components
-will survive and may be aliased down.  We'd like to sort of "fill in"
+will survive and may be aliased down.  We’d like to sort of “fill in”
 the other pixels, at least along the axis of oscillation, rather than
 skipping over them completely as if they belonged to an entirely
 different image.
@@ -241,7 +241,7 @@ reasonably good fill-in without widening the line of the OTF much:
 > *y*[*i*, *j*] = *x*[*i*, *j*] + *x*[*i*-1, *j*-1]  
 > *y*[*i*, *j*] = *x*[*i*, *j*] + *x*[*i*-2, *j*-1]
 
-But let's not do that; we can perhaps get a bit more mileage out of
+But let’s not do that; we can perhaps get a bit more mileage out of
 the antialiasing filter in the case where the oscillation wavelength
 and both dimensions of the Gaussian window and are much larger than
 this; we could use, for example, a simple Gaussian blur, which also
@@ -261,7 +261,7 @@ filter proposed in the section above, as well as providing
 antialiasing fill-in along the axis of oscillation and some amount of
 transverse window.  If you were to iterate this filter two more times
 you would have a second-order approximation to a squished Gaussian,
-but let's not --- let's just run it once more and be satisfied, and
+but let’s not — let’s just run it once more and be satisfied, and
 reduce the high-pass filtering from the previous section by one
 filtering stage.
 
@@ -297,7 +297,7 @@ perpendicular direction.
 
 Because of the existing falloff, we may be able to get away with one
 more stage of this CIC filter at this point,
-but we'll probably need two more.
+but we’ll probably need two more.
 
 The direction of blurring can be chosen as either (-3, 4) or (3, -4);
 I chose the first here in order to use previous scan lines rather than
@@ -314,7 +314,7 @@ The overall Gabor filter, then, requires a cascade of around 8 + 5 + 8
 + 6 = 26 stages, each performing a single integer addition or
 subtraction, followed by some final scaling by a constant.  This is
 quite small compared to the millions of pixels in the support of the
-approximate Gabor wavelet that is the system's finite impulse
+approximate Gabor wavelet that is the system’s finite impulse
 response, although downsampling the image on its way into the pipeline
 would reduce this disparity somewhat.
 
@@ -322,7 +322,7 @@ would reduce this disparity somewhat.
 and got a pretty round-looking kernel with *n* = 5, *m* = 3, *p* = 30,
 and the (4, 3) stride suggested above.
 In plots it looks
-just fine, but of course that's not strong evidence.  I haven't
+just fine, but of course that’s not strong evidence.  I haven’t
 calculated its error (that would require figuring out the diameters of
 the Gaussians), but I estimate that in essentially this form it should
 be able to deliver worst-case errors of less than 1% (-40 dB) and
@@ -335,7 +335,7 @@ Reducing memory usage
 ---------------------
 
 As is standard practice, you can pipeline these stages (see file
-`dsp-pipeline`) so that you don't need 26 modified copies of the
+`dsp-pipeline`) so that you don’t need 26 modified copies of the
 entire image floating around in memory (some at increased precision).
 But doing this in the straightforward way, scan line by scan line, you
 still need a pretty big buffer to do this in, because some of the 26
@@ -368,17 +368,17 @@ memory needed is as follows:
        <tr><td>transverse comb 3      <td>240
 </table>
 
-Whew.  That's 1189 scan lines of memory in total, plus some fractional
-scan lines I'm not considering.  Is there any way to reduce this?
+Whew.  That’s 1189 scan lines of memory in total, plus some fractional
+scan lines I’m not considering.  Is there any way to reduce this?
 
-(Well, of course there's decimation.  But I mean aside from
+(Well, of course there’s decimation.  But I mean aside from
 decimation.)
 
-I thought about tiling.  It doesn't help, because you just switch from
+I thought about tiling.  It doesn’t help, because you just switch from
 having to buffer previous scan lines to having to buffer previous rows
-of tiles.  In fact it hurts a little because you can't discard
-fractional tiles.  Maybe there's still a way for it to work but I
-don't see it.
+of tiles.  In fact it hurts a little because you can’t discard
+fractional tiles.  Maybe there’s still a way for it to work but I
+don’t see it.
 
 I thought about maintaining resonator state in a different way, using
 per-pixel Minsky or Goertzel resonators, spatially shifted by varying
@@ -387,7 +387,7 @@ basically a Karplus-Strong oscillator).  This might help but it only
 saves you the memory needed by the resonator, which is relatively
 small compared to that needed to window the oscillations.  And it
 makes the assertion about the precise cancellation of windowing more
-dubious, since I don't think there's a precise way to calculate Minsky
+dubious, since I don’t think there’s a precise way to calculate Minsky
 or Goertzel resonation.  (See file `goertzel-minsky-pll-prefix-sums`.)
 
 I thought about using more stages for the transverse window.  That
@@ -402,7 +402,7 @@ the whole result image in memory instead of just part of it.
 Multiple Gabor sharing
 ----------------------
 
-So, if you're going to do a bunch of Gabor convolutions on the same
+So, if you’re going to do a bunch of Gabor convolutions on the same
 image, what parts of the pipeline should you share between them?
 
 The most computationally intensive (heh) parts of the pipeline are
@@ -410,7 +410,7 @@ those dependent on the frequency and the angle: the resonating
 feedback comb, the oscillation-axis low-pass filter, and (more
 loosely) the antialiasing filter.  These depend on *λ* and *θ*, but
 not *σ* or *γ*.  It might make sense to move these stages, as well as
-the transverse blur's integrators, to the beginning of the pipeline so
+the transverse blur’s integrators, to the beginning of the pipeline so
 that they can be shared between different window sizes and shapes,
 running the oscillation window and the transverse blur window later,
 which are only six of the 26 stages.  This probably is not practical
@@ -418,10 +418,10 @@ to do in floating-point because of the large magnitudes needed to feed
 the Hogenauer-style cascade of six windowing combs.
 
 The antialiasing filter is applicable over an octave or so of
-frequencies at any angle (although in the above example it's a bit
+frequencies at any angle (although in the above example it’s a bit
 longer in one direction than the other), and the transverse-blur
 integrators are applicable for any frequency at a given angle.  They
-can't both go first, though; putting the antialiasing filter first is
+can’t both go first, though; putting the antialiasing filter first is
 probably better because it allows you to decimate the image
 immediately.
 
@@ -433,7 +433,7 @@ approximating convolution with a Gabor wavelet probably works and
 probably is efficient (although my IPython notebook prototype
 certainly is not).  It provides obvious ways to set five of the six
 parameters, but not *ψ*, the phase offset.  This is a little alarming
-because without the phase offset there's no way to get the *complex*
+because without the phase offset there’s no way to get the *complex*
 Gabor wavelet.  It would be surprising if there turned out to be no
 way to do this, but none is obvious to me at the moment.
 
@@ -451,10 +451,10 @@ basis functions that could possibly approximate the target kernel
 well, then optimizing the weights of that sparse subset further, under
 a loss function that drives small weights toward zero.
 
-Moreover, there's no particular reason to limit yourself entirely to
+Moreover, there’s no particular reason to limit yourself entirely to
 Gabor wavelets when optimizing that approximation; you can include
 other kernels that can be computed efficiently using such sparse
 cascades, such as separable kernels (see file `svd-convolution`), flat
 and especially polygonal kernels (see file `convolution-bokeh`), and,
-using the techniques used above to propagate the Gabor's oscillation
+using the techniques used above to propagate the Gabor’s oscillation
 along a line, line segments.
