@@ -1,0 +1,288 @@
+Lots of images in the modern world are overlaid with some kind of
+regular screen pattern.  Halftoned images from newspapers, posters,
+and magazines; images printed on woven cloth or art paper with cloth
+imprinted on it; images photographed through window screens, security
+grilles, or microwave oven doors; signs printed on cloth-backed vinyl,
+illuminated from behind; GIFs using patterned dither; woodcut and
+metal engraving images; bus-window advertising, with its pattern of
+regular holes; shadow-mask and Trinitron patterns from CRTs;
+pixel-grid patterns from LCD matrices, especially low-resolution ones;
+silkscreened images with incomplete coverage; objects seen through
+mostly-opaque cloth; patterns of illumination on woven and nonwoven
+cloth and legs wearing fishnet stockings.  Additionally, there are
+one-dimensional equivalents — PWM signals, audio distorted by
+clipping, and AM radio.
+
+I suspect that these patterns are amenable to a number of interesting
+image-processing and other signal-processing algorithms.
+
+Dehalftoning
+------------
+
+### Traditional newsprint monochrome halftone ###
+
+A classic newspaper-article monochrome halftone image consists of a
+square lattice of black dots on a white background, rotated to some
+odd angle to minimize aliasing artifacts, whose varying diameters give
+varying “tones”, which is to say brightnesses, to different areas of
+the image.  In blacker areas, the dots lose their roundness and start
+to merge together, leaving isolated white dots, which start to become
+round.
+
+In the frequency domain, we can analyze a small area of the image as
+containing some DC level, plus “dithering noise” added by the
+halftoning, which is entirely concentrated in the even harmonics of
+two spatial frequencies, one 90° rotated from the other but otherwise
+identical — the frequencies of the warp and weft of the halftone
+screen.  If we look at different small areas of the image, the
+amplitudes (but not the phases) of these harmonics vary (in varying,
+non-monotonic ways) with the DC level; looking at a larger area of the
+image, this amplitude modulation manifests as sidebands on the
+“carrier signal”.
+
+The underlying process is not simply AM; the carrier signal is *added
+to* the underlying image gray level, and then the sum is thresholded
+(originally, through nonlinear chemical processing).  The result has a
+maximum carrier amplitude at 50% gray, and zero carrier amplitude at
+either pure white or pure black; the second harmonic of the carrier is
+zero at pure white, pure black, and 50% gray, while reaching amplitude
+maxima at 25% and 75%, I think; and higher harmonics vary in ampitude
+more rapidly.
+
+XXX even in one dimension, the Nth harmonic has N maxima and N+1
+nulls; the odd harmonics are not missing (except at 50%!) so the below
+algorithm is wrong (and probably something simpler is doable)
+
+### Linearly, shift-invariantly dehalftoning the newspaper ###
+
+Given the carrier frequency and angle, it is fairly straightforward to
+construct a zero-phase linear filter kernel that sharply notches out
+the carrier frequency itself and precisely its even harmonics, leaving
+just the information-carrying sidebands, using filter inversion.  The
+filter for the even harmonics is a (“feedback”) comb filter; spatially
+it looks like a square grid of points (positive impulses) at the same
+angle as the halftone screen and twice its frequency; the filter for
+the fundamental looks like the heights of egg-carton foam, also making
+a square grid at the same angle, but without impulses or sharp edges;
+and inverting either of those turns it negative and adds a new, much
+stronger positive impulse in the center.
+
+The convolution of these two notch filters provides a filter that
+eliminates the halftone screen entirely.  However, without any spatial
+windowing, they only remove the part without any spatial variation
+whatsoever; you need to window them down to a spatially reasonable
+area, for example with a Gaussian window, in order to remove the
+harmonics that are prevalent in a given area.
+
+This filter might still seem to have alarmingly large support for
+practical spatial-domain convolution, but due to its special
+structure, the multiplication-free sparse-kernel-cascade techniques
+described in file `sparse-kernel-cascade-gabor-approximation` can
+compute convolutions with it very inexpensively.
+
+There’s one problem left over: DC is an even harmonic of the
+halftone-screen frequency — the zeroth harmonic — so the even-harmonic
+filter removes the DC signal we wanted to save, and we’re left with
+only edges detected.  To solve this problem it is necessary to
+high-pass-filter the even-harmonic-selecting kernel so that its DC
+response is zero, or at least less than ½ or so, ideally without
+affecting its relative response to the other harmonics.  This is
+clearly doable by, for example, bidirectionally filtering the signal
+the even-harmonic filter detected with a high-pass Chebyshev filter
+before subtracting it from the original image pixel to invert it; but
+it’s not immediately evident to me if there’s a way to do it with the
+sparse multiplication-free approach.
+
+The frequency-selectivity of this approach should give much better
+high-frequency response than the usual approach of just blurring the
+image — that is to say, it should preserve edges that are close to the
+frequency of the halftoning screen itself, and even those that are
+higher, assuming the halftoning approach is the traditional
+photographic analog approach, from which the dots can come out
+off-center and non-round.
+
+#### Minor nonlinear enhancement ####
+
+If the resolution is high enough, the intendedly-bilevel nature of the
+halftoned image can be used to nonlinearly correct some other errors:
+uneven illumination, uneven paper color, and uneven ink blackness can
+all be corrected by contrast-stretching the image with locally-varying
+black and white levels; a bit of morphological opening and closing
+might help due to the intendedly-contiguous nature of the halftone
+dots.  Doing this for CMYK images is more complex, due to the 16
+possible combinations of ink colors, but is certainly possible with
+high enough resolution.
+
+Some kind of nonlinear preprocessing is probably needed for CMYK
+images, because each color channel is normally printed with the
+halftoning screen at a different angle in order to reduce aliasing
+artifacts, and the inks interact nonlinearly (though I conjecture that
+in a negative image they might be closer to linearity).  So you need
+to recover some kind of per-color-channel estimate before you go
+trying to dehalftone.
+
+### Linearly, shift-invariantly dehalftoning other images ###
+
+The other kinds of images I mentioned above — backlit images printed
+on cloth-backed vinyl, images printed on Lambertian cloth, images with
+CRT shadow-mask patterns, and so on — mostly don’t have the pattern of
+modulation of harmonics that characterizes the kind of screen
+halftoning used by newspapers and magazines.  Instead, they have a
+grid pattern whose amplitude is multiplied by the image, pixel by
+pixel, without modulating the spatial spectrum of the grid pattern
+(unless there’s sensor saturation, say).  Nevertheless, the same
+linear filter should work.
+
+This process is a much purer spatial equivalent of amplitude
+modulation as used in radio, although the carrier signal is not
+sinusoidal, and the baseband signal is still present; in general it
+consists of all the harmonics of two spatial frequencies, which is to
+say, the lattice generated by two vectors in frequency space.
+
+### Morphologically, shift-invariantly dehalftoning those images ###
+
+In these cases, it ought to be possible to morphologically open or
+close the image in order to reduce the halftoning
+artifacts — depending on whether the artifacts are dark, as they
+usually are, or light, as in a photo taken through a window screen.
+This approach won’t work (or will work very poorly) with newspaper
+halftoning, because the image data isn’t encoded in the brightness or
+color of what is seen through the screen, but of the size of the
+“apertures”.  But for linearly-encoded data like this, it ought to
+work well.
+
+This is closely analogous to how a crystal radio set demodulates AM
+radio, though without a tuner: the nonlinearity of the diode detector
+spreads the peak of the detected wave across the valleys in between.
+
+### Chroma subsampling ###
+
+CRT and (low-resolution) LCD images are somewhat special among
+linearly-encoded halftoned images in that they have, effectively,
+color filters — the red, green, blue, and sometimes white subpixels
+are each limited in what colors they can carry.  Nevertheless, in CRTs
+and in LCDs using subpixel rendering, they are used to carry both
+chroma and brightness information, relying on the lower resolution
+accorded to chroma information by the eyes of the humans.
+
+Probably the best solution here is to do the dehalftoning process
+entirely in brightness-space, then add blurred chroma information to
+it afterwards.
+
+### Non-shift-invariant dehalftoning ###
+
+A potentially more interesting approach is to try to identify which
+pixels depend on the “underlying image” and which are just part of the
+halftone screen and should be filled in based on some kind of filling
+operation from the underlying image (whether via mathematical
+morphology or some kind of more elaborate texture-synthesis
+algorithm).  This is likely to work a lot better for, for example,
+photos taken through security grilles or microwave oven doors, than
+the algorithms above.
+
+Low-resolution images are likely to have a lot of mixed pixels, so the
+model needs to handle partly-screen pixels.
+
+The simplest kind of model here is one that estimates the phase,
+angle, and perhaps waveform of the screen; then multiplies the image
+by it pixel-by-pixel to selectively amplify the underlying image; then
+blurs that image or comb-filters out the screen frequency, as before,
+to estimate the underlying image.  This is precisely analogous to an
+AM radio receiver mixing with a local oscillator.
+
+Video or stereo data is probably very useful for these models, since
+correlations over time or over viewpoints will tend to separate the
+underlying image from the screen.
+
+### Optimization-based approaches ###
+
+Given a computation that generates a halftoned image from an
+underlying image and other parameters such as halftone-screen angle
+and phase, an error metric accounting for the likelihood of things
+like sensor noise and ink squeeze, and a prior probability
+distribution over underlying images, you can use a generic
+high-dimensional optimization algorithm such as the popular variants
+of gradient descent to infer likely underlying images.
+
+(See file `image-approximation` for more explorations along these
+lines.)
+
+Image separation by demodulation
+--------------------------------
+
+Consider a photo taken through a microwave-oven door.  Most of the
+image consists of a reflection of the room behind the camera, but
+through the holes in the RF shielding grille we can see the scene
+inside the microwave.
+
+As I said above, the inside scene is an amplitude-modulated signal,
+and we can recover it in the usual way, by mixing with a local
+oscillator or morphologically “rectifying” it, and then filtering out
+the carrier.  However, another alternative is to filter out the
+carrier *and the sidebands*, leaving only the reflection of the room.
+
+An improved estimate of either the baseband non-modulated image of the
+room or of the interior, amplitude-modulated image, allows us to do a
+better job of canceling its contribution to the combined image,
+getting a better estimate of the other image.  In this way we can, to
+a significant extent, separate the original combined image into its
+constituent layers.
+
+(The same approach can be used, of course, with temporally-modulated
+illumination; in a loose sense this is the basis of structured-light
+3-D scanning.)
+
+### Canceling reflections of amplitude-modulated textures ###
+
+As another example of the same phenomenon, on the bus home, there was
+an illuminated sign indicating which branch of the line the bus was
+serving, made of fabric-backed vinyl and illuminated from within.
+This sign was just inside the windshield, near the bottom, so it
+created a strong reflection on the windshield, obscuring the image of
+the road.
+
+With this approach, it should be possible to subtract the
+cloth-modulated reflection and see the road — if JPEG compression
+doesn’t get to your image first and erase the subliminal road data.
+
+### Detecting amplitude-modulated textures in superimposed images ###
+
+Consider instead looking out the window of a café where the sun is
+falling on a table.  The newspaper on the table, lit by the sun, is
+reflected in the window; its reflection is superimposed on the image
+of the tree outside the window.  Can you recover the newspaper
+front-page photo from a high-resolution combined image?
+
+Newspaper halftoning has the solarization ambiguity I mentioned
+earlier — the spatial frequency spectra are symmetric around 50% gray.
+But, in theory, even the fundamental frequency and its second harmonic
+are sufficient to recover the gray level up to that ambiguity — but
+only if you know beforehand how strong they would be at their
+strongest.  The third and fourth harmonics help further, because their
+own minima allow us to precisely calibrate the strength of the first
+and second harmonics.
+
+(I say “minima” because the nulls are far sharper than the maxima,
+being as they are the crossing of a sinusoid with the X-axis, while
+the maxima are the peaks of those sinusoids.)
+
+A similar problem is removing glare from a photograph of a glossy
+magazine.  If the sensor didn’t saturate and the photo didn’t suffer
+lossy compression, the halftone-frequency information in the glare
+area contains most of the information, again up to the solarization
+ambiguity.
+
+All of these presuppose that you can perspective-correct the image and
+obtain a reasonably correct estimate of the halftoning frequencies and
+angles, of course.
+
+For mesh sizes below about 200 μm, diffraction starts to become a
+problem, and geometric-optics-based algorithms become increasingly
+inaccurate.  The Airy radius sin *θ* = 1.22*λ*/*D* of a 100-mm mirror
+at 555 nm is 6.7 μradians, which means that from more than about 30
+meters away, a 100-mm mirror or lens can’t image through a 200-μm
+hole; the mirror itself is visible, subtending about 0.2°, half the
+apparent size of the sun or moon.  More-distant sensors would need to
+be proportionally larger.  So you don’t need to worry about drones too
+far away for you to see using these algorithms to see through your
+bedroom curtains.

@@ -1,0 +1,230 @@
+Here I want to talk about some things to try for sparse filter design
+that might extend its range considerably.
+
+What I mean by “sparse filters”
+-------------------------------
+
+File `sparse-filters` outlines some basic techniques for designing
+digital filters that require only a few inexpensive operations per
+sample, file `sparse-kernel-cascade-gabor-approximation` demonstrates
+how to get an almost arbitrary approximate 2-D Gabor wavelet from
+under 30 additions and subtractions.  File `convolution-bokeh`
+describes some ways to do precise flat convolution filters in 2-D
+sparsely, and file `svd-convolution` describes some once-well-known
+ways to do very inexpensive approximate convolution using a
+singular-value decomposition of the desired convolution
+kernel — approaches that do require multiplications, but fewer.
+
+Basics
+------
+
+The basic techniques I’m using are CIC or Hogenauer filters; comb
+filters, especially negative-feedback comb filters; linear filter
+composition, convolving their time-domain responses; filter addition,
+adding their time-domain responses; and zero-phase filter inversion.
+
+(The notes in this section probably are not an adequate introduction
+to the subject, but hopefully are sufficient to tell if I have
+something basic wrong with my understanding; [The Scientist’s and
+Engineer’s guide to DSP](http://www.dspguide.com/) is a much better
+introduction.)
+
+The basic Hogenauer filter is a boxcar low-pass filter built from a
+marginally stable recursive integrator and a feedforward comb filter;
+its response in the time domain is a pulse, which is of course finite,
+and in the frequency domain it’s a sinc.  Most commonly they’re used
+for sample rate downconversion — you cascade two to four of them to
+get a Gaussian response in both domains, rearrange the order of the
+stages to put the integrators first, and decimate in between to reduce
+the memory requirement on the comb filters.  Then, typically, you use
+a direct-form FIR filter at the lower rate to flatten out the
+passband.
+
+Feedforward comb filters amount to adding the input signal to a
+delayed and possibly inverted version of itself; by destructive
+interference, this perfectly cancels frequencies for whom the delay is
+an odd number of half-cycles, or a whole number of cycles if inverted.
+Nearby frequencies are attenuated, but the notch is pretty sharp.
+They also amplify broad ranges of frequencies in between the notches
+by as much as 6 dB, those for which the interference is constructive.
+Negative-feedforward comb filters eliminate DC bias, and more
+generally they have a high-pass effect up to half of their first null
+frequency; positive-feedforward comb filters double DC bias.
+Feedforward comb filters’ impulse responses consist of pairs of
+impulses.
+
+Unity-gain *feedback* comb filters are marginally stable: their
+impulse response is an infinite impulse train, alternating in sign if
+gain is negative.  Instead of sharp nulls, they have sharp resonances,
+with infinite gain in fact; the positive-feedback ones have resonances
+at the period of their lag and all its harmonics (including zero),
+while the negative-feedback ones have resonances at twice the period
+of their lag and its odd harmonics.  So negative-feedback comb filters
+resonate at the frequencies that a positive-feedforward comb filter
+with the same lag would cancel, and positive-feedback comb filters
+resonate at the frequencies that a negative-feedforward comb filter
+with the same lag would cancel.
+
+If you replace the marginally-stable integrator in a Hogenauer filter
+with a marginally-stable unity-feedback comb filter — positive or
+negative — then instead of integrating the DC component of the input,
+it starts integrating a pulse-train component of the input.  (You need
+to make sure that the following stabilizing feedforward comb filter is
+canceling in-phase components of that pulse train.)  This transforms
+the Hogenauer filter from a low-pass filter into a bandpass filter,
+one that responds equally at a fundamental frequency and either all
+its harmonics, including DC (if the feedback comb uses positive
+feedback) or just its odd harmonics (if it uses negative feedback).
+Its window is a boxcar and so its frequency-domain response is just a
+sinc, or rather a periodic, infinite sequence of sincs, so usually you
+need to cascade this one too.  A cascade of three or more provides a
+quite good approximation to a Gabor wavelet.
+
+Cascading or composing filters convolves their time-domain impulse
+response and multiplies their frequency response; in particular this
+means that if a filter has zero response at some frequency, then so
+will any cascade of linear filters including it.
+
+Given two or more filters, you can connect them to the same input and
+add together their outputs.  The time-domain impulse response will be
+the sum of their individual responses, which is straightforward, and
+so will the frequency-domain impulse response, which is not
+straightforward, because the frequency-domain response is in general
+complex.  So if two filters both amplify a certain frequency by 3 dB,
+their sum might amplify it by 3 dB, or by 9 dB, or they might cancel
+it out completely, or anything in between, depending on their relative
+phase.
+
+For this reason it’s often convenient to design with linear-phase
+filters, those whose impulse response is time-reversal-symmetric†, like
+the boxcar or an equal pair of impulses.  By delaying your other
+signals relative to a linear-phase filter, you can make it a
+*zero-phase filter*, whose impulse response is time-reversal-symmetric
+*around zero time*.  Linear-phase filters include boxcars, Gaussians,
+unity-gain positive-feedforward comb filters, and the bandpass variant
+of the Hogenauer filter described above — as long as its time-domain
+response has an *odd number* of half-wavelengths in it.  They also
+include arbitrary convolutions of linear-phase filters and arbitrary
+sums of zero-phase filters.
+
+*Inversion* is subtracting the null filter — the input signal — from a
+zero-phase, appropriately-scaled low-pass filter, converting it into a
+high-pass filter.  This is very demanding of the low-pass filter,
+though: 1 dB of passband droop in the low-pass part is going to limit
+stopband attenuation to a miserable -10 dB!
+
+† These have *even* time-domain response.  Filters with *odd*
+time-domain response are *also* linear-phase but I don’t know how to
+make them zero-phase other than, I guess, convolving them with another
+filter with odd time-domain response to get a filter with even
+time-domain response.  There are other linear-phase filters which are
+weighted sums of odd and even filters with the same frequency
+response, but I have no idea how to take advantage of that.
+
+Flattening out the passband without a direct-form FIR filter
+------------------------------------------------------------
+
+As I said above, it’s common to use a direct-form FIR filter to
+flatten out the passband of a CIC filter when you use it for rate
+downconversion.  The idea is that you can run just the integrators,
+which just do an addition per sample, at the high sample rate, to get
+a kind of floppy low-pass-filtered signal that anyway doesn’t have any
+significant signal left up at the top end to alias when you decimate
+it; then you can clean up that droopy passband at the lower sample
+rate where you have time for lots of computation per sample.
+
+But what if you aren’t using the Hogenauer filter for downconversion?
+What if you want a bandpass filter (using the variant I described
+above) or, God forbid, you want to invert the filter and get a
+high-pass filter out of it?
+
+Well, it occurs to me that if you want your bandpass filter to have a
+somewhat flatter top, you have several alternatives.  First, instead
+of cascading several sinc-frequency-response bandpass filters at the
+*same* frequency, you could *cascade* several at *different* but
+similar frequencies.  The droop in the various frequency responses
+will compensate somewhat for the amplification that comes from the
+“integrators”.  Second, by using zero-phase bandpass
+filters — windowing their pulse-train time-domain response so that
+it’s symmetric — you can *add* several of them in parallel.
+
+Another alternative is to start with a much wider passband than you
+need — using a very short window in the time domain — and then
+*subtract* narrower bandpass filters above and below.  Or maybe use
+feedforward comb filters to notch out frequencies above and below your
+desired passband.
+
+Similarly, I think you can use a broad zero-phase bandpass filter of
+the kind described above — maybe with a Q of 2 or so — to shore up the
+droopy high end of an orthodox Hogenauer filter’s passband.
+
+Low-Q bandpass filters
+----------------------
+
+Above I pointed out that you can get a Hogenauer-like bandpass filter
+with a cascade of a feedback comb like
+
+> *y*[*t*] = *x*[*t*] - *y*[*t* - 8]
+
+and a feedforward comb like
+
+> *y*[*t*] = *x*[*t*] + *x*[*t* - 24]
+
+(XXX is this correct?)
+
+to get a finite-time impulse response.  This is very frugal if you
+want a lot of oscillations in your window and thus a high Q — you can
+get an arbitrarily large number of oscillations with just two adds or
+subtracts.  But if you only want a small number of oscillations, for a
+filter for a broad range of frequencies, you might as well use a
+direct-form FIR filter:
+
+> *y*[*t*] = *x*[*t*] - 2*x*[*t* - 8] + *x*[*t* - 16]
+
+Various pulse sizes
+-------------------
+
+If you have a single integrator connected to your input signal, you
+can use several negative-feedforward combs on it to get various sizes
+of boxcars out of it.  The same boxcar can be added to itself with
+multiple different delays to build the overall shape of a filter
+kernel; indeed, going beyond series-parallel combinations, boxcars of
+a small number of different sizes can be used, then melted together
+with a low-pass filter.
+
+Splines
+-------
+
+If you convolve two boxcars of the same size you get a triangle
+function.  If you convolve that triangle function with a signal
+sampled at intervals of the boxcar size — one impulse every boxcar
+length, with zeroes in between — you get a linear interpolation of the
+signal.  This gives you an easy and fairly sparse way to generate a
+filter with piecewise-linear time-domain response, requiring one
+multiply per knot in the kernel, per sample.
+
+If you convolve the triangle with itself, you get a piecewise-cubic
+approximation of the Gaussian.  This is not a basis spline, but it’s
+not far from one; it is a simple linear algebra exercise to express an
+arbitrary piecewise-cubic signal with knots at one-boxcar intervals in
+the basis of this kernel, shifted by one-boxcar intervals.  (You
+convolve the signal at the knots with the representation of the basis
+spline in terms of the approximate Gaussian.)  This gives you an only
+slightly less easy, and very nearly as sparse, way to generate a
+filter with a piecewise-cubic time-domain response, again, requiring
+one multiply per knot in the kernel, per sample.
+
+In some cases it might make sense to sum a few different such spline
+kernels at different scales to different levels of detail at different
+times during the kernel.
+
+A factitious sinc
+-----------------
+
+A sinc looks like a Gaussian lump in the middle, a sine wave on the
+left that gets smaller on the left, and a sine wave on the right (180°
+out of phase with the left one) that gets smaller on the right.  What
+if we add together a Gaussian and a few differently delayed copies of
+a shortish triangle-windowed oscillation kernel, made out of the
+bandpass thing described above?  Could we get a frequency-domain
+bandpass response that looks more like sinc’s ideal pulse?

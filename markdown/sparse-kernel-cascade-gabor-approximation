@@ -173,8 +173,8 @@ harmonic is 2.3 octaves above the fundamental, so a generic low-pass
 filter can separate it from the fundamental pretty easily.
 
 Our fundamental has a period (8*n*, 6*n*), so our third harmonic has a
-period (8*n*/3, 6*n*/3).  We can either subtract pixels at this
-displacement or add pixels at half this displacement (4*n*/3, 3*n*/3)
+period (⅓8*n*, ⅓6*n*).  We can either subtract pixels at this
+displacement or add pixels at half this displacement (⅓4*n*, ⅓3*n*)
 to completely suppress the third harmonic.  If these offsets are not
 precise, for example because 4*n* isn’t divisible by 3, the
 suppression won’t be precise either, and a lot more of the third
@@ -185,7 +185,7 @@ low-pass filtering.)
 So the simplest form of our heart-stabbing filter would look like
 this:
 
-> *y*[*i*, *j*] = *x*[*i*, *j*] + *x*[*i* - 4*n*/3, *j* - 3*n*/3]
+> *y*[*i*, *j*] = *x*[*i*, *j*] + *x*[*i* - ⅓4*n*, *j* - ⅓3*n*]
 
 That taken care of, we can proceed to the oscillation-axis low-pass
 filter, which is mostly important if *n* is larger than 2 or 3.
@@ -353,7 +353,7 @@ memory needed is as follows:
        <tr><td>oscillation window 3 <td>90
        <tr><td>resonator 4          <td>15
        <tr><td>oscillation window 4 <td>90
-       <tr><td>heart-stabbing filter<td>5           <td><i>x</i>[<i>i</i> - 4<i>n</i>/3, <i>j</i> - 3<i>n</i>/3]
+       <tr><td>heart-stabbing filter<td>5           <td><i>x</i>[<i>i</i> - ⅓4<i>n</i>, <i>j</i> - ⅓3<i>n</i>]
        <tr><td>axis LPF integrator 1<td>3           <td><i>y</i>[<i>i</i> - 4, <i>j</i> - 3]
        <tr><td>axis LPF comb 1      <td>6           <td>-<i>x</i>[<i>i</i> - 8, <i>j</i> - 6]
        <tr><td>axis LPF integrator 2<td>3
@@ -425,6 +425,43 @@ can’t both go first, though; putting the antialiasing filter first is
 probably better because it allows you to decimate the image
 immediately.
 
+Dealing with invalid pixels ("NA")
+----------------------------------
+
+Sometimes we can identify certain pixels as containing invalid
+data — for example, they don’t work on the sensor, or they’re
+suffering salt-and-pepper noise in this frame, or they’re saturated
+(perhaps due to a lens flare).  Some numerical-computation
+environments have special facilities for such situations; Octave and R
+have “NA”, while Numpy has “masked arrays” which support most of the
+same operations as ordinary arrays.
+
+Dealing with such invalid pixels is a particularly tricky problem for
+FFT-based convolution algorithms, since the structure of the FFT
+doesn’t have a reasonable way to incorporate validity information.
+R’s `fft` function, for example, will simply return an array of NA
+values if asked to transform an array with a single NA value in it.
+Octave, by contrast, returns an array whose values are NA only in the
+phase or phases affected by the NA value — so they may have a NA real
+magnitude, a NA imaginary magnitude, or both.  In either case, you
+can’t use FFT convolution on a signal containing even a single invalid
+pixel; the signal comes back entirely NA.
+
+By contrast, a direct implementation of convolution has three
+straightforward ways to handle NA values: it can propagate them to the
+affected neighborhood, turning each single NA pixel into a giant NA
+hole in the result; it can omit the NA pixels from the weighted sum,
+increasing the weights on the other pixels to compensate, unless all
+pixels with nonzero weight are NA; or it can switch between these two
+strategies at some threshold of invalidity, such as 50%.  (Both
+Octave’s `conv` and R’s `filter(method=’convolution’)` take the first
+approach.)
+
+This kind of sparse filtering using two-input kernels could take any
+of these three approaches, but in the recursive case (integrators) any
+of them would lead rapidly to disaster.  Probably in that case the
+least bad approach is to treat NA pixels as 0 in recursive filters.
+
 Conclusions
 -----------
 
@@ -440,7 +477,8 @@ way to do this, but none is obvious to me at the moment.
 (The issue is that you want to phase-shift the oscillation by a
 quarter cycle, but without moving the Gaussian window along with it.
 Maybe the solution could be something as simple as a differentiator in
-the direction of oscillation and a compensating constant factor.)
+the direction of oscillation, perhaps by a half cycle,
+and a compensating constant factor.)
 
 Among the possible applications are approximating an arbitrary
 convolution kernel as a sum of Gabor wavelets.  One possible approach
@@ -458,3 +496,9 @@ cascades, such as separable kernels (see file `svd-convolution`), flat
 and especially polygonal kernels (see file `convolution-bokeh`), and,
 using the techniques used above to propagate the Gabor’s oscillation
 along a line, line segments.
+
+Another possible application is the design of transmission-line RF
+filters, including stripline/microstrip transmission lines built into
+printed circuit boards, and waveguide filters — though I’m not sure
+how much that will buy you, given the need for matching networks to
+interconnect the signal paths.
