@@ -44,3 +44,17 @@ not.  This results in wasting something like half of my display’s
 horizontal resolution, two thirds for dim blue-tinted graphics.  This
 is really frustrating when I’m trading off legibility for data
 coverage.
+
+LCD subpixel ordering is not the limit of subpixel antialiasing,
+either, and I think that even the soft antialiasing matplotlib uses
+provides visually-subpixel positioning of the line.
+
+Matplotlib of course does not insist on drawing one-pixel-wide lines.
+You can get it to draw lines several pixels wide.  It’s just that the
+particular line profile it uses is a slightly antialiased boxcar: a
+constant opaque color inside the line, dropping off to perfect
+transparency outside it.  You could easily imagine a better compromise
+between precision and visibility — for example, a strong thin line
+with a diffuse background around it, possibly in a contrasting color,
+making it easy both to find the line and see its overall shape and to
+see its precise value.

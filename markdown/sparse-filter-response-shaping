@@ -1,3 +1,6 @@
+A bag of candidate techniques for sparse filter design
+======================================================
+
 Here I want to talk about some things to try for sparse filter design
 that might extend its range considerably.
 
@@ -14,6 +17,38 @@ sparsely, and file `svd-convolution` describes some once-well-known
 ways to do very inexpensive approximate convolution using a
 singular-value decomposition of the desired convolution
 kernel — approaches that do require multiplications, but fewer.
+
+The conventional wisdom, as I understand it, is to use direct-form FIR
+filters, with their non-sparse array of coefficients which gains
+nothing from cascading (you might as well just convolve the two arrays
+of coefficients and get a single-stage FIR kernel with one fewer
+multiplication per sample to do), and IIR filters without any delay
+elements in them, ideally realized as a cascade of second-order
+sections, applied bidirectionally if you need linear phase delay.  The
+Hogenauer filter, Karplus-Strong string synthesis, and PLLs hint that
+it’s possible to do dramatically better, especially on computers and
+FPGAs where delay memory is nearly free but multiplication is
+expensive; but we still lack a theory of how to design such things.
+
+If you convolve two FIR filters whose impulse responses are *m* and
+*n* samples long, the resulting impulse responses is *m* + *n* - 1
+samples long.  But, even without resorting to non-LTI filters, if you
+convolve two FIR filters whose impulse responses contain *m* and *n*
+nonzero elements, possibly with zero elements between them, the
+resulting impulse response may have as many as *mn* nonzero elements.
+So if you convolve *n* FIR filters each containing only two nonzero
+samples, you can get a FIR filter with 2*ⁿ* nonzero samples, if there
+is never any overlap.  This allows you to get a 2*ⁿ*-tap FIR filter
+with only *n* multiplications — but not *any* 2*ⁿ*-tap FIR filter,
+only certain special ones, ones which are as far as I know not very
+interesting.  Still, the possibility is open that we can do
+exponentially better than we have done so far.
+
+More interestingly, there are certain convolutions of FIR and IIR
+filters which produce FIR rather than IIR filters; this allows you to
+get, say, a zero-phase bandpass filter at any frequency with a
+selectable and arbitrarily high Q — perhaps 1000 or 100'000 — with six
+to ten additions and subtractions per sample.
 
 Basics
 ------
@@ -158,6 +193,23 @@ Similarly, I think you can use a broad zero-phase bandpass filter of
 the kind described above — maybe with a Q of 2 or so — to shore up the
 droopy high end of an orthodox Hogenauer filter’s passband.
 
+Reducing harmonics of bandpass filters with frequency diversity
+---------------------------------------------------------------
+
+Windowing a feedback comb doesn’t get you just one passband; it gets
+you as many passbands as will fit in your sample rate, since either
+all the harmonics of the baseband or all the odd harmonics will also
+be passbands.  Since you need to cascade a few windowed combs to get
+acceptable stopband suppression anyway, you might try detuning them
+from each other a bit not only to flatten the desired passband but
+also so they mutually weaken one another’s harmonics.  This works
+because all the passbands of a feedback comb are equally wide (in
+cycles per sample) at, say, their half-power points, but harmonics are
+further apart (in cycles per sample) than the fundamental.
+
+This may not be very important since you probably just want to use a
+low-pass filter to attenuate those harmonics.
+
 Low-Q bandpass filters
 ----------------------
 
@@ -170,8 +222,6 @@ and a feedforward comb like
 
 > *y*[*t*] = *x*[*t*] + *x*[*t* - 24]
 
-(XXX is this correct?)
-
 to get a finite-time impulse response.  This is very frugal if you
 want a lot of oscillations in your window and thus a high Q — you can
 get an arbitrarily large number of oscillations with just two adds or
@@ -180,6 +230,25 @@ filter for a broad range of frequencies, you might as well use a
 direct-form FIR filter:
 
 > *y*[*t*] = *x*[*t*] - 2*x*[*t* - 8] + *x*[*t* - 16]
+
+You can see that these are equivalent by plotting the results of the
+following Numpy code:
+
+    def feedback_comb(sig, lag, gain):
+        rv = sig.copy()
+        for i in range(lag, len(rv)):
+            rv[i] += gain * rv[i - lag]
+        return rv
+
+    def feedforward_comb(sig, lag, gain):
+        rv = sig.copy()
+        rv[lag:] += gain * sig[:-lag]
+        return rv
+
+    x = zeros(100)
+    x[2] = 5
+    y = feedback_comb(x, 8, -1)
+    z = feedforward_comb(y, 24, 1)
 
 Various pulse sizes
 -------------------
@@ -228,3 +297,45 @@ if we add together a Gaussian and a few differently delayed copies of
 a shortish triangle-windowed oscillation kernel, made out of the
 bandpass thing described above?  Could we get a frequency-domain
 bandpass response that looks more like sinc’s ideal pulse?
+
+Other candidates
+----------------
+
+- Recognizing a square wave, or in 2-D a zebra pattern, by convolving
+  an impulse train (finite-length, windowed, or otherwise) with a
+  pulse
+- Combining filters by multiplication, min, or softmin rather than
+  addition to recognize “templates”
+- Measuring the ac energy along lines at different angles to identify
+  the angles which contain most information, before running a more
+  expensive operation (perhaps the humans do this when they tilt their
+  heads)
+- Maybe take the FFT of the signal along a line at some angle through
+  an image to identify one or two dominant frequencies; the relative
+  phases of those dominant frequencies in a nearby parallel line
+  (obtainable with Goertzel or with the delay-line techniques
+  discussed above) then give you an estimate of the dominant angle of
+  lines running across the region between them — maybe cheaper than
+  running a cross-correlation on the two lines
+- Exponential filtering from a recursive non-unity-gain feedback comb
+  filter (in any spatial direction, e.g. coma from lens aberration) is
+  linear and “sparse” though it requires a multiplication; can you cut
+  it down to a finite impulse response in the same way as its special
+  cases above, the integrator and the unity-gain feedback comb?  Even
+  if not perfectly (e.g., due to rounding error), can you do it well
+  enough to make useful IIR approximations of FIR filters?
+- More generally, piecewise-complex-exponential approximations of
+  filter responses
+- File `sparse-kernel-cascade-gabor-approximation` laments not having
+  a way to rotate the phase of a given frequency 90 degrees without
+  phase-shifting much lower frequencies detectably.  Can it be as
+  simple as a unity-negative-feedback comb?
+- Spectral inversion is of course not linear, but it can be applied to
+  a signal very cheaply.  If you invert the spectrum of a signal on
+  the way in and out of a linear filter, you have inverted the
+  frequency response of that filter, though be careful of the delay so
+  that you don’t inadvertently invert the signal amplitude.  In
+  addition to doing this around ½*fₛ* by alternating signs on every
+  sample, you can do it around ¼*fₛ* by alternating signs every other
+  sample, offering the potential of inverting either the signal
+  amplitude or frequency if you get the phase delay wrong

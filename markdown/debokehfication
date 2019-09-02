@@ -1,1 +1,57 @@
-Bokeh preserves sharp edges; it just spreads them out.
+Bokeh preserves sharp edges; it just spreads them out.  The
+circularly-symmetric boxcar filter of an ideal bokeh has a
+circularly-symmetric sinc frequency response in two-dimensional
+frequency space, and sinc’s falloff is pretty slow, just 6 dB per
+octave.  So even a 32-pixel-wide bokeh is only attenuating
+single-pixel detail by about 30 dB.
+
+Indeed, as suggested in file `starfield-servo`, under some
+circumstances such a bokeh can actually *enhance* sensor precision,
+and it might be preferable to use a large pinhole in front of a sensor
+rather than a lens on a camera, both because it gives you a more
+precise reading on the position of bright impulses in the visual
+field, and because it does a better job of taking advantage of the
+limited dynamic range of common image sensors.  A more elaborate
+shadow mask such as a Hadamard matrix could improve this further.
+
+Real camera bokehs tend to not be perfectly flat, even at small
+scales; although they don’t include Hadamard-matrix shadow masks, in
+addition to spherical aberrations, they do include tiny imperfections
+on the lens and lens filters that only add a tiny amount of stray
+light to a focused image, but are easily visible in unfocused images
+of (near) point source lights.
+
+> N.B.: This effect might be useful for getting lensless optical
+> transmission microscopy out of commonplace digital cameras without
+> taking the lenses off of them: put the slide reasonably close to the
+> camera, illuminate with one or more out-of-focus point sources,
+> ideally with some non-overlapping or mostly non-overlapping images
+> on the focal plane.
+
+These imperfections provide additional high-frequency information that
+could permit improved estimates of the unblurred image; moreover, in
+images that contain at least some bright points, they can provide much
+tighter estimates of the defocus of a particular region of the image.
+Also, if they are sufficiently strong, they can disambiguate
+behind-focal-plane defocus from in-front-of-focal-plane defocus.
+
+Aside from the obvious approach of removing bokeh by applying Wiener
+filters selectively to parts of the image, it might be worthwhile to
+try not only convolution with an estimated bokeh shape but also
+morphological erosion with it, to identify candidate bright
+points — both to improve the estimate of bokeh shape and to measure
+the scale of the bokeh in different parts of the image.
+
+Image-processing tricks on the bokeh are not limited to removing it
+and doing microscopy with it; you can also do camera identification
+(from the lens imperfections) and depth estimation.  You might be able
+to correct chromatic aberration.
+
+Bokeh can vary over the focal plane due to, for example, occlusion
+from a shroud extending in front of the lens.  If this is recognizable
+it should be relatively easy to correct, but more general occlusion
+effects cannot be corrected in general — you might have a single light
+that’s half-covered by a finger halfway between the camera and the
+light, giving a sort of partially-eclipsed-moon bokeh not shared with
+much else in the scene.
+
