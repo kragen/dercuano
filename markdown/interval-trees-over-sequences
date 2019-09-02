@@ -151,6 +151,47 @@ index’s query performance thereafter.  8 levels of tree is sufficient
 up to four gigabytes, at which point the tree deepens and it becomes
 9.
 
+A tiny sketch of building such an index with numpy
+--------------------------------------------------
+
+I hacked this out quickly just in order to get some kind of
+performance measurement; it could obviously be cleaned up.  I kept the
+data size super small because I was plotting things and, although
+numpy can deal with tens of millions of items with no problem,
+matplotlib falls over.  Obviously in real life you would need some
+provision for non-power-of-two sizes, and probably appending records
+as well, and you wouldn't want a special-case array for the leafnode
+annotations.
+
+    x = rand(2**17)
+    x.sort()
+
+    leafnodes = x.reshape((len(x)//32, 32))
+    lmin = leafnodes.min(axis=1)                       # leafnode min/max
+    lmax = leafnodes.max(axis=1)
+
+    imin, imax = zeros(lmin.shape), zeros(lmax.shape)
+    size = len(lmin) // 2
+
+    imin[:size] = lmin.reshape((size, 2)).min(axis=1)
+    imax[:size] = lmax.reshape((size, 2)).max(axis=1)
+
+    pos = size
+
+    while size > 1:
+        size //= 2
+        imin[pos:pos+size] = imin[pos-2*size:pos].reshape(size, 2).min(axis=1)
+        imax[pos:pos+size] = imax[pos-2*size:pos].reshape(size, 2).max(axis=1)
+        pos += size
+
+Building the index this way on my laptop takes about 3–5 milliseconds.
+Taking precautions to limit the load on matplotlib, increasing `x` to
+2²⁴ items (128 mebibytes) slows it to 227 ms one time, 194 ms another
+time, 182 ms a third time.  Increasing it to 2²⁶ items, I accidentally
+crashed my laptop trying to re-evaluate the IPython cell (thus
+resulting in two half-gibibyte arrays in memory at once); sorting it
+took 10.8 seconds; but building the index tree only took 892 ms.
+
 Ordering and reindexing flexibility
 -----------------------------------
 
@@ -179,7 +220,11 @@ better at keeping the intervals smaller, and thus permit better
 pruning.  Some applications might even be able to get away with doing
 the simplest thing — leaving the records purely in insertion order
 --- because the insertion order already had enough locality in the
-relevant attributes to make queries adequately efficient.
+relevant attributes to make queries adequately efficient.  For
+example, in a zooming user interface, most queries for drawable
+objects are restricted to a particular (x, y, size) interval, and
+generally when you create new objects, you create them in a small
+area in a small range of sizes.
 
 If the records are instead sorted in a lexicographic order by some
 sequence of attributes, such as (x, y), then the performance
@@ -501,3 +546,24 @@ stored in a database, perhaps in a SAT solver or a database of
 combinational-logic circuits, and it might be useful to query not only
 for a particular bit pattern but for things that have supersets or
 subsets of it set.
+
+Affine-arithmetic nodes
+-----------------------
+
+Suppose that instead of annotating each node with just the (min, max)
+values of each indexed attribute, you annotate it with a coefficient
+which gives a *predicted* attribute value when multiplied by its
+offset within that node, and a (min, max) value pair for the
+*difference* between the predicted value and the real value.  If the
+coefficient is 0, then the (min, max) values are the same as before,
+but if there’s some correlation between the attribute value and the
+record position (at least locally), this may allow much tighter
+bounds, and in particular much faster range narrowing — interpolation
+search on steroids.
+
+(You might want some kind of extended-precision data type to handle
+the necessary arithmetic on string keys.)
+
+This is quite close to a totally trippy paper from Google Research on
+training neural nets as database index nodes, whose authors and title
+I forget.
