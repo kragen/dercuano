@@ -318,6 +318,8 @@ approximate Gabor wavelet that is the system’s finite impulse
 response, although downsampling the image on its way into the pipeline
 would reduce this disparity somewhat.
 
+### Python smoke test of the algorithm ###
+
 [I did try it in IPython tonight][1] ([notebook viewer][2]),
 and got a pretty round-looking kernel with *n* = 5, *m* = 3, *p* = 30,
 and the (4, 3) stride suggested above.
@@ -330,6 +332,82 @@ average-case errors that are smaller still.
 
 [1]: http://canonical.org/~kragen/sw/dev3/sparse-gabor.ipynb
 [2]: https://nbviewer.jupyter.org/url/canonical.org/%7Ekragen/sw/dev3/sparse-gabor.ipynb
+
+The code in the notebook boils down to something like this very crude
+code, with all but the last plot stripped out:
+
+    n=5
+    m=3
+    p=30
+    impulse = zeros((700, 700), dtype=dtype('float16'))
+    impulse[300, 100] = 1.0
+    ir1 = impulse.copy()
+    for i in range(4*n, len(ir1)):
+        ir1[i, 3*n:] -= ir1[i-4*n, :-3*n]
+    fr1 = ir1.copy()
+    for i in range(8*n*m, len(fr1)):
+        fr1[i, 6*n*m:] -= ir1[i-8*n*m, :-6*n*m]
+    ir2 = fr1.copy()
+    for i in range(4*n, len(ir2)):
+        ir2[i, 3*n:] -= ir2[i-4*n, :-3*n]
+    fr2 = ir2.copy()
+    for i in range(8*n*m, len(fr2)):
+        fr2[i, 6*n*m:] -= ir2[i-8*n*m, :-6*n*m]
+    ir3 = fr2.copy()
+    for i in range(4*n, len(ir3)):
+        ir3[i, 3*n:] -= ir3[i-4*n, :-3*n]
+    fr3 = ir3.copy()
+    for i in range(8*n*m, len(fr3)):
+        fr3[i, 6*n*m:] -= ir3[i-8*n*m, :-6*n*m]
+    hs = fr3.copy()
+    for i in range(int(4*n/3), len(hs)):
+        hs[i, 3*n/3:] += fr3[i-int(4*n/3), :-3*n/3]
+    ai1 = hs.copy()
+    for i in range(4, len(ai1)):
+        ai1[i, 3:] += ai1[i-4, :-3]
+    ff1 = ai1.copy()
+    ff1[8:, 6:] -= ai1[:-8, :-6]
+    ai2 = ff1.copy()
+    for i in range(4, len(ai2)):
+        ai2[i, 3:] += ai2[i-4, :-3]
+    ff2 = ai2.copy()
+    ff2[8:, 6:] -= ai2[:-8, :-6]
+    bf1i = ff2.copy()
+    for j in range(1, len(bf1i[0])):
+        bf1i[:, j] += bf1i[:, j-1]
+    bf1c = bf1i.copy()
+    bf1c[:, 8:] -= bf1i[:, :-8]
+    bf2i = bf1c.copy()
+    for j in range(1, len(bf2i[0])):
+        bf2i[:, j] += bf2i[:, j-1]
+    bf2c = bf2i.copy()
+    bf2c[:, 8:] -= bf2i[:, :-8]
+    bf3i = bf2c.copy()
+    for i in range(1, len(bf3i)):
+        bf3i[i] += bf3i[i-1]
+    bf3c = bf3i.copy()
+    bf3c[6:] -= bf3i[:-6]
+    bf4i = bf3c.copy()
+    for i in range(1, len(bf4i)):
+        bf4i[i] += bf4i[i-1]
+    bf4c = bf4i.copy()
+    bf4c[6:] -= bf4i[:-6]
+    tvi1 = bf4c.copy()
+    for j in range(4, len(tvi1[0])):
+        tvi1[:-3, j] += tvi1[3:, j-4]
+    tvc1 = tvi1.copy()
+    tvc1[:-3*p, 4*p:] -= tvi1[3*p:, :-4*p]
+    tvi2 = tvc1 / 256
+    for j in range(4, len(tvi2[0])):
+        tvi2[:-3, j] += tvi2[3:, j-4]
+    tvc2 = tvi2.copy()
+    tvc2[:-3*p, 4*p:] -= tvi2[3*p:, :-4*p]
+    tvi3 = tvc2 / 256
+    for j in range(4, len(tvi3[0])):
+        tvi3[:-3, j] += tvi3[3:, j-4]
+    tvc3 = tvi3.copy()
+    tvc3[:-3*p, 4*p:] -= tvi3[3*p:, :-4*p]
+    imshow(tvc3[200:500, 300:600], origin='lower'); colorbar()
 
 Reducing memory usage
 ---------------------
