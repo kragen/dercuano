@@ -1,0 +1,109 @@
+High-speed cameras are a crucial sensor technology for a variety of
+purposes, including high-speed robotics with camera feedback (see file
+`starfield-servo` and file `v-plotter-servo`) and analysis of
+high-speed physical events, such as breaking glass or basically
+anything solid objects do on the micron scale or below.  But existing
+high-speed cameras, based on CMOS and CCD sensors, are expensive and
+sometimes hard to get for other reasons.
+
+How about photodiodes for faster, cheap camera focal planes?
+
+Photodiodes
+-----------
+
+Cheap photodiodes can be astoundingly fast compared to a typical
+camera sensor.  The Fairchild QSD2030 5-mm IR photodiode has
+5-nanosecond response time, passes 25 microamps at 0.5 mW/cm^2 and 5
+volts, and 10 nA dark current (at 10V); it costs 53 cents at Digi-Key.
+The OSRAM SFH 2701 infrared photodiode (400-1050 nm) passes 1.4
+microamps under the same conditions, and boasts 2-nanosecond response
+times, for 95 cents (48 cents in quantity 100).
+
+In the subnanosecond range, prices do start to heat up, because you're
+getting into avalanche photodiodes and silicon photomultipliers; the
+Marktech MTAPD-07-003 infrared avalanche photodiode (which can detect
+down to 400 nm, though at 600 nm its responsivity is already cut in
+half) is specified for a 300 picosecond rise time, and it claims 35-50
+microamps at one microwatt of incident light (on its
+230-micron-diameter sensor --- though this may be an error and maybe
+it should be 0.35 to 0.50) and less than 400 pA of dark current
+(though "typical" is 50 pA).  It costs US$22.  (Advanced Photonix,
+Excelitas, ON Semiconductor, and Opto Diode are four other vendors.)
+
+Possible camera designs
+-----------------------
+
+### Matrix focal plane ###
+
+But at the 2-nanosecond prices you could quite reasonably put together
+a 16x16 focal plane of fast photodiodes and get a 256-pixel image at
+500 million frames per second, although it's challenging to amplify
+and digitize the data that fast, and your RF signal integrity design
+needs to be high-quality, with carefully matched stripline or
+something.
+
+### Pushbroom focal planes ###
+
+Maybe more interesting, you could put your 256 photodiodes in a
+*column* instead of a matrix, then scan them across the image
+horizontally, for example using a spinning mirror like the kind used
+in the Michelson-Morley measurements of the speed of light, in
+supermarket scanners, and in laser printers.  Spinning at 30,000 rpm
+like a Dremel tool, an eight-sided spinning mirror could scan 4000
+times per second; perhaps a separate stationary mirror or two could
+multiply that by 2 or 4.  Air bearings can manage perhaps three times
+higher speeds than that.
+
+You do suffer a loss of light-gathering capacity, because unless your
+camera is kilometers long, there's nowhere to store the light that
+gets reflected to the left or right of the photodiode array; it just
+gets lost.  Light-gathering capacity is extremely important at these
+speeds.
+
+However, note that this provides an only sort of mediocre frame rate,
+but a sort of excessively horizontal resolution, limited by the mirror
+speed: 500 million pixels per second per photodiode, divided by 4000
+scans per second, gives you 125000 pixels horizontally, but still only
+256 pixels vertically.  Something more like 512 pixels horizontally
+and a million frames per second would be a much better compromise.
+
+Maybe a bunch of stationary mirrors, or more facets on the spinning
+mirror, can increase the number of horizontal scans per second, at the
+expense of a very narrow field of view.  But maybe you start running
+into diffraction problems with mirror edges.
+
+### Staggered pushbrooms ###
+
+If there's no diffraction problem with mirror edges, though, there's
+an alternative to sacrificing field of view.  You increase the number
+of mirror facets as before, but you organize the photodiodes in
+several rows, as in the mirrorless 16x16 matrix --- but this time with
+a large empty horizontal space between columns, such that the narrow
+fields of view of the various columns, produced by the spinning
+mirror, nearly overlap, giving you back a wider field of view.
+
+Is there in fact a diffraction problem?  If we want our mirror facets
+to be at least 7 microns wide, we can fit almost 4500 of them around
+the circumference of a 10-mm-diameter mirror; this could give you a
+bit over 2 million scans per second.
+
+### Alternative camera scanning mechanisms ###
+
+Perhaps instead of a spinning mirror you could use an electro-optical
+Kerr cell or Pockels cell with a voltage gradient from one side of it
+to the other, thus obtaining much quicker response times but smaller
+deflection angles.  Alternatively you could physically move a mirror
+with a piezoelectric stack actuator like those used for
+adaptive-optics telescopes; many of these actuators have reasonable
+response at frequencies up into the megahertz, so sinusoidally
+scanning a mirror over a small angle at such frequencies should be
+feasible.
+
+Time-domain sparkle sensors
+---------------------------
+
+However, for applications like those described in file
+`starfield-servo`, the 16x16 matrix could be very useful --- not for
+motion video made of frames, but for measuring with high precision the
+times at which each sparkle begins to impinge on each camera pixel.
+This should provide
