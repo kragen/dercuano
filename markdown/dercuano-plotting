@@ -425,9 +425,22 @@ to 78 kilobytes.)
 
 The implicit, conditional associations in file `principled-apl` should
 help somewhat with the problem of associating varying quantities with
-an aesthetic — it should be just as easy to set the voltage's
+an aesthetic — it should be just as easy to set the voltage’s
 linewidth to be the current as to set it to 3.  (You might need some
 kind of scale mapping from amperes to pixels, though.)
+
+A possible alternative is, as in the 2016 prototype, to do computation
+by *changing* a *variable* — for example, adding a constant to it, or
+multiplying it by a time-lagged version of itself — and update a
+pre-existing display accordingly.
+
+Another approach, explored in file `relational-modeling-and-apl`, is
+for these quantities to exist as named attributes of a model, which
+then has one or more visual presentations.  A cylinder, for example,
+has a volume, a cross-sectional area, a lateral area, a total surface
+area, a radius, a diameter, and a length.  But I’m not sure how this
+would work with plotting a series of different cylinder volumes
+against some independent variable.
 
 Performance
 -----------
@@ -471,10 +484,16 @@ I tried it in C:
     }
 
 Without optimization, it was the same speed as Firefox; with
-optimization, I had to make the number a parameter to keep GCC from
+optimization, I had to make the number
+a command-line parameter to keep GCC from
 evaluating the loop at compile time, and it takes 900 ms, four times
 as fast.  (Also, it gets the right answer, unlike JS.)
 
 So the cost of JS for this simple integer numerical code is about a
 factor of 4.  So JS on my laptop or my phone is faster than C on my
-netbook.
+netbook.  And my rule of thumb is that code in Numpy takes 5× longer
+to run than reasonably written C, so JS might actually be faster than
+Numpy.  We just need to compile the dataflow graph into nested loops
+in JS before evaluating it in order to get that delicious JITty
+goodness!
+

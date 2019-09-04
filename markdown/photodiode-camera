@@ -6,29 +6,32 @@ anything solid objects do on the micron scale or below.  But existing
 high-speed cameras, based on CMOS and CCD sensors, are expensive and
 sometimes hard to get for other reasons.
 
-How about photodiodes for faster, cheap camera focal planes?
+How about photodiodes for faster, cheaper camera focal planes?
 
-Photodiodes
------------
+What photodiodes are like
+-------------------------
 
 Cheap photodiodes can be astoundingly fast compared to a typical
-camera sensor.  The Fairchild QSD2030 5-mm IR photodiode has
-5-nanosecond response time, passes 25 microamps at 0.5 mW/cm^2 and 5
-volts, and 10 nA dark current (at 10V); it costs 53 cents at Digi-Key.
-The OSRAM SFH 2701 infrared photodiode (400-1050 nm) passes 1.4
-microamps under the same conditions, and boasts 2-nanosecond response
-times, for 95 cents (48 cents in quantity 100).
+camera sensor.  The Fairchild QSD2030 5-mm IR photodiode has 5-ns
+response time, passes 25 μA at 0.5 mW/cm² and 5 V, and 10 nA dark
+current (at 10 V); it costs 53¢ at Digi-Key.  The OSRAM SFH 2701
+infrared photodiode (400-1050 nm) passes 1.4 μA under the same
+conditions, and boasts 2-ns response times, for 95¢ (48¢ in quantity
+100).
 
 In the subnanosecond range, prices do start to heat up, because you're
 getting into avalanche photodiodes and silicon photomultipliers; the
 Marktech MTAPD-07-003 infrared avalanche photodiode (which can detect
 down to 400 nm, though at 600 nm its responsivity is already cut in
-half) is specified for a 300 picosecond rise time, and it claims 35-50
-microamps at one microwatt of incident light (on its
-230-micron-diameter sensor --- though this may be an error and maybe
-it should be 0.35 to 0.50) and less than 400 pA of dark current
-(though "typical" is 50 pA).  It costs US$22.  (Advanced Photonix,
-Excelitas, ON Semiconductor, and Opto Diode are four other vendors.)
+half) is specified for a 300 picosecond rise time, and it claims
+35–50 μA at 1 μW of incident light (on its 230-μm-diameter
+sensor — though this may be an error and maybe it should be 0.35 to
+0.50) and less than 400 pA of dark current (though “typical” is 50
+pA).  It costs US$22.  (Advanced Photonix, Excelitas, ON
+Semiconductor, and Opto Diode are four other vendors.)
+
+These currents are fairly small, which is why people often use
+phototransistors instead.
 
 Possible camera designs
 -----------------------
@@ -54,6 +57,10 @@ times per second; perhaps a separate stationary mirror or two could
 multiply that by 2 or 4.  Air bearings can manage perhaps three times
 higher speeds than that.
 
+(This is somewhat similar to the display outlined in file
+`mechano-optical-vector-display`, but backwards in time, with light
+sensors in place of light sources.)
+
 You do suffer a loss of light-gathering capacity, because unless your
 camera is kilometers long, there's nowhere to store the light that
 gets reflected to the left or right of the photodiode array; it just
@@ -65,7 +72,9 @@ but a sort of excessively horizontal resolution, limited by the mirror
 speed: 500 million pixels per second per photodiode, divided by 4000
 scans per second, gives you 125000 pixels horizontally, but still only
 256 pixels vertically.  Something more like 512 pixels horizontally
-and a million frames per second would be a much better compromise.
+and a million frames per second would be a much better compromise, but
+you can’t spin a macroscopic mirror 500 times faster; it will explode,
+as did Michelson and Morley’s mirror once.
 
 Maybe a bunch of stationary mirrors, or more facets on the spinning
 mirror, can increase the number of horizontal scans per second, at the
@@ -74,7 +83,7 @@ into diffraction problems with mirror edges.
 
 ### Staggered pushbrooms ###
 
-If there's no diffraction problem with mirror edges, though, there's
+If there’s no diffraction problem with mirror edges, though, there’s
 an alternative to sacrificing field of view.  You increase the number
 of mirror facets as before, but you organize the photodiodes in
 several rows, as in the mirrorless 16x16 matrix --- but this time with
@@ -86,6 +95,59 @@ Is there in fact a diffraction problem?  If we want our mirror facets
 to be at least 7 microns wide, we can fit almost 4500 of them around
 the circumference of a 10-mm-diameter mirror; this could give you a
 bit over 2 million scans per second.
+
+### Smaller and nutating mirrors ###
+
+A smaller-radius mirror can rotate faster before exploding — the
+cross-section holding it together diminishes at least proportional to
+the radius, but the acceleration diminishes proportional to the
+radius, and the mass diminishes jointly inversely proportional to the
+radius and to the cross-section, so you gain a factor of the radius.
+However, submillimeter-scale things in sliding contact tend to stick
+together (think of compacting dry, clayey dirt between your fingers)
+and also wear quickly.  So it might be worth using a flexing solid
+object rather than sliding-contact parts.
+
+(What about lubrication?  Lubrication with a film of a Newtonian fluid
+of a given viscosity creates a frictional force proportional to the
+movement speed and contact area, but inversely proportional to the
+film thickness.  So if we scale down an oil-film-lubricated joint 10×
+in every spatial dimension, including its movement speed, it seems
+like we win: 100× less surface area and 10× less movement speed gives
+1000× less friction, and the 10× thinner film thickness cuts that to
+100×.  Maybe lubrication could work?)
+
+Even a macroscopic mirror can vibrate at higher than 500 Hz, although
+generally not over a very wide range of angles.  Music-box comb tines
+can vibrate (resonantly!) at 1kHz or so with lengths on the order of
+10 mm.  If you scale one down by a linear factor of 10 you diminish
+its mass by 1000 and each part of the cross section of the elastic
+beam by a factor of 100 (see file `gold-leaf-trusses`).  If the tine
+is curved with a radius of curvature scaled down by the same 10, then
+the strain near its upper and lower surfaces will be the same as the
+original tine, and so will the stress, but by acting over a 100×
+smaller cross-sectional area, it will exert a 100× smaller force.
+This force is acting over a 10× smaller lever arm to the neutral axis
+of the beam, thus generating a 1000× smaller moment, but the beam
+length is also 10× smaller, so this results in a 100× smaller force on
+the weight at the end of the tine, and thus a 10× greater acceleration
+at the same relative tine curvature.
+
+This greater acceleration, in turn, would, by itself, raise the
+resonant frequency of oscillation by √10 ≈ 3.16, but the amplitude of
+oscillation (measured in meters) is also diminished by a factor of 10,
+which raises the frequency by another √10.  So the micro-music-box
+tine might vibrate at 10 kHz rather than 1 kHz.  And if we scale it
+down by 100× instead of 10× we get 100 kHz.
+
+But a music-box tine is far from the fastest-vibrating piece of metal
+of its scale; rather, it’s designed to have very low rigidity so that
+its Q will be high, its amplitude of vibration will be large, and its
+frequency will be *lower*.  A *serrucho* or musical saw can resonate,
+when bowed or plucked, at the same frequency as a music-box tine, but
+the saw is perhaps 700 mm long and 200 mm wide, about a hundred times
+larger.  So it might be possible to get microscopic mirrors to nutate
+up into the megahertz.
 
 ### Alternative camera scanning mechanisms ###
 
@@ -99,11 +161,123 @@ response at frequencies up into the megahertz, so sinusoidally
 scanning a mirror over a small angle at such frequencies should be
 feasible.
 
+### Scanned illumination ###
+
+As an alternative to scanning the photodiodes’ viewpoint across the
+scene being photographed, you could scan a laser or focused LED across
+the scene instead, as in file `flying-spot-reilluminatable-stage`.
+You could do this with just a single photodiode and a full scanning
+raster pattern, as suggested in that note, or you could sweep a short
+vertical line of light horizontally across the scene and locate the
+column of photodiodes on a one-dimensional focal plane.  You might be
+able to design an asymmetric lens with a normal focusing,
+imaging-optics shape in the Y dimension, but a
+compound-parabolic-collector or similar wide-angle non-imaging optics
+light-gathering shape in the X direction, to somewhat ameliorate the
+light-gathering problems of the pure-pushbroom configuration.
+
+#### Switching between illumination sources ####
+
+This configuration has much the same X-Y imbalance problem as the
+pushbroom: if your laser is scanned at only 4000 Hz, you get 125000
+pixels in X and only 256 pixels in Y.  But common lasers and
+low-brightness LEDs have switching times measured in nanoseconds.
+Suppose that the illumination pattern of the vertical line produced by
+the optics in front of the laser is spatially intermittent, with 256
+small dots, one in the field of view of one photodiode.  Now if you
+alternately illuminate those optics with two different lasers, one a
+bit below the other, the dots will be displaced a small amount
+vertically, but perhaps without moving from the field of view of one
+photodiode to another.  This means that each photodiode is being
+time-shared between two separate scan lines; most of the temporal
+dimension of the signal corresponds to the X dimension, but a small
+amount of it now corresponds to Y instead.
+
+You can extend this to, say, 16 laser diodes, one above the other,
+firing in sequence.  You still have only 4000 frames per second, but
+now each frame consists of 4096 scan lines of some 7812 or 7813 pixels
+each.  The overall laser firing pattern happens at 1.953'125 MHz, but
+the waveform at each diode has important components up to 31.25 MHz.
+This is well within the capabilities of most common laser diodes, but,
+again, requires some attention to RFI.  (This time it’s a high-power
+signal, tens of milliwatts rather than microwatts.)
+
+Rather than dotting the vertical line projected by each laser, you
+could make it short, and instead make the field of view of each
+photodiode dotted, using faceted mirrors or a faceted lens.
+
+#### Switching between illumination directions ####
+
+Instead of illuminating the scene from a single spinning mirror or
+other scanning device, illuminated alternatingly by light sources that
+reflect onto slightly different parts of the scene, as above, you
+could illuminate it alternatingly by scanning light sources at
+different locations.  Instead of merely photography at a higher
+vertical resolution, this provides near-simultaneous photography from
+several different points of view.  If the light sources are all in a
+horizontal line, this effect should be fairly pure, but if they are in
+some other arrangement, the Y parallax will be out of sync, since the
+Y dimension comes entirely from the sensor array.
+
 Time-domain sparkle sensors
 ---------------------------
 
 However, for applications like those described in file
-`starfield-servo`, the 16x16 matrix could be very useful --- not for
-motion video made of frames, but for measuring with high precision the
-times at which each sparkle begins to impinge on each camera pixel.
-This should provide
+`starfield-servo`, the 16×16 matrix could be very useful — not for
+motion video made of frames, but for measuring with high precision and
+low latency the times at which each sparkle begins to impinge on each
+camera pixel.  This should provide nanosecond-level-precise times when
+the movement being tracked crossed one or another threshold, and thus
+allows the measurement of smooth movements with high spatial
+precision, despite the small number of pixels.
+
+And at these speeds, even fairly quick movements will be smooth: if
+you are detecting the crossing of a 1-μm-wide threshold with a
+time-domain resolution of 2 ns, your spatial precision doesn’t start
+to suffer until the motion is faster than 1 μm/2 ns, which is 500 m/s.
+
+The timing resolution is high enough that you may need to compensate
+for the light travel time to the camera; 2 ns is 600 mm in air or
+vacuum.
+
+Balanced flip-flops
+-------------------
+
+Since we’re talking about such small, high-frequency signals (-20 to
+-40 dBm at 500 MHz, so, femtojoule scale, on the order of tens of
+thousands of electrons, or less at low light levels) it might be
+desirable to rig up some kind of robust amplification physically on
+the focal plane, like the humans’ retinas do.  One possible way to do
+this is with the goofy differential-amplifier scheme DRAM uses (see
+file `snap-logic`): an RS latch with a short in the middle, biasing it
+permanently to its metastable point.  When the short is removed (it’s
+really a transistor!), the latch can settle to either the R or S
+state, and even a small amount of charge on its R and S inputs can
+determine which way it goes.  It’s a sort of clocked latching
+differential amplifier.
+
+In DRAM that charge comes from a just-discharged capacitor that held a
+bit, but in this case it would come from the light current of a
+reverse-biased photodiode — from the delta in voltage from the time
+that both photodiodes’ capacitance had been initially charged.
+
+This would allow you to amplify the *difference* between adjacent
+photodiodes, rather than a single photodiode signal, and generate a
+binary output from it.  By using the history of past outputs, we can
+adjust the bias in the original photodiode charge levels to cancel out
+any DC bias and give us a sigma-delta bitstream of the
+high-pass-filtered difference signal between the two photodiodes,
+using a mechanism analogous to neural habituation.  This leaves you
+with a bitstream with no trace remaining of the absolute levels of
+light or variations in gains and offsets among sensor pixels, only
+detected edge movements over time.  The humans seem to do okay with
+not much more than this.
+
+(Such a circuit might be useful for applications other than fast
+photodiode amplification, too.)
+
+In particular, two such photodiode pairs that overlap by one
+photodiode can distinguish the direction of movement of a shadow
+boundary if it’s slow enough.  Something like this is the principle of
+operation of the coded-tape and coded-wheel shaft encoders commonly
+used in laser and inkjet printers.
