@@ -112,7 +112,7 @@ independently.  And this is what file `principled-apl` is about.
 (Also, don’t forget `colorbar()`, which is not the same as
 `legend()`.)  This is actually the same problem as getting the X-axis
 labels right by default: for Numpy, `R` is just a vector of six
-numbers, just as earlier `VR` was an array of 100'000 numbers.  It
+numbers, just as earlier `VR` was an array of 100’000 numbers.  It
 doesn’t have any idea why there are six.
 
 The only software I’ve seen that does get this right is μMath+; see
@@ -168,7 +168,23 @@ Numpy is an embedded DSL in Python, rather than a separate language
 implemented in Python, much less a funky keystroke-driven RPN UI.  So
 why not do the same thing in JS?
 
-First, 
+First, JS doesn’t support operator overloading, which is a bigger deal
+for readability than it sounds like.  (a + b + c + d)/e.sum() becomes
+a.plus(b.plus(c.plus(d))).divide(e.sum()).  It’s already hard enough
+to tell if the computation you specified was really the computation
+you wanted; this makes it much harder still.
+
+Second, I prefer the RPN UI because it’s a lot more fluid than typing
+in strings of Python or JS.  See the above complaints about Numpy for
+some of the reasons.
+
+Third, I want to be able to define functions in a somewhat abstract,
+static way so that replotting them over different regions is a
+reasonable thing to do.  I even want to be able to do this for
+Runge–Kutta integration and things like that, although I don’t know
+how successful I’ll be.  Embedding your DSL means that the
+host-language facilities are always ready-to-hand, but they would
+frustrate this ambition.
 
 Rendering improvement
 ---------------------
@@ -181,7 +197,12 @@ boxcar kernel at right angles to it.
 
 Ideally, the line plotted on a plot is infinitely thin, a line-shaped
 Dirac delta, but rendering it that way requires not only infinite
-resolution but also infinite dynamic range.  Bandlimiting the Dirac
+resolution but also infinite dynamic range.
+(The infinite dynamic range is particularly a problem for dark lines,
+since it would require either emitting negative amounts of light (at
+infinite concentration) from the line itself, or drawing on an
+infinitely bright background.)
+Bandlimiting the Dirac
 delta to a sinc that won’t alias at the screen resolution and maybe
 inverse-filtering a bit to compensate for the rectangularity of LCD
 pixels (which amounts to a low-pass filter through convolution with a
@@ -202,6 +223,13 @@ important when lines cross or pass very nearby.  However, I don’t know
 whether the dynamic range increases proportional to the number of
 pixels or to their square root.
 
+Any opacity, even if it merely results from saturation, is nonlinear
+and tends to generate alias frequencies.  (It might be possible to
+avoid the generation of alias frequencies through some kind of very
+careful balancing, but if you don’t manage to do that, they will be
+present, and for the right pattern of lines they will be
+overwhelmingly strong.)
+
 [Windytan’s oscilloscope-emulation
 algorithms](http://www.windytan.com/2013/03/rendering-pcm-with-simulated-phosphor.html)
 demonstrate what can be achieved with closer-to-ideal plot
@@ -221,6 +249,17 @@ overview of what 2-D graphical primitives the experts at Adobe thought
 were important in 2003; they go well beyond what PostScript can do.
 
 [0]: https://www.w3.org/TR/2003/REC-SVG11-20030114/filters.html
+
+To get deep-subpixel line positioning, a brute-force approach is to
+render with minimal antialiasing at a much higher resolution, then
+convolve with an antialiasing filter kernel at the high resolution
+before decimating to screen resolution.  This is probably not very
+computationally efficient.  More efficient approaches might include
+precomputed fractional-delay filters to shift patterns by fractions of
+a pixel and texture-mapping with a 1-D texture representing the
+pattern produced by the integrated filter kernel along a line
+perpendicular to the line being drawn, plus some kind of linear or
+quadratic adjustment to account for sharp angles or sudden ends.
 
 It’s often observed that bright lines on a dark screen background are
 more visible to the humans than dark lines on a bright screen
