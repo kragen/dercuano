@@ -161,6 +161,15 @@ Even the hairiest plots I’ve been doing so far should be encodable in
 a kilobyte or two of text, and maybe different plots in the same
 document could talk to each other.
 
+Why I don’t want to try an embedded DSL in JS
+---------------------------------------------
+
+Numpy is an embedded DSL in Python, rather than a separate language
+implemented in Python, much less a funky keystroke-driven RPN UI.  So
+why not do the same thing in JS?
+
+First, 
+
 Rendering improvement
 ---------------------
 
@@ -497,3 +506,162 @@ Numpy.  We just need to compile the dataflow graph into nested loops
 in JS before evaluating it in order to get that delicious JITty
 goodness!
 
+### I tried to test array indexing speed but all I found out was that integer division is super slow and now I need to redo everything below ###
+
+But JS array indexing is bounds-checked, so it might be a lot slower
+than C.  So I wrote these quick functions in Firefox’s inspector
+console to see:
+
+    function leap(a, n) { let m = a.length, j = 0; for (let i = 0; i < n; i++) { a[j] += i; j = (a[j] + j) % m; } }
+    function time(t) { let a = new Date(); let b = t(); let c = new Date(); return [c-a, b]; }
+    function repeat(x, n) { return new Array(n).fill(x); }
+
+Thus `time(() => leap(repeat(0, 8), 5000000))` gives 1.49–1.51 seconds
+(in another run, mentioned below, after a reboot, 1.23–1.28 seconds
+instead); at 10 million it gives 3.09–3.11 seconds.  *Enlarging* the
+array to 8192 *speeds up* both of these, 5 million to 1.09–1.12
+seconds; enlarging it further to 65536 speeds up 5 million to
+9.91–1.02 seconds; at 16777216, 2.3–2.6 seconds; at 1048576, 1.46–1.52
+seconds; at 2097152, 1.32–1.37 seconds; at 33554432, 3.9–4.6 seconds.
+Moreover, at 33554432, doubling the loop count to 10 million only
+extends the time to 5.5–6.9 seconds.  It doesn’t start to get linear
+again until 20 million, at 8.5–9.6 seconds.
+
+(I did three trials of each one to get some idea of the variability,
+but probably the JIT is too unpredictable for just three trials to be
+decent.)
+
+I don’t know what to make of this precisely, but it seems like for
+small arrays, it can do 3 to 5 million of those Array inner loops per
+second, which is enormously less than the 280 million it was getting
+for just adding the loop counter, and then starts to get slower
+presumably due to cache effects for indexing arrays over 32
+mebi-items.
+
+To see if the optimizer is replacing the % with a &, I tried reducing
+the array size to 33554431, which didn’t make any difference.  This
+suggests that maybe I should try explicitly using & to see if the 97%
+of the work this program is doing has a lot of division in it.
+
+> At 10 seconds, Firefox shows its warning that “a web page is slowing
+down your computer”, offering the option to kill the computation; this
+is a thing to beware of.
+
+### Typed arrays ###
+
+To compare, I tried `time(() => leap(new Float32Array(8192),
+5000000))` and got 0.964–0.969 seconds; Int32Array gave 0.924–0.935
+seconds; Uint8Array gave 0.50–0.53 seconds; Uint16Array gave 0.74–0.76
+seconds; Uint32Array gave 1.170–1.172 seconds; and Float64Array gave
+1.21–1.23 seconds.  Both of these last two are slower than just using
+`Array`.  This is well below the size where cache effects came into
+play, and the `leap()` loop is specifically designed to not be
+vectorizable, so I don’t know why the smaller data types give a
+performance boost (up to 10 million iterations per second!).
+
+To see if we get big caching effects, I tried `time(() => leap(new
+Float64Array(33554432), 20000000))` and got 8.35–8.41 seconds; with
+Float32Array I got 5.9–6.2 seconds; and, astonishingly, with
+Int16Array — which I expected to be *faster* — I got 14.6–15.3
+seconds.
+
+I don’t think these results are predictable enough to draw very
+precise conclusions about whether, or even when, typed arrays help or
+hurt performance.  They seem to help performance by a factor of 2 in
+some cases and hurt it by a factor of 1.5 in others.  Maybe a better
+benchmark function would help.
+
+### Adding methods to arrays makes no difference ###
+
+After the reboot mentioned below, I thought I would try `time(() => {
+let a = repeat(0, 8); a.method = function(x) { return "hi, " + x; };
+leap(a, 5000000)})` to see if the extra method on the array frustrated
+Firefox’s optimizer.  (This is a thing I’d done in
+[81hacks](http://canonical.org/~kragen/sw/81hacks) and always wondered
+if it was the reason for what seemed to me to be relatively poor
+performance.)  It didn’t make any difference: it took 1.262–1.265
+seconds, within the 1.23–1.28 range observed immediately previously.
+
+However, it’s certainly possible that the bottleneck in `leap()` isn't
+actually the array indexing!  (It turns out to be true, so I need to
+redo this test.)
+
+### Memory use ###
+
+I tried running `x = repeat(0, 1024*1024*64)` and had to reboot after
+Firefox allocated a few gigabytes of virtual memory.
+
+After rebooting, it was hard to tell which of the many Firefox
+processes to watch in htop.  `x = repeat(0, 16777216)` did not make it
+apparent.  It turned out to be pid 4172, as revealed by `f = n => (n <
+2 ? 1 : f(n-1) + f(n-2)); f(36)`, using 1839MB VSZ, 336MB RSS.
+Rerunning the `repeat` boosted that to 2366MB VSZ, 858MB RSS, a
+difference of 527 and 522 megabytes respectively.  That suggests that
+each array item is occupying a bit over 32 bytes, which is four times
+what I expected.  `delete x` returned the process to 1976MB/465MB.
+
+Presumably typed arrays should reduce this substantially, and indeed,
+after `x = new Uint8Array(16777216)`, we see 1972MB/479MB, a 14MB jump
+in RSS, close to the expected 16MB.  `delete x` has no effect (481MB
+remained constant before and after) but `x = new
+Float64Array(16777216)` boosts memory use to 2257MB/606MB, 285MB and
+127MB respectively; the latter is very close to the 128MB you’d expect
+at 64 bits (8 bytes) per array item.
+
+So native JS arrays are four times more expensive on memory use than
+you’d naively expect, while typed arrays have exactly the memory price
+they say on the tag, which can be more than an order of magnitude
+better.  Given that there’s no consistent runtime cost for using typed
+arrays, though also no consistent benefit, it is probably better to
+use typed arrays by default for numeric data arrays.  (Presumably
+using typed arrays will make *other* code run faster by reducing the
+load on the garbage collector.)
+
+### How I found out the speed tests above were totally wrong ###
+
+This took 1.0–1.4 seconds: `time(() => { const a = repeat(3,
+16777216); let t = 0; for (let i = 0; i < a.length; i++) t += a[i];
+return t })`.  That’s, like, 10 or 20 million array indexing
+operations per second.  However, this still took 0.9 seconds: `time(()
+=> { const a = repeat(3, 16777216); let t = 0; for (let i = 0; i <
+a.length; i++) t += i; return t })`.  So it wasn’t really the array
+indexing in the loop; it was the `repeat` function above.  Changing to
+`time(() => { const a = new Array(16777216); let t = 0; for (let i =
+0; i < a.length; i++) t += i; return t })` gives 61 milliseconds
+instead, 15 times faster — so it was the `.fill()` call.
+
+It only takes 73–75 ms to run `time(() => { const a = new
+Float64Array(16777216); let t = 0; for (let i = 0; i < a.length; i++)
+t += a[i]; return t })`, which just totals up all the zeros.  But I’m
+not sure how far I can trust Firefox’s optimizer here.
+
+This version takes wildly varying times from 168 ms to 639 ms:
+`time(() => { const a = new Float64Array(16777216); for (let i = 0; i
+< a.length; i++) a[i] = 3; let t = 0; for (let i = 0; i < a.length;
+i++) t += a[i]; return t })`.  Using `Array` instead slows it to
+0.9–1.5 seconds, which is probably slower than calling `.fill()`
+inside `repeat`.
+
+So, I don’t know.  Loop analysis and bounds-checking hoisting is
+easier with loop counters, and maybe that’s what accounts for the
+difference.  Certainly my earlier typed-array tests weren’t calling
+`.fill()`; they just relied on the implicit zero-filling provided by
+these constructors (even the float ones), which, as we see above, is
+much faster than what I was doing.  So maybe it really was the
+inner-loop division.
+
+Here’s a division-free version specialized for power-of-two arrays:
+
+    function laap(a, n) { let m = a.length-1, j = 0; for (let i = 0; i < n; i++) { a[j] += i; j = (a[j] + j) & m; } }
+
+And, with that, `time(() => laap(repeat(0, 8), 5000000))` takes
+50–80 ms.  I totally fucked up by using division!  `time(() =>
+laap(repeat(0, 8), 500000000))` takes 5.36–5.37 seconds, so 93 million
+loop iterations per second.
+
+I was going to say, “This explains why there was no difference
+(usually) between JS arrays and typed arrays,” but it turns out
+`time(() => laap(new Float64Array(8), 500000000))` is still three
+times as slow as the plain-Array version above.  Still, the better
+benchmark function probably will make it easier to understand what
+differences do exist.
