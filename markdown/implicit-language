@@ -12,6 +12,37 @@ I'm pretty sure I'll have to rework some of this, but I feel like at
 this point I have not only something implementable but also a concrete
 use case where I can see how the existing designs are suboptimal.
 
+The basic idea is that every expression evaluates not to an atomic
+value like 37 or 2.5 but to (looking at it in five different ways) a
+table or an array or an N-ary relation or conditional or function; and
+the particular atomic values we get out of it depend on the
+*circumstances* that obtain when we happen to look at it; and under
+some circumstances it may fail to have a value entirely.  We can
+inspect these tables to see which circumstances are the relevant ones,
+and when the possibilities are finite, we can enumerate all the
+possible sets of circumstances and the corresponding atomic values,
+which is to say that we can reason counterfactually about what values
+the expression *would have had* under circumstances that do not in
+fact obtain at the moment.
+
+Even if the possibilities are infinite, by stipulating all the
+relevant circumstances, we can reason counterfactually about what
+atomic value the expression would have had under those hypothetical
+circumstances.
+
+As a very concrete example relevant to my plotting problem, given some
+value representing a function *y* that depends on an argument *x*, we
+can ask what value *y* would have if *x* were 0, or if *x* were a
+member of the list [-1, -0.5, 0, 0.5, 1]; in the latter case, the
+result is a finite table of five values that tell us what value *y*
+would have for each value of the index into the list.  If *y*
+additionally depends on a parameter *p*, we can stipulate that *p*
+belongs to some other list, and *y* will provide a potentially larger
+table of results.  This provides a strategy for getting good
+efficiency out of even a naive interpreter implementation, much like
+Numpy, Pandas, APL, Octave, or R; but it should be much easier to
+write correct code with, because of the rigorous logical underpinning.
+
 Syntax
 ------
 
@@ -84,7 +115,9 @@ universe:
 
 The key columns of an aggregate are its free variables.
 
-XXX Should we remove infinite aggregates?
+XXX Should we remove infinite aggregates?  They are the only way to
+represent things like "matrix-vector multiplication" as values, but
+they seem significantly different from other kinds of values.
 
 ### Variables ###
 
@@ -363,6 +396,169 @@ XXX wait, the loop state has to be a single atomic value?
 XXX "domain" and "range" are better than "key" and "result" column;
 "domain variable" is maybe better than "free variable" for aggregates.
 
+Variable capture
+----------------
+
+As described above, the model has the same variable capture problem as
+Lisp macros, only much worse.
+
+Consider this expression for describing the *L<sub>p</sub>* norm of a
+vector:
+
+    (** (sum (i) (** x p)) (/ 1 p))
+
+This relies on the fact that the `i` introduced by the `sum` is
+visible to `x` so that it can select the elements of `x`.  Similarly,
+consider this code to evaluate a polynomial at a point
+(inefficiently):
+
+    (sum (i) (* a (** x i)))
+
+This relies on implicitly indexing `a` with `i`.  But consider this
+expression for describing matrix-vector multiplication:
+
+    (sum (k) (* (let (j k) a) (let (i k) x)))
+
+This has a free variable `i` which ranges over the columns of `a` (or
+rather its `j`-indices).  To do the summation, we need to introduce a
+new, fresh loop variable `k`; it is our intention that the only two
+uses of `k` be indexing the `i`-indices of `x` and indexing the
+`j`-indices of `a`.
+
+But what happens if `a` or `x` internally has a free variable, which
+is to say an argument, `k`?  Disaster strikes!  Instead of bubbling up
+to the sum expression as a whole, it becomes part of the iteration,
+with bizarre results that will potentially be difficult to debug.
+
+On the other hand, if we change the language's scoping to purely
+lexical, constructs like `(let (j k) a)` make no sense --- lexically
+`a` does not contain `j`, so that expression would be equivalent to
+just `a`.  And `(** (sum (i) (** x p)) (/ 1 p))` relies on the
+visibility of the index `i` to the vector `x`.
+
+This is more or less just the standard problem of variable capture
+that occurs in Lisp macros or with dynamic scoping, but it's much more
+severe in this context, because of the pervasive use of free variables
+for implicit parameter passing through many stack levels.
+
+The usual Common Lisp approach to solving the problem would be
+something like this:
+
+    (let ((k (gensym)))
+       `(sum (,k) (* (let (j ,k) a) (let (i ,k) x))))
+
+Alternatively, but awfully, you could use a name less likely to
+collide:
+
+    (sum (*matrix-multiply-index*)
+      (* (let (j *matrix-multiply-index*) a)
+         (let (i *matrix-multiply-index*) x)))
+
+[Alan Bawden and Jonathan Rees's "syntactic closures"
+mechanism](https://apps.dtic.mil/dtic/tr/fulltext/u2/a195921.pdf "AI Memo 1049, Bawden 1988")
+offers an relatively simple solution that is not difficult to
+implement (see also [Chris Hanson's shorter 1991
+proposal](https://groups.csail.mit.edu/mac/ftpdir/users/cph/macros/prop.ps.gz)
+and [the superb Scheme Wiki
+page](http://community.schemewiki.org/?syntactic-closures), and also
+[Stephen Paul Carl's 1996 master's thesis on an extension of
+it](ftp://ftp.cs.utexas.edu/pub/garbage/carl-msthesis.ps)); Scheme
+unfortunately standardized on [Will Clinger's "Macros that
+Work"](https://3e8.org/pub/pdf-t1/macros_that_work.pdf "Clinger 1991")
+instead, which is a much more complex mechanism to implement.
+
+On the other hand, because of the evaluation semantics outlined above,
+a different kind of variable capture that occurs in Scheme is absent
+here.  Bawden and Rees give the example
+
+    (define-macro (push obj-exp list-var)
+      `(set! ,list-var (cons ,obj-exp ,list-var)))
+    ...
+    (let ((cons 5))
+      (push 'foo stack))
+
+in which the expression containing the macro invocation expands to
+
+    (let ((cons 5))
+      (set! stack (cons 'foo stack))
+
+which will give an error due to attempting to invoke the number 5 as a
+function.  I assert without demonstrating that the corresponding
+problem does not arise in this new language.
+
+XXX does it?
+
+A simple direct fix for the matrix-vector-multiply problem is to have
+a `fresh` or `new` or `my` annotation that generates the equivalent of
+a syntactic closure or gensym:
+
+    (sum ((my k)) (* (let (j k) a) (let (i k) x)))
+
+However, this is bug-prone; code that unintentionally omits the `my`
+tag will function correctly, perhaps for years, until used in a
+context where variable capture occurs, which may be a result of a
+change to code that doesn't even explicitly invoke the matrix multiply
+or whatever, even renaming a variable or something.  A different
+alternative is to make the variables introduced by expressions like
+`sum` implicitly lexical, but continue to treat `let` variables as
+dynamically-scoped; this would leave the matrix-vector multiply as I
+had originally written it, but the Minkowski *p*-norm code would
+change from
+
+    (** (sum (i) (** x p)) (/ 1 p))
+
+to the perhaps more gnomic
+
+    (** (sum (i) (** (let (i i) x) p)) (/ 1 p))
+
+and change the polynomial-evaluation code from
+
+    (sum (i) (* a (** x i)))
+
+analogously to
+
+    (sum (i) (* (let (i i) a) (** x i)))
+
+(I reiterate that the S-expression form shown here is not intended as
+the syntax for interactive use, but just as an unambiguous
+representation of the internal tree structure; perhaps on the display
+this would be written as *a<sub>i=i</sub>* or abbreviated in something
+like the conventional way as *a<sub>i</sub>*.)
+
+However, there's still the possibility of unintended variable capture
+in an expression such as
+
+    (let (h (* n dh)) (/ (- (let (x (+ x h)) f) f) h))
+
+where we are really just using `let` to factor out a common
+subexpression, rather than to pass arguments to code or index data
+lexically defined elsewhere.
+
+A third alternative would be to require every introduction of a new
+variable by `let`, `sum`, and the like, to be explicitly marked as
+statically or dynamically scoped, but this seems like it would still
+be bug-prone --- a variable incorrectly marked as dynamically scoped
+would still be a bug.  You could catch this by requiring that the
+dynamically-scoped variable *not be used statically*, though.
+
+A fourth alternative would be to declare the variables at some lexical
+scope, in some cases module scope (where, in the context of
+`dercuano-plotting`, a module might be a note or a plot).  Then, an
+expression like
+
+    (** (sum (i) (** x p)) (/ 1 p))
+
+would be referring to some `i` that was already in scope, perhaps
+imported from another module or perhaps declared in the same module,
+and would be a compilation error if there were no such variable, so in
+theory you would know that you were capturing a variable that could be
+used as a parameter; while on the other hand an expression like
+
+    (** (sum ((my idx)) (** (let (i idx) x) p)) (/ 1 p))
+
+would be introducing a new `idx` variable.  This seems simultaneously
+more awkward and less safe than most of the alternatives above.
+
 Extradimensional features
 -------------------------
 
@@ -397,3 +593,9 @@ uses to figure out the possible values that `month` can take on in
 discrete and continuous parameters based on how they're used, a sort
 of type inference, find out what their valid values would be, and
 measure their limits.
+
+Automatic differentiation
+-------------------------
+
+How can we squeeze reverse-mode automatic differentiation into this
+model?
