@@ -1,0 +1,399 @@
+In file `dercuano-plotting` I talked about the need for a linguistic
+model of describing calculations to plot, that is, a programming
+language.  I think the ideas I'm describing here are finally
+crystallizing, but I wrote about them previously in file `typed-apl`,
+file `principled-apl`, file `relational-modeling-and-apl`; additional
+sources of inspiration have been file `micro-math-plus`, the ZIMPL and
+GNU MathProg languages discussed in file
+`linear-optimization-landscape`, Adam N. Rosenberg's "A Description of
+One Programmer's Programming Style", and Darius Bacon.
+
+I'm pretty sure I'll have to rework some of this, but I feel like at
+this point I have not only something implementable but also a concrete
+use case where I can see how the existing designs are suboptimal.
+
+Syntax
+------
+
+Because I'm planning to use a non-textual user interface, I'm not
+going to design a syntax; instead, I'll just use Lisp S-expression
+syntax in this document.  It's not very readable syntax but it's
+adequately formal and flexible.  Its execution semantics are not Lisp
+execution semantics; it just represents an ordered-tree structure.
+
+Semantic model
+--------------
+
+The main objects of interest are atomic values, atomic types,
+aggregates, variables, environments, and expressions.  The following
+is full of forward references, unfortunately; I should see if there's
+a better order to put things in.
+
+### Atomic values ###
+
+Atomic values are things like 4 or -2.5 or 4+1j or :London or possibly
+'w'; they correspond to values in many normal programming languages,
+but do not include any kind of aggregate data structure such as
+arrays, structs, dictionaries, sets, lists, tuples, or ML-style
+constructors.  Like quarks, they are never observed alone; they are
+always part of an aggregate.  There are different kinds of atomic
+values: integers, real numbers, opaque symbols like :London (which I
+will write with a leading `:` to distinguish them from variables), and
+maybe characters.
+
+### Atomic types ###
+
+XXX confused ideas about what goes here: discrete vs. continuous?
+Finite vs. infinite?  Bound vs. unbound?  Bounded vs. unbounded?
+Nominal, ordinal, interval, and rational levels of measurement?  Units
+of measurement?  Can a single aggregate contain values of different
+types?
+
+### Aggregates ###
+
+Aggregates are tables of atomic values, in the sense that they have
+rows and columns.  The number of rows may be zero, any natural number,
+or infinite; there is always one "result" column, but there can be
+zero or more "key" columns.  Each "key" column is associated with a
+variable, but the "result" column is not; it is only associated with
+the tuple of key-column variable values in its row.  Conceptually
+neither rows nor columns have order, although by necessity they will
+be in some order when we serialize them.  Aggregates are what
+expressions evaluate to, and what environments bind variables to.
+Here is an example aggregate:
+
+    (agg      (month oils)
+              (1    :VEG1  110)
+              (1    :VEG2  120)
+              (1    :OIL1  130)
+              (2    :VEG1  130))
+
+This aggregate has two key columns, associated with the variables
+`month` and `oils`, and four rows, the first of which associates the
+atomic value 110 with the situation where the variable `month` has the
+atomic value `1` and the variable `oils` has the atomic value :VEG1, a
+symbol.  A useful way of reading this is "110 if month == 1 and oils
+== :VEG1, else 120 if month == 1 and oils == :VEG2, else 130 if month
+== 1 and oils == :OIL1, else 130 if month == 2 and oils == :VEG1."
+
+Here is an aggregate with no key columns, a *constant*, which
+associates the atomic value 4 with all possible states of the
+universe:
+
+    (agg () 4)
+
+The key columns of an aggregate are its free variables.
+
+XXX Should we remove infinite aggregates?
+
+### Variables ###
+
+Variables are opaque, indivisible names, like `x`, `VC`, `month`, or
+`oils`.  In themselves they serve only to be distinguished from one
+another, but they are crucial links between aggregates, expressions,
+environments, and atomic values.
+
+### Environments ###
+
+Environments are sets of key-value pairs in which the keys are
+variables and the values are aggregates.  Here is an example
+environment:
+
+    (env (month (agg () 1))
+         (oils (agg () :VEG1))
+         (oilhardness (agg (oils) (:VEG1 8.8) (:VEG2 6.1))))
+
+This associates the variables `month` and `oils` with constant
+aggregates and the variable `oilhardness` with an aggregate with two
+rows and two columns.  You might think that this second aggregate
+contains some extraneous data, describing as it does the `oilhardness`
+of a situation that we know is not currently the case (when `oils` is
+`:VEG2`), but as we will see, this counterfactual data can be very
+useful.
+
+### Expressions ###
+
+Expressions describe computable functions; given some input data, in
+the form of an environment, they evaluate to output data, in the form
+of an aggregate.  But there are other things we can do with
+expressions other than evaluate them; we can query them to find out
+what free variables they require in a given environment and what they
+require of those free variables.
+
+Here is an example expression:
+
+    (+ (* x y)
+       (let (oils (agg () :VEG2)) oilhardness)
+       (sum (month) production))
+
+XXX should we require an explicit "in months" in case production fails
+to depend on month in a useful way so we don't know what to sum over?
+Should there be some kind of explicit or implicit association between
+domains and variables, to allow inferring a universe in the absence of
+an explicit value?
+
+XXX I'm being a bit fast and loose including an aggregate literal
+inside the expression.  I might not want that to be legal.
+
+It has the free variables `x`, `y`, `oilhardness`, `month`, and
+`production`, so it cannot be evaluated in an environment without an
+aggregate associated with each of these variables.  Also, it may
+inherit some free variables from the aggregates associated with those
+variables; for example, if `production` is associated with an
+aggregate that depends on the variable `city`, then the expression as
+a whole also has `city` as a free variable.  However, there are two
+binding constructs in this expression, `let` and `sum`, which bind the
+variables `oils` and `month` in their respective argument expressions
+`oilhardness` and `production`, which prevents those free variables
+from bubbling up further.  Indeed, if the expression is evaluated in
+an environment that provides values for these free variables, these
+binding constructs will prevent those values from penetrating.
+
+This sort of bubbling up is why the set of free variables of an
+expression depends on the environment; it amounts to a sneaky sort of
+dynamic scoping.  XXX can this dependency be expressed in a usefully
+simple way to satisfy the needs of plotting to figure out what kind of
+creature it's going to have to plot?
+
+The aggregate that results from evaluating an expression in an
+environment has the same set of free variables the expression had in
+that environment, and the tuples taken from its key columns will be
+some subset of the cross-product of the result columns of the
+aggregates supplied for those free variables in that environment.
+However, the expression may produce some arbitrary subset of those
+rows rather than all of them.
+
+XXX could it be that the expression had free variables that aren't
+used?
+
+Expression types
+----------------
+
+### Literal aggregates ###
+
+Although I'm not sure if this is the right thing, for the moment I'm
+going to allow literal aggregates as expressions.  Moreover, constants
+such as 4 and `:VEG1` are also valid; they represent constant
+aggregates like `(agg () 4)` and `(agg () :VEG1)`
+
+### Arithmetic ###
+
+The standard set of computer arithmetic operations are provided with
+their usual meanings: +, -, \* for multiplication, / for division, %
+for remainder, \*\* for exponentiation, >>, <<, abs, exp, ln, pow,
+sin, cos, tan, asin, acos, atan, ceil, floor, round, bitand, bitor,
+bitnot, and bitxor.  I mean this might change a bit but that's what I
+think right now.
+
+These operations take one or more arguments, which are evaluated in
+the same environment the arithmetic operation is, and the aggregates
+thus produced are passed to the arithmetic operation as actual
+parameters.  Their free variables are the union of the free variables
+of their operands.
+
+These operations operate purely pointwise and generate a full
+Cartesian product output.  In any environment, `(+ 3 4)`, syntactic
+sugar for `(+ (agg () 3) (agg () 4))`, will produce `(agg () 7)`.  In
+an environment lacking `x`, `(+ (agg (x) (1 3) (2 5)) 4)` will produce
+`(agg (x) (1 7) (2 9))`, and
+
+    (+ (agg (x) (1 3) (2 5))
+       (agg (x) (1 4) (2 10)))
+
+will produce `(agg (x) (1 7) (2 15))`.  In an environment lacking both
+`x` and `y`,
+
+    (+ (agg (x) (1 3) (2 5))
+       (agg (y) (:a 4) (:b 10)))
+
+will produce `(agg (x y) (1 :a 7) (1 :b 13) (2 :a 9) (2 :b 15))`.  (At
+this point a reminder seems in order that the sequence of rows and
+columns in the aggregate is arbitrary and insignificant.)
+
+XXX note that this contradicts the note earlier saying that
+expressions could not be evaluated in an environment that didn't
+provide aggregates for all their free values.
+
+XXX rename 'aggregate' to 'table'?  It's too long and operations like
+"sum" and "min" are usually called "aggregate operations".
+
+The expression `(+ x y)` cannot be evaluated to a finite aggregate if
+either `x` or `y` is missing from the environment, but consider the
+environment
+
+    (env (x (agg (p) (0 3) (-1 5)))
+         (y (agg (q r) (20 30 4))))
+
+in which `(+ x y)` will evaluate to `(agg (p q r) (0 20 30 7) (-1 20
+30 9))`, with three free variables bubbling up from the bindings of
+`x` and `y`.  If we further augment the environment, we can prevent
+`q` from remaining free:
+
+    (env (x (agg (p) (0 3) (-1 5)))
+         (y (agg (q r) (20 30 4)))
+         (q (agg () 20)))
+
+This causes `(+ x y)` to evaluate to `(agg (p r) (0 30 7) (-1 30 9))`.
+
+It will be seen that an arithmetic expression containing free
+variables defines a function taking those variables as arguments.
+
+### `let`-expressions ###
+
+The expression `(let assignments expr)` allows invoking a function
+with specific arguments or composing two (or more!) functions.  During
+evaluation, it constructs an environment by augmenting its own
+evaluation environment with new associations taken from `assignments`,
+which is a list of alternating variables and expressions.  These
+expressions are evaluated in the outer environment, and each one is
+associated with its corresponding variable in the new environment.
+
+The let-expression's free variables are the free variables of `expr`,
+minus the variables assigned to in `assignments`, plus the free
+variables of the expressions in `assignments`, which might reasonably
+add variables back in that were dropped in the second step.
+
+So, for example, `(let (x 3 y 4) (+ x y))` evaluates as before to
+`(agg () 7)`, because whatever the outer environment is like, the
+inner environment has `x` bound to `(agg () 3)` and `y` bound to `(agg
+() 4)`; and it has no free variables.
+
+A more interesting example is `(- x (let (i (- i 1)) x))`.  If `x` has
+`i` as a free variable and is defined for `i` integer, the inner `x`
+can evaluate to different atomic values from the outer `x`, and you
+get the backward differences of `x` along the `i` axis.  (I said at
+the top that I wouldn't invent syntax, but if I were inventing syntax,
+I might write this as `x - x[i=i-1]`.)
+
+### Conditional expressions ###
+
+The expression `(if x y)` operates very similarly to the arithmetic
+expressions, in that its free variables are the union of the free
+variables of expression `x` and those of expression `y`, it evaluates
+them both in its own environment, and it combines the `x` and `y`
+results pointwise.  However, it produces, in general, less than the
+full Cartesian product of their results; the rows where `x` produced
+false are removed.
+
+So, for example, `(if (> x 1) (if (< x 3) (* x x)))` is the function
+*x*<sup>2</sup> limited to the domain (1, 3).
+
+The expression `(case e1 e2 e3 ...)` evaluates all the expressions
+`e1`, `e2`, `e3`, etc., in the same environment it was invoked in, but
+then combines them in the fashion of SQL's `coalesce` or the `|`
+alternation operator in Icon or Unicon: rows are taken from `e2` only
+for the case where `e1` did not produce a value, from `e3` only where
+`e2` failed, and so on.  This means that you could write the
+absolute-value operator, for example, as
+
+    (case (if (> x 0) x)
+          (- x))
+
+The first expression produces `x` whenever `x` is greater than 0, but
+for x less than or equal to zero, it produces no value, so `case`
+fills in the empty space with the result of the `-` operator.
+
+Note that this can be misleading; if you write `(case (if p q) r)`,
+even if `p` is always true, that is no guarantee that you will never
+see values from `r`, because `q` might fail of its own accord, aside
+from getting externally failed by `p`.
+
+(Again, if I were inventing syntax, I'd want to write that as `x > 0
+-> x | -x`.)
+
+Another use of `case` is augmenting the first-differences example
+above with the initial value of the sequence `x`:
+
+    (case (- x (let (i (- i 1)) x)) x)
+
+Here we suppose that when `i` is at its minimum valid value, such as
+0, then `(let (i (- i 1)) x)` will fail, leaving a hole that can be
+filled with `x`.
+
+XXX for efficient evaluation we need to be able to tell which
+dimensions are going to stay rectangular.
+
+### iota ###
+
+The expression `(iota var expr)` evaluates to `(agg (var) (0 0) (1 1)
+(2 2) ... (n n))`, where `n` is one less than the value to which the
+expression `expr` evaluated.
+
+XXX this sucks compared to writing `1:10` in Octave or R.  You have to
+name a variable!  Moreover you still have to index it.
+
+### Standard reductions ###
+
+The expression `(sum (month) production)` produces a result that is
+the same as the result of evaluating `production` except that all the
+rows differing only by `month` have been summed together, and the
+`month` key column has been removed.  This generalizes in obvious ways
+to multiple key columns and to the other standard reductions
+`product`, `min`, `max`, and `mean`.
+
+XXX this means that `month` does escape as a free variable, but the
+result won't depend on it, and there's no way to get a sum over more
+months than you have some other iteration variable to throw away; this
+is surely the wrong semantics, and the one explained earlier is surely
+better.  Given some of the evaluation semantics explored above, it
+could probably get the valid months out of `production`.  But then how
+do you get a sum over only certain months?  Maybe `(sum (mi) (let
+(month (agg (mi) (1 3) (2 5) (3 11))) production))`, maybe with some
+syntactic sugar like `sum{mi} production[month[mi]=[3 5 11]]`?
+
+### Monoidal prefix sums ###
+
+XXX
+
+### Non-monoidal reduction ###
+
+The expression `(for var1 seq var2 start var3 reducer)` expresses a
+general definite loop.  It evaluates `seq` in its surrounding
+environment and produces an aggregate "the sequence" with, hopefully,
+the variable `var1` free.  It also evaluates `start` in its
+surrounding environment and produces "the initial state".  Then it
+proceeds sequentially along the sorted values of `var1` in the domain
+of the sequence, evaluating `reducer` once for each sequence item, in
+an environment with `var2` bound to the sequence item and `var3` bound
+to the previous result of `reducer` or, on the first iteration, the
+initial state.
+
+XXX wait, the loop state has to be a single atomic value?
+
+XXX "domain" and "range" are better than "key" and "result" column;
+"domain variable" is maybe better than "free variable" for aggregates.
+
+Extradimensional features
+-------------------------
+
+In the UI, you can write a table with some key columns and some value
+columns; each value column becomes a new aggregate, stored under a
+variable with the name in the column header, indexed by all the key
+columns.  If you don't have key columns, a nominal invisible key
+column is generated.
+
+The top level of the UI defines an environment, or a sequence of
+environments, within which each expression is evaluated.
+
+XXX does this mean it does some kind of topological sort to come up
+with an evaluation order?
+
+When you define an expression with a single continuous free variable,
+the UI by default plots its value against that free variable in a 2-D
+plot, heuristically picking an initial range that seems likely to be
+interesting (which you can then interactively zoom and pan).  If you
+define an expression with two continuous free variables, it by default
+generates a contour plot in a similar way, with a 3-D heightfield plot
+a click away.  Discrete free variables that belong to some numerical
+range get, by default, a lollipop plot; discrete free variables that
+are merely nominal result in a labeled small-multiples display,
+switchable with a click to a single plot with multiple lines (or
+lollipops or whatever).  Tabular results display is always available,
+but only enabled by default for small tables.
+
+The UI uses the same kind of introspective magic for this that `sum`
+uses to figure out the possible values that `month` can take on in
+`(sum (month) production)`.  This allows it to distinguish between
+discrete and continuous parameters based on how they're used, a sort
+of type inference, find out what their valid values would be, and
+measure their limits.

@@ -1,4 +1,5 @@
 Related to file `dercuano-rendering`, file `dercuano-formula-display`,
+file `dercuano-calculation`,
 and file `dercuano-drawings`, but not the same — I want some kind of
 equation-and-data-plotting thing in Dercuano, with some kind of
 Jupyter-like rapid feedback.  I think I can make it simpler and less
@@ -490,6 +491,16 @@ area, a radius, a diameter, and a length.  But I’m not sure how this
 would work with plotting a series of different cylinder volumes
 against some independent variable.
 
+Abstract model/language semantics
+---------------------------------
+
+There are two pieces here: one is the semantic model of the
+*plotting*, and the other is the semantic model of the *calculation*.
+
+I anticipate that the model of the calculation is going to be a
+longish document, so I'm preemptively splitting it out into file
+`implicit-language`.
+
 Performance
 -----------
 
@@ -694,7 +705,8 @@ Here’s a division-free version specialized for power-of-two arrays:
     function laap(a, n) { let m = a.length-1, j = 0; for (let i = 0; i < n; i++) { a[j] += i; j = (a[j] + j) & m; } }
 
 And, with that, `time(() => laap(repeat(0, 8), 5000000))` takes
-50–80 ms.  I totally fucked up by using division!  `time(() =>
+50–80 ms.  On my netbook, it takes 270-310 ms, or 370-420 ms
+on the netbook in Chromium. I totally fucked up by using division!  `time(() =>
 laap(repeat(0, 8), 500000000))` takes 5.36–5.37 seconds, so 93 million
 loop iterations per second.
 
