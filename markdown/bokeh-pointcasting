@@ -1,0 +1,308 @@
+I was thinking about the silent-alarm problem: suppose a human is
+being robbed at gunpoint in their store or home, and they want to
+sound an alarm, but without getting shot.  This requires some kind of
+alarm system and at least unidirectional communication from them to
+it; it’s very helpful if this connection is bidirectional, so the
+alarm system can notify them that you’re tripping it, and maybe avoid
+false alarms.
+
+The constraints of the problem
+------------------------------
+
+Anything the human can do voluntarily does can be interpreted as a
+signal by the alarm system, given appropriate sensors: blinking, head
+tilts, hand gestures, other eye gestures, other head gestures, tongue
+movements, shifting their weight, whistling, humming, breathing
+patterns, sucking in their stomach or pooching it out, wiggling their
+toes inside their shoes (as in _Eudaemonic Pie_), swallowing, raising
+eyebrows, emitting brain waves, and so on.  But since, by hypothesis,
+they are under close observation and possibly physical restraint from
+the robbers, the signals ought to inspire a minimum of suspicion.
+
+Communication in the other direction is subject to similar
+constraints.  The actuators used by the alarm system to communicate
+with its humans need to be inconspicuous so that the robbers do not
+deactivate them (for example, with a bullet or spray paint), and in
+particular should be much more difficult for the robbers to observe
+than for the defenders.  So, for example, sounds on loudspeakers,
+visible flashing lights, pervasive floor vibrations, and the like,
+might draw suspicion.
+
+An additional constraint in some circumstances is that the actuators
+themselves should not be tempting theft targets; conspicuous LCDs and
+luminaires may induce robberies where otherwise none would have
+occurred.  Prevention is better than cure, because prevention doesn’t
+get you shot and doesn’t provoke retribution.
+
+Candidate actuators
+-------------------
+
+### Hearing aids ###
+
+In-ear and behind-ear hearing aids (see file `hearing-aid`) can
+receive a variety of signals (radio waves, infrared, near-field
+electromagnetic, ultrasound, etc.)  and provide auditory cues to the
+wearer.  They are only moderately likely to tempt theft or to be
+suspected of forming part of an alarm system, at least initially, and
+robbers will hesitate before removing them, since usually their
+objective requires that the defenders be able to hear their demands.
+
+Also, hearing aids can be equipped with a variety of sensors for
+communication in the other direction: accelerometers to measure head
+tilt, galvanometers to measure subcutaneous nerve activity related to
+muscle movement, and of course microphones and cameras.
+
+There’s a significant safety concern here, in that buggy hearing-aid
+firmware can easily produce sound at ear-damaging volumes.
+
+The available communication bandwidth here is presumably close to that
+of human speech, some 39 bits per second.
+
+### Ultrasound or millimeter-wave beams ###
+
+Several ultrasound-pointcasting demonstration systems have been built
+that project ultrasound beams at people’s ears to produce private
+sound.  These use nonlinear air–ear interactions to produce
+audible-range sounds inside people’s ears from much stronger
+ultrasound.
+
+Presumably it is possible to do the same kind of thing with
+millimeter-wave radio beams if they are strong enough, but I’m not
+sure if there’s a mechanism for converting the millimeter-wave light
+to nerve impulses that isn’t destructive to the human, such as skin
+heating.  I have similar safety concerns about ultrasound.
+
+Again, this is probably around 39 bits per second.
+
+### Dental or tongue implants ###
+
+A receiver cemented to a tooth with dental cement or implanted in a
+tongue piercing can produce bone-conduction sound that the human can
+detect even at very low energy levels.  Electric shock (<1mA) is
+another possible communication channel.  Implants in such places are
+also well situated to sense tongue movements, tooth clacking, and
+*sotto voce* vocal signals.
+
+These have a great advantage over hearing aids: they are entirely
+invisible if the robbers do not know to look for them, and even then
+they are difficult to distinguish.
+
+These, too, are probably around 39 bits per second, except that the
+electrical-shock channel is probably more like 5 bits per second.
+
+### On-body vibrators ###
+
+Cellphones commonly alert the humans to events by vibrating,
+stimulating the skin.  This approach can also be used as a
+communications channel of rather low bandwidth, perhaps around 5 bits
+per second.
+
+### Time-domain indicator lights ###
+
+An indicator light, such as a conventional 40mW green LED emitting its
+≈4mW (2–3 lumens†) of light, can easily be visible at 1–10 meters
+distance, depending on lighting conditions; by flashing in different
+time-domain patterns, such as Morse code, it can convey messages,
+perhaps around 10 bits per second.
+
+However, a normal LED suffers from equal visibility to the robbers.
+If a defender looks at the LED, the robbers may understand the LED’s
+significance and destroy or paint over it.
+
+The 2–3 lumens of a conventional LED is spread over about *π*
+steradians, thus amounting to about one candela.  At 2 meters radius,
+this 2–3 lumens is spread over about 13 m² of the 50-m²-area sphere of
+2 meters radius centered on the LED, thus illuminating the defender at
+about 0.1–0.2 lux.
+
+This situation can be improved by using a laser, steered by mirrors,
+to pointcast the information to the defender’s eye pupil.  This will
+be minimally visible to the robbers, because it is only necessary to
+use the same 0.1–0.2 lux to achieve the same visibility to the
+defender that the conventional LED would have had.  If the pupil is
+about 4 mm across, this amounts to about 1.3 × 10⁻⁵ m² out of the
+13 m² mentioned above, so the laser can and indeed must be much dimmer
+than the LED: rather than 2–3 lumens, it should run at 2–3
+*micro*lumens, amounting to a few nanoamperes of drive current for a
+semiconductor diode.
+
+A higher data rate, however, would be desirable.
+
+† I’m guessing here; I haven’t checked datasheets.
+
+### Bokeh laser projectors ###
+
+This higher data rate is achievable by using spatial modulation as
+well as time-division multiplexing.  If the defender has their eye
+focused on the laser, it will appear as merely a point of light;
+however, if they defocus their eye, like any other point source, the
+point of light expands to a blurry bokeh circle like those discussed
+in file `convolution-bokeh` and file `debokehfication`.  The pattern
+of the bokeh reflects the spatial modulation of the light at the
+pupil; for example, if part of the pupil is obscured by eyelashes, the
+shadows of those eyelashes can be seen on the retina.
+
+By scanning the laser in a raster pattern over the pupil, using either
+galvo-controlled mirrors or something subtler like piezo-controlled
+mirrors, while modulating a video signal onto it, could produce a
+readable message in the defocused bokeh.  The defender will need to
+look at it so that the message is focused on their fovea, but robbers
+following their gaze will see nothing of interest.
+
+The degree of defocus possible, and thus the maximum degree of
+expansion of the bokeh pattern on the retina, depends on the
+individual person and on the state of their eye, especially the degree
+of dilation of the pupil.  Earlier today, indoors during the day, this
+body’s eyes had a defocus diameter equivalent to about 6 mm at a
+radius of 800 mm, or about 8 milliradians (26 minutes of arc, in
+ancient Babylonian units), but now that it’s night, it has a defocus
+diameter of about double that, about 16 milliradians.  Presumably if I
+turned the light off and waited a while, I could beat 20 mrad†.  All
+of this is for distant point-source lights, on the order of 8–20 m
+away, effectively ∞.
+
+How much information could you display in an 8-milliradian-wide
+circle?  Well, that depends on the resolving power of the human visual
+system.  Right now, on this laptop, a 7×13 font is readable to this
+body, but a 6×10 font is not.  The screen is 1150 mm away from this
+eye, 305 mm wide, and 1920 pixels wide.  This means each (square)
+pixel is 160 μm wide and subtends about 140 μrad (28 arcseconds, in
+ancient Babylonian units.)  Reading 7×13 (`xterm -fn 7x13`) requires,
+roughly, distinguishing bright from dark areas that are separated by
+about 1½ pixels.
+
+However, a more direct measurement of the information-carrying
+capacity of a small area of the visual field is that the 7×13
+characters are about a milliradian wide and 1.8 milliradians high, and
+carry about 6–7 bits of information each, for a textual information
+density of about 3–4 bits (or 0.56 letters) per square milliradian.
+Perhaps more advanced rendering methods like those described in file
+`dercuano-plotting` could improve this bound, but it’s at least
+demonstrably feasible, with the eyes in this body.
+
+So an 8-milliradian-wide circle, with its area of 50 mrad², could hold
+about 25–30 marginally readable letters, or 150–200 bits.  The rapid
+serial visual presentation (“RSVP”) method associated with speed
+reading can display a series of phrases at around 1 Hz without losing
+readability, so this method has a bit rate of around 128–256 bits per
+second, probably dramatically higher than the others considered above.
+
+The scanning action of the laser needs to be fairly precise.  In
+pixels, we’re talking about something on the order of a
+60-pixel-diameter circle.  Considering a viewing distance of 2 m,
+these 60 pixels need to be mapped across the 4-mm pupil, so about 70
+microns per pixel, which is 35 microradians; the laser beam thus needs
+to have a divergence of less than about 35 microradians, and the
+deflection-scanning apparatus needs to have a reproducibiity of 35
+microradians or so to keep alignment of successive scan lines as we
+raster across the pupil.
+
+However, there’s a huge problem!  This small divergence requires a
+relatively large laser and mirrors; the
+Airy limit of sin *θ* = 1.220*λ*/*D* means 35 × 10⁻⁶ = 1.22 × 555 nm /
+*D*, which is to say *D* = 1.22 × 555 nm / 35 × 10⁻⁶ = 19 mm.  This,
+in turn, means that the laser won’t look like a point source to the
+defender, since it subtends 10 milliradians, and the image of that
+aperture will be convolved with the desired bokeh pattern, blurring it
+all to shit!
+
+This ratio between 10 mrad and 140 μrad is about 70, so by coarsening
+the intended resolution of the bokeh image by about √70, a factor of 8
+or 9, to 1.2 mrad, we can use a laser aperture that also only subtends
+1.2 mrad (2.4 mm for a viewing distance of 2 m), and achieve the
+desired effect.  But instead of 25–30 readable letters, we have a
+7-pixel-diameter circle, holding about 40 pixel — enough for *one*
+letter.
+
+We can probably present more than one letter per second, but it
+suggests that the bokeh approach won’t beat the auditory approaches on
+bandwidth.
+
+† milliradians, not millirads, of course.
+
+### Laser pointcasting with active retroreflection ###
+
+Suppose that we give up on the whole bokeh idea.  Can we use a similar
+laser-tracking approach to get a low-power video image that’s only
+visible to one person, without them defocusing their eyes?  Something
+like Jeri Ellsworth’s CastAR retroreflective-surface VR projector, but
+without the conspicuous glasses.
+
+Yes!  Using point-source illumination from the opposite wall, which
+might or might not be a laser:
+
+    *--------\
+            /
+           /
+         _/
+        (_)
+         |
+        /|\
+         |
+        / \
+
+In one variation of this scheme, we use a scannable laser on one wall
+which raster-scans across a deflectable mirror of some 20 mm diameter
+on the other wall (perhaps behind a color filter to filter out
+extraneous wavelengths), which is synchronously raster-scanning so
+that, wherever the beam falls on the mirror, that point gets reflected
+to the defender’s eye.
+
+To get those same 60 pixels across the 20-mm mirror, you can tolerate
+a beam divergence of about 300 μm, which is achievable at a 2-meter
+distance with a laser output aperture of under 2 mm in diameter.
+
+Of course, you don’t actually need the mirror to raster-scan for that.
+You could just use an ellipsoidal mirror (and probably just a
+parabolic one), so that you get the desired property even without
+scanning the mirror.  However, you still need to move the mirror when
+the defender moves, in order to change the focal point; and, worse,
+you need focusing optics of some kind to adjust to different
+defender-eye focal distances.  Deforming the mirror itself is a
+feasible solution, especially if it’s cheap metallized plastic;
+getting a radius of curvature of about 2 meters (ideal for redirecting
+all light between two foci each 2 meters from the mirror) only
+requires depressing the center of a 20-mm-wide mirror by about 25 μm,
+or depressing its center by 12.5 μm while raising its edges by that
+same 12.5 μm.
+
+The above variations only need about 60 scan lines, but probably
+mechanically scanning a massive mirror at only 3.6 kHz would make a
+conspicuous noise, since that’s close to the humans’ peak auditory
+sensitivity frequency.
+
+In another variation, the light source is just a point source, such as
+a small LED, perhaps shrouded like some keychain ultraviolet LEDs so
+that it illuminates the whole mirror and almost nothing else.  The
+entire mirror is illuminated at once, rather than being scanned as in
+the above schemes, but this mirror is something like a DLP chip: it
+has pixels that can be individually turned on or off, either with
+actual DLP or with an LCD.  You still need some kind of head tracking
+to point the result at the defender’s eyes.  All of this can be hidden
+behind a color filter so it doesn’t draw attention.
+
+With these approaches, you can get the 150–200 bits per second rates I
+was hoping for earlier from the bokeh approach, the ones ruined by the
+divergence problem.
+
+These schemes encode the information not in the position of the laser
+spot on the viewer’s pupil, as the bokeh scheme does, but in the
+direction from which it enters.  I don’t know if it’s possible to do
+better than either with some kind of combination scheme.
+
+Machine-to-machine communication
+--------------------------------
+
+Normal laser communication like Ronja uses time-domain signaling,
+using optics only to get antenna gain, but perhaps you could use such
+a spatial-modulation approach for machine-to-machine communication as
+well, as file `ccd-oscilloscope` suggests doing for analog memory
+inside an oscilloscope.  In that context you might not be limited by
+the considerations of clandestinity described here, so much larger
+optics might be feasible.  By scanning your signaling beam across the
+lens of the receiver in a raster pattern, you can draw a bitmap in the
+bokeh on their “focal plane” sensor, which can be positioned at such a
+distance from the optical focal plane that the bokeh nearly covers it;
+or, by scanning it across your own output optics, you can paint a
+picture that they see when it’s entirely in focus.
+
