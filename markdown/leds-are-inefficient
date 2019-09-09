@@ -1,0 +1,57 @@
+Comment at <https://news.ycombinator.com/edit?id=20908476>:
+
+> *the point of sun light is that it has a very attractive cost of exactly 0$. It costs absolutely nothing. So it doesn't matter that solar panels are not very efficient. They actually are getting better and certainly 16% efficiency is nowhere near the best there is.*
+
+For most purposes I agree with you!  However, in this case, the alternatives I am considering are:
+
+1. Build a 10000 m² greenhouse full of, say, lettuce, perhaps on multiple shelves ("vertical farming").
+
+2. Build a 10000 m² solar park full of solar cells, then use the energy produced by the solar cells to illuminate lettuce being grown inside an opaque concrete box, of some arbitrarily variable size.
+
+In this comparison, the efficiency of solar cells and of LEDs matters very much indeed!  Because of their inefficiency, you get 30 times as much lettuce in case #1.  That's the reason I think this scheme is uneconomic except in unusual cases.  In another part of the comment thread, I agreed that abundant wind energy is a case where it might make sense.
+
+It's true that there are solar cells in commercial production that are 30+% efficient instead of 16%.  However, those are specialty solar cells designed for use in things like spacecraft (we used them on our satellites at Satellogic, for example.)  Consequently, they are eye-wateringly expensive and not getting cheaper, and so nobody is building solar parks with them, particularly since non-arable land is abundant and will remain so for a couple of decades, while the prices of low-cost 16%-efficient solar cells are dropping like a hafnium pellet.
+
+> *The whole point of LEDs is that they are supposedly very efficient; around 40-50%.*
+
+No, LEDs are nowhere close to 50% efficient.  LEDs have many wonderful attributes, including tunable color spectra, directionality, the possibility of being scaled down to submillimeter scales (hard to do with an incandescent bulb!) and, indeed, very good efficiency --- *compared to other light sources*, that is.  The problem is, all light sources are shitty when it comes to efficiency; LEDs are just less shitty.  That's why we charge our cellphones wirelessly with induction coils, not LEDs and expensive multijunction photovoltaic cells.
+
+It's hard to get your hands on good efficiency numbers, because LED vendors don't quote any kind of absolute energy efficiency number in the datasheets, because they only publish luminous efficacy (because that's what people normally care about).  In theory, we can derive the absolute energy efficiency using a luminous-efficiency curve: <https://en.wikipedia.org/wiki/Luminosity_function>.  I'll see if I can do that in a separate comment.
+
+> *heat is not actually energy loss in a vertical farm.*
+
+This argument turns out to be wrong; I've explained why in detail in <https://news.ycombinator.com/item?id=20906210>, but in brief, 87% of the energy we're talking about gets lost in the solar park, not the hothouse, and artificial illumination to crop-growing levels produces so much heat that you need to air-condition the hothouse rather than heating it.  Moreover, produced heat is *always* energy loss, because you can always reduce it further even by adequate insulation.
+
+> *Meaning that the reason vertical farming is getting a lot of attention is that the cost of energy has been dropping by rather a lot and is projected to continue to drop. Effectively this dominates variable cost in a vertical farm.*
+
+It's true that the cost of energy dropping, and to levels that would make people in the Space Age gasp.  I still don't see how that justifies building a 30-hectare solar park to grow the same lettuce you could grow in a one-hectare greenhouse.  I mean, how big is your armored vault hothouse going to be?
+
+> *You seem to be arguing this cost is too high. That seems to be countered by the many people actually growing stuff in greenhouses for decades this and making plenty of money.*
+
+No, man, that's not what I'm *saying*, man.  I'm saying that if you're going to build a hothouse, make it a greenhouse.  Daylight it, with skylights and/or lightpipes.  Maybe supplement with artificial lighting some of the time.  Lighting it with a solar farm that's thirty times as big is going to be more expensive, unless solar cells are thirty times cheaper than glass per square meter, and lighting it with fossil fuels is more expensive still.  Fuck, thirty times cheaper than plexiglass.  Thirty times cheaper than the shitty transparent plastic wrap we used to make greenhouses in Ecovillage Velatropa.  If you're right and, against all odds, LEDs are now 50% efficient, exceeding the theoretical ideal luminous efficacy maximum Wikipedia gives, the threshold becomes fifteen times cheaper instead of thirty --- still improbable!
+
+While I'm calculating the efficiency of LEDs for you, would you mind undoing your downvote, please?
+
+****
+
+There are some example calculations in https://en.wikipedia.org/wiki/Luminous_efficacy#Examples_2 of the overall luminous efficiency of different kinds of light sources. Candles are around 0.04% efficient, while incandescent bulbs range from 1.2% efficient (though there's really no lower limit) to 5.1%. The illumination LEDs listed are in the range of 15%-25%.  None comes close to 40% efficiency, much less 50%.  Low-pressure sodium lights, the kind you occasionally still see in streetlights, head the pack with luminous efficiency up to 29%, which is why they're so popular with clandestine indoor growing operations.
+
+Here's the deal with luminous efficacy: to calculate the absolute energy-efficiency (η) of an electrical light source, we need to know the input power (watts: *P* = *EI*) and the output power, which is in the form of radiant flux (also watts).  The ratio between these two is the efficiency; it tells us how much of the electrical energy that goes into the luminaire comes out as light, or inversely, just gets wasted as heat.
+
+But nobody publishes radiant flux numbers for their light sources because what people care about is mostly the *brightness* and, sometimes only secondarily, the temperature and the color rendering index.  Brightness --- luminous flux --- is measured in lumens, not watts.  But because the humans' eyes are not equally sensitive at all wavelengths, converting between radiant flux and luminous flux is complicated.  A hundred watts of radiant flux at a 900-nanometer wavelength counts as zero luminous flux, because the humans' weak little eyes can't see it at all.  Similarly, a hundred watts of radiant flux at 350 nanometers is also zero luminous flux, although that will give a human a sunburn pretty quickly.  A hundred watts at 555 nanometers, where the humans' cone cells are most sensitive to light, looks twice as bright as a hundred watts of radiant flux at around 520 nanometers or 630 nanometers.
+
+So, to convert between radiant flux and luminous flux, we use a weighting function called the luminous efficiency function, which reflects this variation.  At 555 nanometers the weight is 683 lumens per watt, a number arbitrarily chosen to make the SI candela (a lumen per steradian) approximate the Victorian-era candlepower as closely as possible.  At every other wavelength, it's lower, according to a standardized approximation of the photopic luminosity function of the humans' eyes, which can be downloaded from the image links at the top of https://web.archive.org/web/20081228083025/http://www.cvrl.org/database/text/lum/vljv.htm (I recommend https://web.archive.org/web/20070518010940/http://www.cvrl.org/database/data/lum/vme_1.txt, specifically).
+
+Now let's consider a modern illumination LED I happen to have the datasheet handy for, the Cree XLamp CXA2530 family.  On p. 6 of its datasheet, it displays its relative spectral power distribution at 800 mA and 85 degrees, from 380 nm to 780 nm.  Let's take the "warm white" variety, because its distribution is flatter, so the calculation errors will be smaller.  Unfortunately, it's normalized to percentage of maximum brightness.  From 380 nm to 430 nm, it's between 0 and 10%; from 430 nm to 480 nm, it's between 10% and 50%; from 480 nm to 530 nm, it's between 20% and 55%; from 530 nm to 580 nm, it's between 55% and 90%; from 580 nm to 630 nm, it's between 85% and 100%; from 630 nm to 680 nm, it's between 30% and 85%; from 680 nm to 730 nm, it's between 5% and 30%; and from 730 nm to 780 nm, it's between 0 and 5%.
+
+On p. 7 we find that these LEDs --- LED arrays, really --- hit this 800-mA current level around 37 volts.  Also, they're a little more efficient if you run them at a lower power level, because the light output is fairly closely proportional to the current, while the current increases with voltage.  So if you run them at 400 mA instead of 800 mA, you get half the light output, but the voltage drops to 34 volts, about a 10% efficiency improvement (so, if we end up computing that they were 22% efficient, that could be improved to 24% this way).  Also, if they're sufficiently cooled, we can get another 10% improvement.  I'm going to use the nominal 800 mA and 85 degrees, but keep those possible improvements in mind.
+
+This works out to 29.6 watts of electrical power.
+
+On p. 9 we find that the "brightness" performance groups range from 2100 lumens up to 3950 lumens, with the top bin, U2, having a minimum luminous flux of 3680 lumens at 85 degrees and 800 mA.  (This also shows up on p. 3 of the datasheet.)  I'm going to assume that Cree isn't just being optimistic and some of their LEDs in this family actually do test into this bin.
+
+Now, if you were trying to find out the maximum luminous flux an LED could put out at a given radiant flux, you would calculate with as much of the energy at the highest-luminous-efficacy wavelengths as possible.  Ideally, all of the energy would be at 555 nm, although here we know that some of it is outside the 530-590 nm range, and some of it is even out past 680 nm one way and 480 nm the other.  If someone had managed to produce LEDs that had the same 3680 lumens at purely 555 nm and 29.6 W, those LEDs would be producing 5.39 watts of green light (and be 18.2% efficient.)
+
+But in this case we have the inverse problem: we're trying to find out the *maximum* radiant flux these LEDs could possibly be emitting, given their published luminous flux rating.  That is, because they're emitting light at other wavelengths as well, they can emit *more radiant flux* at the same luminous flux.  And to put bounds on how much radiant flux they could be emitting, we need to do the opposite: put as much of the power as possible at the least-visible-possible wavelengths.
+
+Given the numbers above, the total area under the curve of the LED's spectral power is between (0 + 10% + 20% + 55% + 85% + 30% + 5% + 0)50 nm = 205% * 50 nm and (10% + 50% + 55% + 90% + 100% + 85% + 30% + 5%)50 nm = 425% * 50 nm.
