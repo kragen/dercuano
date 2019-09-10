@@ -2,8 +2,8 @@ Patterns for failure-free, bounded-space, and bounded-time programming
 ======================================================================
 
 Often, the most convenient way to program a piece of software is to
-use garbage collection, recursion, and the Lisp object-graph memory
-model they were born in, often along with closures and dynamic typing.
+use garbage collection, recursion, and [the Lisp object-graph memory
+model][1] they were born in, often along with closures and dynamic typing.
 But these approaches have their drawbacks: almost any part of your
 program can fail or require unbounded time to execute.  Sometimes it
 is useful to write programs that will not fail, even on a computer
@@ -14,6 +14,8 @@ becomes unusable, even if the rest of its software is working fine
 microcontroller fails, there is often no sensible way for it to report
 failure, and physical processes it was controlling may run out of
 control, perhaps damaging equipment or killing some of the humans.
+
+[1]: http://canonical.org/~kragen/memory-models
 
 The basic incompatibilities are the following:
 
@@ -237,10 +239,60 @@ traversal time cheaply.
 
 (File `linear-trees` has more thoughts on this.)
 
+Pagaltzis’s wall-following tree traversal
+-----------------------------------------
+
+You can do flexible immutable tree traversals in constant space if the
+tree nodes have parent pointers.
+
+Aristotle Pagaltzis wrote the fascinating [Tree traversal without
+recursion: the tree as a state
+machine](https://news.ycombinator.com/item?id=20863431) in 2007,
+describing an algorithm for traversing a binary tree in constant
+space, if each node has a parent pointer as well as the usual child
+pointers; [HN user kofejnik pointed out][0] that the algorithm is
+equivalent to the standard wall-following maze algorithm, where you
+just keep your right hand on the right wall as you walk through the
+maze, so that whenever you re-enter a node with multiple exits, you
+exit through a new exit, your only state being your position and which
+way you’re facing.
+
+In summary, the next node and direction is either:
+
+- the current node’s left child, traversing down, if you’re traversing down;
+- the current node’s right child, traversing down, if you’re
+  traversing up and the previous node is the current node’s left
+  child; or
+- the current node’s parent, traversing up, otherwise (when you’re
+  traversing up and the previous node is not the current node’s left
+  child; instead it will be the current node’s right child).
+
+This algorithm generalizes to general ordered tree traversal (you have
+to search through the child node pointers until you find the right
+one) and to cases where you don’t want to traverse the entire tree for
+things such as database index traversal — you just pretend to have
+traversed the subtrees of no interest.
+
+Pagaltzis pointed out in his article that, using node locks, the
+traversal can continue successfully even in the face of tree mutations
+as long as they don’t detach a non-leaf node.  But of course it won’t
+traverse a consistent snapshot of the tree, and node locks eliminate
+its failure-free, bounded-time nature.
+
+The Pagaltzis algorithm takes constant space and constant traversal
+time per tree node.  However, to put bounds on the Pagaltzis
+algorithm’s time to traverse the next leafnode — the metric of
+interest in many cases — you need to bound the depth of the tree,
+e.g., ensure that it doesn’t degenerate into a linked list.  If you
+can do that, though, you can also bound the space and time usage of a
+traditional recursive tree traversal.
+
+[0]: https://news.ycombinator.com/item?id=20865561
+
 Moving things in linked lists
 -----------------------------
 
-Given an item i that is a member of a linked list and a place p in
+Given an item `i` that is a member of a linked list and a place `p` in
 (the same or a different) linked list after which to insert it, you
 can move it to its new position in a failure-free, allocation-free,
 bounded-time fashion:
@@ -444,17 +496,139 @@ Traditional Lisps, Squeak, and newer versions of Python transparently
 overflow integer arithmetic into bignum arithmetic.  This has the
 advantage that the results of integer arithmetic operations are always
 correct, while in many other programming languages, they may be only
-approximate, or they may 
+approximate, or they may overflow, either crashing the program or
+producing dramatically incorrect results.
 
-Overflow-safe arithmetic
-------------------------
-Interval arithmetic?
---------------------
+However, this more common approach of producing approximate or
+dramatically incorrect results is often the price of failure-free,
+bounded-space, and bounded-time computation.
+
+In signed 16-bit arithmetic, for example, 32767 + 1 = -32768, and
+32767 + 3 = -32766; the first Ariane 5 rocket was destroyed by an
+arithmetic exception resulting from such an arithmetic overflow
+(though on a conversion from floating-point, rather than addition.)
+
+Floating-point, as used for integer arithmetic in particular in JS,
+gives incorrect results for most operations, though not all.  In
+64-bit IEEE-754 floating-point, integer arithmetic (except for
+division) is exact up to 2⁵³ = 9007199254740992.0; one result of this
+is that 9007199254740992.0 - 1 gives the correct result in most
+programming languages, while 9007199254740992.0 + 1 simply gives
+9007199254740992.0 again.  Under many circumstances, these errors are
+tolerable, although you can easily spend years on techniques to prove
+bounds on the errors in particular algorithms; and in many cases they
+produce results that are just wrong.
+
+But both two’s-complement integer arithmetic and floating-point
+arithmetic are usually constant-space and constant-time, and is often
+failure-free, although floating-point division by zero may produce a
+failure-free ±∞ value or, as in Python, an exception, depending on how
+things are configured; two’s-complement integer division by zero
+almost invariably produces some kind of exception.
+
+So what’s the disadvantage of defaulting to bignums?  Well, one of the
+first things I did with Squeak Morphic was to write an escape-time
+Mandelbrot-set renderer, but I had to set it to 16×16 pixels with a
+maximum number of iterations of about 10 or 12.  (The Mandelbrot set
+is the set of complex numbers *c* for which the recurrence *zᵢ* =
+*zᵢ*-₁² + *c* remains bounded rather than zooming off to infinity as
+*i* increases, starting at *z*₀ = 0; escape-time rendering colors each
+pixel according to the number of iterations of the recurrence needed
+to exceed some limit (usually |*z*| > 2).)
+
+When I set my iteration limit to a more reasonable number, like 256 or
+100 or 30 or even 20, it took an unreasonably long time to render, or
+would hang completely.  I was mystified; why was Squeak so slow?
+
+A little investigation showed that the values of *c*, derived from
+dividing pixel positions by the width and height of the array,
+producing exact rational numbers; so, for example, *z*₄ = ((*c*² +
+*c*)² + *c*)² + *c* might involve calculating the eighth power of a
+number like 11/16, which is 214,358,881/4,294,967,296; but then *z*₅
+would include its 16th power, which is
+45,949,729,863,572,161/18,446,744,073,709,551,616; and so on.  So my
+little Mandelbrot-set renderer was taking time — and memory! — 
+*exponential* in the number of iterations.
+
+Using an exponential amount of time is bad enough, but using an
+exponential amount of memory guarantees that you’ll run out of memory
+before too many iterations.
+
+Adding a decimal point somewhere was sufficient to get Squeak to
+switch from using exact arithmetic to using floating-point arithmetic,
+and suddenly I could use thousands of pixels and thousands of
+iterations.
+
+So, constant-space arithmetic that doesn’t crash on overflow is a
+useful way to make your arithmetic bounded-space, bounded-time, and
+failure-free, in the sense of not crashing (because of running out of
+memory or for any other reason).
+
+More generally, if you are going to compute with some kind of entity,
+whether a number or not, in a failure-free fashion, you need to be
+able to represent it with a constant space bound, and usually in
+constant space.  If your representation uses unbounded space, you
+cannot guarantee that your program will not run out of memory.  (If it
+uses variable space with a constant bound, to get failure-free
+computing, you need to somehow ensure that space is always available
+when it needs to expand to its maximum size, which is feasible but
+usually more difficult than just always using the maximum size.)
+
+But constant-space arithmetic gives you the wrong answer some of the
+time, which you could consider a software failure, even if the
+software doesn’t consider it an “error condition arising”.  It is a
+widely shared observation that sometimes subtly wrong answers are
+worse than an outright failure, to the point that it’s one of the core
+design principles of Python.
+
+So, to use constant-space arithmetic without that danger, you need
+some extra care.  There are three basic approaches: numerical
+analysis, overflow-safe arithmetic, and self-validating arithmetic.
+
+### Numerical analysis ###
+
+Numerical analysis consists of statically analyzing your software to
+prove that it doesn’t provoke the arithmetic errors inherent to
+constant-space arithmetic representations — in particular, the errors
+caused by the particular representation you’re using — or that, if it
+does, the errors are acceptably small.
+
+For standard C `signed` arithmetic, this involves statically ensuring
+that no overflow happens, because C `signed` arithmetic is undefined
+on overflow, which basically means that the compiler is free to break
+your program.  The simplest approach is to statically associate
+constant upper and lower bounds with every arithmetic expression in
+the program, but this works only in the simplest cases; it fails for
+any code containing nontrivial loops.  So, generally, you need to use
+bounds that are some kind of algebraic expression, rather than
+constants.
+
+For wrapping binary arithmetic such as C `unsigned` arithmetic and the
+two’s-complement arithmetic performed by CPUs when they are doing
+signed arithmetic, in many cases it isn’t necessary to ensure that
+intermediate quantities don’t overflow; it is only necessary to ensure
+that final results don’t overflow.  This is true for addition,
+subtraction, and I think multiplication, but not division; I think it
+is necessary that neither dividends nor divisors overflow.
+
+For floating-point arithmetic, it’s usually not a question of whether
+the result is correct — it’s not — but of computing bounds on its
+error.  The IEEE-754 standard guarantees that fundamental
+operations — +, -, ×, ÷, and perhaps surprisingly √ — are correct to
+within half an [ulp][2], but offers less stringent guarantees for
+other operations, including exp, ln, exponentiation, and trigonometric
+functions.
+
+[2]: https://en.wikipedia.org/Unit_in_the_last_place
+
+### Overflow-safe arithmetic ###
+
+### Self-validating arithmetic (e.g., interval arithmetic and affine arithmetic) ###
 
 The object-embedding memory model
 ---------------------------------
 
-The object-embedding memory model eliminates certain failure modes
+The [object-embedding memory model][1] eliminates certain failure modes
 from the object-graph memory model.  In its pure form, all allocation
 is static, so there is no chance of any allocation failure.  Embedded
 objects cannot be NULL, cannot be aliased (except via a pointer), and
@@ -668,3 +842,6 @@ The key relationship here, though, is that the failure-free,
 bounded-time code for the virtual machine produces a conservative
 approximation of the result of the more unrestricted code for the
 unreliable, loosey-goosey CPython virtual machine.
+
+Stream processing
+-----------------
