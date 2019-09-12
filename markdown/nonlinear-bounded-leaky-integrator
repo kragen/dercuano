@@ -1,0 +1,172 @@
+An integrator or prefix sum is a linear low-pass filter with no
+rolloff: 6 dB per octave all the way down to dc, where it diverges.
+Sometimes it’s desirable to have a similar kind of filtering action
+with BIBO stability, and there are a couple of standard linear ways to
+do that.  A nonlinear approach just occurred to me, which is what this
+note is about.
+
+The integrator and its standard variants
+----------------------------------------
+
+The discrete integrator is the linear filter
+
+> *yᵢ* = *yᵢ*₋₁ + *xᵢ*
+
+also known as the prefix sum, plus-scan, summed-area table, and other
+terms; it’s the discrete analogue to the antiderivative operator.  It
+amplifies frequencies by a linear gain factor proportional to their
+wavelength, which means that it’s not BIBO stable: a bounded input
+sequence with any dc bias will eventually produce an arbitrarily large
+magnitude of output.  It’s marginally stable — if you stop stimulating
+it with a dc bias, its output won’t keep growing.  Its impulse
+response is the Heaviside step function.
+
+It’s extremely inexpensive to compute.
+
+If you’re doing this on a computer, sometimes this instability can be
+bad.  In C, it can be undefined behavior.  In integer arithmetic, it
+can overflow from positive to negative values or vice versa, which is
+a problem under some circumstances.  In floating point, it results in
+a gradual loss of precision which eventually becomes total, although,
+for a signal with 16 bits of dynamic range being represented in a
+64-bit IEEE-754 float, loss of precision doesn’t begin until you have
+processed at least 2³⁷ samples.  In arbitrary-precision arithmetic,
+which is generally not used for signal processing, it starts to use
+more memory and become slower.
+
+If you’re using the integrator as a model of some physical system,
+such as a capacitor charging from an operational transconductance
+amplifier, you have a potentially more serious problem: the system
+almost certainly has some kind of physical bounds on its response, and
+if your linear model has unbounded behavior, that means its
+approximation of the physical system is going to be unboundedly awful
+under some circumstances.
+
+### The really long boxcar and its variants ###
+
+Consider composing the integrator above with the following sparse FIR
+comb filter, producing a filter that is overall FIR and thus BIBO:
+
+> *yᵢ* = *xᵢ* - *xᵢ*₋₂₀₄₈₀
+
+This boxcar has the same output as the integrator on signals of less
+than 20480 samples and on frequencies whose wavelength is much shorter
+than 20480 samples, but for lower frequencies, its gain has an
+asymptote of 20480, although the gain isn’t very well behaved; it has
+sharp nulls at 2π = ω 20480 samples and its harmonics.
+
+You could soften this a bit to something like
+
+> *yᵢ* = 3*xᵢ* - *xᵢ*₋₃₃₁₃₇ - *xᵢ*₋₂₀₄₈₀ - *xᵢ*₋₁₂₆₅₇
+
+so that you don’t have any really sharp nulls like that, just some
+1.8-dB attenuations.
+
+However, you still have striking time-domain artifacts in the form of
+echoes: one at 33,137 samples, one at 20,480 samples, and one at
+12,657 samples.
+
+If you pass a signal through a filter with a Gaussian time-domain
+response, followed by an integrator, you get a unstable filter with a
+sigmoid impulse response, a sort of softened Heaviside step function.
+You can approximate this closely with four integrators and three combs
+like the comb above.  If you delay the output of this filter, scale it
+down to unit magnitude, and subtract it from an integrator, you can
+similarly tame the integrator and get it to be FIR and thus BIBO
+stable, without much echo except at low frequencies and, I think,
+without any sharp nulls; the impulse response of the combination is a
+pulse with a sharp beginning, a flat top, and a slow sigmoid decline
+to zero.  It costs one multiply, five adds, and four subtracts per
+sample.
+
+The stable approximation of an integrator provided by these LTI hacks
+may be adequate for many purposes.
+
+### Exponential leakage ###
+
+A simpler way to make the integrator BIBO stable without altering its
+high-frequency response and LTI nature is to add a little bit of
+exponential decay:
+
+> *yᵢ* = *kyᵢ*₋₁ + *xᵢ*
+
+Here *k* is a decay factor between 0 and 1, say something like 0.99 or
+0.999, analogous to a bleeder resistor across an accumulating
+capacitor.  The impulse response of this filter is a pulse with a
+sharp onset followed by an exponential decay back to zero with a time
+constant *τ* = -1/(*fₛ* ln *k*).
+
+This has no echoes or sharp nulls, but it’s not FIR like the boxcars.
+
+Nonlinear leakage through saturation
+------------------------------------
+
+Suppose we harshly clip our integrator output as if it were the output
+of an ADC:
+
+> *yᵢ* = -*k* ∨ *yᵢ*₋₁ + *xᵢ* ∧ +*k*
+
+(Here *a* ∨ *b* is *a* if *a* > *b*, *b* otherwise, and *a* ∧ *b* =
+-(-*a* ∨ -*b*).)
+
+This guarantees that it’s BIBO stable because its output is bounded to
+[-*k*, +*k*], no matter what the input is.  (This approach is commonly
+used to limit integrator windup in PID controllers.)  It gives up
+linearity, and in the process creates all kinds of potential for
+interaction between frequencies.
+
+An interesting thing about this approach is that if the integrator is
+floating around near its limit when some high-frequency oscillation
+starts, say with amplitude 0.1, that would force it beyond the limit,
+the first quarter-cycle of that oscillation gets clipped; but
+thereafter the whole oscillation proceeds without incident, having
+added enough of a negative step function (a component at dc!) to make
+room for the rest of its waveform below the saturation level.
+
+Another interesting thing about it is that there are a lot of natural
+phenomena that behave to some degree like this, including saturation
+in transformers and ionic polarization in dielectrics (see file
+`coffee-humidity-sensing`); the optical Kerr effect can manifest such
+effects at near-exahertz timescales.
+
+### Softer saturation ###
+
+Suppose we’d like to get some of this effect, but with gentler
+nonlinearity; we’d like to smoothly tilt the playing field for *x* so
+that it can move *y* back toward zero a little more easily than it can
+move *y* further away from zero.  This way, maybe we can get the BIBO
+stability of the hard saturation thresholds, the same
+no-cutoff-frequency low-pass filtering action of the pure integrator,
+and minimal waveform distortion, except where these three conflict.
+
+Maybe something like
+
+> *yᵢ* = (1 - *kxᵢ*²)*yᵢ*₋₁ + *xᵢ*
+
+would do.  But I feel like this is maybe *too* nonlinear, since it
+fails at BIBO.  Also requiring three multiplications per sample seems
+like a lot, since the standard LTI exponentially-leaky integrator only
+requires one.
+
+*xᵢyᵢ*₋₁ is negative when *xᵢ* is trying to decrease the magnitude of
+*yᵢ*, and positive when it’s trying to increase them.  So an
+alternative, simpler approach might be to use this factor to adjust
+the gain on *xᵢ* smoothly:
+
+> *yᵢ* = *yᵢ*₋₁ + (1 - *kxᵢyᵢ*₋₁)*xᵢ*
+
+This still requires three multiplications per sample.  The parameter
+*k*, maybe in the range 0.0001 to 0.1, sets the maximum amplitude of
+the output, which also depends on the frequency (relative to the
+sampling rate) and the other existing frequencies.
+
+This is imperfect — in particular, the gain goes negative
+if *kxᵢyᵢ*₋₁ > 1 — but it seems to be giving reasonable results on
+some simple test signals.  It can produce extreme harmonic distortion
+with undesirable values of *k*.
+
+    def nlf(x, k=.025):
+        y = x.copy()
+        for i in range(1, len(y)):
+            y[i] = y[i-1] + (1 - k*x[i]*y[i-1])*x[i]
+        return y
