@@ -1,0 +1,132 @@
+What it means that HTML is "not a programming language", and why the ignorant sometimes think otherwise
+=======================================================================================================
+
+From <https://news.ycombinator.com/item?id=20906267>, responding to
+user coldtea:
+
+It's important to care for semantics in order to have a conversation
+that conveys information, which is necessary for having culture, so I
+will continue the semantics discussion you have started.
+
+Your proposed definition of programming languages
+
+> People don't care for semantics. If you write it and it causes a PC
+> to do something (even if it's just to show a website), it's a
+> programming language. Doesn't need to have branching, variables,
+> etc... (not to mention that HTML includes JS and CSS) print "hello
+> world", `<b>hello world</b>`, same difference.
+
+includes, as I said, CSV, JPEG, Word, and URLs. Does that mean that
+anyone who snaps a photo on Instagram is a programmer? This does not
+seem to be in accordance with the usual meaning of the word
+"programmer". Is it "programming" to write a dunning letter in Word?
+It seems to me like a qualitatively different activity.
+
+*Programming languages* are all more or less equivalent; although they
+have a variety of paradigms, and although they are supplied with a
+variety of I/O facilities, you can program more or less precisely the
+same set of *computations* in all of them.
+
+Consider the differences between C, Forth, Smalltalk, Prolog,
+Fractran, Lisp, Brainfuck, Haskell, VHDL, amd64 machine code, and
+Malbolge: some of these do not even have branching or variables, but
+they are all programming languages; none of them can compute anything
+that any of the others cannot.
+
+The exception might be things like Turner's "Total Functional
+Programming", which excludes nonterminating computations without, he
+hopes, excluding much of practical interest; Excel, excluding the
+macro language, also has this limitation, but in Excel it is more
+onerous.
+
+By contrast, you can't compute so much as a polynomial or NAND in
+HTML. That is to say, you can't program at all in HTML. So HTML is not
+a programming language.
+
+English does not include Latin, although, e.g.†, phrases like "*inter
+alia*" and "*et cetera*" can be used in English, and it's not uncommon
+for an English sentence to quote a Latin motto. Similarly, HTML does
+not include JS and CSS, just as it does not include the URL
+specification, and Python does not include SQL or HTML; they are six
+separate languages.
+
+† *exempli gratia*
+
+****
+
+> >Your proposed definition of programming languages includes, as I
+> >said, CSV, JPEG, Word, and URLs.
+
+> And yet people don't call them "programming languages", while they
+> do call HTML that -- so that even if HTML is not a programming
+> language, there's still a not formally expressed difference that
+> people can intuitively grasp with those other things...
+
+> >By contrast, you can't compute so much as a polynomial or NAND in
+> >HTML. That is to say, you can't program at all in HTML. So HTML is
+> >not a programming language.
+
+> You can't program most things in SQL either (not without some modern
+> extensions that make it turing complete), but it is still considered
+> a programming language...
+
+> I understand your point that "tt's important to care for semantics
+> in order to have a conversation that conveys information", but I'm
+> of the (e.g. Wittgenstein-ian) school that what matters is not some
+> original/holy definition, but the actual popular usage.
+
+I agree with your fundamental epistemological stance, but disagree
+with the conclusions you draw.
+
+On somewhat of a tangent, it's fairly uncommon for people to call SQL
+a "programming language", but you actually can program quite a bit
+with SQL; even without the recursive common table expressions you
+allude to, you can do surprisingly complex computations with it, and
+even define functions in the form of views, as long as they are
+finite. Certainly neither NAND nor evaluating polynomials poses any
+difficulty for SQL. In fact, here's an example of *arbitrary*
+polynomial evaluation in SQL which works in MySQL, MariaDB, Postgres,
+Oracle, and SQL Server, in this case evaluating 5x⁴ + 2x + 5 at the
+points 0, 1, 2, and 3:
+
+    select x, sum(a * power(x, e))
+    from (select 3 as x union select 0 union select 1 union select 2) xt,
+         (select 4 as e, 5 as a union
+          select 0, 5 union
+          select 1, 2) t
+    group by x;
+
+(In SQLite, you easily can evaluate a *particular* polynomial, or,
+with a bit more hassle, any polynomial up to some finite degree, but
+evaluating an *arbitrary* polynomial would seem to be out of reach
+without using recursive CTEs.)
+
+Returning to the subject at hand, I have occasionally heard people
+saying HTML is a programming language. But I think they're just
+mistaken. Presumably most people at some point thought the world was
+flat; we shouldn't attempt to explain away their error by saying that
+they meant something different by "world" or "flat" than we do. Some
+people think vaccines cause autism; this isn't actually because
+they're using the word "vaccine" or "autism" in a different sense than
+we are. They're just wrong. (As for the people who think organic food
+contains no chemicals, I'm not sure; I think some of them are just
+wrong, while others are in fact just using a nonstandard definition of
+"chemical", meaning something like "pure chemical" or "industrially
+produced chemical".)
+
+In the same way, people are just wrong if they think HTML belongs to
+the set that includes C, Forth, Smalltalk, Prolog, Fractran, Lisp,
+Brainfuck, Haskell, VHDL, amd64 machine code, Malbolge, Scratch,
+Octave, Python, and R, rather than to the set that includes CSV, JPEG,
+Word, and URLs. Similarly, bash clearly belongs to the former set, and
+Excel (without macros) and SQL arguably do.
+
+In a lot of cases, they seem to be reasoning based on shallow surface
+features like the use of plain ASCII text files. (You can see several
+examples of this even in the thread here, such as
+<https://news.ycombinator.com/item?id=20906702>.) This is similar to
+the neural network that learned to recognize photos of tanks based on
+whether the photos had been taken on a sunny day or a cloudy day, or
+the people who think I'm "hacking into systems" when they see me using
+a terminal emulator --- an understandable error from the ignorant and
+foolish, but not one we should allow to confuse our own thinking.

@@ -1,0 +1,326 @@
+Isotropic nonlinear texture effects for letterforms from a scale-space representation
+=====================================================================================
+
+I was walking by some of those goofy hipster chalkboard signs in my
+*cheto* neighborhood today and noticed that a lot of them are produced
+from a bunch of relatively simple transformations of letterforms:
+outlining, drop-shadowing, color gradients, and so on.  It occurred to
+me that it’s probably feasible to mechanically explore restricted but
+visually interesting sets of such transformations in the form of DAGs
+of a simple algebra.
+
+In many cases, it would be ideal for the transformation to be
+shift-invariant (s-i), rotation-invariant (i), resolution-invariant
+(r-i), and bounded-amplitude (b) — that is, transforming a shifted,
+rotated, or resampled image should produce the shifted, rotated, or
+resampled transformation of the original image, and that it should be
+possible to compute bounds on the brightness of the pixels in the
+transformed image, at least given bounds on the brightness of the
+images in the original image.  Moreover, if you want to do image
+approximation for style transfer (see file `image-approximation`) it
+might be helpful for the transformation to be differentiable with
+respect to some set of parameters.  These restrictions reduce the
+space of possible transformations in a way that should dramatically
+accelerate stochastic exploration and mathematical optimization.
+
+Note that it is quite explicitly *not* a goal to restrict ourselves to
+*linear* transformations.
+
+This is quite similar to, and inspired by, the abundance of excellent
+work in recent years on computer vision using artificial neural networks.
+
+(See also file `texture-algebra` and file `cheap-textures`.)
+
+Colors
+------
+
+In the below, I generally speak of “images” as two-dimensional
+regularly sampled grids of scalar numbers.  This is most apt to
+grayscale images; the simplest way to incorporate color images is to
+treat them as three separate images, one each for red, green, and
+blue.
+
+The basics: isotropic scale-space representation
+------------------------------------------------
+
+Given a sampled image, you can convolve it with some linear filter to
+get a transformed image; this transformation is shift-invariant (s-i)
+from the definition of convolution.  If the filter’s impulse response
+is isotropic, which is to say rotation-invariant (i), this
+transformation will be isotropic.  If the linear filter *fₛ* has a
+scale parameter *s* such that *fₖₛ* gives the same linear filter
+resampled to a new sampling grid *k* times larger, then you can
+satisfy the resolution-invariance criterion.  You can derive
+reasonable amplitude bounds on the resulting image from amplitude
+bounds on the original image and on the filter’s impulse response.
+
+A particularly appealing filter is the Gaussian, the scaled function
+*e*<sup>-*r*²</sup>, both because it’s the only isotropic separable filter and
+because it can be very inexpensively approximated using CIC or
+Hogenauer filters, called repeated box blurs in image
+processing — independent of the radius, a quadratic approximation to
+the Gaussian (up to a constant scale factor) takes only six
+subtractions per pixel, given a dimension-indepenent third-order
+two-dimensional prefix sum (aka summed-area table) of the image, which
+requires six additions per pixel to compute, and in general about four
+times as much space as the original image.
+
+(An additional desirable property is that Gaussian convolution is
+closed under composition: the composition of two Gaussian convolutions
+is a third Gaussian convolution whose scale parameter is simply the
+sum of the scale parameters of the two.)
+
+This is the standard [scale-space representation][0] used in machine
+vision since the 1960s, the two-dimensional analogue of the
+one-dimensional [Weierstrass transform][1] used in analysis (and in
+particular function approximation) since the 1800s.
+
+[0]: https://en.wikipedia.org/wiki/Scale_space
+[1]: https://en.wikipedia.org/wiki/Weierstrass_transform
+
+So you can use Gaussian convolutions with arbitrary constant radii as
+elementary operations in your algebra of transformations without risk
+of producing an inefficient, anisotropic (¬i), shift-variant (¬s-i),
+resolution-dependent (¬r-i), or unbounded (¬b) transformation.
+Moreover the transformation is differentiable with respect to both the
+input image and the scale parameter.
+
+Another class of scalable isotropic filters that admit especially
+efficient implementations of convolution are flat† circles — circular
+boxcar filters.  These are less efficient than Gaussian convolution,
+especially as kernel sizes grow, but, as discussed in file
+`convolution-bokeh`, they still admit much more efficient
+implementations than are generally known in the literature, on the
+order of 1–3 additions and subtractions per scan line in the kernel,
+or less if polygonal approximations are used.
+
+Flat circle convolution is i and r-i except for aliasing artifacts, b,
+and s-i.  It’s differentiable with respect to the input image, but
+it’s imperfectly differentiable with respect to the scale parameter;
+the flatness constraint requires the circle to expand by discrete
+pixels, which create discontinuities in its derivative.  I feel like
+you should be able to make a differentiable version by lerping between
+circles of adjacent radii; using the above-linked algorithms, such a
+filter can be implemented at much less than twice the cost of a single
+flat circle convolution, since the two circles will be equal on most
+scan lines.
+
+† “Flat” in the sense that all points within the support of the filter
+have the same “height”.
+
+Nonlinear morphological operators
+---------------------------------
+
+Another class of shift-invariant, resolution-invariant, and
+bounded-amplitude transformations on images with efficient
+interpretations are the nonlinear morphological operations of erosion
+⊖ and dilation ⊕; if used with an isotropic “structuring element” or
+kernel, such as a flat circle, these operations are isotropic.  These,
+too, have been used in machine vision since the 1970s.  As described
+in file `bresenham-erosion`, Urbach and Wilkinson published an
+algorithm that can evaluate these operators with flat kernels at only
+slightly higher computational cost than the linear convolution with
+flat circular kernels described in the previous section, and it’s
+straightforward to shave off another factor of 2 or 3 from Urbach and
+Wilkinson’s algorithm in most cases.
+
+So you can use erosion and dilation with flat circles with arbitrary
+constant radii as additional elementary operations; as with the
+isotropic convolution cases, this poses no risk of producing an
+inefficient, anisotropic, shift-variant, scale-variant, or unbounded
+transformation.
+
+Combining operators
+-------------------
+
+### Arithmetic pixelwise combination ###
+
+Given constant images and the above elementary unary operations on
+images, we can combine them pixelwise using most of the standard
+mathematical operators: +, -, ×, ∧ (minimum), ∨ (maximum), and in some
+cases ÷, if appropriate bounds can be shown to hold for the input
+images.  (But not %.)  In particular, note that
+pixelwise-nonlinear ×, ∧, and ∨ permit the
+realization of nonlinear image filtering operations even without the
+use of any nonlinear neighborhood operations such as the
+morphological operations.
+
+Moreover, you can apply a number of unary operations pixelwise, such
+as exp, sin, cos, atan, and in some cases ln.
+
+### Bounds-preserving operators ###
+
+However, I think the above set of combining operators is somewhat
+suboptimal with respect to its boundedness and efficiency.  It’s true
+that you can compute bounds on *a* + *b* or *a* × *b* given bounds on
+*a* and *b*, but if you’re randomly assembling DAGs in this algebra, a
+lot of them will randomly have very large or very small bounds.  It
+would be desirable to have a similarly expressive set of operations in
+which, if both inputs are bounded to some range, the output is too.
+
+In particular, consider the case of *a*, *b*, *c* ∈ [0, 1].  Then
+these continuous, pixelwise combining operations preserve that bound:
+
+- 1 - *a*
+- ½*a* + ½*b*
+- ½*a* - ½*b* + ½
+- *a* × *b*
+- *a* ∨ *b*
+- *a* ∧ *b*
+- *a* + *b* × (*c* - *a*) (lerp)
+- lg (1 + *a*)
+- 2<sup>*a*</sup> - 1
+- ½sin(*ωa* + *φ*) + ½
+- 0 if *a* = 0 else *a*/(*a* + *b*)
+- 0 if *a* = 0 ∨ *b* = 0 else 2/(1/*a* + 1/*b*) (scaled resistors in
+  parallel; soft minimum; harmonic mean)
+- √(*a*)
+- *a<sup>k</sup>*, more generally
+
+Of these, all but ∧ and ∨ are everywhere differentiable; those may
+happen to be differentiable in a particular case.  It might be
+possible to use the harmonic mean above or √(*ab*), the *geometric*
+mean, in place of *a* ∧ *b*, but it’s not a very good substitute.
+
+Anisotropy
+----------
+
+The algebra of image filtering above can express a wide range of
+effects, but since all of its operators are isotropic, it can’t
+express anisotropic effects, which for better or worse include
+calligraphic stroke emphasis (including goofy hipster ironic Victorian
+puffery effects) and drop shadows. By adding just a simple shift
+operator to the algebra, *s<sub>m,n</sub>*(*p*) = (*x*, *y*) =>
+*p*(*x* - *m*, *y* - *n*), we can gain a wide variety of such
+anisotropic transformations, while still guaranteeing b, s-i, and
+r-i—except for aliasing artifacts. Differentiability suffers from the
+same kind of aliasing artifact as the flat circle convolution, and
+similarly bilinear interpolation is sufficient to mostly restore
+differentiability. However, bilinear interpolation suffers from its
+own artifacts, having to do with the lousy approximation the triangle
+kernel is to a sinc.
+
+To fully restore differentiability, we need a differentiable
+interpolation operator, such as quadratic spline interpolation, which
+additionally is a much better approximation of sinc. It requires nine
+multiply-accumulates per pixel, though perhaps I can strength-reduce
+that to three, or one if it is separable or close enough.
+
+To account for both the computational cost and the anisotropy we would
+like to minimize, it may be a good idea to include a special penalty
+term for the use of the shift operator in cost functions used for
+mathematical optimization.
+
+Dynamical systems
+-----------------
+
+### Discrete time ###
+
+In addition to static graphs of image transformations, we can think
+about evolving an image over time. One simple way to do this is to
+iterate a transformation some number of times — that is, run it with
+its previous output as its new input.  This can give rise to
+interesting behavior even with very simple transformations.  (This is
+also one of the motivations for seeking combining operations with
+output bounds the same as input bounds.)
+
+### Continuous time ###
+
+However, the number of times the transformation runs in that
+state-machine scheme is necessarily discrete — and such discretized
+time means that the result cannot be differentiable with respect to
+time.  As a possible alternative, we can use a transformation to
+define an *ordinary* differential equation that specifies the temporal
+evolution of the image: the pixelwise difference between the original
+image and the transformed image gives the pixelwise time derivative of
+the evolution.  (It can be seen that, except for numerical
+approximation errors, this will never lead the pixel outside the
+smallest interval containing both its own range and the range of the
+transformed pixel; so if both are [0, 1], it will remain within [0,
+1].)  Then we can use garden-variety Runge–Kutta numerical integration
+of ordinary differential equations to compute the image’s evolution,
+time step by time step, with high precision.
+
+This makes the resulting image differentiable with respect to the time
+parameter — somewhat by fiat, as it were — and allows us to vary that
+parameter continuously.
+
+Differentiable crossbars
+------------------------
+
+In the above I’ve mostly talked about the DAG of image-processing
+operators as if it descended from heaven.  But there occur to me three
+major ways to handle this:
+
+1. Expose image-processing operators directly to a user, whether
+   through an API, a GUI, or some hybrid, and let them play around.
+
+2. Generate DAGs randomly, possibly using genetic-programming
+   techniques, or exhaustively, possibly using some kind of heuristic
+   breadth-first search.
+
+3. Use a fixed topology that is nevertheless flexible enough to
+   generate a wide variety of effects.
+
+The third approach is the one taken by most current
+artificial-neural-network research, usually through “fully connected
+layers” (complete bipartite graphs) and “max-pooling”.  Fully
+connected layers of *n* neurons from *m* inputs involve multiplying a
+vector of length *m* through an *n* × *m* matrix — for every pixel in
+your image, if you’re doing something convolutional.
+
+Telephone networks originally worked using fully connected
+switchboards: any jack could be patched to any other jack by the
+operator by inserting a wire into both jacks.  But this scaled poorly
+with the size of the network, so they changed to crossbar switching.
+
+A crossbar switch is a small permutation matrix; it might have four
+inputs and four outputs, although in the Telephone network all these
+connections were initially bidirectional.  Each of the 16 crossing
+points could be closed (1) or open (0).  In this way, any input can be
+connected to any output, and indeed every input can be connected to
+some output at once when the matrix is 75% sparse.
+
+The trick is that multiple layers of many of these crossbar switches
+can produce any permutation of the inputs on the outputs.  (A sorting
+exchange network is the special case of this where the crossbars are
+2-input 2-output switches.)  Consider a layer of four input 4×4
+crossbars, each with one output connected to each of four output 4×4
+crossbars.  This is sufficient to connect any of the 16 inputs to any
+of the 16 outputs, but it cannot produce all possible
+permutations — you cannot have two inputs on the same input switch
+connected to two outputs on the same output switch.  All circuits are
+busy.
+
+Introducing an intermediate “hidden” layer of four more 4×4 crossbars,
+with a similar fully-connected arrangement, does, I think, give you
+all possible permutations.  (A simple counting argument shows that it
+*could*, while no arrangement of eight 4×4 crossbars can — 4! = 24,
+and 24<sup>8</sup> = 110,075,314,176, while 16! = 20,922,789,888,000,
+but 24<sup>12</sup> = 36,520,347,436,056,576; but clearly there are
+many ways to get the same output permutation by routing circuits
+through different hidden-layer crossbars.)  There is some savings
+here: a single-stage 16×16 crossbar would contain 256 contact points,
+while this three-stage network contains only 12×16 = 192 contact
+points.  Adding further crossbar-switch stages to the network
+increases the economy.
+
+What I have in mind here is using 4×4 matrices as differentiable
+crossbar switches.  Applied pixelwise to four input images, such a
+crossbar produces four output images as linear pixelwise functions of
+the inputs, and so a few layers of such stages can substitute more
+economically for the fully-connected layers in traditional artificial
+neural networks.
+
+The output of these stages is then fed to some set of fixed-function
+units attached in a fixed topology to the crossbar outputs: lerp,
+multiply, average, max, min, Gaussian blur, shift, and so on.  In this
+way, the continuously-differentiable “crossbars” substitute for the
+discrete connection topologies we might otherwise have to search
+through.
+
+We can apply an optimization penalty for weights that are far from 0
+or 1, perhaps later on in the training, as is conventionally done in
+topological optimization.  In this way we can give the crossbars an
+incentive to sparsify, and thus we can stop computing functions that
+aren’t contributing to the results.

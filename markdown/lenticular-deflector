@@ -1,5 +1,6 @@
-I think I might have a solution to the problem of rapidly deflecting
-light beams through large angles under electronic control, using a
+I think I might have a solution to the problem of deflecting
+macroscopic light beams through large angles under electronic control
+at submicrosecond time scales, using a
 plano-convex lens and a plano-concave lens, which translate relative
 to each other — or, rather, an array of each, like the surface of a
 lenticular 3-D image.  Then you can get large light deflections out of
@@ -11,7 +12,8 @@ The problem of electronically rapidly deflecting light
 One of the problems I’ve frequently confronted — in, for example, file
 `bokeh-pointcasting`, file `photodiode-camera`, and file
 `ccd-oscilloscope` — is how to rapidly change the direction of light
-beams, such as laser beams.  This is a standard problem, and Michelson
+beams, such as laser beams, under the control of some kind of control
+system, such as an electronic circuit.  This is a standard problem, and Michelson
 and Morley’s 19th-century solution to it — a prismatic mirror spinning
 on an air bearing — led to new measurements of the speed of light and
 is used today in, among other things, supermarket scanners and laser
@@ -22,7 +24,7 @@ movement is very predictable, it is not very controllable.
 Modern laser light shows confront this problem with “laser galvos”,
 descendants of the old instrument for measuring small currents — a
 galvanometer connected to a mirror rather than a needle.  These are
-used in pairs, one for X dflection and one for Y deflection.  Galvos
+used in pairs, one for X deflection and one for Y deflection.  Galvos
 for laser shows are rated in “kpps”, thousands of points per second,
 and a few tens of kpps is typical.
 
@@ -78,12 +80,12 @@ stray light reflections at the new surfaces, this compound lens still
 behaves precisely as before, leaving collimated light collimated, but
 making it brighter.
 
-         __
-  ----/|| /
-     | |||----
-  ---|-|||----
-     | |||----
-  ----\||_\
+          __
+    ----/|| /
+       | |||----
+    ---|-|||----
+       | |||----
+    ----\||_\
 
 However, if we slide the two halves relative to each other, retaining
 flat-surface parallelism and distance, the collimated light exiting
@@ -109,22 +111,22 @@ layers of that lenticular plastic covering that covers those 3-D
 parallax Jesus cards, except that the lenslets on one of them are
 concave:
 
-         __
-  ----/|| /
-     | |||----
-  ---|-|||----
-     | |||----
-  ----\|| \
-  ----/|| /
-     | |||----
-  ---|-|||----
-     | |||----
-  ----\|| \
-  ----/|| /
-     | |||----
-  ---|-|||----
-     | |||----
-  ----\||_\
+           __
+    ----/|| /
+       | |||----
+    ---|-|||----
+       | |||----
+    ----\|| \
+    ----/|| /
+       | |||----
+    ---|-|||----
+       | |||----
+    ----\|| \
+    ----/|| /
+       | |||----
+    ---|-|||----
+       | |||----
+    ----\||_\
 
 This exhibits the same direction-changing behavior over the same angle
 with the same displacement as the single lens, but can handle a great
@@ -141,13 +143,17 @@ displacement.
 How fast can you move a thing?  Tens of microseconds if it’s 100 mm
 -------------------------------------------------------------------
 
-How fast is the speed of sound in glass?  I think it’s around
-3000 m/s, though I can’t remember.  Suppose you have a 100-mm-wide
+[The speed of sound in glass is commonly about 4500 m/s][6]
+though [it varies from 4000–6000 m/s for different glasses][7].
+Suppose you have a 100-mm-wide
 sheet of these lens things and you give it a shove on one edge,
 parallel to its surface, say with a piezoelectric actuator.  That
 shove produces a sound wave that bounces back and forth through the
 glass about ten times before the whole thing has settled, in about
-30 μs, if my guess about the speed of sound is right.
+220 μs, using the above estimate of its speed of sound.
+
+[6]: https://www.nde-ed.org/EducationResources/HighSchool/Sound/speedinmaterials.htm
+[7]: https://www.engineeringtoolbox.com/sound-speed-solids-d_713.html
 
 This sounds dismayingly slow, but I don’t think the picture is that
 bleak.  It’s true that you have *latency* in the tens of microseconds,
@@ -155,10 +161,14 @@ but it’s very consistent, predictable latency.  You can inverse-filter
 for the phase delay.  XXX what about variation across the sheet while
 it’s strained?  Just turn the laser off except at key moments?
 
-(You might also be able to improve the situation with some acoustic
+You might also be able to improve the situation with some acoustic
 impedance matching: some kind of matched resistance on the other side
 of the glass sheet that absorbs the shock and keeps it from bouncing
-back.)
+back.  That doesn’t save you the initial 22-μs latency, but it means
+you don’t have to contend with reflection.
+
+This doesn’t depend on the thickness of the sheet, as long as it’s
+stiff enough not to buckle.
 
 How small can you make the lenslets?
 ------------------------------------
