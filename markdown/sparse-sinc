@@ -1,0 +1,118 @@
+Is there a reasonable way to approximate a low-pass time-domain sinc
+filter with a sparse filter cascade, in the sense described in file
+`sparse-filters` and elaborated, for example, in file
+`sparse-kernel-cascade-gabor-approximation`?
+
+A sinc consists of two sine waves of the same frequency, 180 degrees
+out of phase, joined with a kind of parabolic lump in the middle (the
+"main lobe"), and with an overall hyperbolic envelope: go twice as far
+out and the oscillations are half as high.  A sort of important thing
+is that the zero-crossings are at perfectly regular intervals, except
+that there's one missing in the middle, in the center of the parabolic
+lump, which is instead the maximum of the whole function.
+
+Most commonly, instead of convolving with the full sinc function,
+which has annoyingly long support, we convolve with a windowed sinc
+function, whose amplitude diminishes considerably more quickly.
+
+A couple of different ideas occur to me for how to do this.
+
+Beating frequencies with a Gaussian window
+------------------------------------------
+
+If we want a sine wave to go through a 180-degree phase shift, a
+simple way to get this is to generate a beating signal by adding two
+sine waves at frequencies above and below it.  For example, if we want
+a 44,100-Hz sine wave to switch polarities 100 times a second, we can
+add equal-amplitude sine waves at 44,050 Hz and 44,150 Hz.  If we put
+a tight window around a zero-crossing of the phase, we can attenuate
+the signal sufficiently that only a single crossover has a significant
+amount of energy.
+
+File `sparse-kernel-cascade-gabor-approximation` shows how to put a
+Gaussian window on a sine wave by composing a feedback comb and a
+feedforward comb, and by adding two different windowed sine waves you
+can get much of the tails of a windowed sinc.  For better or worse,
+the amplitude will diminish in the tails as exp(-*x*<sup>2</sup>).
+
+This doesn't provide the lump in the center, but perhaps we can get a
+reasonable lump out of a simple (non-oscillating) Gaussian and add
+that in.
+
+The above gives us about 15 additions and subtractions per sample.
+
+However, I think the envelope of this approach will be too far from
+correct, because the sidelobes immediately next to the main lobe will
+have amplitudes that are too small.
+
+This approach is particularly interesting for a slightly different
+application: as an ideal *bandpass* filter has a frequency response of
+a symmetrical low-pass boxcar convolved with an impulse at its center
+frequency, it has a time-domain response of the low-pass boxcar's sinc
+*multiplied pointwise* by a sinusoid at the center frequency.  Where
+the sinc crosses zero, the center-frequency sinusoid reverses phase.
+So the beating trick can be used to get some of those sidelobes.
+
+Summing a bunch of in-phase Gaussian-windowed oscillations
+----------------------------------------------------------
+
+Suppose that, instead of trying to generate a beating frequency and
+then window it, we start with a single Gabor kernel (a
+Gaussian-windowed sinusoid) of, say, an eighth of the overall window
+width.  Then we build up the overall hyperbolic envelope by adding
+delayed and amplified copies of the thus-windowed signal, careful that
+the delays don't put the various copies out of phase (except in the
+middle).  Perhaps six or eight copies should thus be adequate to get a
+good approximation to the overall hyperbolic envelope, and then, as
+before, you need to add in the central lump.
+
+The copies on opposite sides of the central lobe are the same
+amplitude, so you can sum them first and then multiply them by the
+amplitude; with this approach, eight copies will require four
+additions and four multiply-accumulates, all starting from the same
+windowed sinusoid.
+
+With this approach we should need about six adds and subtracts to get
+the initial windowed sinusoid, six adds and subtracts to get the
+central lump, and four additions and four multiply-accumulates to put
+the whole thing together: 20 operations in all.
+
+Summing exponentially-decaying oscillations
+-------------------------------------------
+
+The things above all work using Gaussian-windowed oscillations, but
+while a real sinc decays as 1/*x*, the Gaussian decays as
+exp(-*x*<sup>2</sup>), which is a lot faster.  In between, we have
+exponentially-decaying oscillations, such as those proceeding from the
+feedback comb filter
+
+> *y*(*t*) = *x*(*t*) - *ky*(*t*-*s*)
+
+where 0 < *k* < 1.  Maybe such a decay could produce one of the tails
+of the sinc filter efficiently, with a slower decay than the Gaussian
+and potentially a much sharper onset, although you might want to tone
+that down a bit in order to reduce discontinuities.
+
+A feedforward-comb trick similar to the trick used to get
+Gaussian-windowed oscillation can cut this exponential off after some
+number of oscillations; this will inevitably have some rounding error,
+but the rounding error will decay exponentially thereafter, so it
+shouldn't be a major concern in this application.  This allows you to
+put together the tail out of a piecewise-exponential decaying
+oscillation, although you can't derive each piece from the same
+exponential the way you could with the Gaussians.
+
+You might think to just use 1/*k* for the other tail, but in that case
+the inevitable rounding error from the cutoff would grow exponentially
+out of control.  A better approach, when it's feasible, is
+bidirectional filtering --- not in the filtfilt way, where the two
+unidirectional filters are *composed*, but where the results of the
+two unidirectional filters applied to the same input signal are
+*added*.
+
+This bidirectional approach might give adequate results with a single
+exponential tail in each direction, with the first impulse in the
+oscillation being a quarter-cycle away from the origin.  This would be
+two subtractions and two multiplications per sample, plus whatever
+low-pass nonsense you need to do to get rid of the third and higher
+harmonics.
