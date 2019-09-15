@@ -23,8 +23,8 @@ Beating frequencies with a Gaussian window
 If we want a sine wave to go through a 180-degree phase shift, a
 simple way to get this is to generate a beating signal by adding two
 sine waves at frequencies above and below it.  For example, if we want
-a 44,100-Hz sine wave to switch polarities 100 times a second, we can
-add equal-amplitude sine waves at 44,050 Hz and 44,150 Hz.  If we put
+a 22,050-Hz sine wave to switch polarities 100 times a second, we can
+add equal-amplitude sine waves at 22,000 Hz and 22,100 Hz.  If we put
 a tight window around a zero-crossing of the phase, we can attenuate
 the signal sufficiently that only a single crossover has a significant
 amount of energy.
@@ -95,7 +95,11 @@ that down a bit in order to reduce discontinuities.
 
 A feedforward-comb trick similar to the trick used to get
 Gaussian-windowed oscillation can cut this exponential off after some
-number of oscillations; this will inevitably have some rounding error,
+number *n* of oscillations by composing with a filter something like this:
+
+> *y*(*t*) = *x*(*t*) - *k*<sup>2*n*</sup>*x*(*t*-2*ns*)
+
+This will inevitably have some rounding error,
 but the rounding error will decay exponentially thereafter, so it
 shouldn't be a major concern in this application.  This allows you to
 put together the tail out of a piecewise-exponential decaying
@@ -116,3 +120,65 @@ oscillation being a quarter-cycle away from the origin.  This would be
 two subtractions and two multiplications per sample, plus whatever
 low-pass nonsense you need to do to get rid of the third and higher
 harmonics.
+
+Summing flat oscillation plateaus
+---------------------------------
+
+The procedure mentioned earlier for generating a Gaussian-windowed
+oscillation consists of convolving three or more rectangular-windowed
+oscillations.  But another possibility is to *add* scaled
+rectangular-windowed oscillations; for example, 64 oscillations scaled
+by 1/64, 32 oscillations scaled by 1/64, 16 oscillations scaled by
+1/32, 8 oscillations scaled by 1/16, 4 oscillations scaled by 1/8, 2
+oscillations scaled by 1/4, and one oscillation scaled by 1/2.  This
+gives you a sort of stepped-pyramid approximation of the sinc shape,
+which you can then perhaps smooth a bit by convolving it with one or
+more windowed oscillations at the same frequency.
+
+This stepped pyramid requires a *single* oscillator (one subtraction),
+seven subtractions to get the steps, then six additions (with binary
+scale factors) to get each side of the sinc from them, for a total of
+20 operations per sample.  Several more operations might be needed to
+add the central lobe and smooth the steps.
+
+(Maybe triangular-windowed oscillations would be a better basis
+function, at least for the final tail; or you could tag on an
+exponential decay.)
+
+Not worrying much about high harmonics
+--------------------------------------
+
+Any departure from the perfect sinc shape in the resulting filter's
+impulse response represents some kind of departure in the frequency
+response from the desired boxcar --- either in passband flatness or in
+some nonzero response in the stopband.  But some kinds of departure
+are less harmful than others; for example, the comb filters we're
+using here have not one passband but an infinite number, spaced at odd
+harmonics of the normal passband.  In some sense this is an extreme
+departure from ideal behavior, but it's not a particularly bad one;
+unless the desired passband is very wide, the extra passbands are
+located far enough away that it's easy to filter them out adequately
+with fairly simple low-pass filtering.
+
+By contrast, if you want a filter that passes 140 Hz to 150 Hz, and
+you instead get a filter that passes 140 Hz to 151 Hz, that extra
+hertz will be an extremely difficult error to remove.  These sparse
+filters might actually be able to do a better job at this than
+conventional FIR and IIR filters, because they can afford to use much
+wider support, which means they can get much sharper frequency
+cutoffs.
+
+Undertone filtering
+-------------------
+
+Because comb filtering passes (either all or odd) harmonics just as
+strongly as the fundamental, you can compose combs at different
+frequencies to get a filter that passes the common multiples of those
+frequencies; for example, one third, one fifth, and one seventh of the
+desired frequency (35/105, 21/105, and 15/105), maybe with a
+feedforward comb to notch out any unwanted frequencies.  This is
+useful when the frequency you want is not close to a factor of your
+Nyquist frequency (or half the Nyquist frequency, in the
+negative-feedback case).
+
+(An alternative in such cases is often to use spectral inversion.)
