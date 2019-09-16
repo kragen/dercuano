@@ -1,0 +1,67 @@
+Suppose that, like most days, we’re trying to find a local minimum of
+a univariate function *f*(*x*) we can automatically differentiate with
+a continuous derivative.
+
+Newtonish–Raphsonish root finding with affine arithmetic
+--------------------------------------------------------
+
+Suppose that the derivative is continuous (though not necessarily
+Lipschitz) and our automatic differentiation procedure supports
+reduced affine arithmetic, so that we can evaluate the function’s
+derivative *f'*(*x*) at “points” that are really affine forms
+describing some interval [*x*₀, *x*₁], such as an interval with a zero
+in it, and get back an affine form that gives a linear approximation
+*k* + *a*₀*x* and a fairly tight worst-case error *a*₁ from that
+approximation *x* ∈ [*x*₀, *x*₁] ⇒ ∃*ε* ∈ [-1, 1]: *f'*(*x*) = *k* +
+*a*₀*x* + *a*₁*ε*.  (Affine arithmetic is discussed at some length in
+file `affine-database` and file `affine-arithmetic-optimization`.)
+
+This allows us to bound the zero of the derivative, and thus the
+critical point of *f*(*x*), to a generally much smaller interval: *x*
+must be between -(*k* - *a*₁)/*a*₀ and -(*k* + *a*₁)/*a*₀.  In fact,
+*every* zero of the derivative within the original interval is
+guaranteed to be within that new interval, so in cases where the new
+interval is larger or fails to be sufficiently smaller than the
+original, we must be prepared instead to subdivide the interval and
+recurse on each subinterval.
+
+Indirect multidimensional optimization, and root-finding in general
+-------------------------------------------------------------------
+
+This can, of course, be used to find zeroes of functions that aren’t
+derivatives of anything of special interest, and I think that’s where
+I got the idea — from people using this approach for raytracing of
+implicit surfaces.  But it seems like an approach that could be
+extremely fruitful for mathematical optimization.  In file
+`adaptive-hill-climbing` I suggested cutting a multidimensional
+function along a gradient line to get a one-dimensional function
+that’s easier to optimize, an approach I haven’t tried yet, but it
+seems like this approach would work for it.
+
+Direct multidimensional optimization
+------------------------------------
+
+Alternatively, it might be feasible to use this approach more directly
+for multidimensional optimization.  There’s a paper out a few years
+back about a correct algorithm using interval arithmetic for
+multidimensional optimization, using a branch-and-bound approach, but
+as I understand it, it has the problem that it is very slow on
+high-dimensional spaces.  Suppose you look for a zero of some gradient
+*g⃗* as Σ_ᵢgᵢ_² or Σ_i_|*gᵢ*| using a variant of the method above,
+using reduced affine arithmetic to compute bounds on this (squared)
+gradient magnitude or other gradient norm over some multidimensional
+box; I think this should take time merely proportional to the
+dimensionality.
+
+The magnitudes of the coefficients in the resulting affine form should
+tell you how sensitive the gradient is to your location within the box
+along each dimension; to some extent you can trade off shrinking the
+box along one dimension against shrinking it along another dimension,
+but it’s hard to know which dimension is optimal to shrink most in.
+
+Maybe if we automatically differentiate our reduced-affine-arithmetic
+program, we can get the gradient of the error bars on the (original
+function’s) gradient norm, with respect to the bounds of the box we’re
+evaluating the gradient over.  This would tell us which dimensions of
+the box are most important to shrink in order to reduce the
+uncertainty in the gradient.

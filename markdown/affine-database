@@ -1,6 +1,10 @@
 An affine-arithmetic database index for rapid historical securities formula queries
 ===================================================================================
 
+I started writing a README.md for a project called “affinebase” in
+2017, but then never wrote any code for it; this note outlines what I
+had in mind to implement.
+
 Suppose you want a database of financial tick data that can
 efficiently evaluate queries for things like “when the price of SPY
 was at least 1% higher than its 15-minute moving average but lower
@@ -95,11 +99,6 @@ possible for any point within the interval to satisfy an equation or
 an inequality — like the inequalities in the example queries at the
 beginning of this note.
 
-Jorge Eliécer FLÓREZ DÍAZ wrote his 2008 dissertation, “Improvements
-in the Ray Tracing of Implicit Surfaces based on Interval Arithmetic”,
-on using this approach to accelerate the ray-tracing of animated
-scenes.
-
 As noted in file `interval-functions` and file
 `affine-arithmetic-optimization`, the affine-arithmetic approximation
 has a higher order of convergence than the interval-arithmetic
@@ -116,6 +115,36 @@ errors that we don’t bother to track separately.  This way we can
 still get the tasty quadratic convergence and even the self-validating
 property without paying the high cost of an ever-growing flock of *εᵢ*
 variables on every operation.
+
+### Existing work ###
+
+The above is not original to me; there are at least three papers
+describing it, none of which I have managed to finish reading:
+
+Jorge Eliécer FLÓREZ DÍAZ wrote his 2008 dissertation, “Improvements
+in the Ray Tracing of Implicit Surfaces based on Interval Arithmetic”,
+on using this approach to accelerate the ray-tracing of animated
+scenes, but using a modal “completion” of ordinary interval arithmetic
+(“modal interval arithmetic”) rather than affine arithmetic.  I read
+someone else’s dissertation in French on doing something similar with
+affine arithmetic, but I can’t remember who it was or what it was
+called.
+
+Knoll, Hijazi, Kensler, Schott, Hansen, and Hagen wrote a paper “Fast
+Ray Tracing of Arbitrary Implicit Surfaces with Interval and Affine
+Arithmetic” in 2008 describing how to use this approach to accelerate
+raytracing, including in GPU shaders; they trace the approach back to
+Toth in 1985 and also cite, among many others, a 2006 paper by Flórez
+Díaz.
+
+There’s also a paper on the subject by Gamito and Maddock from 2004 or
+2005, “Ray Casting Implicit Fractal Surfaces with Reduced Affine
+Arithmetic”; I think this may be the paper that introduced reduced
+affine arithmetic.
+
+These papers are especially relevant to file
+`reduced-affine-arithmetic-raytracer`, which is why I was reading
+them.
 
 A univariate affine-arithmetic database
 ---------------------------------------
