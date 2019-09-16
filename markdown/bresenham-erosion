@@ -90,6 +90,23 @@ kernels.
 I think this algorithm may be [due to Richard Harter in 2001][1], who
 called it “the ascending minima algorithm”, but I’m not sure.
 
+> As an interesting side note, a slight variation of this algorithm
+> computes the convex hull of a series of points in 2-D in linear
+> time.  It consists of a basic pass which computes the upper convex
+> hull, which is applied a second time under a suitable transformation
+> to compute the lower convex hull, which together (perhaps with
+> vertical lines to join them) form the overall convex hull.  Each
+> pass iterates over the points in increasing order of X coordinate,
+> just as the sliding-window algorithm does; the upper convex hull is
+> accumulated on a stack (rather than a deque) and points are popped
+> off the stack if, considering the new point being added, they would
+> make the hull non-convex, rather than if they are greater than the
+> new point being added.  This maintains the invariant that the
+> sequence is convex upwards, rather than that it is nondecreasing.
+> This is important for efficiently finding affine-arithmetic
+> approximations of empirical data, as explored in file
+> `affine-database`.
+
 There’s a completely different algorithm with similar linear
 performance published by van Herk in 1992 in a paper entitled, “A fast
 algorithm for local minimum and maximum filters on rectangular and
