@@ -1,6 +1,11 @@
+Fast mathematical optimization with affine arithmetic
+=====================================================
+
 Suppose that, like most days, we’re trying to find a local minimum of
 a univariate function *f*(*x*) we can automatically differentiate with
-a continuous derivative.
+a continuous derivative.  By using affine arithmetic, we should be
+able to get both quadratic convergence to the minimum, under
+Newton–Raphson-like conditions, and a guarantee of global optimality.
 
 Newtonish–Raphsonish root finding with affine arithmetic
 --------------------------------------------------------
@@ -24,6 +29,26 @@ guaranteed to be within that new interval, so in cases where the new
 interval is larger or fails to be sufficiently smaller than the
 original, we must be prepared instead to subdivide the interval and
 recurse on each subinterval.
+
+### Rate of convergence and global optimality ###
+
+I was thinking about trying to do a rigorous proof here but instead
+I’m just going to handwave because it’s almost 4 AM.  Generally the
+(vertical) error bounds affine arithmetic gives you are proportional
+to the second derivative of the function you’re calculating (which is
+itself a derivative in the above), unrelated to its first derivative,
+and inversely proportional to the square of the interval width.  This
+is pretty much the same situation as Newton–Raphson iteration or the
+method of secants, so you should expect it to converge quadratically
+under the same conditions that they do.
+
+If you can figure out how to make an initial interval that is big
+enough to contain all the local optima, then this approach is
+guaranteed to find all the local optima and in fact all the critical
+points; you can use branch-and-bound to avoid recursing too deeply in
+areas where the local optima are not as good as the worst case in
+other areas where you are also searching, so even functions with a
+large number of critical points may be tractable.
 
 Indirect multidimensional optimization, and root-finding in general
 -------------------------------------------------------------------
@@ -49,7 +74,7 @@ back about a correct algorithm using interval arithmetic for
 multidimensional optimization, using a branch-and-bound approach, but
 as I understand it, it has the problem that it is very slow on
 high-dimensional spaces.  Suppose you look for a zero of some gradient
-*g⃗* as Σ_ᵢgᵢ_² or Σ_i_|*gᵢ*| using a variant of the method above,
+*g⃗* as Σ*ᵢgᵢ*² or Σ*ᵢ*|*gᵢ*| using a variant of the method above,
 using reduced affine arithmetic to compute bounds on this (squared)
 gradient magnitude or other gradient norm over some multidimensional
 box; I think this should take time merely proportional to the
