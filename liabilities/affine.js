@@ -86,4 +86,9 @@ let affine = (k, a) => {
    linearity they represent might all have the same sign even if the
    terms have different signs — so we have to use their absolute
    values rather than their signed sum to get the new coefficient.
+
+   Gamito and Maddock omit all this special-case stuff for squared
+   error symbols, so I should be careful to verify that I’m not making
+   a reasoning error.
+
  */
