@@ -1,0 +1,70 @@
+I’ve been struggling with local-files WWW browsing in Dercuano since
+its inception, and I’ve learned a few things in the process.
+
+Android, the special shitty snowflake
+-------------------------------------
+
+As described in file `dercuano-hand-computers`, I think that probably
+PDF is a more feasible solution for *delivery to* hand computers, but
+I also want to do *development on* hand computers.
+
+I can build Dercuano on Android in Termux with no difficulty,
+especially now that I’ve spent the hour to port it to Python 3.
+However, browsing the built HTML tree is more difficult.
+
+Firefox Lite on Android can’t browse local files at all.  Chrome on
+Android can, using the normal file:///sdcard/whatever URLs, but not
+the entire filesystem.  So it’s necessary to put the files you’re
+browsing in /sdcard, even if it’s “emulated”, so that the browser has
+access to them.
+
+Opening HTML files in Android from Termux with `termux-open-url` does
+not work well, because it doesn’t use the file:// but rather a
+content:// URL which could perhaps in theory export the whole tree of
+HTML files (and CSS, and JS) but in practice doesn’t.  It’s rather
+fiddly to get the correct directory in Termux if you got there via
+symlinks; I’ve resorted to `termux-open-url "file://$(readlink -f
+"$(pwd)")/index.html"`, though maybe there’s an easier way.
+
+Chrome on Android is capable of saving HTML files you’re viewing,
+which it does in a MIME multipart/related document.  Firefox Lite does
+not deign to permit mere users such abilities.
+
+Same-domain problems in filesystem browsing
+-------------------------------------------
+
+Normal Firefox of course can browse local file URLs; however, it has
+some rather strange restrictions.
+[dercuano-20190915/index.html](../index.html) can successfully load
+[dercuano-20190915/liabilities/style.css](../liabilities/style.css),
+which can then successfully load, for example,
+[dercuano-20190915/liabilities/et-book-roman-old-style-figures.ttf](../liabilities/et-book-roman-old-style-figures.ttf),
+and if you click from dercuano-20190915/index.html to, for example,
+dercuano-20190915/notes/notes-on-local-file-browsing.html, it can also
+load these files.  Similarly, both can load
+[addtoc.js](../liabilities/addtoc.js) from the liabilities directory.
+However, if you open
+dercuano-20190915/notes/notes-on-local-file-browsing.html directly
+(for example, by pasting the URL, launching it from the command line,
+or clicking a bookmark), it can load the CSS and the JS but not the
+TTF, which gets an error message about cross-origin requests in the JS
+console.  So as long as you’re clicking around from the top level,
+you’re fine, but entering through another path will result in a
+mysterious font failure.
+
+Chromium also fails to load the fonts under similar but not identical
+circumstances.
+
+Whatever concept of “origin” the browsers are using isn’t exported to
+JS as `window.origin` or `document.domain`, which are consistently
+`"null"` (a string) and `""`, respectively.
+
+localStorage
+------------
+
+Somewhat surprisingly, both Firefox and Chromium support localStorage
+from local files; Firefox, for one, seems to use the same notion of
+“origin” that sometimes prevents it from loading the fonts.  In both
+cases localStorage survives browser restarts.  This suggests that it
+should be possible to use localStorage as a persistent cache, but it’s
+not safe as the only way to store important data.
