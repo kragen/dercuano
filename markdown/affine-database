@@ -1,0 +1,229 @@
+An affine-arithmetic database index for rapid historical securities formula queries
+===================================================================================
+
+I started writing a README.md for a project called “affinebase” in
+2017, but then never wrote any code for it; this note outlines what I
+had in mind to implement.
+
+Suppose you want a database of financial tick data that can
+efficiently evaluate queries for things like “when the price of SPY
+was at least 1% higher than its 15-minute moving average but lower
+than its 4-hour moving average”, or “when the price of GOOG.A was more
+than 26 times the price of GOOG.B”.
+
+Conventional database indices provide very little help with such
+queries, but an organization based on affine arithmetic occurs to me
+as an efficient structure for such things.
+
+File `interval-trees-over-sequences` considers associating an
+interval-arithmetic interval with substrings of a sequence of records
+as a form of index; this note considers moving from interval
+arithmetic to affine arithmetic.
+
+Affine arithmetic
+-----------------
+
+Affine arithmetic is a system of “self-validating arithmetic” similar
+to interval arithmetic, but supporting linear cancellation of
+approximation errors.
+
+In affine arithmetic, instead of evaluating expressions to numbers
+under some assignment of numbers to their free variables, we evaluate
+them to *affine forms* under some assignment of affine forms to their
+free variables; these affine forms take the form *k* + Σ*ᵢaᵢεᵢ* and
+are stored as a vector [*k*, *a*₀, *a*₁, … *aₙ*].  The *εᵢ* are
+gremlin variables that are free to introduce error into your results
+by taking any value within some fixed range, usually [-1, 1].
+Whenever you execute an arithmetic operation that may introduce
+rounding error, you introduce a new *εᵢ* to account for that rounding
+error, with an *aᵢ* sized appropriately for the computed size of the
+rounding error.
+
+In its most basic form, this is a somewhat less conservative form of
+interval arithmetic; in ordinary interval arithmetic, the expression
+*x* - *x* evaluates to some interval around zero whose error is twice
+the size of the error of *x*, but in affine arithmetic the errors
+cancel exactly and you are left with exactly 0, as the SF intended.
+In general, affine arithmetic can precisely cancel the
+linearly-varying parts of numerical errors, but nonlinearly-varying
+parts will be incompletely canceled, so it still provides error bounds
+that are wider than the real error can be.
+
+The part where this gets interesting is when you assign non-negligible
+*aᵢ* to the free variables.  Suppose you want to plot the surface *x*²
++ *xy* + 2, for example.  With affine arithmetic, you can directly
+evaluate it over a region such as *x* ∈ [-1, 3], *y* ∈ [2, 4], by
+assigning *x* = 1 + 2*ε*₀, *y* = 3 + 1*ε*₁.  Depending on the
+particular evaluation approach, the result will depend not only on
+*ε*₀ and *ε*₁, but also two to four more ε variables representing the
+rounding error from the additions and the nonlinearity of the
+multiplications.  If we ignore the rounding errors, this works out to
+8 + 10*ε*₀ + 1*ε*₁ + 2*ε*₂ + 2*ε*₃.
+
+> For use as self-validating arithmetic, which is to say saving you
+> the trouble of calculating static bounds on your algorithm’s
+> approximation errors, you probably want to run each calculation more
+> than once with different floating-point rounding modes by calling
+> the C99 function `fesetround` or something similar: 0 is
+> round-toward-0 and 1 is the default round-to-nearest, but the
+> relevant ones are 2 for toward-positive-infinity and 3 for
+> toward-negative-infinity; with GCC I think you also need to compile
+> with `-frounding-math`.  However, in this note, I’m focusing on the
+> non-self-validating-arithmetic uses of affine arithmetic.
+
+Now, the simplest reading of this result 8 + 10*ε*₀ + 1*ε*₁ + 2*ε*₂ +
+2*ε*₃ is that if *x* and *y* are inside the specified ranges, then the
+surface will be between the heights of 8 - 10 - 1 - 2 - 2 = -7 and 8 +
+10 + 1 + 2 + 2 = +23, and this is true.  In fact the surface actually
+does reach +23 at (3, 4), but its lowest point in this range is at
+(-1, 4), where it reaches -1, so the -7 is a bit conservative.  This
+is in fact precisely the same result that ordinary interval arithmetic
+would have given us on the factored form (*x* + *y*)*x* + 2, but
+affine arithmetic gave it to us without doing the factoring step.
+
+However, a *much more interesting* reading of this result is to
+re-express it in terms of *x* and *y*.  5*x* = 5 + 10*ε*₀, so it’s 3 +
+5*x* + 1*ε*₁ + 2*ε*₂ + 2*ε*₃, which is 0 + 5*x* + *y* + 2*ε*₂ + 2*ε*₃,
+which is to say, 0 + 5*x* + *y* ± 4.  This gives us *much tighter*
+bounds on the result: instead of ±15 we have ±4.  (They are still
+conservative bounds, because the function never actually gets below
+5*x* + *y* - 2¼, which it reaches at (½, 4).)
+
+So, a very interesting thing we can do here is to start with a large
+interval of our independent variables and recursively subdivide it to
+get a piecewise-linear approximation of our function of choice.  We
+can choose whether to subdivide the interval based on criteria such
+as: the remaining error; for plotting, the geometric angle, in
+radians, between adjoining line segments; or simply whether it’s
+possible for any point within the interval to satisfy an equation or
+an inequality — like the inequalities in the example queries at the
+beginning of this note.
+
+As noted in file `interval-functions` and file
+`affine-arithmetic-optimization`, the affine-arithmetic approximation
+has a higher order of convergence than the interval-arithmetic
+approximation — as the size of the interval decreases, the error of
+any regular function diminishes quadratically in the size of the
+interval with affine arithmetic, but only linearly with interval
+arithmetic.
+
+In this connection it’s worth mentioning “reduced interval arithmetic”
+in which we restrain the proliferation of the *εᵢ*s by introducing an
+*ε<sub>ω</sub>* not subject to linear cancellation; its coefficient
+represents the errors proceeding from things like small rounding
+errors that we don’t bother to track separately.  This way we can
+still get the tasty quadratic convergence and even the self-validating
+property without paying the high cost of an ever-growing flock of *εᵢ*
+variables on every operation.
+
+### Existing work ###
+
+The above is not original to me; there are at least three papers
+describing it, none of which I have managed to finish reading:
+
+Jorge Eliécer FLÓREZ DÍAZ wrote his 2008 dissertation, “Improvements
+in the Ray Tracing of Implicit Surfaces based on Interval Arithmetic”,
+on using this approach to accelerate the ray-tracing of animated
+scenes, but using a modal “completion” of ordinary interval arithmetic
+(“modal interval arithmetic”) rather than affine arithmetic.  I read
+someone else’s dissertation in French on doing something similar with
+affine arithmetic, but I can’t remember who it was or what it was
+called.
+
+Knoll, Hijazi, Kensler, Schott, Hansen, and Hagen wrote a paper “Fast
+Ray Tracing of Arbitrary Implicit Surfaces with Interval and Affine
+Arithmetic” in 2008 describing how to use this approach to accelerate
+raytracing, including in GPU shaders; they trace the approach back to
+Toth in 1985 and also cite, among many others, a 2006 paper by Flórez
+Díaz.
+
+There’s also a paper on the subject by Gamito and Maddock from 2004 or
+2005, “Ray Casting Implicit Fractal Surfaces with Reduced Affine
+Arithmetic”; I think this may be the paper that introduced reduced
+affine arithmetic.
+
+These papers are especially relevant to file
+`reduced-affine-arithmetic-raytracer`, which is why I was reading
+them.
+
+A univariate affine-arithmetic database
+---------------------------------------
+
+So, if we have an affine form that summarizes a time-varying quantity,
+such as a stock price, in the form *k* + *a*₀*t* + *a*₁*ε*₁, for some
+interval, where *ε*₁ is a bound on the error of the linear
+approximation over that interval, then we can efficiently compute some
+bounds on the kinds of expressions in the introduction, and
+efficiently reject huge swaths of history at once as not meeting our
+query condition, and efficiently accept other huge swaths of history
+as always meeting it.  For intervals where the condition may possibly
+be met, we can recursively subdivide them into smaller intervals with
+tighter error bounds.
+
+But where do we get these affine forms?  They already exist in the
+technical analysis of securities prices, where they go by the name of
+“channels” — a “channel” is a linear approximation of a securities
+price over some period of time within some error bounds.  Although
+there is no guarantee of this, it is typically very efficient to
+compute the best channel for a given time period by computing the
+convex hull of the prices over that time period, which takes linear
+time, and then considering the slopes of the line segments of that
+convex hull; the best channel slope will be one of these, and it
+suffices to consider the points on the convex hull.  In theory there
+could be a linearly large number of line segments on both the upper
+and lower convex hull, but in practice the number is much smaller.
+
+You can subdivide history at arbitrary points and compute the best
+channel for those arbitrary intervals, but you can get much tighter
+channel bounds if you instead look for “natural” points to make the
+divisions.  The points on the convex hull are promising candidates for
+“natural” division points, since the largest local extrema of
+oscillation from the trend line will necessarily be part of the convex
+hull, but I think there’s a linear-time algorithm to find the “most
+natural” division point.
+
+If you use FP-persistent stack structures to build the convex hull
+using the convex-hull algorithm mentioned in file `bresenham-erosion`,
+you compute the convex hull not only of the whole interval but also
+every prefix of the interval in a single linear-time, linear-space
+pass.  Doing this once in each direction allows you to evaluate every
+possible division point within the interval without redundantly
+recomputing those convex hulls.
+
+In this way you can build a tree over time that permits rapid
+branch-and-bound evaluation of ad-hoc historical queries on arbitrary
+computable inequalities.
+
+A multivariate affine-arithmetic database using PCA
+---------------------------------------------------
+
+Simply approximating security prices or other time series as linear
+functions of time plus guaranteed error bounds does allow you to
+compute things like ratios and differences between them efficiently
+with guaranteed error bounds.  However, it’s very common — not to say
+nearly universal — for securities prices to have correlations,
+negative or positive, that go beyond a simple linear trend over some
+time period, and if you can take these correlations into account, you
+may be able to get much tighter error bounds.
+
+One possible way to do this is to run a principal components analysis
+over historical prices, and then store the time series of several
+principal components in your database alongside the actual securities
+prices.  Then you can summarize each interval in the tree of a
+security as a linear function not merely of time but also of these
+principal components.  This should permit much tighter bounds on the
+results of the arbitrary expressions over long time intervals, thus
+permitting much faster branch-and-bound evaluations.
+
+Non-market applications
+-----------------------
+
+This technique, of course, is applicable to any time-series
+quantitative data, not just securities prices — market prices of
+commodities, temperatures and other climate data, system
+administration metrics such as network traffic and error rates,
+telemetry data from satellites and space probes, audio signals, image
+data (with two “time” dimensions), and so on.
+
+<script src="../liabilities/affine.js">
+</script>
