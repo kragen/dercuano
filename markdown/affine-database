@@ -34,6 +34,7 @@ free variables; these affine forms take the form *k* + Σ*ᵢaᵢεᵢ* and
 are stored as a vector [*k*, *a*₀, *a*₁, … *aₙ*].  The *εᵢ* are
 gremlin variables that are free to introduce error into your results
 by taking any value within some fixed range, usually [-1, 1].
+(The standard term for “gremlin variable” is “error symbol”.)
 Whenever you execute an arithmetic operation that may introduce
 rounding error, you introduce a new *εᵢ* to account for that rounding
 error, with an *aᵢ* sized appropriately for the computed size of the
@@ -119,7 +120,11 @@ variables on every operation.
 ### Existing work ###
 
 The above is not original to me; there are at least three papers
-describing it, none of which I have managed to finish reading:
+describing it, none of which I have managed to finish reading.
+
+These papers are especially relevant to file
+`reduced-affine-arithmetic-raytracer`, which is why I was reading
+them.
 
 Jorge Eliécer FLÓREZ DÍAZ wrote his 2008 dissertation, “Improvements
 in the Ray Tracing of Implicit Surfaces based on Interval Arithmetic”,
@@ -137,14 +142,54 @@ raytracing, including in GPU shaders; they trace the approach back to
 Toth in 1985 and also cite, among many others, a 2006 paper by Flórez
 Díaz.
 
+#### Gamito and Maddock ####
+
 There’s also a paper on the subject by Gamito and Maddock from 2004 or
 2005, “Ray Casting Implicit Fractal Surfaces with Reduced Affine
 Arithmetic”; I think this may be the paper that introduced reduced
 affine arithmetic.
 
-These papers are especially relevant to file
-`reduced-affine-arithmetic-raytracer`, which is why I was reading
-them.
+I think it has a couple of errors in it.  On p. 6 equation (13),
+computing the reduced affine arithmetic product of two variables *ŵ* =
+*ûv̂* represented as three-tuples (center, parametric coefficient,
+error bound) says *w*₂ = |*u*₀*v*₂ + *v*₀*u*₂| + (|*u*₁| +
+|*u*₂|)·(|*v*₁| + |*v*₂|), but this can incorrectly cancel the error
+bound *v*₂ of *v̂* against the error bound *u*₂ of *û* if their signs
+happen to be opposite, which would be pure happenstance; that first
+term should be |*u*₀*v*₂| + |*v*₀*u*₂|, not |*u*₀*v*₂ + *v*₀*u*₂|.
+(This is assuming that it’s possible for the error-bound’s sign to be
+negative, which would arise from a direct application of the affine
+operations in equation (7) on p. 5.)
+
+On p. 5 I think equation (8) gives an avoidably pessimistic bound for
+the extra error coefficient of a product *w<sub>k</sub>*.  It says
+*w<sub>k</sub>* = Σ*ᵢ*|*uᵢ*| · Σ*ᵢ*|*vᵢ*|, which is safe but unduly
+pessimistic in the case where the two *i* variables coincide.  *û* =
+*u*₀ + Σ*ᵢuᵢeᵢ* for i > 0 (Gamito and Maddock use *eᵢ* rather than the
+*εᵢ* used above), and similarly for *v*, and if we take *e*₀ = 1 this
+simplifies to *û* = Σ*ᵢuᵢeᵢ*.  Then *ŵ* = Σ*ᵢ*Σ*ⱼuᵢeᵢvⱼeⱼ*.  So the
+case *i* = *j* > 0 corresponds to a term in the fully expanded sum
+*uᵢvᵢeᵢ*², and the implicit presumption of that sum is that *eᵢ*² ∈
+[-1, 1].
+
+This is not *incorrect*, but a tighter and also correct bound is that
+*eᵢ*² ∈ [0, 1]; if you take this into account, you need to add ½*uᵢvᵢ*
+to the constant term *w*₀, so rather than being *w*₀ = *u*₀*v*₀, it’s
+*w*₀ = *u*₀*v*₀ + ½Σ*ᵢuᵢvᵢ* for *i* > 0; this halved sum is also what
+you would subtract from *w<sub>k</sub>*.  I think.  I haven’t really
+tried it, so I might be overlooking an absolute value or something.
+
+Similarly, the “interval optimisation” algorithm they give in §4.3 and
+figure 2 on pp. 6–7 is not *wrong* but it is *suboptimal* — they had
+the brilliant idea of using the affine form to tighten the interval
+where they’re trying to find the root, which is the whole thing that
+file `affine-arithmetic-newton` is about, but then they wastefully
+divide the interval in half even if the affine-arithmetic-based
+tightening was very successful, guaranteeing an additional time
+through the loop and perhaps even an additional branch to recurse
+down.
+
+Also they misspelled “Lipschitz” as “Lipchitz”.
 
 A univariate affine-arithmetic database
 ---------------------------------------
