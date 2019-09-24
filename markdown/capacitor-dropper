@@ -1,0 +1,182 @@
+Looking at STMicroelectronics’s appnote AN392, “Doc ID 1863”.  It’s a
+little bit shocking, though hopefully not literally; it contains a
+very cost-optimized, compact power supply circuit for microcontroller
+projects that can be kept safely away from the delicate bodies of the
+humans.
+
+Quoting Horowitz and Hill:
+
+> Never build an instrument to run off the powerline without an
+> isolating transformer!  To do so is to flirt with disaster.
+> Transformerless power supplies, which have been popular in some
+> consumer electronics (radios and televisions, particularly) because
+> they’re inexpensive, put the circuit at high voltage with respect to
+> external ground (water pipes, etc.).  This has no place in
+> instruments intended to interconnect with any other equipment and
+> should always be avoided.  And use extreme caution when servicing
+> any such equipment; just connecting your oscilloscope probe to the
+> chassis can be a shocking experience.
+
+Consequently they do not explain how to build such consumer
+electronics (though they promise that chapter *9x* will.)  This
+appnote is about how to do it, a topic also occasionally discussed in
+the YouTube channel of bigclivedotcom.  So how do they suggest doing
+it?
+
+Outline of the capacitor-dropper circuit
+----------------------------------------
+
+They’re running an ST6210 8-bit microcontroller directly off the hot
+side of mains current, connected to the touch sensor at the human’s
+finger through two or three 4.7-MΩ resistors (thus at 340V peak you
+get 36 microamps or less, not enough to feel).  The 5-volt rail is
+literally the hot side of the power line (though fused), but the
+“ground” is floating; a simple regulated capacitor dropper produces
+about 5 volts on the ground rail as follows.  The neutral side of the
+power line is connected to an 820Ω half-watt resistor, which is
+connected to a 220-nF 400-V capacitor, which is connected to the low
+side of a 5.6-volt zener diode, whose positive end is connected to the
+5-volt rail.  A 1N4148 clamps the ground rail to be no more than 0.7
+volts above the low end of the zener, and there’s a 100-μF 10-volt
+energy storage capacitor connected between the ground and the 5-volt
+rail.
+
+(This appnote is from 1998, so this is not capacitive touch sensing;
+instead, the human’s finger forms part of a voltage divider between
+the hot and neutral powerline rails, protected by the megohms.)
+
+How the regulated capacitor dropper works
+-----------------------------------------
+
+This is not quite a standard capacitive voltage divider circuit.
+
+The 220-nF capacitor produces a 12–15-kΩ reactance at 50–60 Hz,
+losslessly limiting the current to 20 mA by itself; I assume the 820-Ω
+resistor is to limit inrush current, because it has ≪1% effect at
+powerline frequencies.  At steady state, with the storage capacitor
+charged, this current sloshes back and forth across the zener
+(remember that the high end of the zener is directly attached to the
+hot side of the power line), but when the zener is reverse-biased and
+the capacitor is discharged, there’s an easier return circuit path
+through the capacitor and 1N4148, which initially only has a 600-mV
+voltage drop before starting to conduct heavily rather than the
+zener’s 5.6 volts.  Once the capacitor is charged, though, the zener
+becomes the easier current return path, and the return current flows
+through it instead.
+
+20 mA through 820 Ω gives you 330 mW, which is why you can’t use a ¼-W
+resistor.  The zener is also going to dissipate 55 mW.  An ideal
+dropper capacitor wouldn’t dissipate anything but real dropper
+capacitors will have some dielectric heating from the constant 20
+milliamps, or 10 milliamps at 120Vrms; this will probably be on the
+order of 1 mW.  The rest of the circuit should have much smaller power
+consumption.
+
+They say their board uses 3 mA; the 100-μF storage capacitor will then
+discharge at 30 V/s, or 0.6 V in the 20 ms between 50-Hz peaks.
+
+The results: regulated 5V from the powerline with five discrete passives
+------------------------------------------------------------------------
+
+So with five simple passive components and no electromagnetics you get
+a regulated 5 volts directly out of the power line.  It’s just not
+safe to touch the circuit while it’s turned on, or to connect it to
+any other circuits, and the dropping capacitor is a bit of a beast.
+In file `capacitors` I have some pricing info on smaller, totally
+inappropriate capacitors; the 19.4¢ Nichicon UWT1H470MCL1GS is 47μF
+and 50V, so you would need strings of 8 of them to get the required
+400 volts, but each such string would only have 6 μF, so you would
+need 38 such strings in parallel for a total of 304 capacitors costing
+a total of US$60.  Capacitors designed for such applications would
+probably be smaller, cheaper, and cooler.
+
+You probably don’t need a bleeder resistor across the dropper cap (and
+the ST appnote doesn’t show one); if you unplug it at the wrong part
+of the cycle, it could have 340 volts across it, but since it’s only
+220 nF, that’s only 18 mJ, not enough to be dangerous to a human.
+It’ll blow holes in your MOSFETs, though.
+
+Unlike a standard capacitive voltage divider, the output voltage
+barely depends at all on the input voltage or the dropper capacitance.
+The dropper capacitor just serves to limit current and thus power
+dissipation.  The output voltage is determined by the zener, or more
+precisely the zener minus the rectifier diode’s forward voltage; the
+only relationship to the input voltage is that the output can’t be
+more than the peak-to-peak input voltage (minus a couple of diode
+drops) and if it gets close you will have less current draw.
+Moreover, this power supply always draws very nearly the same current,
+whether anything is running from it or not, unless the current load is
+so high as to substantially drop the voltage in the power-storage
+capacitor.
+
+This means, of course, that its efficiency is always terrible: as bad
+as 0% (when the load is turned off) and never much more than 30% or
+so.
+
+The context: controlling mains power with triacs
+------------------------------------------------
+
+The appnote isn’t about regulated capacitor droppers; it just mentions
+in passing that “the board supply comes from the mains through a
+simple RCD circuit”.  The appnote is actually about controlling triacs
+(“the least expensive power switch to operate directly on the 110/240
+V mains”); it recommends using a microcontroller to inject a turn-on
+pulse at the appropriate point in the cycle.  In the appnote ST
+recommended a BTA 16-600CW triac for motor control so as to need no
+snubber, but it needs 60 mA to trigger it.  The more common (?)  95¢
+T405Q-600B-TR I mentioned in file `jellybeans` would work and only
+needs 5 mA, but would presumably require a snubber.
+
+So in ST’s appnote the inefficiency of this power supply is
+insignificant: if you’re controlling a 700-watt vacuum cleaner with a
+15-mW microcontroller, it hardly matters that you’re burning 200 or
+400 mW to get a regulated power supply, as long as you don’t have
+dozens and dozens of vacuum cleaners plugged in for every one you’re
+using.
+
+Capacitive droppers for micropower IoT?
+---------------------------------------
+
+In file `stm32` I calculated datasheet power consumption for a number
+of STM32 processors; even without using power-down modes, a number of
+them would run at under 50 μA at 131 kHz, and with power-down modes
+you could reasonably reduce power consumption by another factor of
+1000, although as mentioned in file `bitbang-am-radio`, it’s easy to
+leak multiple microamps through your bypass capacitors.  This suggests
+that 10 μA might be a reasonable current to design an embeddable
+powerline-powered IoT device for.  (As long as it doesn’t have to be
+controlling a triac or something, anyway.)
+
+Adapting the above design for the lower current level, though, the
+dropper capacitor could be 220 pF instead of 220 nF, the storage
+capacitor could be 0.1 μF instead of 100 μF, and the input resistor
+would, I think, be unnecessary.  Using the *C* = *εA*/*d* formula for
+capacitance, *ε*<sub>*r*</sub> of 3 and an egregiously large plate
+separation of 1 mm, you could get the capacitance you need from 83 cm²
+of foil “shielding” wrapped around a plastic-insulated electrical
+line.  (3 is a reasonable guess for many plastics.)  That’s a rather
+large chunk of foil, though, and a better option might be to run a
+high-efficiency buck regulator off a smaller piece of foil instead of
+just regulating with a zener.
+
+If you’re going to try to go with such a capacitive connection, you
+might want to do it on both the hot wire and the neutral wire, despite
+this requiring four times as much foil.  That way, you have no dc
+connection to the powerline at all.
+
+In theory at these current levels you could use reeally thin wires.
+In file `balcony-battery` I estimated that 142-μm copper wire would
+probably work for five-amp fuse wire.  Suppose that’s correct.  Here
+the wire needs to carry ten thousand times less current, so it can
+have ten thousand times less surface area per resistance, which means
+it could be 21 times narrower and thus have 21 times less surface area
+and 441 times more resistance.  But that would be 7-μm copper wire,
+which is going to be hard to find and maybe even a bit dangerous to
+handle.  If we take copper’s resistivity to be 16.78 nΩ·m, as in file
+`executable-scholarship`, that wire is 436 Ω/m.
+
+I’m pretty sure a 220-pF 400-V X7R ceramic capacitor would be a few
+millimeters in size and cost under a dollar, and that’s a much better
+option than meters of foil snaking around your conduits and junction
+boxes.  But it means that you need a direct non-galvanically-isolated
+electrical connection to the mains power and thus a fuse.
