@@ -597,14 +597,14 @@ above) and have less noise words:
 #### Subroutine definitions ####
 
 Darius Bacon has been working on a new dialect of Scheme called
-“[Cant][1]”, previously “Squeam”, in which the fundamental
+“[Cant][2]”, previously “Squeam”, in which the fundamental
 procedure-call mechanism uses a pattern-matching mechanism on the
 argument list to select a method to invoke on the receiver object.
 That is, you don’t have procedures as such, just receivers.  This
 provides a very nice unification of ML-style pattern matching and
 Smalltalk-style object orientation.
 
-[1]: https://github.com/darius/cant/
+[2]: https://github.com/darius/cant/
 
 You could do something similar here, defining functions as sets of
 argument-list/body pairs.  To guarantee determinism the compiler would
