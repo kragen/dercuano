@@ -450,5 +450,26 @@ For smaller strings the cost is smaller — with those parameters,
 everything up to 512 bytes is guaranteed to fit into a single level of
 B-tree.
 
+For perspective, this suggests that the process of inserting a
+character (or arbitrary string) into the middle of an FP-persistent
+4-gibibyte rope will require on the order of a microsecond and ten
+kilobytes of allocation:
+
+- 18 new nodes, totaling 4 kilobytes in cache to break the tree into
+  two slices at the insertion point;
+- 9 new nodes, totaling 2 kilobytes in cache, to create the tree for
+  the new byte;
+- 9 new nodes, totaling 2 kilobytes in cache, to concatenate the new
+  byte to the left tree fragment;
+- 9 new nodes, totaling 2 kilobytes in cache, to concatenate the right
+  tree fragment onto that.
+
+Filling up these 10 newly allocated kilobytes of memory is going to
+take a few thousand instructions, which takes about a microsecond on
+modern CPUs.  You could probably reduce this cost in the average case
+with a simplified “buffer gap” approach in which you maintain separate
+left and right trees, so that you normally only pay the cost of
+creating the new byte’s tree and concatenating it onto the left tree.
+
 I feel like there may still be aspects of B-tree rebalancing I’m not
 appreciating, even without slicing.
