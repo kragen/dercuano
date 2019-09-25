@@ -436,7 +436,7 @@ algorithms, which are usually on opposite ends of the universe.
 
 B-trees in particular are relatively friendly to this.  Suppose you
 decide on nodes of about 128 bytes: 64–256 bytes of text for
-leafnodes, 8–32 pointers for internal nodes.  The worst-case B-tree
+leafnodes, 8–32 pointers for internal nodes†.  The worst-case B-tree
 for a 4-gibibyte rope is 2²⁶ = 67108864 leaf nodes, which is at worst
 9 levels of internal nodes.  So, to concatenate it with another such
 rope, at worst you’d have to merge together 9 pairs of nodes, about
@@ -473,3 +473,13 @@ creating the new byte’s tree and concatenating it onto the left tree.
 
 I feel like there may still be aspects of B-tree rebalancing I’m not
 appreciating, even without slicing.
+
+† CLRS claims that allowing nodes to be less than ½ full, as in the
+factor of ¼ in this example configuration, makes it no longer really a
+B-tree, and if we don’t allow nodes to be less than ⅔ full it becomes
+a “B\*-tree”.  However, CLRS gets terminology wrong pretty often, so
+this might not be right.  My rationale for the extra factor of 2
+slack, which probably doesn't really apply in an FP-persistent context
+(at least not without more work), is to prevent pathological
+modification sequences from thrashing between splitting and joining
+the same node.
