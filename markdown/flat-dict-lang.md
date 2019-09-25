@@ -1160,6 +1160,107 @@ the above structure without change:
 
     a b c
 
+##### An unpolished parser in Python #####
+
+I just wrote [the following simple parser in Python][4] which seems to
+handle the syntax outlined above properly and translates it into
+graphviz files you can view with, for example, `dot -Tx11`.  It’s
+maybe 50% longer than the S-expression parser above in Lua.  It
+contains some duplication to factor out, would need to be extended to
+handle quoted strings, can break its graphviz output if you put
+special characters in the input, wastes memory, doesn’t handle tabs,
+and (as always with Python) breaks on Unicode input in environmentally
+dependent ways, but hopefully it represents some kind of clarifying
+sketch.
+
+    from __future__ import print_function
+    import re
+    import sys
+
+
+    def parse(lines):
+        stack = []
+        node_counter = 1
+        edges = []
+
+        for line in lines:
+            col = len(re.match(r'\s*', line).group(0))
+            while stack and stack[-1][0] >= col:
+                stack.pop()
+            word, start, empty = [], col, ()
+
+            while col < len(line):
+                c = line[col]
+                if word and re.match(r'\s', c):
+                    nw = ''.join(word)
+                    word[:] = empty
+                    if stack:
+                        edges.append((stack[-1][2], nw, node_counter))
+                    else:
+                        edges.append((0, nw, node_counter))
+                    assert start is not None
+                    stack.append((start, nw, node_counter))
+                    node_counter += 1
+                    start = None
+
+                elif re.match(r'\S', c):
+                    if not word:
+                        start = col
+                    word.append(c)
+
+                col += 1
+
+            if word:
+                nw = ''.join(word)
+                if stack:
+                    edges.append((stack[-1][2], nw, node_counter))
+                else:
+                    edges.append((0, nw, node_counter))
+
+                assert start is not None
+                stack.append((start, nw, node_counter))
+                node_counter += 1
+                start = None
+
+        return edges
+
+    def graphviz(edges, name='cosas'):
+        yield 'digraph '; yield name; yield ' {\n'
+        yield '    rankdir=LR;\n'
+        yield '    node [label="", shape=circle];\n'
+        for start, label, end in edges:
+            yield '    '; yield str(start); yield ' -> '; yield str(end)
+            yield ' [label="'; yield label; yield '"];\n'
+        yield '}\n'
+
+
+    if __name__ == '__main__':
+        sys.stdout.writelines(graphviz(parse(sys.stdin)))
+
+So for example it renders the first example above as follows:
+
+    digraph cosas {
+        rankdir=LR;
+        node [label="", shape=circle];
+        0 -> 1 [label="while"];
+        1 -> 2 [label="a"];
+        1 -> 3 [label="do"];
+        3 -> 4 [label="setq"];
+        4 -> 5 [label="b"];
+        5 -> 6 [label="a"];
+        4 -> 7 [label="a"];
+        7 -> 8 [label="b"];
+        8 -> 9 [label="%"];
+        9 -> 10 [label="a"];
+    }
+
+[4]: http://canonical.org/~kragen/sw/dev3/treeify.py
+
+Since it took me about 40 minutes to write, test, and (mostly) debug
+that, including the graphviz output, this syntax is probably not too
+complex for a language whose first-draft compiler you want to write in
+an afternoon.
+
 ### Functions for manipulating edge-labeled graphs ###
 
 What is our equivalent of the ur-Lisp’s CAR CDR CONS NULL ATOM QUOTE
