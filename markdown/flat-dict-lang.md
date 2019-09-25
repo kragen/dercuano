@@ -1150,11 +1150,15 @@ these two expressions are equivalent:
 
 and
 
-    a d
+    a e
       b d
         c
 
-as well as two more variations.
+as well as two more variations.  Moreover, as mentioned toward the
+beginning, code written for the following structure will also work on
+the above structure without change:
+
+    a b c
 
 ### Functions for manipulating edge-labeled graphs ###
 
