@@ -1,5 +1,5 @@
-A homoiconic language with a finite-map-based data model rather than lists
-==========================================================================
+A homoiconic language with a finite-map-based data model rather than lists?
+===========================================================================
 
 I wrote [a mock Lisp the other night][0], which was a surprisingly
 pleasant experience.  Thanks to LuaJIT, it took me only a couple of
@@ -15,7 +15,14 @@ number function.
 
 This led me to wonder whether an imperative homoiconic programming
 language based on maps rather than lists could be a better alternative
-to Lisp.
+to Lisp.  I think it’ll necessarily have more redundancy than Lisp,
+since a map with *N* keys has *N*! equivalent permutations (so the
+parsing process discards lg (*N*!) bits), but that may not be a bad
+thing; after all, we can diminish redundancy further by dropping to
+Forth, PostScript, or APL.
+
+After examining some clumsy alternatives, I think I have a reasonable
+alternative based on a forgotten SourceForge project for text munging.
 
 The magic of READ and PRINT
 ---------------------------
@@ -725,6 +732,8 @@ horrors is the less bad translation?
                               + {. c * {. zs at i}}}}
            then {. xs at i put nx}}}
 
+or
+
     do: (=: nx: (.: (.: c, *: (.: xs, at: i)), +: (.: s, *: (.: zs, at: i)))):
         (.: zs, at: i, put: (.: (.: -: s, *: (.: xs, at: i)),
                              +: (.: c, *: (.: zs, at: i)))):
@@ -743,7 +752,7 @@ edge-labeled graph (similar to Suciu’s UnQL unstructured query
 language) delimited by whitespace and structured by indentation, and
 provided tools to query it and to reformat a number of Unix commands
 to make them more amenable to processing with it.  (Unfortunately, I
-forget the name, and I haven't been able to find it again.)  So, for
+forget the name, and I haven’t been able to find it again.)  So, for
 example, given this input:
 
     time    real    0m1.694s
@@ -757,7 +766,9 @@ labeled with a string such as “0m1.524s”.  This of course means that
 you can easily query `time.user` and get that response.
 
 (In a tree, it’s immaterial whether the labels are on the arcs or on
-the nodes they lead to, but in a more general graph it can matter.)
+the nodes they lead to, but in a more general graph it can matter.  It
+might make more sense to think of all of the following as having tags
+on nodes rather than edges.)
 
 Note how this generalizes a subset of the finite-map-tree model: the
 names are just strings, as in JS and Perl, rather than general
@@ -765,22 +776,45 @@ objects, as in Python, Lua, and Clojure, but there’s no distinction
 between keys and values — the values are just the labels after the
 level where your query stopped traversing edges.  Also, the keys need
 not be unique.  (They may or may not be sequenced; those are different
-variants of the model.)
+variants of the data model.)
 
 Suppose we try to use this approach for our homoiconic language,
 although using parentheses rather than indentation to indicate side
 branches — the above graph comes out as `time (real 0m1.694s) (user
-0m1.524s) sys 0m0.168s`.  In a sense, this is just the Lisp cons
-rotated 90°: nesting is the default and parentheses turn it off!  But
-let’s say that the sequence of branches is not important, so it’s
+0m1.524s) sys 0m0.168s`.
+
+The grammar here is something like
+
+    tree ::= [ \n]* ("(" tree [ \n]* ")" | [-A-Za-z0-9*]+) tree | ε
+
+Here the three alternatives amount to three different ways to grow a
+tree: by branching it, by extending a branch by a segment, and by
+terminating a branch.  This apparently has one more alternative than
+the original `sexp` grammar given above, but this is an illusion; the
+`sexp` grammar contained `sexp*`, which hides an alternative in its
+Kleene closure.
+
+### A homoiconic language using edge-labeled graphs? ###
+
+In a sense, this is similar to the Lisp cons
+rotated 90°: nesting (car) is the default and parentheses turn it off!  But
+let’s say that the sequence of branches is not important, so the above example is
 equivalent to say `time (user 0m1.524s) (sys 0m0.168s) real 0m1.694s`.
 
-Now we could use sequencing not only for imperative statement
-sequences but also for argument lists.  And the label leading us into
+#### Sequencing is now easy, but what do expressions look like? ####
+
+With this approach, we could use sequencing not only for imperative statement
+sequences but also for argument lists.  A sequence of statements might
+look like `(some action) ; (some other action) ; a third action`, with
+`;` edges connecting the sequence of statement nodes.
+
+And the problem we previously had with difficulty
+determining what operation to invoke is gone — the label leading us into
 an expression node can be the variant tag that tells the interpreter
 unambiguously how to handle that expression — or, as in Common Lisp,
 either an identifier of a special form or the name of a function.
-This suggests that, as in Forth, variables are just zero-argument
+This suggests that, as in Forth,
+variables (and perhaps constants) are just zero-argument
 functions, but in this case — unlike in Forth — they can look to see
 if they’re being invoked with arguments, such as maybe `=`.  (And you
 can of course have a FUNCALL function as in Common Lisp or a `value`
@@ -797,5 +831,383 @@ inevitably a lot of nodes where this benefit does not obtain — any new
 property you attach at those nodes might be mistaken for the property
 value!
 
-Still, it’s an interesting idea to explore.  I’m not sure what the
-code would look like yet.
+#### Function calls are kind of hairy ####
+
+Unary operations and commutative, associative operations like `+`
+might conceivably just attach their arguments directly to their node:
+`+ (x) (y) * (a) b`, for example, for *x* + *y* + *a* × *b*.  But more
+general function calls might require named arguments `fib (n 10)` or
+an argument sequence analogous to statement sequences `cat2 (leaf "x")
+, leaf "y"`.  Also, if duplicate edges are not allowed, `* (x) x`
+would be a problem.
+
+#### What if math operators are messages sent to numbers? ####
+
+As before, a possible alternative to applying (typically global and
+constant) functions to arguments is to send messages to objects, which
+would seem to allow syntax like `x + 1` or `xs (at i) put nx`.
+However, though the actors and closures models are formally
+equivalent, this poses a real problem for chains of operators of the
+kind we commonly see in mathematical expressions — it would seem to
+require the equivalent of Lisp’s FUNCALL function, GlyphicScript’s `;`
+operator, or Haskell’s `$` function to separate the two operators.
+For example, *x* + *y* - *a* × *b* could be written, for example, as
+`(o (f x + y) - a * b)` or as `(x + y) $ - a * b`.
+
+The problem with the obvious way of writing it `(x + y) - a * b` is, I
+think, that the root expression node has the `-` edge coming directly
+out of it, and we’re considering here a universe where root expression
+nodes instead have edges coming out of them that denote message
+receivers, not operators, and it isn’t clear who is supposed to be
+receiving the `-` message.  Maybe it could be made to work, though,
+even for things like `(x + y) - (a * b) - 3` and `x + (y) - (a * b) -
+3`, by making operators like `+` and `-` link together a sequence of
+expressions in the same way that `;` and `,` are suggested to do
+above.
+
+This will inevitably lead to somewhat of an impedance mismatch with
+conventional mathematical precedence, as did the systematic rules of
+APL and Smalltalk, which may lead to bugs in programs.  In this case,
+it might be possible to refuse to parse most expressions that have
+such problems, but not, for example, `a * b + c`.
+
+#### How about currying? ####
+
+If the difficulty only pertains to functions that must distinguish
+between their arguments, such as `<` or `÷`, can we solve it by
+currying?  In the function paradigm, this seems to require a function
+analogous to FUNCALL or APPLY:
+
+    funcall (< 2) x
+
+Maybe in the message-receiver paradigm it works better?
+
+    x . (2 <)
+
+This (equivalent to `x . 2 <`) doesn’t seem promising.
+
+#### The other programming constructs are simple enough ####
+
+By contrast with primitive operations and function calls,
+there are relatively few difficulties with looping,
+conditionals, assignment, and function declarations.
+
+A simple while loop poses no difficulty:
+
+    while (condition)
+       do body
+
+Perhaps we can use `:` as a tag for such bodies:
+
+    for (x in mylist): some body expression
+
+More generally, looping can be written in a way quite analogous to
+Common Lisp, introduced with a `loop` tag and containing an
+unsequenced set of keyword-driven clauses:
+
+    loop (for i = 1 to 10)
+         (for x in mylist)
+         (if ((> x) (< 2)) then collect i)
+
+Conditionals can be written either in a variant of the if-then-else
+style described earlier, with the `if` pulled out into an introductory
+tag, as
+
+    if ((< x) (> 2)) (then 1) else recursive expression
+
+or in a cond sequence, since now we have a reasonable way of writing
+sequences:
+
+    cond ((condition a) -> consequent a)
+       | ((condition b) -> consequent b)
+       | else other consequent
+
+Or
+
+    if ((condition a) then consequent a)
+    elseif ((condition b) then consequent b)
+    else other consequent
+
+And lambda-expressions can be written with a delimiter to distinguish
+the body from the argument list:
+
+    fn (x y z) => some expression of x y z
+    λ (x y z) . some expression of x y z
+
+Assignment could be written in a conventional way:
+
+    x = 3
+    x ← 3
+    x <- 3
+    x := 3
+
+Or in a parallel-assignment way, like `letrec` or `setq`:
+
+    fn (a b) => (while (a): setq (b a) (a (b % a))); b
+
+#### What if we represent branching with infix operators rather than parens? ####
+
+It’s rather jarring in the above that, for example, these two
+expressions are equivalent, even though the second looks like a
+typographical error:
+
+    while (a): setq (b a) (a (b % a))
+    while (: setq (b a) (a (b % a))) a
+
+The fact that the associative and commutative operation of attaching
+two branches x and y to the same node is represented using the
+asymmetric syntax `(x) y` is, I think, the root of this difficulty.
+In a one-dimensional media it is unavoidable that we put them in some
+order, but we could imagine using a more visually symmetrical operator
+to separate the two symmetrical branches.
+
+For example, `,`, as explored briefly in the ill-fated “Flat dict
+syntax” section above.  But we don’t want to write
+
+    while a, do setq ...
+
+because as long as comma binds more loosely than juxtaposition (as it
+should), that attaches the `setq` and `while` edges to the same root.
+Instead we get
+
+    while (a, do setq (b a, a b % a))
+
+which seems potentially reasonable, though perhaps it gives us back
+the extreme nesting we were hoping to escape.  It echoes Python’s
+named-parameter syntax, but more placidly; instead of `f(g=h, i=j)` we
+have `f(g h, i j)`.
+
+#### Maybe we should use indentation rather than parentheses to indicate side branches ####
+
+A purely indentation-based version of this syntax is doable, replacing
+the line-noise punctuation and recursive nesting parentheses with
+preattentively-comprehensible horizontal juxtaposition for path
+concatenation and vertical juxtaposition for branching.  Maybe using
+parentheses rather than indentation to indicate side branches wasn’t
+such a hot idea after all!
+
+    while a
+          do setq b a
+                  a b % a
+
+Alternatively, with more vertical syntax:
+
+    while
+      a
+      do
+        setq
+          b a
+          a b % a
+
+These variants at last seem like they might actually be an ergonomic
+improvement over Lisp syntax rather than a regrettable compromise, at
+least if there’s a solution to the problem with arithmetic
+expressions.
+
+It unfortunately gets us back to the problem of representing sequences
+of statements with progressively increasing nesting:
+
+    do setq nx sum product c
+                   *       xs at i
+               +   product s
+                   *       zs at i
+       then do zs at i
+                  put sum product - s
+                          *       xs at i
+                      +   product c
+                          *       zs at i
+               then xs at i
+                       put nx
+
+Or maybe
+
+    let nx sum product c
+               *       xs at i
+           +   product s
+               *       zs at i
+        in do zs at i
+                 put sum product - s
+                         *       xs at i
+                     +   product c
+                         *       zs at i
+              then xs at i
+                      put nx
+
+Or maybe, using `,` as an argument-sequencing graph label this time
+instead of a syntactic branching operator:
+
+    let nx + * c
+               , xs at i
+             , * s
+                 , zs at i
+        in do zs at i
+                 put + * - s
+                         , xs at i
+                       , * c
+                           , zs at i
+              then xs at i
+                      put nx
+
+This seems pretty bug-prone because it took me a couple of tries to
+get the `, zs at i` lines to the right indentation level.
+
+This is less nauseatingly bloated than the earlier versions but it
+still compares poorly to the C++ version:
+
+      nx = c*xs[i] + s*zs[i];
+      zs[i] = -s * xs[i] + c*zs[i];
+      xs[i] = nx;
+
+You could argue that maybe syntactic sugar can compensate, but the
+right syntactic sugar is precisely what I’m looking for here.
+
+I may be asking too much, since even in Common Lisp it’s still uglier
+and more bug-prone than the C++:
+
+    (let ((nx (+ (* c (aref xs i)) (* s (aref zs i)))))
+      (setf (aref zs i) (+ (* (- s) (aref xs i)) (* c (aref zs i))))
+      (setf (aref xs i) nx))
+
+But that’s not in the same league of noise bloat as most of the
+examples above.
+
+We could imagine an infix-formula-evaluating macro like the ones in sh
+and Tcl, called, say, `[` (since `FORTRAN` would be a tasteless name,
+*Σ* is hard to type and too specific, and `eval` probably means
+something else):
+
+    let nx [ c
+             * xs at i
+             + [ s
+                 * zs at i ] ]
+        in do zs at i
+                 put [ - s
+                       * xs at i
+                       + [ c
+                           * zs at i ] ]
+              then xs at i
+                      put nx
+
+However, that won’t work as written; `[` has no way to tell whether
+you wrote `x * y + z` or `x + z * y`.  If you want it to have a whole
+*sequence* of labels to compile, you have to put them on one line,
+which also means you can’t inline-evaluate arbitrary bits of code like
+`xs at i` without some kind of magic tag.  If you do it that way you
+could say
+
+    let nx [ c * [ xs at i ] + s * [ zs at i ] ]
+        in do zs at i
+                 put [ - s * [ xs at i ] + c * [ zs at i ] ]
+              then xs at i
+                      put nx
+
+In practice this is maybe not the best example since you would
+probably want array indexing in your numeric expression evaluator and
+also because a better way to do the whole calculation is
+
+    let xi xs at i
+        zi zs at i
+        in do xs at i
+                 put [ c * xi + s * zi ]
+              then zs at i
+                      put [ - s * xi + c * zi ]
+
+or maybe even some kind of parallel assignment.  I just picked an
+example that’s too easy, I guess.
+
+A potential problem with the proposed embedding syntax: what happens
+if you have branching inside the embedded expression?  I mean, you
+could imagine something like
+
+    [ 2 * [ gcd a x ] + 3 ]
+                b 2
+
+where we invoke `gcd` with named arguments `a` and `b`, which upon
+some thought it can be seen can be made to work just fine — the `[`
+parser just needs to look down all the branches to find the
+terminating `]` of the embedded expression, not just one.  This gets
+uglier if you have two such things; this will not work:
+
+    [ 2 * [ gcd a x ] + 3 * [ lcm a x ] ]
+                b 2               b 2
+
+But it will work if expressed this way:
+
+    [ 2 * [ gcd a x ] + 3 * [ lcm a x ] ]
+                                  b 2
+                b 2
+
+This is complex enough to be confusing.
+
+##### How is that different from SRFI-49 I-expressions, Wisp, or LISPIN? #####
+
+In the above proposal, as long as arcs out of a node remain unordered,
+these two expressions are equivalent:
+
+    a b c
+        d
+      e
+
+and
+
+    a d
+      b d
+        c
+
+as well as two more variations.
+
+### Functions for manipulating edge-labeled graphs ###
+
+What is our equivalent of the ur-Lisp’s CAR CDR CONS NULL ATOM QUOTE
+EQ?  The fundamental traversal operation should presumably be
+`go(node, tag)`, which returns the node (if any) obtained by
+traversing the edge labeled `tag` from `node`, equivalent to
+`node[tag]` in JS or Lua syntax; if duplicate edges are allowed,
+probably both its `node` argument and its return value should be
+*sets* rather than individual nodes, and possibly `tag` should also be
+a set.  Invoking the tag as a function `tag(node)` is an alternative
+possibility.
+
+(If they are sets of nodes, we need to be able to iterate over them;
+we need to be able to test whether they are empty, but iterating over
+them with side effects may be an adequate interface for that.)
+
+In the case where they are indeed individual nodes, there is the
+possibility of returning nil, in which case we need a way to detect
+nil — in a functional paradigm, `isnil(node)`, but alternatives
+include treating nil as false in conditionals (making the function
+implicit); a pattern-matching `ifnil(node, consequent, alternate)`
+function which takes two functions to invoke, one with the node if it
+is not nil, and the other if it is; and the λ-calculus-like
+`node(consequent, alternate)`, which does the same without a separate
+function.
+
+It’s also necessary to iterate over the edges out of a node, since
+arbitrary values such as 57 are also stored as tags in the above
+model.  (This wouldn’t have to be the case — 57 could be a node, as it
+is in Lisp — but without this ability to iterate over edges you also
+can’t write PRINT or the macro transformer for LETREC.)  You can do
+this with a function `kids(node)` or `pairs(node)` which returns a
+list in the usual car–cdr or first–rest form; perhaps each node in the
+resulting list contains both a key — the edge label — and a
+value — the child node that it leads to.  (That’s superfluous, though,
+since `go(parent, tag)` will give you the child node.)
+
+If we consider tags to attach to nodes rather than to the edges
+leading to them, we might be able to conflate nodes with tags, so that
+the `go()` function above takes two arbitrary node arguments.  (The
+alternative is to have special “tag nodes”.)  But we still need to be
+able to compare tags for equality, thus `eq(tag1, tag2)` or
+`sametag(node1, node2)` is needed.
+
+With `go`, `isnil`, `kids`, and `eq` (or the other alternatives
+discussed above), we can traverse the graph as we please, just as with
+CAR, CDR, NULL, ATOM, and EQ.  However, constructing new graph
+structure — as with CONS — requires another operation: `add(node, tag,
+kid)`, which returns a new node identical to `node` except that it now
+has an edge with tag `tag` to node `kid`.  However, this is not quite
+enough — it doesn’t allow us to produce new nodes with no children.
+So we need `new()` to produce such a fresh node.
+
+And of course we can provide QUOTE (and, more interestingly,
+quasiquote) just as Lisp does.  That’s what homoiconicity means!
