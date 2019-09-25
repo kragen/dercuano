@@ -296,8 +296,19 @@ As I said above, this takes 250 milliseconds, working out to 400
 kilobytes per second.  Although at this scale this is 12 times faster
 than the O(*N*²) native-Lua implementation, it’s still ridiculously
 slow, and three times slower than when I wasn’t using an explicit
-stack.  Building the same string this way instead gets a further 5×
-speedup:
+stack.  For perspective, this takes about the same time, with 1000
+times as many iterations:
+
+    macrope = require 'macrope'
+    function doit(N)
+        s = 0
+        for i = 1, N do s = s + i end
+        s = tostring(s)
+        return s
+    end
+    =doit(100*1000*1000)
+
+Building the same string this way instead gets a further 5× speedup:
 
     macrope = require 'macrope'
     N = 10000
