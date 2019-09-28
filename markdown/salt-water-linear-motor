@@ -1,0 +1,179 @@
+Methods of pumping ice-vest coolant silently
+============================================
+
+I was thinking about file `ice-pants` and related ice vest stuff on
+the bus the other day.  One of the potential problems with the design
+is that it needs a pump; pumps are usually noisy and unreliable, in
+part because they contain a lot of moving parts.  A pump that avoided
+these problems would be desirable for an everyday-wear ice vest, which
+after all only needs a small total flow rate.  (To remove 200 watts of
+heat by warming water from 0° to 20°, you need about 2.4 milliliters
+per second: 200 W / (20 kcal/ℓ).)
+
+Electrohydrodynamic motors
+--------------------------
+
+Electrohydrodynamic motors are pumps that solve these problems by
+passing a current through the liquid to be pumped at right angles to
+an applied magnetic field.  The magnetic field produced by the current
+creates a pressure gradient in the fluid, which propels it silently
+through the passage.  Jacque Fresco famously envisioned silent ships
+propelled by this means, although this might require unreasonably
+large fuel cells if you aren’t going to generate the electricity with
+a noisy heat engine; perhaps some navy has tried this approach for
+silent nuclear submarine propulsion.  In, I think, 2018, the YouTube
+channel Cody’sLab demonstrated the use of such a pump for pumping
+mercury between reaction vessels for the chloralkali process.
+
+The electrolysis problem
+------------------------
+
+However, electrolysis poses a potential difficulty for
+electrohydrodynamic motors in water and other ionic conductors: the
+electrodes immersed in the liquid will tend to produce bubbles of
+oxygen and hydrogen.  This problem can be reduced to some extent by
+periodically reversing the direction of the current (and of the
+applied magnetic field, so as to not reverse the flow direction) but
+not, I think, eliminated, in a classical EHD motor.  In most
+circumstances, this is not a problem for EHD motors, though measures
+must be taken to prevent anodic dissolution, such as using carbon
+electrodes.
+
+Perhaps the lore of electroplating has useful information here,
+because bubble buildup is a problem for electroplating — plating
+doesn’t happen in regions of the cathode covered by bubbles.  But
+anode bubbles are no problem for electroplating.
+
+The buildup of explosive gases in the tubing of an ice vest could not
+only impede liquid flow but potentially even pose a hazard of rupture
+and fire.
+
+Brine coolant
+-------------
+
+The coolant in the ice vest needs to have a melting point below that
+of pure water so that it can pass unimpeded through the ice pack
+without risk of freezing, and it needs to prevent bacterial and fungal
+growth inside the tubing, since those can also produce gases and
+potentially corrode the tubing.  One possible solution to this problem
+is to use water sufficiently salty that almost no life forms can
+survive in it, and this has the advantage of greatly increasing the
+water’s conductivity.  This probably requires keeping the water from
+contact with glass or metal to prevent heavy corrosion, though most
+common plastics would be fine.
+
+Eddy-current-driven pumping
+---------------------------
+
+A possible electrolysis-free way to do a electrohydrodynamic motor to
+pump an electrolyte is to use eddy (electrical) currents rather than
+linear (electrical) currents through the electrolyte, thus eliminating
+the need for electrode contact — in essence, a squirt coilgun rather
+than a squirt railgun.  This is the same approach used in
+squirrel-cage AC motors, coilguns, and some magnetic-levitation
+systems.  I think eddy currents should provoke no ionic concentration
+gradients at all.
+
+One way to do this would be to wrap many coils around an
+electrolyte-filled tube and energize the coils in the same current
+direction in sequence, moving the magnetic field along the length of
+the tube.  This will induce eddy currents inside the electrolyte
+around the axis of the tube opposing the direction of the coil
+current, thus producing an opposing magnetic field, growing with a
+time constant related to the inductance of the single “turn” around
+the axis and the resistance of the electrolyte; when the coil magnetic
+field moves to the next coil, the thus-magnetized electrolyte will be
+attracted to it, with its magnetic field potentially diminishing with
+the same time constant.  Energizing the coil behind it with the
+opposing direction of current will also help.
+
+The movement speed of the applied magnetic field needs to bear a
+certain relation to the movement speed of the liquid and the RL time
+constant of the induced eddy current.  If the field moves too fast
+(e.g., 100 000 m/s), the eddy currents induced in the liquid will not
+have time to build up to a level where they can produce an appreciable
+magnetic force; indeed, the magnetic field will be confined to the
+skin of the electrolyte by the skin effect.  (Am I misunderstanding
+this?  Perhaps large eddy currents occur almost instantly and the
+magnetic field penetrates more deeply as they begin to die away?)  On
+the other hand, if the field moves too slowly (e.g., 1 μm/s), the eddy
+currents will have decayed to very low levels before the applied
+magnetic field moves to the next coil.  Somewhere in between is a
+sweet spot.
+
+It may be more efficient to use a small tubes to get a more
+concentrated magnetic field or large tubes to get less viscous losses,
+to use concentric tubes separating liquid layers to force the eddy
+currents in the outer parts of the liquid to enclose a large area of
+magnetic flux, to use an annular tube with just an air space in the
+middle for the same reason, and perhaps even to replace that air space
+with something like ferrite — although perhaps that would result in
+increasing the force on the ferrite rather than the liquid.
+
+A centrifugal magnetic stirrer
+------------------------------
+
+As an alternative to electrohydrodynamic motors, you could drive a
+solid impeller.
+
+Chemistry labs nowadays commonly use magnetic stirrers, often built
+into hotplates.  These apply a magnetic field rotating at a few Hz to
+the reaction vessel, typically an Erlenmeyer flask; a magnet moving
+freely at the bottom of the vessel is free to rotate to align itself
+with the rotating magnetic field.  (The magnet must be encapsulated in
+something; I suspect teflon.)  This usually produces a substantial
+amount of noise, but much less than a conventional motor driving a
+gearbox which turns an impeller on a bearing-mounted shaft that passes
+through a seal.  And, although it has a moving part, that moving part
+has tolerances measured in centimeters, so wear is not much of a
+problem.
+
+You could apply the same approach to the ice vest, applying a rotating
+magnetic field to rotate a solid impeller entirely contained inside
+the liquid chamber; the low speeds involved (< 60 rpm) suggest the use
+of a permanent-magnet-based impeller rather than something like a
+squirrel cage.  To prevent the clattering noises common with
+chemistry-lab magnetic stirrers, the impeller could be circular, like
+a centrifugal blower, rather than oblong; a Tesla-turbine design might
+work.  By giving it the same overall density as the liquid, balancing
+the extra density of the permanent magnets by including air bubbles,
+you could avoid stresses from impacts and changes in the direction of
+gravity.
+
+The magnets themselves might be sufficient to prevent its axis of
+rotation from deviating too far from the axis of the pumping chamber
+without requiring a shaft, and to prevent it from translating axially
+until it hit a wall of the chamber; thus it could normally operate
+without any solid-to-solid contact and thus without any wear.  Whether
+the magnetic fields were radial (as in a squirrel-cage motor or
+ordinary BLDC motor) or axial (as in a pancake motor), active position
+control may be necessary to prevent instability that would cause it to
+drift closer to some of the electromagnets until it hit a wall.
+Perhaps fluid-bearing effects could be adequate to prevent this.
+
+In some sense the ideal would be to have the highest MMF density and
+thus flux density at the center of the pumping chamber rather than
+near its walls, so that the magnet or magnets in the impeller would
+tend to drift toward the center rather than toward the walls.  Given
+that the coils applying the magnetic field are necessarily in the
+walls, I’m not sure if this is feasible, but it might be a good start
+to wrap the coils around the center of the chamber (e.g., in the *xz*
+plane and the *yz* plane, if the *z*-axis is the rotation axis and the
+origin is the center of the chamber — not parallel to those planes,
+actually in them) rather than around cores outside its walls.
+
+The use of a solid impeller would obviate the necessity for using an
+electrolyte, allowing the use of less corrosive liquid coolants (see
+file `coolants`) such as propylene glycol or a water–(propylene
+glycol) mixture.  This in turn could perhaps enable the use of a bare
+metal impeller without excessive corrosion, though I would think that
+plastics such as PET would still be a better choice.
+
+If the pumping chamber were spherical rather than cylindrical, the
+impeller could rotate freely in it when the pump was being rotated in
+space, thus avoiding collisions with the walls, even if the impeller
+itself were still cylindrical (though it could be spherical as well,
+like those spherical compasses people mounted on their car dashboards
+in the 1980s).  The applied magnetic fields would eventually bring it
+back into alignment for proper pumping action.
+

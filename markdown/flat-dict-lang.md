@@ -32,7 +32,9 @@ LuaJIT REPL made me wish for Python, JS, OCaml, or Lisp — languages
 where your data structures can be automatically serialized in a
 parseable form, a very handy feature not only for interactive testing
 but also for network communication, ad-hoc filesystem persistence,
-manual fixup of broken systems, and primitive user interfaces.  Here’s
+manual fixup of broken systems, primitive user interfaces, and
+shared-nothing message-passing parallel and concurrent processing,
+as with fork().  Here’s
 a rehearsed interaction with the OCaml interpreter:
 
     $ ocaml
@@ -744,8 +746,8 @@ code above, but I think the second one is worse.
 
 [3]: http://canonical.org/~kragen/sw/dev3/rotcube.cpp
 
-Edge-labeled graphs
--------------------
+Edge-labeled graphs: now is the winter of our discontent made glorious summer
+-----------------------------------------------------------------------------
 
 Years ago I saw a project on SourceForge that treated text as an
 edge-labeled graph (similar to Suciu’s UnQL unstructured query
