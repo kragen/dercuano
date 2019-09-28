@@ -68,3 +68,15 @@ from local files; Firefox, for one, seems to use the same notion of
 cases localStorage survives browser restarts.  This suggests that it
 should be possible to use localStorage as a persistent cache, but it’s
 not safe as the only way to store important data.
+
+data: URLs
+----------
+
+Data URLs such as
+[data:text/html,hello<script>alert('hi')%0a</script>](data:text/html,hello<script>alert('hi')%0a</script>)
+are apparently not supported by Firefox Lite, but they are supported
+by Android Chrome, and they support JS and base64.  Unfortunately I
+don’t think there’s a way to get them to be gzipped.  This is maybe a
+useful delivery mechanism for apps that can be encoded in a single QR
+code (size limit: 2953 bytes without chaining multiple QR codes, which
+is maybe enough for a decompressor).
