@@ -53,6 +53,7 @@ class Bundle:
         self.cached_titles = {}
         self.notes = list(self._notes())
         self.note_map = {note.notename: note for note in self.notes}
+        assert len(self.note_map) == len(self.notes)  # ensure notenames unique
 
     def __repr__(self):
         return 'Bundle(%r)' % self.dirname
@@ -71,10 +72,11 @@ class Bundle:
 
     def _notes(self):
         dirname = self.filename('markdown')
-        for notename in sorted(os.listdir(dirname)):
-            if notename.endswith('~') or notename[0] in '.#':
+        for filename in sorted(os.listdir(dirname)):
+            if filename.endswith('~') or filename[0] in '.#':
                 continue
-            yield Note(self, notename, os.path.join(dirname, notename))
+            notename = filename[:-3] if filename.endswith('.md') else filename
+            yield Note(self, notename, os.path.join(dirname, filename))
 
     def note(self, notename):
         return self.note_map[notename]
@@ -472,7 +474,9 @@ ad_hoc_link_re = re.compile(r'(?:[fF]ile\s+)?<code>(.*?)</code>')
 def markdown_replacing_links(bundle):
     def replace(s):
         def repl(mo):
-            note = bundle.note_map.get(mo.group(1))
+            # XXX get_by_filename?
+            notename = re.compile(r'\.md$').sub('', mo.group(1))
+            note = bundle.note_map.get(notename)
             return ley(note.link_ley()) if note else mo.group(0)
 
         if isinstance(s, bytes):

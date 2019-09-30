@@ -6,6 +6,7 @@ Bug: uses your local time zone rather than the commit timezone.
 import subprocess
 import sys
 import time
+import re
 
 
 def when(filename):
@@ -18,10 +19,11 @@ def when(filename):
     return min(dates), max(dates)
 
 def format_when(filename, start, end):
+    notename = re.compile(r'\.md$').sub('', filename)
     if start is None or end is None:
-        return '%s needs manual-investigation-of-dates\n' % filename
+        return '%s needs manual-investigation-of-dates\n' % notename
     return ('%s written %s\n'
-            + '    updated %s\n') % (filename, date(start), date(end))
+            + '    updated %s\n') % (notename, date(start), date(end))
 
 def date(time_t):
     if time_t == 1232577326:
