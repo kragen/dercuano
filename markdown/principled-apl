@@ -184,7 +184,6 @@ hopefully you can agree that this is a way to do this that Fortran
 programmers would think was not totally insane.  Also you can see that
 an enormous benefit of APL over Fortran for this kind of thing is that
 you have at least some hope of changing your mind about whether it was
-
 the rays or the normals or both that you wanted to have more than one
 of, because making the loops and indexing implicit there means that
 you don’t have to change the code to index into a `dx` array and maybe
@@ -468,3 +467,168 @@ The difference, of course, is that all this default parameterization
 is purely implicit.
 
 This is closely analogous to dynamic scoping in Lisp.
+
+Comparison to GNU MathProg and ZIMPL
+------------------------------------
+
+GNU MathProg, also known as GMPL, and ZIMPL are two languages for
+defining models (“linear programs”) for a linear optimizer to
+optimize.  (This is called “linear programming”.  See file
+`linear-optimization-landscape` for details.)  They have essentially
+the same data model; in what follows I will use the MathProg
+terminology and syntax.
+
+I wish I had read about these systems earlier, because much of what I
+describe above is already present in them.  Unfortunately, I didn’t
+learn anything about them until 2019.
+
+Here is a slightly tweaked example of a MathProg model from the GLPK
+distribution, licensed under the GNU GPL version 2.  It describes some
+kind of industrial metallurgy planning problem, perhaps finding the
+cheapest way to mix two tonnes of an alloy within desired
+concentration limits from a combination of recycled scrap and fresh
+metal.
+
+    /* plan.mod */
+    var bin1, >= 0, <= 200;    var bin2, >= 0, <= 2500;
+    var bin3, >= 400, <= 800;  var alum, >= 0;
+    var silicon, >= 0;
+    param sival := .38;
+
+    minimize
+    value: .03 * bin1 + .08 * bin2 + .17 * bin3 + .21 * alum + sival * silicon;
+
+    subject to
+    yield: bin1 + bin2 + bin3 + alum + silicon = 2000;
+    fe: .15 * bin1 + .04 * bin2 + .02 * bin3 + .01 * alum + .03 * silicon <= 60;
+    cu: .03 * bin1 + .05 * bin2 + .08 * bin3 + .01 * alum <= 100;
+    mn: .02 * bin1 + .04 * bin2 + .01 * bin3 <= 40;
+    mg: .02 * bin1 + .03 * bin2 <= 30;
+    al: .70 * bin1 + .75 * bin2 + .80 * bin3 + .97 * alum >= 1500;
+    si: 250 <= .02 * bin1 + .06 * bin2 + .08 * bin3 +
+        .01 * alum + .97 * silicon <= 300;
+
+(`glpsol -m plan.mod -o plan.out` reports that the optimal values for
+the design variables are `bin1` ≈ 44.3, `bin2` ≈ 844, `bin3` ≈ 534,
+`alum` ≈ 421, and `silicon` ≈ 156, resulting in a `value` of $307.46.)
+
+In the above example, all the variables and parameters are scalars,
+but MathProg also supports models incorporating aggregates.  Here’s
+another tweaked example from the GLPK distribution:
+
+    /* Chvatal V. (1980), Hard knapsack problems, Op. Res. 28, 1402-1411. */
+
+    param n > 0 integer;
+    param log2_n := log(n) / log(2);
+    param k := floor(log2_n);
+    param a{j in 1..n} := 2 ** (k + n + 1) + 2 ** (k + n + 1 - j) + 1;
+    param b := 0.5 * floor(sum{j in 1..n} a[j]);
+    var x{1..n} binary;
+    maximize obj: sum{j in 1..n} a[j] * x[j];
+    s.t. cap: sum{j in 1..n} a[j] * x[j] <= b;
+    data;
+    param n := 15;
+
+In these languages, the expressed values — the values that expressions
+can evaluate to — are called “elemental values”, and they can be
+strings (which are mostly treated as opaque atoms and are sometimes
+called “symbolic values”), integers, real numbers, logical or binary
+values, or sets of these, called “elemental sets”.  Their denoted
+values — the values that can be identified by names — include the
+expressed values, and also “model objects”, which consist of “sets”,
+“parameters”, “variables”, “constraints”, and “objectives”.  All of
+the model objects other than objectives are “indexed” by n-tuples
+drawn from some “subscript domain” which is the Cartesian product of a
+possibly-empty sequence of sets.
+
+The logical or binary values are *true* and *false*.  The other kinds
+of elemental values have their usual programming nature and support
+the usual operations, including string concatenation, substrings,
+transcendental functions, exponentiation, and set arithmetic.
+
+Parameters and variables are essentially identical in structure; they
+are partial functions from their subscript domains to elemental
+values.  The only difference is that when you run the optimizer, you
+choose the parameters, while the optimizer chooses the variables.
+There are rules limiting the structure of numerical expressions to
+ensure that they are linear in the variables; I will not be concerned
+with that here, but that is the reason for thus drawing the
+distinction at the language level rather than, for example, specifying
+it with the objective.
+
+Confusingly, there are two related entities called “sets”: the
+expressed value, called an “elemental set”, and the model object,
+which is a denoted value.  The difference is that the denoted value is
+indexed, like parameters and variables; it is a partial function from
+its subscript domain to elemental sets.
+
+Constraints are partial functions from their subscript domains to
+Boolean values.  The optimizer looks for a “feasible solution” which
+makes them everywhere true, and which maximizes or minimizes the
+objective among all feasible solutions.
+
+The only iterative operations are `sum`, `prod`, `min`, and `max`,
+`forall` and `exists` for sets, the implicit `forall` on each
+constraint, and a set-comprehension operator on (elemental) sets that
+amounts to a Cartesian product filtered by a logical expression.  All
+of these implicitly include an elementwise transformation function.
+
+There is, I think, no way to compute an elemental set whose contents
+depend on the value of a variable, and the other kind of sets (the
+model objects) are specified as part of the model, so they can’t
+depend on the value of a variable either.  This serves the purpose of
+ensuring that MathProg and ZIMPL models can be “translated” into the
+formats MPS and CPLEX LP, which do not support any aggregate values at
+all, only affine equations and inequalities in real, integer, and
+logical variables.
+
+Since (elemental) sets are the only aggregate values that expressions
+can evaluate to, expressions as such can only describe pointwise
+computations.  Consider this line from the above example:
+
+    maximize obj: sum{j in 1..n} a[j] * x[j];
+
+This defines an objective called `obj` which is to be maximized,
+defined as Σ*ⱼ aⱼxⱼ*.  `1..n` is a range expression which produces a
+set of 15 integers from the integer parameter `n` = 15; `{j in 1..n}`
+declares the “dummy variable” `j` (confusingly, not related to the
+meaning of “dummy variable” in statistics) which is scoped to the
+“integrand” of `sum`, `a[j] * x[j]`, which indexes the real-valued
+parameter `a` and the binary-valued parameter `x` with the 1-tuple
+`j`, producing respectively a real and a binary value for a given
+value of `j`, which are then multiplied together; and finally `sum`
+produces a real number by summing 15 values computed from its
+“integrand”.
+
+This approach to aggregate operations is very different from the APL
+approach, in which you would write `+/a×x`, which is at least
+considerably fewer user interface operations.  In the principled APL
+I’m thinking about, `+/` would need to somehow indicate which axis (or
+dimension or index) it wants to sum along: `+/j a×x`, for example, if
+the axis were in fact called `j`, or `(sum (j) (* a x))` in Lisp
+S-expression syntax.  However, for reasons described in file
+`implicit-language`, I think this approach will probably lead to
+variable-capture problems of the same kind encountered in Lisp macros,
+and so it’s probably best to scope the variables bound by such
+iterative operations lexically; this leads to the formulation `+/j
+a[j=j]×x[j=j]`, which abbreviated to `+/j a[j]×x[j]` looks very
+similar to the MathProg approach.  The biggest difference is that the
+limits of the sum come from the domain of the “integrand” rather than
+being explicitly specified.
+
+(The indexing or reshaping operation `v[k=e]` is a special case: it
+binds variables dynamically rather than lexically, since otherwise it
+would not work.)
+
+MathProg variables and parameters correspond roughly to the array
+variables described above, and indexes and sets are conflated above as
+“axes of variation” or “inputs”.  A big difference from APL is that in
+MathProg elementary sets are first-class values, while in APL axes are
+not any kind of value at all, except in the implicit sense that they
+are functions from your program’s inputs to some dimension of some
+array.  Also, sets in MathProg are unordered, while many operations in
+APL only make sense if some axes are ordered sequences of index
+values, notably prefix sum or scan `\`, encode `⊤` and decode `⊥` (the
+names come from their use for number base conversion), grade-up `⍋`
+and grade-down `⍒`, reversal and rotation `⌽`, take `↑`, drop `↓`, and
+catenate `,`.
