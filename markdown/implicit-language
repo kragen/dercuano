@@ -3,7 +3,7 @@ A formal language for defining implicitly parameterized functions
 
 In file `dercuano-plotting` I talked about the need for a linguistic
 model of describing calculations to plot, that is, a programming
-language.  I think the ideas I'm describing here are finally
+language.  I think the ideas I’m describing here are finally
 crystallizing, but I wrote about them previously in file `typed-apl`,
 file `principled-apl`, file `relational-modeling-and-apl`; additional
 sources of inspiration have been file `micro-math-plus`,
@@ -13,7 +13,7 @@ GNU MathProg languages discussed in file
 `linear-optimization-landscape`, with the relationship explored in
 file `principled-apl`.
 
-I'm pretty sure I'll have to rework some of this, but I feel like at
+I’m pretty sure I’ll have to rework some of this, but I feel like at
 this point I have not only something implementable but also a concrete
 use case where I can see how the existing designs are suboptimal.
 
@@ -51,9 +51,9 @@ write correct code with, because of the rigorous logical underpinning.
 Syntax
 ------
 
-Because I'm planning to use a non-textual user interface, I'm not
-going to design a syntax; instead, I'll just use Lisp S-expression
-syntax in this document.  It's not very readable syntax but it's
+Because I’m planning to use a non-textual user interface, I’m not
+going to design a syntax; instead, I’ll just use Lisp S-expression
+syntax in this document.  It’s not very readable syntax but it’s
 adequately formal and flexible.  Its execution semantics are not Lisp
 execution semantics; it just represents an ordered-tree structure.
 
@@ -62,13 +62,13 @@ Semantic model
 
 The main objects of interest are atomic values, atomic types,
 aggregates, variables, environments, and expressions.  The following
-is full of forward references, unfortunately; I should see if there's
+is full of forward references, unfortunately; I should see if there’s
 a better order to put things in.
 
 ### Atomic values ###
 
 Atomic values are things like 4 or -2.5 or 4+1j or :London or possibly
-'w'; they correspond to values in many normal programming languages,
+‘w’; they correspond to values in many normal programming languages,
 but do not include any kind of aggregate data structure such as
 arrays, structs, dictionaries, sets, lists, tuples, or ML-style
 constructors.  Like quarks, they are never observed alone; they are
@@ -89,9 +89,9 @@ types?
 
 Aggregates are tables of atomic values, in the sense that they have
 rows and columns.  The number of rows may be zero, any natural number,
-or infinite; there is always one "result" column, but there can be
-zero or more "key" columns.  Each "key" column is associated with a
-variable, but the "result" column is not; it is only associated with
+or infinite; there is always one “result” column, but there can be
+zero or more “key” columns.  Each “key” column is associated with a
+variable, but the “result” column is not; it is only associated with
 the tuple of key-column variable values in its row.  Conceptually
 neither rows nor columns have order, although by necessity they will
 be in some order when we serialize them.  Aggregates are what
@@ -108,9 +108,9 @@ This aggregate has two key columns, associated with the variables
 `month` and `oils`, and four rows, the first of which associates the
 atomic value 110 with the situation where the variable `month` has the
 atomic value `1` and the variable `oils` has the atomic value :VEG1, a
-symbol.  A useful way of reading this is "110 if month == 1 and oils
+symbol.  A useful way of reading this is “110 if month == 1 and oils
 == :VEG1, else 120 if month == 1 and oils == :VEG2, else 130 if month
-== 1 and oils == :OIL1, else 130 if month == 2 and oils == :VEG1."
+== 1 and oils == :OIL1, else 130 if month == 2 and oils == :VEG1.”
 
 Here is an aggregate with no key columns, a *constant*, which
 associates the atomic value 4 with all possible states of the
@@ -121,7 +121,7 @@ universe:
 The key columns of an aggregate are its free variables.
 
 XXX Should we remove infinite aggregates?  They are the only way to
-represent things like "matrix-vector multiplication" as values, but
+represent things like “matrix-vector multiplication” as values, but
 they seem significantly different from other kinds of values.
 
 ### Variables ###
@@ -164,13 +164,13 @@ Here is an example expression:
        (let (oils (agg () :VEG2)) oilhardness)
        (sum (month) production))
 
-XXX should we require an explicit "in months" in case production fails
-to depend on month in a useful way so we don't know what to sum over?
+XXX should we require an explicit “in months” in case production fails
+to depend on month in a useful way so we don’t know what to sum over?
 Should there be some kind of explicit or implicit association between
 domains and variables, to allow inferring a universe in the absence of
 an explicit value?
 
-XXX I'm being a bit fast and loose including an aggregate literal
+XXX I’m being a bit fast and loose including an aggregate literal
 inside the expression.  I might not want that to be legal.
 
 It has the free variables `x`, `y`, `oilhardness`, `month`, and
@@ -191,7 +191,7 @@ This sort of bubbling up is why the set of free variables of an
 expression depends on the environment; it amounts to a sneaky sort of
 dynamic scoping.  XXX can this dependency be expressed in a usefully
 simple way to satisfy the needs of plotting to figure out what kind of
-creature it's going to have to plot?
+creature it’s going to have to plot?
 
 The aggregate that results from evaluating an expression in an
 environment has the same set of free variables the expression had in
@@ -201,7 +201,7 @@ aggregates supplied for those free variables in that environment.
 However, the expression may produce some arbitrary subset of those
 rows rather than all of them.
 
-XXX could it be that the expression had free variables that aren't
+XXX could it be that the expression had free variables that aren’t
 used?
 
 Expression types
@@ -209,7 +209,7 @@ Expression types
 
 ### Literal aggregates ###
 
-Although I'm not sure if this is the right thing, for the moment I'm
+Although I’m not sure if this is the right thing, for the moment I’m
 going to allow literal aggregates as expressions.  Moreover, constants
 such as 4 and `:VEG1` are also valid; they represent constant
 aggregates like `(agg () 4)` and `(agg () :VEG1)`
@@ -220,7 +220,7 @@ The standard set of computer arithmetic operations are provided with
 their usual meanings: +, -, \* for multiplication, / for division, %
 for remainder, \*\* for exponentiation, >>, <<, abs, exp, ln, pow,
 sin, cos, tan, asin, acos, atan, ceil, floor, round, bitand, bitor,
-bitnot, and bitxor.  I mean this might change a bit but that's what I
+bitnot, and bitxor.  I mean this might change a bit but that’s what I
 think right now.
 
 These operations take one or more arguments, which are evaluated in
@@ -249,11 +249,11 @@ this point a reminder seems in order that the sequence of rows and
 columns in the aggregate is arbitrary and insignificant.)
 
 XXX note that this contradicts the note earlier saying that
-expressions could not be evaluated in an environment that didn't
+expressions could not be evaluated in an environment that didn’t
 provide aggregates for all their free values.
 
-XXX rename 'aggregate' to 'table'?  It's too long and operations like
-"sum" and "min" are usually called "aggregate operations".
+XXX rename ‘aggregate’ to ‘table’?  It’s too long and operations like
+“sum” and “min” are usually called “aggregate operations”.
 
 The expression `(+ x y)` cannot be evaluated to a finite aggregate if
 either `x` or `y` is missing from the environment, but consider the
@@ -286,7 +286,7 @@ which is a list of alternating variables and expressions.  These
 expressions are evaluated in the outer environment, and each one is
 associated with its corresponding variable in the new environment.
 
-The let-expression's free variables are the free variables of `expr`,
+The let-expression’s free variables are the free variables of `expr`,
 minus the variables assigned to in `assignments`, plus the free
 variables of the expressions in `assignments`, which might reasonably
 add variables back in that were dropped in the second step.
@@ -300,7 +300,7 @@ A more interesting example is `(- x (let (i (- i 1)) x))`.  If `x` has
 `i` as a free variable and is defined for `i` integer, the inner `x`
 can evaluate to different atomic values from the outer `x`, and you
 get the backward differences of `x` along the `i` axis.  (I said at
-the top that I wouldn't invent syntax, but if I were inventing syntax,
+the top that I wouldn’t invent syntax, but if I were inventing syntax,
 I might write this as `x - x[i=i-1]`.)
 
 ### Conditional expressions ###
@@ -318,7 +318,7 @@ So, for example, `(if (> x 1) (if (< x 3) (* x x)))` is the function
 
 The expression `(case e1 e2 e3 ...)` evaluates all the expressions
 `e1`, `e2`, `e3`, etc., in the same environment it was invoked in, but
-then combines them in the fashion of SQL's `coalesce` or the `|`
+then combines them in the fashion of SQL’s `coalesce` or the `|`
 alternation operator in Icon or Unicon: rows are taken from `e2` only
 for the case where `e1` did not produce a value, from `e3` only where
 `e2` failed, and so on.  This means that you could write the
@@ -336,7 +336,7 @@ even if `p` is always true, that is no guarantee that you will never
 see values from `r`, because `q` might fail of its own accord, aside
 from getting externally failed by `p`.
 
-(Again, if I were inventing syntax, I'd want to write that as `x > 0
+(Again, if I were inventing syntax, I’d want to write that as `x > 0
 -> x | -x`.)
 
 Another use of `case` is augmenting the first-differences example
@@ -370,7 +370,7 @@ to multiple key columns and to the other standard reductions
 `product`, `min`, `max`, and `mean`.
 
 XXX this means that `month` does escape as a free variable, but the
-result won't depend on it, and there's no way to get a sum over more
+result won’t depend on it, and there’s no way to get a sum over more
 months than you have some other iteration variable to throw away; this
 is surely the wrong semantics, and the one explained earlier is surely
 better.  Given some of the evaluation semantics explored above, it
@@ -387,9 +387,9 @@ XXX
 
 The expression `(for var1 seq var2 start var3 reducer)` expresses a
 general definite loop.  It evaluates `seq` in its surrounding
-environment and produces an aggregate "the sequence" with, hopefully,
+environment and produces an aggregate “the sequence” with, hopefully,
 the variable `var1` free.  It also evaluates `start` in its
-surrounding environment and produces "the initial state".  Then it
+surrounding environment and produces “the initial state”.  Then it
 proceeds sequentially along the sorted values of `var1` in the domain
 of the sequence, evaluating `reducer` once for each sequence item, in
 an environment with `var2` bound to the sequence item and `var3` bound
@@ -398,8 +398,8 @@ initial state.
 
 XXX wait, the loop state has to be a single atomic value?
 
-XXX "domain" and "range" are better than "key" and "result" column;
-"domain variable" is maybe better than "free variable" for aggregates.
+XXX “domain” and “range” are better than “key” and “result” column;
+“domain variable” is maybe better than “free variable” for aggregates.
 
 Variable capture
 ----------------
@@ -435,14 +435,14 @@ is to say an argument, `k`?  Disaster strikes!  Instead of bubbling up
 to the sum expression as a whole, it becomes part of the iteration,
 with bizarre results that will potentially be difficult to debug.
 
-On the other hand, if we change the language's scoping to purely
+On the other hand, if we change the language’s scoping to purely
 lexical, constructs like `(let (j k) a)` make no sense --- lexically
 `a` does not contain `j`, so that expression would be equivalent to
 just `a`.  And `(** (sum (i) (** x p)) (/ 1 p))` relies on the
 visibility of the index `i` to the vector `x`.
 
 This is more or less just the standard problem of variable capture
-that occurs in Lisp macros or with dynamic scoping, but it's much more
+that occurs in Lisp macros or with dynamic scoping, but it’s much more
 severe in this context, because of the pervasive use of free variables
 for implicit parameter passing through many stack levels.
 
@@ -459,17 +459,17 @@ collide:
       (* (let (j *matrix-multiply-index*) a)
          (let (i *matrix-multiply-index*) x)))
 
-[Alan Bawden and Jonathan Rees's "syntactic closures"
+[Alan Bawden and Jonathan Rees’s “syntactic closures”
 mechanism](https://apps.dtic.mil/dtic/tr/fulltext/u2/a195921.pdf "AI Memo 1049, Bawden 1988")
 offers an relatively simple solution that is not difficult to
-implement (see also [Chris Hanson's shorter 1991
+implement (see also [Chris Hanson’s shorter 1991
 proposal](https://groups.csail.mit.edu/mac/ftpdir/users/cph/macros/prop.ps.gz)
 and [the superb Scheme Wiki
 page](http://community.schemewiki.org/?syntactic-closures), and also
-[Stephen Paul Carl's 1996 master's thesis on an extension of
+[Stephen Paul Carl’s 1996 master’s thesis on an extension of
 it](ftp://ftp.cs.utexas.edu/pub/garbage/carl-msthesis.ps)); Scheme
-unfortunately standardized on [Will Clinger's "Macros that
-Work"](https://3e8.org/pub/pdf-t1/macros_that_work.pdf "Clinger 1991")
+unfortunately standardized on [Will Clinger’s “Macros that
+Work”](https://3e8.org/pub/pdf-t1/macros_that_work.pdf "Clinger 1991")
 instead, which is a much more complex mechanism to implement.
 
 On the other hand, because of the evaluation semantics outlined above,
@@ -502,7 +502,7 @@ a syntactic closure or gensym:
 However, this is bug-prone; code that unintentionally omits the `my`
 tag will function correctly, perhaps for years, until used in a
 context where variable capture occurs, which may be a result of a
-change to code that doesn't even explicitly invoke the matrix multiply
+change to code that doesn’t even explicitly invoke the matrix multiply
 or whatever, even renaming a variable or something.  A different
 alternative is to make the variables introduced by expressions like
 `sum` implicitly lexical, but continue to treat `let` variables as
@@ -530,7 +530,7 @@ representation of the internal tree structure; perhaps on the display
 this would be written as *a<sub>i=i</sub>* or abbreviated in something
 like the conventional way as *a<sub>i</sub>*.)
 
-However, there's still the possibility of unintended variable capture
+However, there’s still the possibility of unintended variable capture
 in an expression such as
 
     (let (h (* n dh)) (/ (- (let (x (+ x h)) f) f) h))
@@ -570,7 +570,7 @@ Extradimensional features
 In the UI, you can write a table with some key columns and some value
 columns; each value column becomes a new aggregate, stored under a
 variable with the name in the column header, indexed by all the key
-columns.  If you don't have key columns, a nominal invisible key
+columns.  If you don’t have key columns, a nominal invisible key
 column is generated.
 
 The top level of the UI defines an environment, or a sequence of
@@ -595,7 +595,7 @@ but only enabled by default for small tables.
 The UI uses the same kind of introspective magic for this that `sum`
 uses to figure out the possible values that `month` can take on in
 `(sum (month) production)`.  This allows it to distinguish between
-discrete and continuous parameters based on how they're used, a sort
+discrete and continuous parameters based on how they’re used, a sort
 of type inference, find out what their valid values would be, and
 measure their limits.
 
@@ -609,17 +609,17 @@ A first prototyping step
 ------------------------
 
 The above has made it clear that there are a variety of issues that
-aren't crystallized yet, but since I've been thinking about this for
-six years, I probably shouldn't expect them to crystallize anytime
+aren’t crystallized yet, but since I’ve been thinking about this for
+six years, I probably shouldn’t expect them to crystallize anytime
 soon without more intensive effort.  Instead, maybe I should write
 enough code to get some experience with a subset that *is*
 crystallized, and maybe try two or three different approaches to the
 other aspects and see which ones work best.
 
 The most basic core is a few kinds of plots (linegraphs, scatterplots,
-lollipop plots, contour plots, and heatmaps, at least, and I'd like
+lollipop plots, contour plots, and heatmaps, at least, and I’d like
 some 3-D surface plots), pointwise arithmetic (\*, \*\*, -, +, /, abs,
-exp, sin, binary min, binary max), conditionals ("where"), extracting
+exp, sin, binary min, binary max), conditionals (“where”), extracting
 the free variables from an expression, and composition (indexing).  I
 think summing along a dimension is the first sort of uncertain thing
 to add.
