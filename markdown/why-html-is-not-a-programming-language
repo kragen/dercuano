@@ -305,12 +305,12 @@ Postgres:
                                            else newm / 2 end)
            end as m,
            case when nextx then 0 else p+1 end as p,
-           n = newm as exit
+           case when nextx then 0=1 else n = newm end as exit
     from (select (m = 1 or newm = 1) as nextx, x, n, m, p, newm
           from (select x, n, m, p,
                 case m % 2 when 1 then 3*m + 1
                                   else m / 2 end as newm
-                from (select 3 as x, 3 as n, 3 as m, 0 as p) state) a) b;
+                from (select 16 as x, 4 as n, 1 as m, 2 as p) state) a) b;
 
 From there it is a matter of finding some external way to initialize
 the computation and repeat it until it results in your translation of
@@ -331,10 +331,9 @@ exercise to the reader.  Maybe you can use `DECIMAL` — in Postgres,
 `select power(2::decimal(30), 64) - (power(2::decimal(30), 64) - 1)`
 works correctly, but that syntax is a Postgres extension to SQL.
 
-#### Failing at the Collatz program using SQL with recursive CTEs ####
+#### The Collatz program in SQL with recursive CTEs ####
 
-I did attempt to iterate the above SQL query using recursive CTEs, but
-without success.  In Postgres 9.5.14 the query
+In Postgres 9.5.14 the query
 
     with recursive collatz as 
        (select 1 as x, 1 as n, 1 as m, 0 as p, 0=1 as exit union
@@ -348,7 +347,7 @@ without success.  In Postgres 9.5.14 the query
                                                           else newm / 2 end)
                end as m,
                case when nextx then 0 else p+1 end as p,
-               n = newm as exit
+               case when nextx then 0 = 1 else n = newm end as exit
         from (select (m = 1 or newm = 1) as nextx, x, n, m, p, newm
               from (select x, n, m, p,
                     case m % 2 when 1 then 3*m + 1 else m / 2 end as newm
@@ -356,100 +355,11 @@ without success.  In Postgres 9.5.14 the query
         where x < 100)
     select * from collatz;
 
-yields the incorrect result
-
-     x  |  n  | m  | p | exit 
-    ----+-----+----+---+------
-      1 |   1 |  1 | 0 | f
-      2 |   2 |  2 | 0 | f
-      3 |   3 |  3 | 0 | f
-      3 |  10 |  5 | 1 | f
-      3 |   5 |  8 | 2 | f
-      3 |  16 |  2 | 3 | f
-      4 |   4 |  4 | 0 | f
-      4 |   2 |  1 | 1 | f
-      5 |   5 |  5 | 0 | f
-      5 |  16 |  8 | 1 | f
-      5 |   8 |  2 | 2 | f
-      6 |   6 |  6 | 0 | f
-      6 |   3 | 10 | 1 | f
-      6 |  10 | 16 | 2 | f
-      6 |   5 |  4 | 3 | f
-      6 |  16 |  1 | 4 | f
-      7 |   7 |  7 | 0 | f
-      7 |  22 | 11 | 1 | f
-      7 |  11 | 17 | 2 | f
-      7 |  34 | 26 | 3 | f
-      7 |  17 | 40 | 4 | f
-      7 |  52 | 10 | 5 | f
-      7 |  26 | 16 | 6 | f
-      7 |  13 |  4 | 7 | f
-      7 |  40 |  1 | 8 | f
-      8 |   8 |  8 | 0 | f
-      8 |   4 |  2 | 1 | f
-      9 |   9 |  9 | 0 | f
-      9 |  28 | 14 | 1 | f
-      9 |  14 | 22 | 2 | f
-      9 |   7 | 34 | 3 | f
-      9 |  22 | 52 | 4 | f
-      9 |  11 | 13 | 5 | f
-      9 |  34 | 20 | 6 | f
-      9 |  17 |  5 | 7 | f
-      9 |  52 |  8 | 8 | f
-      9 |  26 |  2 | 9 | f
-     10 |  10 | 10 | 0 | f
-     10 |   5 | 16 | 1 | f
-     10 |  16 |  4 | 2 | f
-     10 |   8 |  1 | 3 | f
-     11 |  11 | 11 | 0 | f
-     11 |  34 | 17 | 1 | f
-     11 |  17 | 26 | 2 | f
-     11 |  52 | 40 | 3 | f
-     11 |  26 | 10 | 4 | f
-     11 |  13 | 16 | 5 | f
-     11 |  40 |  4 | 6 | f
-     11 |  20 |  1 | 7 | f
-     12 |  12 | 12 | 0 | f
-     12 |   6 |  3 | 1 | f
-     12 |   3 |  5 | 2 | f
-     12 |  10 |  8 | 3 | f
-     12 |   5 |  2 | 4 | f
-     13 |  13 | 13 | 0 | f
-     13 |  40 | 20 | 1 | f
-     13 |  20 |  5 | 2 | f
-     13 |  10 |  8 | 3 | f
-     13 |   5 |  2 | 4 | f
-     14 |  14 | 14 | 0 | f
-     14 |   7 | 22 | 1 | f
-     14 |  22 | 34 | 2 | f
-     14 |  11 | 52 | 3 | f
-     14 |  34 | 13 | 4 | f
-     14 |  17 | 20 | 5 | f
-     14 |  52 |  5 | 6 | f
-     14 |  26 |  8 | 7 | f
-     14 |  13 |  2 | 8 | f
-     15 |  15 | 15 | 0 | f
-     15 |  46 | 23 | 1 | f
-     15 |  23 | 35 | 2 | f
-     15 |  70 | 53 | 3 | f
-     15 |  35 | 80 | 4 | f
-     15 | 106 | 20 | 5 | f
-     15 |  53 |  5 | 6 | f
-     15 | 160 |  8 | 7 | f
-     15 |  80 |  2 | 8 | f
-     16 |  16 | 16 | 0 | f
-     16 |   8 |  4 | 1 | f
-     16 |   4 |  1 | 2 | f
-     17 |  17 | 17 | 0 | t
-
-but I do not know whether the bug is in the query or in Postgres.
+appears to work, producing 1634 rows in 23 ms.
 
 In SQLite 3.11.0, subqueries cannot refer to recursive CTEs, and it's
 not obvious to me how to reformulate this query to eliminate the
 subqueries.
-
-So perhaps Platonic ANSI SQL is Turing-complete with recursive CTEs,
-but its implementations seem to have their limits.
 
 #### Rice’s Theorem ####
 
