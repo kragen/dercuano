@@ -1,0 +1,151 @@
+Is there an incremental union find algorithm?
+=============================================
+
+The union-find data structure, sometimes called a disjoint-set forest,
+is a well-known data structure that pops up in, for example,
+constructing minimum spanning trees; it efficiently supports the
+operations *component*(*n*) and *connect*(*n*₁, *n*₂).  You are
+guaranteed that *component*(*n*) == *component*(*m*) if and only if
+there is a (possibly empty) set of past *connect* calls that create a
+path between *n* and *m* — if the *connect* calls create arcs in a
+graph, they are in the same component.  Moreover, you can intersperse
+*component* and *connect* calls freely without losing efficiency, and
+the structure uses only O(*N*) space, where *N* is the number of
+nodes, not even the number of arcs.
+
+However, the standard structure does not support edge *deletion*, only
+edge *creation*.  It seems probably impossible for a structure with
+the same space performance to support such an operation, since its
+size must remain unchanged as O(*N*) despite the creation of O(*N*²)
+edges, any of which can later be deleted.  But is there a way to
+support edge deletion with “reasonable” performance?
+
+The standard union-find data structure
+--------------------------------------
+
+Here’s an implementation of the standard union-find algorithm I wrote
+last year as part of [a maze generation program][0] in Golang:
+
+    // Data structure for rapidly determining whether two maze cells are
+    // already connected.
+    type Unionfind map[Cell]Cell
+
+    func (u Unionfind) root(c Cell) (root Cell) {
+            parent, ok := u[c]
+            if !ok {
+                    return c
+            }
+            root = u.root(parent)
+            u[c] = root
+            return
+    }
+
+    func (u Unionfind) Connect(start, end Cell) {
+            u[u.root(start)] = u.root(end)
+    }
+
+    func (u Unionfind) Connected(a, b Cell) bool {
+            return u.root(a) == u.root(b)
+    }
+
+[0]: http://canonical.org/~kragen/sw/dev3/unimaze.go
+
+For convenience, this implementation uses a Golang `map` to store the
+parent pointers; you can use a plain array of integers if you identify
+your nodes with integers, size the array to be big enough, reserve a
+distinguished integer to mean “nil”, no parent, and initialize by
+filling the array with “nil”.  (Alternatively, instead of setting root
+nodes’ parents to a nil value, you can make them their own parents.)
+
+Analyzing the performance of this algorithm is difficult enough that I
+am not going to try (though there is an extensive literature on the
+subject), but you can see that `root()` is O(1) whenever it is called
+a second time on the same node without an intervening `Connect()` call
+that would change its return value, because it recurses at most once.
+In such a case it does two `u[c]` lookups in the map, the second of
+which fails, and one (redundant) `u[c]` update.
+
+For this algorithm variant (“path compression without union by rank”),
+CLRS gives a worst-case running time of Θ(*n* + *f* (1 + log<sub>2 +
+*f*/*n*</sub> *n*)) for *n* - 1 `Connect` calls and ½*f* `Connected`
+calls (p. 571).  When *f* ≫ *n* this function is very nearly *n* +
+*f*; when *f* ≪ *n* it is *n* + *f* lg *n*; and when *f* ≈ *n* it is
+about *n* + *f* ln *n*.  The “path compression with union by rank”
+variant is asymptotically faster, but it requires a great deal of
+extra bookkeeping information and has a larger constant factor; it
+uses twice as much space and, until *n* is fairly large, it’s also
+slower.  If *f* is much larger than *n*, it’s slower even then.
+
+A logarithmic-time union-find with edge deletion (or maybe not)
+---------------------------------------------------------------
+
+Suppose that, instead of parent pointers, we maintain, for each node,
+a linked list of edges, each indicating a lower-numbered node that it
+is directly linked to.  Now `Connect()` merely has to determine which
+node has the higher number and add the edge to that node’s edge list,
+but `root()` becomes infeasible except by groveling over the entire
+set of nodes repeatedly.  To avoid this, we add the parent pointers
+back in, but in the form of an additional linked list of edges on each
+node — but these edges are edges between components, not just between
+nodes.  These are established using essentially the same rule as
+before, with the additional proviso that they must point from a higher
+to a lower node, like the edges between nodes.  So now `Connect()`
+must create both a between-nodes edge and a between-components edge,
+and unlike before, it does not delete a between-components edge.
+
+Every edge (in the between-nodes list or the between-components list)
+has a list of dependent between-components edges attached to it.  If
+that edge is removed, its dependents are also removed; and since those
+dependents may have further dependents, those further dependents are
+also removed.  When a between-components edge is created, it becomes a
+dependent of the between-nodes edge that was created at the same time
+(if any), as well as all of the between-components edges that were
+followed for its creation.  The logic of `root()` now must handle the
+situation of multiple “parent pointers” (that is, between-components
+edges); it always follows the pointer that points to the
+lowest-numbered node, since this (XXX I think) is guaranteed to be the
+most-recently-created surviving parent pointer.
+
+XXX If a between-components edge is deleted because it depended on
+another between-components edge that has been deleted, but it was
+added together with a between-nodes edge, should it be recreated from
+its original between-nodes edge?
+
+Hmm, I was thinking that I could replace the single-hop parent
+pointers with a logarithmic number of parent pointers, each traveling
+up the parent chain by a power of 2, or roughly so, sort of like a
+skip list, in order to keep the space and time overhead both bounded
+at logarithmic.  But I’m not sure any variant of this approach will
+work at all.
+
+Merging union-find structures?
+------------------------------
+
+Suppose you have built two union-find structures on the same set of
+nodes by applying two some potentially large sets of *connect*
+operations.  How can you compute the union-find structure that would
+have been computed from the union of those two sets of edges?
+
+One way to do it is to determine whether the second set contains any
+edges that bridge components that are separate in the first
+set — which is to say, whether there are any pairs of nodes that are
+connected in the second set but not the first.  If so, you can apply
+additional *connect* operations to the first set to unify them.
+
+To connect, in the first structure, all the pairs of nodes that are
+connected in the second set, it is adequate to connect each node to
+either its root or its parent (in both cases, in the second union-find
+structure).  That is, the parent pointers provide adequate information
+for this task; they are a compressed summary of the original second
+set of edges.
+
+This merge operation suggests that we could build a binary tree of
+union-find structures in which, at the leaves, we have individual
+edges (that is, union-find structures containing only a single edge).
+Then, to remove an edge, we null out its leaf and propagate the merge
+operations back up to the root.
+
+Unfortunately, although we need only walk through O(lg *E*) nodes, we
+are doing O(*N*) work at each node.  It would be faster to just
+recompute the union-find from scratch, unless there are many more
+edges than nodes.
