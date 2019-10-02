@@ -1,0 +1,324 @@
+Right now all the code blocks in Dercuano are rather plain: black on
+gray, with one typewriter typeface in one size; I think some syntax
+highlighting would make it both more *pleasant* to read and more
+*inviting*.  The contrast between the colorful source listing I see as
+I’m editing notes in Emacs and the dull gray listing I see in the
+rendered HTML is depressing.
+
+The standard way to syntax-highlight code for the WWW is to run
+something like Pygments or Emacs `htmlfontify-buffer` on the server side
+to generate a passel of HTML spans that refer to some stylesheet, but
+in part since Dercuano doesn’t have a server side, that isn’t really
+an option, for the same reason prerendering of PNGs is not an option
+(see file `dercuano-drawings`) — the resulting files are huge.
+
+So, how can I syntax-highlight code in Dercuano?  Presumably I need to
+write something in JS that can be instructed to attempt to tokenize
+code blocks with the lexical syntax of various languages, perhaps even
+parsing them, and apply spans and styles to them based on the results.
+
+Languages: mostly Python, SQL, and very minimalist languages
+------------------------------------------------------------
+
+First I thought it would be good to take a sampling of the
+syntax-highlightable languages I’m using in Dercuano.
+
+File `phase-relations`: none  
+File `clamp-on-transformer`: none  
+File `interval-trees-over-sequences`: SQL, Python, SQL fragments  
+File `cheap-textures`: none  
+File `tagged-dataflow`: none  
+File `sparse-filter-response-shaping`: Python  
+File `flexures`: none  
+File `raph-io`: Io, Scheme, possible extensions of Io  
+File `microfinance`: none  
+File `binate-kanren`: Binate  
+File `midpoint-method-texture-mapping`: none  
+File `named-stack-forth`: possible extensions of Forth  
+File `big-if-true`: none  
+File `spiral-chinese-windlass`: ASCII art diagrams  
+File `wang-tile-font`: none  
+File `fractional-reserve-banking`: none
+
+The main conclusion I can draw from this random sample of 16 notes is
+that there isn’t much code in Dercuano (≈⅓), and what there is tends
+toward very minimalist programming languages (Scheme, Forth, Io,
+Binate) which in many cases don’t even have existing
+implementations — and, also, Python and SQL.  Languages I’ve recently
+used in other notes include SQL, Python, OCaml, Lisp S-expressions,
+Lua, GNU MathProg, and Golang.
+
+Syntactic categories and aesthetic treatment
+--------------------------------------------
+
+Popular syntactic categories to highlight include, in more or less
+decreasing order of importance, keywords, function names, type names,
+string contents, numbers, comments, and punctuation.
+
+Common practice is **to** emphasize **the** keywords, **but** that
+does **not** make any sense; **the** keywords are **the**
+lowest-information-density part **of the** program code, so that
+merely adds noise.  A better approach might be <span
+class="kwfade">to</span> reduce <span class="kwfade">the</span>
+contrast <span class="kwfade">of</span> keywords, allowing <span
+class="kwfade">the</span> reader <span class="kwfade">to</span> focus
+<span class="kwfade">on the</span> informative part.  Reducing font
+size (<span class="kwsmall">and</span> increasing letter-spacing <span
+class="kwsmall">to</span> compensate) might also help.  Much the same
+can apply to punctuation, and while this is fairly unimportant for
+*comprehension* because it’s already visually distinctive, it can be a
+major boon to *aesthetics*.
+
+<style>
+.kwfade { opacity: 0.4 }
+.kwsmall { font-size: 0.5em; letter-spacing: 0.25em; }
+</style>
+
+A recent post discussed on the orange website suggested coloring
+identifiers by a hash of their contents, so that `pcall` would look
+very different from `pcal1`, especially to non-colorblind people.  If
+you also wanted to use color to distinguish function names, type
+names, and keywords, you’d need to slice up the color cube into
+distinct regions for each one with a demilitarized zone between them
+to permit reliable discrimination.
+
+One possible significant exception to the dismissal of punctuation is
+that parenthesis-matching can improve the readability of Lisp code
+substantially.  Traditionally it’s done interactively (e.g., by
+bouncing on % in vi or using C-M-f and C-M-b in Emacs), but by
+assigning different colors and weights to different parenthesis
+levels, noninteractive parenthesis matching could be facilitated.
+
+The available aesthetic attributes for syntax highlighting in modern
+CSS go far beyond what was traditionally available either in hot lead
+or in emulated VT340+ terminals.  Even without using different
+typefaces, sizes, and letter-spacing, we can oblique, drop-shadow,
+change the background color, greatly vary the line width, underline
+(though be careful about underlining spaces), overline, strikethrough,
+compress the letterforms, and rotate the letterforms.
+
+The vgrind program would call out definitions (for example, of
+functions and types) by putting the name of the defined entity in the
+right margin in a larger font, which was useful for paging through
+printed-out listings but probably isn’t useful for a small snippet of
+code with commentary around it.
+
+Where do I get the tokenizers or grammars?
+------------------------------------------
+
+It would be nice to avoid writing parsers for Python, SQL, OCaml,
+Scheme, MathProg, Golang, and Lua, especially fragment-tolerant and
+REPL-tolerant parsers, but there’s probably no way to get around
+writing parsers for things like Binate, proposed extensions of Forth,
+proposed extensions of Io, and Io itself.
+
+### Pygments ###
+
+Pygments comes with a fairly comprehensive set of lexers optimized for
+this task; `grep --color -nH -e ^class
+/usr/lib/python2.7/dist-packages/pygments/lexers/*.py` yields a bit
+over 400 matches.  Most of these contain some imperative Python code,
+but Pygments has a pretty extensive set of regexp-based facilities:
+
+    class MoinWikiLexer(RegexLexer):
+        """
+        For MoinMoin (and Trac) Wiki markup.
+
+        .. versionadded:: 0.7
+        """
+
+        name = 'MoinMoin/Trac Wiki markup'
+        aliases = ['trac-wiki', 'moin']
+        filenames = []
+        mimetypes = ['text/x-trac-wiki']
+        flags = re.MULTILINE | re.IGNORECASE
+
+        tokens = {
+            'root': [
+                (r'^#.*$', Comment),
+                (r'(!)(\S+)', bygroups(Keyword, Text)),  # Ignore-next
+                # Titles
+                (r'^(=+)([^=]+)(=+)(\s*#.+)?$',
+                 bygroups(Generic.Heading, using(this), Generic.Heading, String)),
+                # Literal code blocks, with optional shebang
+                (r'(\{\{\{)(\n#!.+)?', bygroups(Name.Builtin, Name.Namespace), 'codeblock'),
+                (r'(\'\'\'?|\|\||`|__|~~|\^|,,|::)', Comment),  # Formatting
+                # Lists
+                (r'^( +)([.*-])( )', bygroups(Text, Name.Builtin, Text)),
+                (r'^( +)([a-z]{1,5}\.)( )', bygroups(Text, Name.Builtin, Text)),
+                # Other Formatting
+                (r'\[\[\w+.*?\]\]', Keyword),  # Macro
+                (r'(\[[^\s\]]+)(\s+[^\]]+?)?(\])',
+                 bygroups(Keyword, String, Keyword)),  # Link
+                (r'^----+$', Keyword),  # Horizontal rules
+                (r'[^\n\'\[{!_~^,|]+', Text),
+                (r'\n', Text),
+                (r'.', Text),
+            ],
+            'codeblock': [
+                (r'\}\}\}', Name.Builtin, '#pop'),
+                # these blocks are allowed to be nested in Trac, but not MoinMoin
+                (r'\{\{\{', Text, '#push'),
+                (r'[^{}]+', Comment.Preproc),  # slurp boring text
+                (r'.', Comment.Preproc),  # allow loose { or }
+            ],
+        }
+
+Even things like pygments.lexers.ml.OcamlLexer (90 lines of code) are
+written entirely in this declarative style without any executable
+code.  As you can see above, Pygments apparently has a stack machine
+for nested multi-line string constructs such as Trac code blocks or
+OCaml comments.
+
+One drawback of trying to use this stuff is that it relies pretty
+heavily on Python’s regexp syntax, which is mostly, but not
+completely, compatible with JS’s.
+
+Another is that syntax-highlighting purely through tokenization
+doesn’t have much chance of, for example, consistently distinguishing
+user-defined types from user-defined functions.
+
+### Vim ###
+
+Vim comes with some 586 syntax definition files; many of them are
+fairly minimal.  They are written in Vimscript, which is imperative,
+but most of the commands consist of defining regular
+expressions — which I originally thought would be in Vim’s regexp
+dialect with `\(\)` for grouping and whatnot, but which has apparently
+adopted many PCRE-like features — though the backwards-incompatible
+ones are turned on on a per-regexp basis by the sequence `\v`, which
+means “very magic”.  Here’s Honza Pokorny’s Dockerfile syntax file:
+
+    if exists("b:current_syntax")
+        finish
+    endif
+
+    let b:current_syntax = "dockerfile"
+
+    syntax case ignore
+
+    syntax match dockerfileKeyword /\v^\s*(ONBUILD\s+)?(ADD|CMD|ENTRYPOINT|ENV|EXPOSE|FROM|MAINTAINER|RUN|USER|VOLUME|WORKDIR|COPY)\s/
+
+    syntax region dockerfileString start=/\v"/ skip=/\v\\./ end=/\v"/
+
+    syntax match dockerfileComment "\v^\s*#.*$"
+
+    hi def link dockerfileString String
+    hi def link dockerfileKeyword Keyword
+    hi def link dockerfileComment Comment
+
+Vim also does automatic indentation, which requires a little deeper
+understanding, but this is done entirely separately and with no
+dependence on the syntax highlighting.
+
+Consequently, even in C, like Pygments, Vim doesn’t manage to
+distinguish between types and functions.
+
+### Emacs ###
+
+Emacs does successfully distinguish between types and functions, and
+it is configured in a similar way to how Vim is configured, but with
+Lisp lists instead of sequences of commands, and perhaps a few more
+levels of indirection.  However, some of the Emacs syntax highlighting
+setup involves truly unbelievable amounts of hair.
+
+#### Golang in Emacs ####
+
+go-mode.el is relatively simple; one of the first things the `go-mode`
+function does is to set `font-lock-defaults` to a list containing the
+name of a function that returns a declarative configuration for syntax
+highlighting as a list:
+
+    (set (make-local-variable 'font-lock-defaults)
+       '(go--build-font-lock-keywords))
+
+This list is built up more or less as follows, though I've omitted
+most of the individual items:
+
+    (defun go--build-font-lock-keywords ()
+      (append
+       `(...)
+       (if ...)
+       `(...
+         (,(concat (go--regexp-enclose-in-symbol "map")
+                   "\\[[^]]+\\]" go-type-name-regexp)
+          1 font-lock-type-face) ;; map value type
+         (,(concat (go--regexp-enclose-in-symbol "map")
+                   "\\[" go-type-name-regexp)
+          1 font-lock-type-face) ;; map key type
+         ...)))
+
+The mysterious `go--regexp-enclose-in-symbol` function is defined as
+follows:
+
+    (defun go--regexp-enclose-in-symbol (s)
+      "Enclose S as regexp symbol.
+    XEmacs does not support \\_<, GNU Emacs does.  In GNU Emacs we
+    make extensive use of \\_< to support unicode in identifiers.
+    Until we come up with a better solution for XEmacs, this solution
+    will break fontification in XEmacs for identifiers such as
+    \"typeµ\".  XEmacs will consider \"type\" a keyword, GNU Emacs
+    won't."
+      (if (go--xemacs-p)
+          (concat "\\<" s "\\>")
+        (concat "\\_<" s "\\_>")))
+
+The two particular items I called out earlier, which cause `foo` and
+`bar` in `map[foo]bar` to be highlighted as type names, come out as
+the following:
+
+    ("\\_<map\\_>\\[[^]]+\\]\\(?:[*(]\\)*\\(\\(?:[[:word:][:multibyte:]]+\\.\\)?[[:word:][:multibyte:]]+\\)"
+    1 font-lock-type-face)
+    ("\\_<map\\_>\\[\\(?:[*(]\\)*\\(\\(?:[[:word:][:multibyte:]]+\\.\\)?[[:word:][:multibyte:]]+\\)"
+    1 font-lock-type-face)
+
+This says to highlight subexpression 1 in each of those regexps as
+`font-lock-type-face`, which begins at the first `\\(` that isn’t
+followed by a `?:` — Emacs, too, has adopted some of Perl’s regexp
+syntax, though not the good part of not having to double-backslash
+things or backslash your parens at all.
+
+The whole syntax-highlighting list is about a page long, mostly
+regexps like that, but it also includes a call to `go--match-func`,
+which parses function parameter lists to look for type names.  This
+involves several pages of Elisp that does a lot of stuff like
+`(save-excursion (if (looking-at ...) (goto-char (match-end 0))))`,
+which is precisely the kind of thing I’d like to avoid, convenient
+though it sometimes is as a way to munge text.
+
+#### C in Emacs ####
+
+By contrast, C syntax highlighting (like various other features for C)
+is mostly handled by a heuristic, forgiving C parser consisting of
+over ten thousand lines of Elisp written over the last 35 years in
+cc-engine.el, which also handles Objective-C, C++ (including the Qt
+extensions), Awk, IDL, Java, and Pike.  No test suite is evident.  As
+to how it distinguishes type names from function names, I have no idea
+and I might not find out tonight even if I spent the rest of the night
+on it, but it does.
+
+### Writing them from scratch ###
+
+An appealing alternative, and really the only alternative when it
+comes to programming language syntax variants that I’m exploring that
+nobody has ever implemented, is to write tokenizers and parsers from
+scratch.  This is especially appealing if the parser can be used to
+actually interpret or compile the language as well as
+syntax-highlighting it, although of course if I’m just interested in
+the language’s semantics and not its syntax I can quite reasonably
+just serialize to S-expressions, as in file `implicit-language`, or
+just RPN, like Python pickle.  But if I want compatibility with
+existing code or existing implementations, parsing arbitrarily
+complicated languages may be useful.
+
+For interpretation, though, handling incomplete or incorrect code
+isn’t necessary, and sometimes for syntax highlighting it is, though
+less often than for text editing.  One possibility for that kind of
+thing is to write a normal parser using some kind of parsing theory
+(such as an Earley or Packrat parser) and then mechanically transform
+it to produce possible parses of *substrings* of the original
+language.  (This approach is also useful for parallelizing and
+incrementalizing parsing; see file `parallel-nfa` for details.)
+
+Another possibility, maybe a more interesting one, is to train a
+recurrent ANN to classify syntactic elements instead.
