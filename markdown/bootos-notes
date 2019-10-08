@@ -1,0 +1,344 @@
+Notes on Óscar Toledo G.’s bootOS
+=================================
+
+Recently Óscar Toledo G. released
+[bootOS](https://github.com/nanochess/bootOS), an MS-DOS-like
+operating system with a built-in filesystem and hex editor; it
+provides some basic OS services and can launch programs, and fits
+entirely into the 512-byte boot sector of a floppy disk.
+
+Background
+----------
+
+The author is a wizard from a secretive underground society of wizards
+known as the Familia Toledo; he and his family (it is a family) have
+been designing and building their own computers (and ancillary
+equipment like reflow ovens) and writing their own operating systems
+and web browsers for some 40 years now. Unfortunately, they live on
+the outskirts of Mexico City, not Sunnyvale or Boston, so the public
+accounts of their achievements have been mostly written by vulgar
+journalists without even rudimentary knowledge of programming or
+electronics.
+
+And they have maintained their achievements mostly private, perhaps
+because whenever they’ve talked about their details publicly, the
+commentary has mostly been of the form “This isn’t possible” and “This
+is obviously a fraud” from the sorts of ignorant people who make a
+living installing virus scanners and pirate copies of Windows and thus
+imagine themselves to be computer experts. (All of this happened
+entirely in Spanish, except I think for a small amount which happened
+in Zapotec, which I don’t speak; the family counts the authorship of a
+Zapotec dictionary among their public achievements.) In particular,
+they’ve never published the source or even binary code of their
+operating systems and web browsers, as far as I know.
+
+This changed a few years back when Óscar Toledo G., the son of the
+founder (Óscar Toledo E.), [won the IOCCC with his Nanochess
+program](https://en.wikipedia.org/wiki/International_Obfuscated_C_Code_Contest#Toledo_Nanochess)
+and four more times as well. His obvious achievements put to rest — at
+least for me — the uncertainty about whether they were underground
+genius hackers or merely running some kind of con job. Clearly Óscar
+Toledo G. is a hacker of the first rank, and we can take his word
+about the abilities of the rest of his family, even if they do not
+want to publish their code for public criticism.
+
+I look forward to grokking BootOS in fullness and learning the
+brilliant tricks contained within! Getting a full CLI and minimalist
+filesystem into a 512-byte floppy-disk boot sector is no small
+achievement.
+
+It’s licensed under the two-clause BSD license.
+
+The significance of bootOS
+--------------------------
+
+If you have a PC with BIOS and a floppy disk, but no software and no
+other computer, you have a paperweight, because you have no way to
+program it.  bootOS is sufficient to program it, albeit in hexadecimal
+machine code, and to store your programs on the disk so that you don’t
+have to start from scratch every time the machine loses power.  And
+it’s close to the bare minimum amount of software to provide a
+programming environment you could actually use.
+
+A brief listing of bootOS in octal
+----------------------------------
+
+Here’s `od -b os.img`:
+
+    0000000 061 300 216 330 216 300 216 320 274 000 167 374 276 000 174 277
+    0000020 000 172 271 000 002 363 244 276 354 173 277 200 000 261 006 245
+    0000040 253 342 374 276 274 173 350 106 001 315 040 374 016 016 016 037
+    0000060 007 027 274 000 167 260 044 350 006 001 200 074 000 164 354 277
+    0000100 310 173 212 005 107 045 377 000 164 021 221 126 363 246 165 004
+    0000120 377 025 353 327 001 317 107 107 136 353 347 211 363 277 000 174
+    0000140 315 043 162 002 377 343 276 303 173 350 003 001 315 040 211 363
+    0000160 254 074 040 164 371 315 045 162 355 303 350 240 000 211 337 200
+    0000200 075 000 164 005 211 376 350 346 000 350 156 000 165 361 303 126
+    0000220 061 311 254 101 074 000 165 372 136 277 000 170 303 127 006 350
+    0000240 100 000 264 002 007 133 162 003 350 204 000 211 345 320 126 004
+    0000260 317 127 006 123 315 045 133 350 325 377 046 200 075 000 164 007
+    0000300 350 067 000 165 365 353 335 127 363 244 350 132 000 137 350 062
+    0000320 000 264 003 353 317 350 012 000 162 321 271 020 000 350 103 000
+    0000340 353 311 123 350 067 000 136 350 245 377 126 127 121 363 246 131
+    0000360 137 136 164 017 350 003 000 165 361 303 203 307 020 201 377 000
+    0000400 172 371 303 215 205 020 210 261 004 323 340 100 221 303 277 000
+    0000420 170 271 000 002 350 014 000 273 000 172 111 353 022 016 007 264
+    0000440 002 353 006 260 000 363 252 264 003 273 000 170 271 002 000 120
+    0000460 123 121 006 260 001 061 322 315 023 007 131 133 130 162 360 303
+    0000500 315 042 276 200 167 211 367 074 010 165 002 117 117 315 041 074
+    0000520 015 165 002 260 000 252 165 357 303 264 000 315 026 074 015 165
+    0000540 006 260 012 315 042 260 015 264 016 273 007 000 315 020 317 254
+    0000560 315 042 074 000 165 371 260 015 315 042 303 277 000 174 127 260
+    0000600 150 350 274 377 137 200 074 000 164 022 350 034 000 163 357 261
+    0000620 004 322 340 221 350 022 000 010 310 252 353 356 260 052 350 237
+    0000640 377 126 133 277 000 174 315 044 303 254 074 000 164 015 054 060
+    0000660 162 367 074 012 162 005 054 007 044 017 371 303 142 157 157 164
+    0000700 117 123 000 117 157 160 163 000 003 144 151 162 172 172 006 146
+    0000720 157 162 155 141 164 016 173 005 145 156 164 145 162 173 173 003
+    0000740 144 145 154 156 172 003 166 145 162 043 172 000 053 172 131 173
+    0000760 135 173 235 172 261 172 325 172 117 117 117 117 117 117 125 252
+
+Here’s a version formatted for readability:
+
+    061 300 216 330 216 300 216 320 274 000 167
+    374 276 000 174 277 000 172 271 000 002 363 244
+    276 354 173 277 200 000 261 006
+    245 253 342 374
+    276 274 173 350 106 001 315 040
+    374 016 016 016 037 007 027 274 000 167
+    260 044 350 006 001
+    200 074 000 164 354
+    277 310 173
+    212 005 107 045 377 000 164 021 221 126 363 246 165 004 377 025 353 327
+    001 317 107 107 136 353 347
+    211 363 277 000 174 315 043 162 002 377 343
+    276 303 173 350 003 001 315 040
+    211 363 254 074 040 164 371 315 045 162 355 303
+    350 240 000 211 337  200 075 000 164 005 211 376 350 346 000
+        350 156 000 165 361 303
+    126 061 311  254 101 074 000 165 372  136 277 000 170 303
+    127 006 350 100 000 264 002  007 133 162 003 350 204 000
+        211 345 320 126 004 317
+    127 006 123 315 045 133 350 325 377
+        046 200 075 000 164 007 350 067 000 165 365 353 335
+        127 363 244 350 132 000 137 350 062 000 264 003 353 317
+    350 012 000 162 321 271 020 000 350 103 000 353 311
+    123 350 067 000 136 350 245 377  126 127 121 363 246 131 137 136 164 017
+        350 003 000 165 361 303
+    203 307 020 201 377 000 172 371 303
+    215 205 020 210 261 004 323 340 100 221 303
+    277 000 170 271 000 002 350 014 000 273 000 172 111 353 022
+    016 007 264 002 353 006
+    260 000 363 252  264 003  273 000 170 271 002 000
+        120 123 121 006 260 001 061 322 315 023 007 131 133 130 162 360 303
+    315 042 276 200 167 211 367  074 010 165 002 117 117
+        315 041 074 015 165 002 260 000  252 165 357 303
+    264 000 315 026  074 015 165 006  260 012 315 042 260 015
+        264 016 273 007 000 315 020 317
+    254 315 042 074 000 165 371  260 015 315 042 303
+    277 000 174  127 260 150 350 274 377 137 200 074 000 164 022
+        350 034 000 163 357 261 004 322 340 221 350 022 000 010 310 252 353 356
+        260 052 350 237 377 126 133 277 000 174 315 044 303
+    254 074 000 164 015 054 060 162 367 074 012 162 005 054 007 044 017 371  303
+    142 157 157 164 117 123 000
+    117 157 160 163 000
+    003 144 151 162  172 172
+    006 146 157 162 155 141 164  016 173
+    005 145 156 164 145 162  173 173
+    003 144 145 154  156 172
+    003 166 145 162  043 172
+    000
+    053 172  131 173  135 173  235 172  261 172  325 172 
+    117 117 117 117 117 117  125 252
+
+Some commentary
+---------------
+
+It would be remiss not to mention that Toledo has written and
+self-published [a book about this kind of
+programming](http://www.lulu.com/shop/oscar-toledo-gutierrez/programming-boot-sector-games/paperback/product-24188564.html).
+
+    061 300  216 330  216 300  216 320  274 000 167
+
+This is xor ax, ax; mov ds, ax; mov es, ax; mov ss, ax; mov 167 000,
+sp.  Presumably this means the BIOS doesn’t reliably set the segment
+registers or stack pointer to sensible values, and that it loads the
+boot sector with a CS of 0.  Also presumably there should be a cli/sti
+pair protecting the last couple of instructions.
+
+    374  276 000 174  277 000 172  271 000 002  363 244
+
+This is memcpy (rep movsb, 363 244) of 002 000 bytes (in cx, register
+1) from 174 000 (in si, register 6) to 172 000 (in di, register 2)
+with ascending addresses (374, cld); this copies bootOS itself, as
+explained in the comments in the source.  BIOS loads programs at
+174 000 (0x7c00) and perhaps bootOS wants to load programs in the same
+place so that if a program is written to run as a boot sector it will
+still run under bootOS.
+
+After this point, everything can assume bootOS is in place at 172 000.
+
+    276 354 173  277 200 000  261 006  245  253  342 374
+
+This loop sets up the interrupt vectors, each of which is 4 bytes, IP
+then CS, starting at address 000 200.  bootOS uses a separate
+interrupt vector for each system call, unlike MS-DOS and the BIOS;
+MS-DOS does provide a deprecated int 0x20 (040) to exit a program, and
+bootOS uses this same number for its own warm-boot system call.
+(bootOS programs exit by warm-booting, like CP/M programs.)
+
+This loads register 6 (SI) with the address of the six interrupt
+vectors toward the end of the boot sector, at 173 354, then register 7
+(DI) with the interrupt vectors, and CL with the number 6.  (We’re
+justified in assuming CH is 0 because we just got here from the rep
+movsb above.)  Then 245 (movsw) copies 16 bits from [SI] to [DI],
+incrementing both pointers, and 253 (stosw) stores 16 bits from AX,
+which is still 0 from the 061 300 instruction at the beginning of the
+program, so all the CS fields of the interrupt vectors will be 0, as
+it should be.
+
+    276 274 173  350 106 001  315 040
+
+This is actually the code for the “ver” command; it’s placed here so
+that, now that we’re done with the 35 bytes of system initialization
+code that set up the interrupt vectors, we display the version banner
+before displaying the prompt (by warm-booting with 315 040, int 0x20).
+173 274 is the address of the ASCIZ string “bootOS” below (142 157 157
+164 117 123 000), and 001 106 is a PC-relative call offset to the
+`output_string` routine below (254 315 042 074 000 165 371 260 015 315
+042 303).
+
+    374  016 016 016  037 007 027  274 000 167
+
+That’s the warm-boot code, invoked by 315 040 — it runs CLD (374) and
+copies CS (loaded from the interrupt vector if necessary) into DS, ES,
+and SS via the stack, and then resets the stack pointer.  This seems a
+little hazardous to me — if you suspect SS or SP may be pointing
+somewhere random, I’d think you wouldn’t want to write to the stack.
+Also I’d think you’d want to have interrupts disabled.
+
+Interestingly, this sequence is two bytes shorter than the cold-boot
+sequence that does the same thing using AX, but that sequence also
+clears AX.  At this point AX may have crap in it, which has
+consequences for the loop over built-in commands below.
+
+Even though it’s usually invoked by an interrupt instruction, it never
+returns from the interrupt, and since it forgets where the stack
+pointer was pointing, it can’t.
+
+    260 044  350 006 001
+
+This sets AL to 044 ‘$’ and calls `input_line` with a PC-relative
+call.  So now we are well and truly into command-line handling.
+
+    200 074 000  164 354
+
+This is a special case for empty commands so you can hit Enter at the
+prompt and not get an error message or run a file whose name is the
+empty string; it’s checking to see if the first byte in the buffer
+pointed to by SI is a NUL.
+
+    277 310 173
+
+This sets register 7 (DI) to 173 310, where there's a list of built-in
+commands, each followed by its address.
+
+    212 005 107 045 377 000 164 021  221 126 363 246 165 004  377 025 353 327
+        001 317 107 107 136  353 347
+
+This is a loop over the built-in command names.  We have DI pointing
+to a length-prefixed command name and SI pointing to the
+(non-length-prefixed!) command line.  First we load AL (low register
+5?) indexing 0 with DI, then increment DI (107: register 7).  To see
+if the length byte was 0, we use 045 377 000, ANDing AX (register 5)
+with 000 377, which would seem like a strange way to write `test al,
+al`, but remember that AH may still have crap in it, and shortly we
+are going to use all of AX as the count for a `rep` prefix.  In the
+case that the length byte was 0, indicating we’ve come to the end of
+the command list, we jump 021 bytes (164 021) and out of the loop, to
+the next code following; but if not, we 221 (`xchg ax, cx`), save SI
+with 126 (`push si`) and use `rep cmpsb` (363
+246) to compare the command name.  (The comparison uses ascending
+addresses because we ran `cld` at the top of the warm-boot code, and
+nothing clears it.)
+
+If the command name didn’t match (and note that this is a prefix
+match!) we jump 4 bytes to the second line of the loop above with
+165 004.  But if it did, it does an indirect call via DI (377 025)
+which has now been incremented off the end of the command name, and
+then does an unconditional jump up to the warm-boot code above.
+
+On the second line of the loop, DI is pointing somewhere into the
+middle of the command name, where we found a mismatch.  To correct
+this, we add the leftover counts in CX to it with 001 317 (`add di,
+cx`, CX being register 1 and DI being register 7), increment DI twice
+(107 107) to step over the command handler address, 136 (`pop si`,
+register 6) to recover from the earlier 126, and jump 031 (=25) bytes
+backwards to the beginning of the loop to try another command.
+
+You’d think that maybe switching the roles of SI and DI would make
+sense here, since the beginning of the loop is basically `lodsb` but
+with DI, but it might not save you enough to be worth the swizzling.
+
+    211 363  277 000 174  315 043  162 002  377 343
+
+So now that we’ve exhausted the possibilities of built-in commands,
+let’s try to load a file to handle the user’s command.  We have an
+ASCIZ string at SI, which we transfer to BX (211 363), then load a
+buffer address (174 000, the boot sector loading address) into DI, and
+then invoke the load-file interrupt (315 043).  This routine indicates
+errors by setting the carry flag, so if that’s set, we jump forward
+two bytes (162 002) to the next line; otherwise, we do an indirect
+jump through BX (377 343).
+
+Although this has the same opcode byte 377 as the indirect call above,
+it really is a jump and not a call; nothing is left on the stack.  So
+the newly launched program must return control to bootOS via the
+warm-boot interrupt or not at all.
+
+    276 303 173  350 003 001  315 040
+
+This puts 173 303, the address of ASCIZ “Oops”, into SI, then calls
+the `output_string` routine with a PC-relative call; then it
+warm-boots.
+
+And that’s the whole CLI loop: 67 bytes, including the warm-boot code.
+Everything that follows are subroutines.
+
+    211 363 254 074 040 164 371 315 045 162 355 303
+    350 240 000 211 337  200 075 000 164 005 211 376 350 346 000
+        350 156 000 165 361 303
+    126 061 311  254 101 074 000 165 372  136 277 000 170 303
+    127 006 350 100 000 264 002  007 133 162 003 350 204 000
+        211 345 320 126 004 317
+    127 006 123 315 045 133 350 325 377
+        046 200 075 000 164 007 350 067 000 165 365 353 335
+        127 363 244 350 132 000 137 350 062 000 264 003 353 317
+    350 012 000 162 321 271 020 000 350 103 000 353 311
+    123 350 067 000 136 350 245 377  126 127 121 363 246 131 137 136 164 017
+        350 003 000 165 361 303
+    203 307 020 201 377 000 172 371 303
+    215 205 020 210 261 004 323 340 100 221 303
+    277 000 170 271 000 002 350 014 000 273 000 172 111 353 022
+    016 007 264 002 353 006
+    260 000 363 252  264 003  273 000 170 271 002 000
+        120 123 121 006 260 001 061 322 315 023 007 131 133 130 162 360 303
+    315 042 276 200 167 211 367  074 010 165 002 117 117
+        315 041 074 015 165 002 260 000  252 165 357 303
+    264 000 315 026  074 015 165 006  260 012 315 042 260 015
+        264 016 273 007 000 315 020 317
+    254 315 042 074 000 165 371  260 015 315 042 303
+    277 000 174  127 260 150 350 274 377 137 200 074 000 164 022
+        350 034 000 163 357 261 004 322 340 221 350 022 000 010 310 252 353 356
+        260 052 350 237 377 126 133 277 000 174 315 044 303
+    254 074 000 164 015 054 060 162 367 074 012 162 005 054 007 044 017 371  303
+    142 157 157 164 117 123 000
+    117 157 160 163 000
+    003 144 151 162  172 172
+    006 146 157 162 155 141 164  016 173
+    005 145 156 164 145 162  173 173
+    003 144 145 154  156 172
+    003 166 145 162  043 172
+    000
+    053 172  131 173  135 173  235 172  261 172  325 172 
+    117 117 117 117 117 117  125 252
