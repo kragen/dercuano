@@ -98,7 +98,8 @@ Here’s `od -b os.img`:
     0000740 144 145 154 156 172 003 166 145 162 043 172 000 053 172 131 173
     0000760 135 173 235 172 261 172 325 172 117 117 117 117 117 117 125 252
 
-Here’s a version formatted for readability:
+Here’s a version formatted for readability, insofar as that is
+possible for an octal dump of machine code:
 
     061 300 216 330 216 300 216 320 274 000 167
     374 276 000 174 277 000 172 271 000 002 363 244
@@ -158,6 +159,8 @@ It would be remiss not to mention that Toledo has written and
 self-published [a book about this kind of
 programming](http://www.lulu.com/shop/oscar-toledo-gutierrez/programming-boot-sector-games/paperback/product-24188564.html).
 
+### Cold-boot code ###
+
     061 300  216 330  216 300  216 320  274 000 167
 
 This is xor ax, ax; mov ds, ax; mov es, ax; mov ss, ax; mov 167 000,
@@ -197,6 +200,8 @@ which is still 0 from the 061 300 instruction at the beginning of the
 program, so all the CS fields of the interrupt vectors will be 0, as
 it should be.
 
+#### ver command ####
+
     276 274 173  350 106 001  315 040
 
 This is actually the code for the “ver” command; it’s placed here so
@@ -207,6 +212,8 @@ before displaying the prompt (by warm-booting with 315 040, int 0x20).
 164 117 123 000), and 001 106 is a PC-relative call offset to the
 `output_string` routine below (254 315 042 074 000 165 371 260 015 315
 042 303).
+
+### CLI ###
 
     374  016 016 016  037 007 027  274 000 167
 
@@ -276,6 +283,10 @@ cx`, CX being register 1 and DI being register 7), increment DI twice
 register 6) to recover from the earlier 126, and jump 031 (=25) bytes
 backwards to the beginning of the loop to try another command.
 
+Note that if we do invoke a built-in command due to this prefix match,
+we do so without restoring SI — so SI points to the text after the
+command, so it can take arguments.
+
 You’d think that maybe switching the roles of SI and DI would make
 sense here, since the beginning of the loop is basically `lodsb` but
 with DI, but it might not save you enough to be worth the swizzling.
@@ -303,42 +314,128 @@ the `output_string` routine with a PC-relative call; then it
 warm-boots.
 
 And that’s the whole CLI loop: 67 bytes, including the warm-boot code.
-Everything that follows are subroutines.
+Everything that follows is subroutines and data; the bulk of it is the
+filesystem.
 
-    211 363 254 074 040 164 371 315 045 162 355 303
+### Commands, system calls, and the filesystem ###
+
+These layers are kind of mixed together, which is probably somewhat
+unavoidable within the 512-byte limit; some orderings can allow you to
+use short jumps, too.
+
+#### del ####
+
+    211 363  254  074 040  164 371  315 045  162 355  303
+
+That’s the “del” command; it just invokes the deletion interrupt
+routine.
+
+#### dir ####
+
     350 240 000 211 337  200 075 000 164 005 211 376 350 346 000
         350 156 000 165 361 303
+
+#### opendir (filesystem routine) ####
+
     126 061 311  254 101 074 000 165 372  136 277 000 170 303
+
+#### `load_file` ####
+
     127 006 350 100 000 264 002  007 133 162 003 350 204 000
         211 345 320 126 004 317
+
+#### `save_file` ####
+
     127 006 123 315 045 133 350 325 377
         046 200 075 000 164 007 350 067 000 165 365 353 335
         127 363 244 350 132 000 137 350 062 000 264 003 353 317
+
+#### `delete_file` ####
+
     350 012 000 162 321 271 020 000 350 103 000 353 311
+
+#### `find_file` ####
+
     123 350 067 000 136 350 245 377  126 127 121 363 246 131 137 136 164 017
         350 003 000 165 361 303
+
+#### `next_entry` ####
+
     203 307 020 201 377 000 172 371 303
+
+#### `get_location` ####
+
     215 205 020 210 261 004 323 340 100 221 303
+
+#### format ####
+
     277 000 170 271 000 002 350 014 000 273 000 172 111 353 022
+
+This has a short jump at the end of it (a tail call, say) that would
+have had to be long if it had been more than 128 bytes from the target.
+
+#### `read_dir` ####
+
     016 007 264 002 353 006
+
+#### `write_zero_dir`/`write_dir`/`disk_dir`/`disk` ####
+
+These four entry points are connected by fallthrough to save space.
+
     260 000 363 252  264 003  273 000 170 271 002 000
         120 123 121 006 260 001 061 322 315 023 007 131 133 130 162 360 303
+
+#### `input_line` ####
+
     315 042 276 200 167 211 367  074 010 165 002 117 117
         315 041 074 015 165 002 260 000  252 165 357 303
+
+#### `input_key`/`output_char` ####
+
     264 000 315 026  074 015 165 006  260 012 315 042 260 015
         264 016 273 007 000 315 020 317
+
+#### `output_string` ####
+
     254 315 042 074 000 165 371  260 015 315 042 303
+
+#### enter ####
+
+This is the hex editor.  For some reason I don’t seem to be getting it
+to work in QEMU; I don't know if I’m using it wrong and it’s not
+giving me an error message, if it’s buggy, or if QEMU is buggy.
+
     277 000 174  127 260 150 350 274 377 137 200 074 000 164 022
         350 034 000 163 357 261 004 322 340 221 350 022 000 010 310 252 353 356
         260 052 350 237 377 126 133 277 000 174 315 044 303
+
+#### xdigit ####
+
+This function is partly necessitated by the choice of hexadecimal, but
+it also skips spaces:
+
     254 074 000 164 015 054 060 162 367 074 012 162 005 054 007 044 017 371  303
+
+### Data tables and the trailer ###
+
+A couple of ASCIZ strings, “BootOS” and “Oops”:
+
     142 157 157 164 117 123 000
     117 157 160 163 000
+
+Then the table of built-in commands and their absolute addresses:
+
     003 144 151 162  172 172
     006 146 157 162 155 141 164  016 173
     005 145 156 164 145 162  173 173
     003 144 145 154  156 172
     003 166 145 162  043 172
     000
+
+Finally, the table of interrupt vectors:
+
     053 172  131 173  135 173  235 172  261 172  325 172 
+
+Then filler and the boot-sector signature 125 252:
+
     117 117 117 117 117 117  125 252
