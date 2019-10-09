@@ -163,17 +163,17 @@ programming](http://www.lulu.com/shop/oscar-toledo-gutierrez/programming-boot-se
 
     061 300  216 330  216 300  216 320  274 000 167
 
-This is xor ax, ax; mov ds, ax; mov es, ax; mov ss, ax; mov 167 000,
-sp.  Presumably this means the BIOS doesn’t reliably set the segment
+This is `ax ^= ax; ds ← ax; es ← ax; ss ← ax; sp ←
+167 000`.  Presumably this means the BIOS doesn’t reliably set the segment
 registers or stack pointer to sensible values, and that it loads the
 boot sector with a CS of 0.  Also presumably there should be a cli/sti
 pair protecting the last couple of instructions.
 
     374  276 000 174  277 000 172  271 000 002  363 244
 
-This is memcpy (rep movsb, 363 244) of 002 000 bytes (in cx, register
+This is memcpy (`rep movsb` — 363 244) of 002 000 bytes (in cx, register
 1) from 174 000 (in si, register 6) to 172 000 (in di, register 2)
-with ascending addresses (374, cld); this copies bootOS itself, as
+with ascending addresses (374, `cld`); this copies bootOS itself, as
 explained in the comments in the source.  BIOS loads programs at
 174 000 (0x7c00) and perhaps bootOS wants to load programs in the same
 place so that if a program is written to run as a boot sector it will
@@ -198,7 +198,7 @@ movsb above.)  Then 245 (movsw) copies 16 bits from [SI] to [DI],
 incrementing both pointers, and 253 (stosw) stores 16 bits from AX,
 which is still 0 from the 061 300 instruction at the beginning of the
 program, so all the CS fields of the interrupt vectors will be 0, as
-it should be.
+they should be.
 
 #### `ver` command ####
 
@@ -329,21 +329,90 @@ and just use fallthrough.
     211 363  254  074 040  164 371  315 045  162 355  303
 
 That’s the “del” command; it just invokes the deletion interrupt
-routine.
+routine.  It starts out with 211 363 `bx ← si`, which is presumably
+because the `delete_file` call takes its argument in BX, not SI.
+
+Then it has a five-byte loop 254 `lodsb` 074 040 `al == ' '` 164 371
+`jz $-7` which skips over spaces, overwriting BX again if necessary.
+This arrangement was somewhat puzzling to me at first, since you’d
+think it would make just as much sense to set BX once, outside the
+loop, once we really knew what we wanted to set it to (the position
+after we’ve skipped over the spaces).  This doesn’t really matter for
+efficiency, but it puzzled me that it was done in this non-obvious
+way.  Eventually I realized that this repeat-until loop topology
+leaves BX with the *unincremented* value of SI.  (This of course means
+that there would be no advantage to making `delete_file` take its
+argument in SI.)
+
+Once that is achieved, it invokes the `delete_file` system call
+315 045, reports any errors by jumping into the CLI loop’s error
+handler if the carry flag is set 162 355, and then 303 returns.
 
 #### `dir` command ####
 
-    350 240 000 211 337  200 075 000 164 005 211 376 350 346 000
-        350 156 000 165 361 303
+    350 240 000  211 337   200 075 000  164 005  211 376  350 346 000
+        350 156 000  165 361  303
+
+First this calls `read_dir` below with a PC-relative call.  `read_dir`
+overwrites bx with the pointer to the disk sector in memory, and the
+next instruction 211 337 is `di ← bx`.
+
+The rest of the function is a loop followed by 303 `ret`; the main
+body of the loop is 211 376 `si ← di`, 350 346 000 `call
+output_string`, and 350 156 000 `call next_entry`.  `next_entry`
+advances di to the next directory entry and sets the carry flag if
+it’s passed over the whole directory — and, implicitly, the zero flag
+if it has.  165 361 is a jump conditional on the *zero* flag, back to
+the beginning of the loop.  (This suggests that the `stc` instruction
+in `next_entry` could be eliminated by making all of its callers use
+the zero flag instead of the carry flag — unless there’s someplace
+where the *BIOS* disk routine’s use of the carry flag to indicate
+errors is propagated to the caller.)
+
+`next_entry` does not skip empty directory entries, so before the
+loop’s main payload, `dir` does a 200 075 000 `byte[di] == 0` and a
+164 005 to jump past the loop’s main payload to the `next_entry` call
+in that case.
+
+This compact code is enabled by the fact that `output_string` and the
+directory entries both use ASCIZ strings; it would be even more
+compact if `output_string` were to use `di` rather than `si` to point
+to its string.
 
 #### opendir (filesystem routine) ####
 
-    126 061 311  254 101 074 000 165 372  136 277 000 170 303
+    126  061 311   254  101  074 000  165 372   136  277 000 170  303
+
+In the source code this is called `filename_length`, but I thought
+that was somewhat misleading.  It does count the length of the ASCIZ
+filename at SI (in CX), using 254 `lodsb` 101 `cx++` 074 000 `al == 0`
+165 372 `jnz .loop`, rather than using `scasb`, for reasons I don’t
+yet understand; around this it wraps a 126/136 pair to preserve SI
+(register 6).  But it *also* sticks the pointer to the disk sector
+buffer `read_dir` uses into di: `di ← 170 000` before 303 returning,
+presumably because that value in di was useful in more than one
+filesystem routine.
 
 #### `load_file` ####
 
-    127 006 350 100 000 264 002  007 133 162 003 350 204 000
-        211 345 320 126 004 317
+    127  006  350 100 000  264 002
+        007  133  162 003  350 204 000
+        211 345  320 126 004  317
+
+This is an interrupt routine, so it returns with 317 `iret` rather
+than the usual 303.  Moreover, it actually has three separate entry
+points: `save_file` merges with it at the beginning of the second line
+(`shared_file`), while `delete_file` merges with it at the beginning
+of the third line (`ret_cf`).
+
+`iret` restores not only CS and PC (uh, “IP”) off the stack, but also
+the flags?  This means that `load_file` and its brethren need to
+mutate the saved flags in order to achieve this with `rcl byte[bp+4],
+1` (320 126 004), having previously pointed bp at the stack with
+211 345 `bp ← sp`.  This presumably has the bizarre effect of
+shifting one byte of the flags register by 1.
+
+XXX
 
 #### `save_file` ####
 
@@ -368,7 +437,7 @@ routine.
 
     215 205 020 210 261 004 323 340 100 221 303
 
-#### format ####
+#### `format` command ####
 
     277 000 170 271 000 002 350 014 000 273 000 172 111 353 022
 
@@ -426,11 +495,11 @@ A couple of ASCIZ strings, “BootOS” and “Oops”:
 
 Then the table of built-in commands and their absolute addresses:
 
-    003 144 151 162  172 172
-    006 146 157 162 155 141 164  016 173
-    005 145 156 164 145 162  173 173
-    003 144 145 154  156 172
-    003 166 145 162  043 172
+    003  144 151 162              172 172
+    006  146 157 162 155 141 164  016 173
+    005  145 156 164 145 162      173 173
+    003  144 145 154              156 172
+    003  166 145 162              043 172
     000
 
 Finally, the table of interrupt vectors:
