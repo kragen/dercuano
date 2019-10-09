@@ -200,7 +200,7 @@ which is still 0 from the 061 300 instruction at the beginning of the
 program, so all the CS fields of the interrupt vectors will be 0, as
 it should be.
 
-#### ver command ####
+#### `ver` command ####
 
     276 274 173  350 106 001  315 040
 
@@ -321,16 +321,17 @@ filesystem.
 
 These layers are kind of mixed together, which is probably somewhat
 unavoidable within the 512-byte limit; some orderings can allow you to
-use short jumps, too.
+use short jumps, too, or (as with the `ver` command above) omit jumps
+and just use fallthrough.
 
-#### del ####
+#### `del` command ####
 
     211 363  254  074 040  164 371  315 045  162 355  303
 
 That’s the “del” command; it just invokes the deletion interrupt
 routine.
 
-#### dir ####
+#### `dir` command ####
 
     350 240 000 211 337  200 075 000 164 005 211 376 350 346 000
         350 156 000 165 361 303
@@ -399,7 +400,7 @@ These four entry points are connected by fallthrough to save space.
 
     254 315 042 074 000 165 371  260 015 315 042 303
 
-#### enter ####
+#### `enter` command ####
 
 This is the hex editor.  For some reason I don’t seem to be getting it
 to work in QEMU; I don't know if I’m using it wrong and it’s not
