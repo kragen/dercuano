@@ -6,6 +6,9 @@ clearly seen with the naked eye.  Actually this is so absurdly good on
 paper that surely someone has tried it and the scheme has some hidden
 fatal flaw I’m not seeing.  Details follow.
 
+MEMS electrostatic relays
+-------------------------
+
 I was reading about electrostatic relays the other day.  MEMS relays
 are made using nanophotolithography techniques, just like CMOS, but
 have significantly different performance characteristics; they turn on
@@ -29,6 +32,9 @@ Other solutions are possible, involving things like leverage to allow
 a smaller electrostatic force to outwrestle a larger one, but just
 using larger and smaller plate areas is simple enough.
 
+Macroscopic paper foil electrostatic relays
+-------------------------------------------
+
 It occurred to me that you could build such devices macroscopically,
 or mesoscopically (with, say, a characteristic dimension of 100μm to
 1mm rather than 10mm or 1μm) out of paper and foil.  The most obvious
@@ -49,7 +55,7 @@ But this is speculative.
 
 Spring materials might be trickier.  Paper might work okay at least
 for prototypes, but ideally you’d like something that doesn’t creep or
-fatigue over time.
+fatigue over time, such as glass foil or foils of other metal oxides.
 
 A 3mm×3mm paper foil relay might consist of a 100μm-thick square of
 aluminum foil on the gate side (this is conservative; common household
@@ -72,9 +78,9 @@ quiet zones around it:
     EE EE EE EE EE
 
 Here the different pixels have stacked-up contents as follows when the
-contacts are open, with "G" being the gate electrode, "." being air,
-"I" being insulating paper, "C" being the contact material, "N" being
-the channel conductor (for example, copper), and "S" being the
+contacts are open, with “G” being the gate electrode, “.” being air,
+“I” being insulating paper, “C” being the contact material, “N” being
+the channel conductor (for example, copper), and “S” being the
 substrate electrode, which can be aluminum or copper or whatever.
 
     AA:   BB:   CC:   DD:   EE:
@@ -143,6 +149,30 @@ Actually reaching such high frequencies might require you to
 extensively perforate the paper (without bridging the contacts on the
 two sides) or operate the whole device in a vacuum to avoid air
 resistance.
+
+### Dynamic deformation ###
+
+Andrea Shepard points out that at high frequencies the paper will not
+behave as a rigid or quasi-rigid object; applying a force to one part
+of the paper will cause displacement to ripple out from that place as
+shear waves at a speed of sound in the paper, on the order of 1 km/s,
+which is to say 1 mm/μs.  This would cause great slowness if the gate
+electrode did not overlap the “channel” and “contact” material, as it
+does in the above design sketch.  Even in the above sketch, there is a
+distance of some 100 μm between them, and the compressive deformation
+will take on the order of 100 ns to propagate through it and 1 μs to
+approximate the behavior of a rigid object again.  I hazard a guess
+that this will not be the limiting factor in the performance of these
+hypothetical devices.
+
+The perfectly overlapping electrodes are somewhat questionable,
+though, for a different reason: electric fields can’t normally
+penetrate conductive masses such as the channel and contact material,
+because statically speaking the field induces a surface charge
+sufficient to cancel it.  (This also creates a MOSFET-like “charge
+injection” problem.)  So there might be no net force from the
+overlapping part of the gate, and the shear waves described above
+might carry almost all of the opening or closing force.
 
 ### Scaling laws ###
 
