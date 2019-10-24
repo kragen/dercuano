@@ -1,5 +1,5 @@
-I read the 2007 "[$1 recognizer]" paper the other day.  It describes a
-simple "unistroke recognizer" you can implement in 100 lines of code
+I read the 2007 “[$1 recognizer]” paper the other day.  It describes a
+simple “unistroke recognizer” you can implement in 100 lines of code
 or so to experiment with pen-based gestures, like PalmPilot Graffiti;
 they report on a user study on an Itsy (or rather an iPAQ) where it
 compared reasonably well to a couple of other stroke recognition
@@ -17,7 +17,7 @@ The $1 recognizer algorithm
 
 For the $1 recognizer, a pen gesture consists of a sequence of (x, y)
 points; its task is to match this sequence against a collection of
-"template" gestures and provide a list of gestures that match most
+“template” gestures and provide a list of gestures that match most
 closely.
 
 The first point in the sequence is where the pen first touched the
@@ -30,8 +30,8 @@ when the sampling clock fired.
 So, the first thing the algorithm does is resample the curve to a
 uniform point spacing, using a fixed, predetermined number of points
 that is the same for every gesture.  They found that numbers in the
-range 64-256 worked best.  The resampling algorithm they used is
-fairly naive, just linearly interpolating between points.  This step
+range 64–256 worked best.  The resampling algorithm they used is
+fairly naïve, just linearly interpolating between points.  This step
 normalizes the drawing speed and the relative phase of the sampling
 clock and the drawing operations, so that exactly the same curve
 traced at different speeds will result in very nearly the same set of
@@ -42,24 +42,24 @@ scale, and aspect ratio of their pen gestures, so the next steps in
 the algorithm are to try to normalize out these features.  The points
 are rotated around their centroid so that the gesture starting point
 is at 0 degrees.  The X and Y coordinates are then given independent
-affine transforms to fit them into a predefined 1x1 bounding box, thus
+affine transforms to fit them into a predefined 1×1 bounding box, thus
 eliminating variations of position, scale, and aspect ratio.  Finally,
 this normalized sequence of points is compared against each
 (normalized) template by calculating the average Euclidean distance
-between corresponding points --- not once, but with a series of
+between corresponding points — not once, but with a series of
 different candidate rotations using golden-section search, based on
 their observation that the rotation-distance function had no local
 minima on correct matches.
 
 Remarkably, they reported 99% accuracy on a vocabulary of 16 unistroke
 symbols in their tests, varying very little with stroke speed; the
-fastest strokes were around half a second, so this amounts to around 8
-bits per second of input bandwidth.
+fastest strokes were around half a second, so this amounts to around
+8 bits per second of input bandwidth.
 
 The nature of diagrams
 ----------------------
 
-Diagrams have a few freehand lines, but are mostly symbolic --- aside
+Diagrams have a few freehand lines, but are mostly symbolic — aside
 from textual labels, they mostly consist of many repetitions of a
 relatively small number of different symbols, at different positions,
 orientations, and sometimes scales or aspect ratios.  So bubble charts
@@ -72,7 +72,7 @@ Other variations between different instances of the same symbol are
 usually random and need not be stored.
 
 Also, diagrams commonly contain significant topology, quite aside from
-their possibly significant geometry, and often it’s helpful to "snap"
+their possibly significant geometry, and often it’s helpful to “snap”
 certain connection points together, and if a symbol is later moved, to
 update connected symbols so that they remain connected.
 
@@ -113,7 +113,7 @@ and so on.
 
 If you were to write text in such an interface, it would ideally
 discover the relatively small number of letters you were using and
-represent your "diagram" as a list of letters and their positions.
+represent your “diagram” as a list of letters and their positions.
 
 Aside from the above fuzzy spectrum between defining symbols and
 freehand drawing, you’d probably want the usual kinds of drawing
@@ -236,7 +236,7 @@ chop!) and also makes rather strong assumptions about the input.
 
 (An alternative way to match against a template that is insensitive to
 translation, scaling, and rotation, though not aspect ratio, would be
-least-squares linear regression in ℂ, the complex-number field.  I've
+least-squares linear regression in ℂ, the complex-number field.  I’ve
 never done linear regression in ℂ, but I think it’s a straightforward
 extension of linear regression in ℝ.)
 
@@ -277,10 +277,10 @@ to take 640,000 Euclidean-distance computations.
 The above hacks
 don’t help much with indexing, but perhaps absurdly-downsampled
 versions of the gesture and templates could be used to get a linear
-speedup on to searching a large index of candidate glyphs --- like 4
+speedup on to searching a large index of candidate glyphs — like 4
 or 8 points.  Some kind of interval-arithmetic categorization or
-something is needed if you’re going to get a superlinear speedup ---
-some way to put a lower bound on the best distance to any template in
+something is needed if you’re going to get a superlinear speedup — some
+way to put a lower bound on the best distance to any template in
 a given group, so that you can avoid iterating over the templates in
 the group.
 
