@@ -1,0 +1,266 @@
+I recently watched a YouTube video by “GreatScott!” demonstrating a
+bistable magnetic electromechanical 7-segment display; each segment is
+a slot through which a moving part is visible, one part of which is
+white, while another part is black.  There are 7 electromagnets on the
+back of the display; by passing a pulse of current through them in one
+direction or the other, a permanent magnet attached to this moving
+part is given a kick big enough to swivel the part and change the
+color of the segment.  The permanent magnet has two stable positions
+in which it is attracted to a ferromagnetic core, so the display
+remains stable without applied power.
+
+The display is multiplexed with a per-digit common ground, so that,
+for example, an 8-digit display with 56 segments requires only 15
+wires — but 7 of them need to be bipolarity.
+
+Digital electromechanical decoding
+----------------------------------
+
+It occurred to me that in some sense this was excessive; 7 bipolarity
+signals (with distinct +, -, and 0 states) can encode 3⁷ = 2187
+commands rather than the 14 needed to switch 7 segments or even the
+112 needed to switch 56 segments.  7 *unipolarity* signals are enough
+to encode 128 commands, enough to switch 64 segments on or off.
+Moreover it should be feasible to route the magnetic flux in such a
+way that the decoding is done passively, by the magnets.
+
+The crucial tricks are:
+
+- You can route magnetic flux to an area by providing a low-reluctance
+  path from a coil to that area; for example, a sheet of electrical
+  steel, or more prosaically, a mild steel wire.  (At kHz and higher
+  frequencies, ferrites might be useful.)
+
+- You can sum flux from different coils by terminating low-reluctance
+  paths in the same area, but with enough of an air gap between them
+  that there isn’t a low-reluctance path between the different coils.
+  It’s sufficient that the flux they produce impinge on a magnet or
+  magnets attached to the same movable part.
+
+- You can route magnetic flux from either end of a coil, so you can
+  get both subtraction and addition.
+
+- By including fixed permanent magnets in the mix, you can include a
+  constant term in these sums.
+
+This allows you to set the flux in a given area to an arbitrary affine
+function of the currents in the different coils.  Consider an area you
+want a movable permanent magnet to be attracted to only when the code
+0001101 is present on the coil control wires.  You route the positive
+ends of coils 0, 2, and 3 to that area, and the negative ends of coils
+1, 4, 5, and 6, and include a fixed permanent magnet powerful enough
+to counteract the flux from just over 2 coils, but not more.
+
+In this area, if coils 0 and 2 only are energized, they are not
+sufficient to overcome the fixed permanent magnet, and the movable
+magnet continues to be repelled from the area.  If coil 1 is
+additionally energized, it partially cancels the flux from coils 0 and
+2, repelling the movable magnet even more strongly.  Now if coil 3 is
+energized, we have 0, 2, and 3 fighting against 1 and the permanent
+magnet, not quite enough to overcome it; but if coil 1 is then
+de-energized, the balance flips, and the area becomes attractive
+rather than repulsive.
+
+In practice this probably means that one such “balance point” is
+needed for each pixel — a position which can be made a stable
+equilibrium with the right combination of energized coils, but becomes
+an unstable equilibrium when power is removed — and once the movable
+part has been brought to this balance point, one of two additional
+coils is energized to tip the equilibrium in one direction or the
+other, while the other coils are de-energized.
+
+(Slightly tweaking this, instead of using two additional coils, you
+could use one additional coil and a permanent magnet; this means that
+the balance point is not quite an unstable equilibrium when power is
+removed.)
+
+So, simply by choosing the polarities with which each coil is coupled
+to each pixel, we can make a unique combination of coil activations
+the strongest for that pixel, then provide a permanent magnet strong
+enough to cancel any combination other than that one.  In essence this
+is an electromechanical McCulloch–Pitts neuron.
+
+Stable, high-coercivity rare-earth or even ferrite permanent magnets
+will work much better for this than unstable alnico magnets, because
+one of the magnets needs to have a strength that stably discriminates
+between the case where, say, 6 coils are activated in concert, and the
+case where 7 are.
+
+A trick not needed: by using different thicknesses of ferromagnetic
+material, you can get different amounts of flux from the same amount
+of electrical current.  This allows you to compute weighted sums and
+differences.  However, though this trick is not needed, it is an
+alternative to using varying strengths of fixed permanent magnets in
+the different cells; it would allow them all to be the same strength.
+
+PWM electromechanical decoding
+------------------------------
+
+A hard disk drive’s head is positioned with a voice-coil actuator by
+running a precisely controlled current through a “voice coil”,
+producing a precisely controlled magnetic field which moves the head
+to a precisely controlled position within a few milliseconds.  Dynamic
+speakers work on the same principle, moving the speaker cone to what
+is in principle a precisely controlled position by producing a
+precisely controlled magnetic field with a precisely controlled ac
+voltage.  Class-D audio amplifiers generate that voltage by,
+essentially, reactively low-pass filtering a PWM signal.
+
+A very simple way of decoding PWM would put a floating magnetic
+compass globe, like those people used to have on their car dashboards
+in the 1980s, in an enclosure with a small transparent window through
+which a single digit could be seen, out of ten printed on the globe in
+different positions; a permanent magnet would align the globe to
+display “0” in its equilibrium position, and a coil producing a field
+at perhaps 120° from that of the permanent magnet could swivel the
+globe to any desired position 1–9 by applying an appropriate strength
+of field.  A second coil producing a vertical magnetic field could
+provide a magnetic dip to counteract the globe’s tendency to return to
+a default horizontal position; this could be used, for example, to
+select from a larger repertoire of characters, or to engage mechanical
+interlocks that kept the globe from turning when power was removed.
+
+(For some reason, the traditional way of doing this, the galvanometer,
+uses a mechanical hairspring rather than a permanent magnet to return
+the needle to its zero position when power is removed.)
+
+If you have some array of magnetically-responsive pixels — for
+example, Dapper-Dan-style magnetic whiskers in tiny mostly-transparent
+plastic boxes, parts of which are opaque white — you can use a similar
+approach to scan a needle in a four-bar linkage involving two
+galvanometers back and forth over this array of pixels, activating a
+magnetic field at its tip to change the color of a pixel when
+appropriate.  I think we can expect this to be slow and scale down
+poorly, but it would work.
+
+Tiny permanent magnets behind white paper, or better still boundaries
+between magnetic poles behind white paper, could potentially make the
+pixels bistable in the absence of friction — the black filings would
+remain stably stuck to them in the absence of any applied magnetic
+field, even in the face of slight vibrations, but could be persuaded
+to leap to a different attractive spot by a temporary cancellation of
+the magnetic field with the needle tip.
+
+An advantage of using magnetic-pole boundaries is that the field
+projected from the magnetic tip wouldn’t have to be perfectly
+calibrated — any amplitude large enough to temporarily more than
+cancel one of the poles would cause all the pole boundaries around
+that pole to temporarily disappear, encouraging the filings to migrate
+to a different still-existing boundary between poles.  By alternating
+the field a number of times, filings in the area could perhaps be
+vibrated loose from any frictional moorings that prevent them from
+vacating the area.
+
+Even without any PWM signals, scanning one or more needle tips over a
+two-dimensional area could be effected by purely mechanical means, for
+example in a VCR-like helical pattern, or a Spirograph-like family of
+circles of the same radius rotated around a center, or a Lissajous
+pattern created by two elastic resonant modes of different
+frequencies.  Then, a persistent image could be produced simply from a
+time-varying magnetic field at the needle tip.
+
+Non-magnetic equivalents using electrets
+----------------------------------------
+
+Suppose that instead of magnetic fields we use electric fields, and
+instead of permanent magnets we use electrets, which have the
+potential advantage of being monopole-capable.  (As far as we know,
+magnetism is not monopole-capable, but all the electrical particles we
+know of are electrical “monopoles”, and so too are chunks of charged
+electret.)  As described in file `paper-foil-relays`, this should
+scale down rather well.  This is more or less how e-ink displays work,
+but without the in-display decoding.
+
+To be concrete about one possible realization, suppose we have some
+negatively-charged black electret particles suspended in oil in a tiny
+linear capsule; one end of the capsule is transparent, while the other
+end is opaque.  We have some more negatively-charged electret embedded
+in the wall of the capsule near its center, slightly toward the opaque
+end, so the particles tend to drift toward the ends of the capsule
+when no voltage is applied, and in particular if they start out
+precisely in the center, they will tend to drift toward the
+transparent end, making the capsule look black.  Lines 0, 2, and 3 are
+connected through capacitors to electrodes wrapped around places near
+the center of the capsule, but not overlapping, so that their mutual
+capacitance is low.  Lines 1, 4, and 5 are connected through somewhat
+larger capacitors to electrodes at each end of the capsule, and line 6
+is connected through a capacitor to an electrode on the opaque end of
+the capsule.
+
+If +5V is applied to all of lines 0, 2, and 3, this pushes a certain
+amount of charge through the capacitors onto the electrodes around the
+center of the capsule, calibrated to be sufficient to shift the
+equilibrium such that the suspended electret particles will tend to
+drift from the ends to the center of the capsule.  If only two of
+these lines are energized, this will not push enough charge onto those
+electrodes to cancel the wall-embedded electret.  If all three of them
+are energized, but also one or more of lines 1, 4, and 5, there will
+be a net positive charge in the center of the capsule, but a larger
+net positive charge at the ends, so electret particles will remain at
+whichever end they are.  But if none of these inhibitory lines are
+energized, the particles will move to the center, or rather, into a
+cloud near the center but slightly toward the transparent end.
+
+If lines 0, 2, and 3 are then grounded, the wall-embedded electret
+will repel the cloud back to the transparent end.  But if first line 6
+is brought high, it will move the cloud past the wall-embedded
+electret, and then when lines 0, 2, and 3 are grounded, the cloud will
+migrate to the opaque end instead.
+
+Of course, the same seven lines can control 63 such capsule pixels in
+this way, with lines 0–5 varying between inhibitory and activatory
+roles on different pixels, and line 6 always controlling which way the
+equilibrium falls when the decoding lines are released.  Different
+capsules may require different amounts of wall-embedded electret to
+cancel their varying numbers of activatory lines, or perhaps the
+series capacitances that set the charge could instead be varied.
+
+This is substantially more complex than the current schemes of e-ink
+displays, and it requires fairly high precision of manufacture to
+precisely calibrate the varying amounts of electret in each capsule,
+as well as precision of design to distribute the electrical fields
+properly.
+
+Non-magnetic equivalents using other kinds of actuators
+-------------------------------------------------------
+
+We can easily go rather far afield with these ideas.
+
+A scanning needle tip (whether raster, Spirograph, Lissajous, or
+otherwise controlled) of course can be activated in other ways.  For
+example, mechanical actuation — in machining this is called a
+dot-peening machine and is used for alphanumeric part marking of
+malleable surfaces, and I’ve used a handheld “Vibro-Graver” version of
+the same process to mark my hand tools.  In an electrolyte, voltage on
+a scanning needle tip can produce an image on a surface by selective
+electroplating or electrochemical machining (depending on polarity),
+and in air it can produce a corona discharge, which can selectively
+functionalize passivated surfaces (see file `cold-plasma-oxidation`)
+or produce light.  If scanned over the same surface in an electrolyte
+for a long period of time, it can be used to 3-D print by
+electrodeposition or to cut an almost arbitrary cavity by
+electrochemical machining.  On a few metals, like silver, such
+electrolytic processes can be used to induce a reversible, localized,
+dramatic color change; as mentioned in file
+`tio2-iridescent-printing`, anodizing of titanium can produce quite
+brilliant colors through iridescence, and this can be done selectively
+to produce color images.
+
+Some of the summing-and-differencing approaches discussed above might
+be usable to select individual “pixels” in such processes as an
+alternative to moving a needle around; for example, anodic dissolution
+of a metal workpiece will happen only in areas where there’s a *net*
+current of positively-charged cations from the workpiece to the tool
+pixels, while it’s possible to prevent anodic dissolution of tool
+pixels by making them out of carbon, and electroplating of the tool
+pixels with a suitable electrolyte.  So if all but one of the tool
+pixels have a positive current flowing from them to the workpiece
+because of summing negative and positive currents, it should be
+possible to do selective electrochemical machining at the one pixel
+that is sucking up cations instead.
+
+Relays
+------
+
+Most of the above methods can be adapted to activate electrical
+switches rather than optical pixels.
