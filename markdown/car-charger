@@ -1,0 +1,215 @@
+Examination of a shitty USB car charger
+=======================================
+
+I found a car-cigarette-lighter USB charger on the street with a
+missing contact spring and some broken plastic.  It’s labeled as
+having one 1-amp USB port and one 2.1-amp USB port, although in fact
+these are wired strictly in parallel.  It’s fairly transparently a
+simple buck converter on a single-sided PCB (silkscreened “HT-668”),
+built around a buck-converter through-hole 8-pin chip labeled “LC51”,
+followed by some kind of fraction-like sigil.  There is some residual
+flux from sloppy hand soldering on the bottom of the board.
+
+“LC51” is not a useful marking for finding the correct datasheet on
+search engines; it turns up many datasheets for chips used in this
+application but they all have the wrong pinout.
+
+Circuit netlist and pinout reverse engineering
+----------------------------------------------
+
+C1 is a 22-μF 25-V electrolytic across the nominally-12-volt input,
+with its - terminal on pin 4 of the IC and its + terminal on pin 6.
+L1 is an unmarked ferrite-core inductor across pins 2 and 3, and "D1"
+(with the “1” silkscreened upside down) is what looks like an ⅛-watt
+rectifier (labeled, I think, “N5 MI”) across pin 4 (ground) and pin 2
+(the stripey end of the diode package).  “CS” is a 100-μF 10-V
+electrolytic on the output, which is connected to pins 4 (on its -
+terminal) and pin 3.  There is a blue LED connected across pins 4 and
+5.  Pins 1 and 7 are shorted to pin 6.  The USB connector shield is
+tied to pin 4.
+
+Amusingly, there are no resistors.
+
+So I infer the following pinout for the chip:
+
+- 1: Vin
+- 2: switched Vout
+- 3: feedback sense
+- 4: ground (common between input and output)
+- 5: current-regulated? power LED indicator output
+- 6: Vin
+- 7: Vin
+- 8: no connection
+
+Except for the indicator LED, this is a textbook buck converter
+circuit.  It seems strange to me that there are 3 pins for Vin and
+only 1 pin for Vout, but I guess most of the output current (7/12 at
+nominal 12V input) really flows through the diode and not the chip.
+Still, one would hope that the amount of current flowing to ground
+through the chip’s internal circuitry is at most a few milliamps, not
+hundreds of them, so you’d want the same number of input and output
+pins.
+
+Observed behavior
+-----------------
+
+None of the components have any visible damage, but on connecting it
+to a 12-volt power supply sourcing an amp or two to a LED illumination
+panel connected in parallel, the onboard blue LED lights up, but there
+is no 5-volt output.  None of the components heat up noticeably.
+
+After unplugging, some residual voltage is visible on both capacitors,
+tens to hundreds of mV, so they are not shorted.
+
+The diode reads as a 170-mV voltage drop with this multimeter a friend
+lent me, but I’m not sure how correct that is.  That seems too low to
+be a working diode.  But in the other direction it looks like an open
+circuit, so I suspect the meter.  However, unless I’m reading this
+wrong, the meter is telling me not only that the diode has an
+implausibly low forward voltage drop but also that it is installed
+backwards, i.e., passing current in the +5V-to-ground direction.
+Maybe the diode is blown and the voltage I’m seeing is actually from
+reverse-biasing the output electrolytic, or some kind of input
+protection circuit in the SMPS chip itself?
+
+Design commentary
+-----------------
+
+If we assume that the ⅛-W rectifier diode is a 300-mV Schottky, then
+it can carry an average of 417 mA, which means that the whole board
+can only supply 12/7 of that — 714 mA — without overheating the diode.
+So the “2.1 A” output rating molded into the plastic is probably
+unreasonably optimistic.  There is also nothing connected to the data
+pins (two of them may be shorted together, but this looks like an
+accident) so no smart current negotiation can be going on here, but
+even without current negotiation, you could plug two 500-mA devices in
+at once, which would mildly overheat the diode.
+
+It probably isn’t really okay to use a 25-volt electrolytic on the
+input of this charger, either, because car electrical systems are
+reputed to have inductive spikes that go higher than that.  You’d
+probably be okay if you never left it plugged into the cigarette
+lighter when the car was turning on and off.
+
+So the design seems a bit dubious.
+
+Most of the chips that come up in the “LC51” datasheet search use
+fixed-frequency oscillations in the tens to hundreds of kHz.  Maybe if
+I hook this up to a voltage source I could observe its oscillation
+frequency.
+
+I don’t know the inductance of the inductor, so I don’t know how fast
+its voltage would ramp up and down, but at 1000 mA difference between
+input and output you would drain the output 100-μF capacitor from 5 V
+down to 0 in 500 μs, and from 5 V down to 4.5 V (which I am inferring
+is probably about the limit of the acceptable voltage deviation,
+although I don’t remember from the USB spec) in 50 μs.  So it seems
+like a fair bet that the chip’s designed oscillation frequency is at
+least a few tens of kHz to keep the thing from falling over without a
+larger output cap.
+
+The inductor presumably needs to be able to ramp its current up and
+down between 0 and 1000 mA over a similar time period — otherwise it
+wouldn’t be able to respond fast enough to things being plugged and
+unplugged.  So a sensible inductor size would be in the neighborhood
+of 50–100 μH.  When the chip’s switched output pin is floating, the
+inductor has to maintain some significant fraction of its ≈1000 mA
+against ≈4.7 volts (the 5 volts of the output capacitor minus the
+presumably 300 mV of the rectifier) for ≈50 μs, which would require at
+least 250 μH or so.  When the chip’s switched output pin is high, the
+inductor’s current would have to be able to ramp up from 0 to ≈1000 mA
+when driven by ≈7 V (12 V - 5 V) in ≈50 μs, which would require no
+more than 350 μH.  In practice the frequency is probably considerably
+higher, so the time period is probably more like 5–10 μs, with a
+correspondingly smaller inductance.
+
+(But there’s no guarantee that they did in fact use a sensible
+inductor size.)
+
+If the inductor were 100 μH, the LC time constant √(LC) would be
+100 μs.  I think the resonant frequency is 1/(2π√(LC)) ≈ 1.6 kHz, so
+it is surely much lower than the frequency being used.
+
+Presumably its feedback pin is divided down internally and compared to
+a temperature-compensated internal bandgap reference; this feedback
+(plus rectifier and capacitor leakage currents) is the only
+open-circuit load on the power supply, and so it might be designed to
+be a heavy enough load to maintain regulation when nothing is plugged
+into it.  The chip, though it’s a through-hole DIP, is a super tiny
+through-hole DIP, and although its package seems like ceramic rather
+than epoxy, it’s probably not capable of dissipating more than ¼ W,
+which implies a maximum current of 50 mA into the feedback pin, and
+probably more like 5 mA.
+
+Prospects for hacking
+---------------------
+
+These are probably obvious, and maybe a bit goofy given that the thing
+is apparently broken.
+
+Presumably the duty cycle of the chip’s switched output is variable
+from under 10% to at least 50% (probably 100%), and this is controlled
+by the voltage detected on the feedback pin.  By cutting a trace on
+the board and hooking up the feedback pin to the center tap of a pot
+between the output and ground, it should be straightforward to get a
+more or less regulated, temperature-compensated output from 5 V up to
+at least 50% and probably 95+% of whatever the input voltage is; I’ve
+inferred that the current through the internal feedback divider is
+probably several milliamps in order to satisfy the minimum-load
+requirement of the internal circuitry, so the current through the pot
+would probably need to be tens of milliamps if you want it to be very
+precise.  But that would imply a pot < 1kΩ, which would be hard to
+find.
+
+Lower output voltages would require pulling the feedback output up
+toward some higher voltage.  The simplest approach might be to totally
+fake the feedback — hook up a variable voltage divider across the
+input that lets you generate a voltage somewhere around 5 V to feed to
+the feedback pin, and use an external resistor to fulfill whatever
+minimum-load requirements the switcher has.  That might work, but
+depending on the feedback scheme, it might always rail at Vout = 0 or
+Vout = Vin.  Including some of the real output voltage in the summing
+junction should make it possible to stabilize it in such cases.  Any
+of these schemes depend on a regulated input voltage, since the
+divided input voltage is going to be compared against its internal
+bandgap.
+
+You might be able to get a regulated output current rather than
+voltage by the usual trick of floating the circuit’s ground at a
+distance below its filtered output determined by a current-sensing
+resistor in series with that filtered output.  For example, if you
+want to set the output to 100 mA, you’d use a 50-Ω resistor.  I’m not
+sure the circuit will start up properly in this situation, though, and
+because there’s 5 volts across the resistor, it’s potentially going to
+burn up a lot of power.
+
+Soldering in a bigger diode would probably enable higher output
+powers, although without current negotiation, compliant USB devices
+will not really take advantage of that.  Amplifying the output with a
+large output transistor to get tens of watts of output power might be
+a fun thing to try, too, though at the cost of losing the overcurrent
+protection presumably included in the chip.
+
+If the output frequency is fixed, a resonant LC notch filter or two
+across the output should be able to attenuate the EM noise from the
+switcher by 20 dB or so.
+
+Presumably you should be able to use the chip as a decent class-D
+audio amplifier by adding the audio input signal into its feedback pin
+in order to modulate its output voltage, which, as I said above, needs
+to be able to respond across the whole audible spectrum in order to
+avoid output overvoltage when you unplug USB devices.  It should be
+able to output 5 watts or more of output at efficiencies of around 90%
+into impedances in the usual 4–8 Ω range, but you will need an
+ac-coupling capacitor on the output to avoid a humongous 5-V dc bias
+on the speaker output.
+
+Depending on what the output frequency actually is, and whether it’s
+fixed or variable, you might also be able to use it as a micropower AM
+or FM radio transmitter if you bias the audio input into the right
+range (and add in the appropriate fraction of the filtered output
+voltage, if necessary) on the feedback pin.  Even if the baseband
+output frequency isn’t in the right band, one of its harmonics may be,
+and by finely adjusting the duty cycle you can finely adjust the
+harmonics’ amplitudes.  (See file `processing-halftoning` for some
+notes on this in the spatial domain.)
