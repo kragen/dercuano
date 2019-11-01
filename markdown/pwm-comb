@@ -1,0 +1,62 @@
+A phase-correct PWM signal has a lot of its energy at the fundamental
+PWM frequency and, typically, more at its harmonics --- though *which*
+harmonics depends on the duty cycle it's producing at the moment.  A
+unity-gain feedforward comb filter has nulls at a fundamental
+frequency and its harmonics --- if the gain is negative, then it has a
+null at DC and at all multiples of the fundamental, while if the gain
+is positive, then it has a null at only odd multiples of the
+fundamental (and a gain of 2 at DC).
+
+Typically the PWM harmonics are thought of as undesirable noise on the
+PWM signal.  The good news is that, at a constant PWM output level,
+*all* of the PWM noise is at these harmonics; so, if we could notch
+them out, PWM could perfectly reproduce our desired output voltage or
+current.
+
+There are many ways to do this, but in particular I wanted to explore
+using transmission-line comb filters.  A transmission line leading to
+an open circuit will feed a delayed copy of its input back to that
+input; this is a unity-gain feedforward comb filter.  A 10-meter
+coaxial transmission line with a typical propagation speed of 0.5*c*
+will add a signal delayed by about 130 ns to its input.
+
+(I'm a little bit vague on exactly how this needs to be hooked up in a
+circuit to get the desired effect, in particular for a high-power
+signal where efficiency is important.)
+
+Suppose that your PWM frequency is 7.5 MHz, carefully locked to this
+delay.  Then the transmission-line comb filter will cancel the first,
+third, fifth, seventh, and higher odd harmonics from the PWM signal,
+leaving only the even harmonics.
+
+If this filter can be cascaded with a second similar filter made with
+a 5-meter coaxial transmission line, that will cancel the second,
+sixth, tenth, and higher 2\*odd harmonics from the PWM signal, leaving
+only the harmonics divisible by 4.
+
+A third such filter made of 2.5 meters of such line will cancel the
+remaining harmonics not divisible by 8: 4, 12, 20, 28, and so on.
+
+A fourth such filter made of 1.25 meters will cancel the remaining
+harmonics not divisible by 16: 8, 24, 40, and so on.
+
+At this point the first 15 harmonics of the PWM signal have been
+perfectly reactively canceled; the first unfiltered harmonic is the
+16th, at 120 MHz.
+
+By adding a delayed copy of the PWM signal to itself four times, we
+can make a stairstep approximation of the desired signal, with I think
+any of 3<sup>4</sup> = 243 different voltage levels; there is a small
+remaining amount of quantization noise remaining at 16 and more times
+the PWM carrier frequency.
+
+Ten-meter-long delay lines might sound impractically large, but
+Horowitz & Hill tell us that old oscilloscopes commonly used a
+dual-core coax with two signal lines in a double helix inside the
+outer shield; the signal propagation along the helix was what you
+would normally expect for signal propagation along a normal coaxial
+cable center.  If this helix were 20 mm in diameter and the coiled
+wire were 1 mm wide (including insulation), each 2 mm of delay line
+would provide 31.4 mm of delay, so 10 m of delay would fit into a
+length of only 640 mm.
+
