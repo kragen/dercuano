@@ -1,0 +1,318 @@
+I was thinking about generating shapes via laser-cut geometry, and it
+occurred to me that laser-cut fabric can inexpensively form netting
+with quite flexible 3-D geometry, which can be applied to a variety of
+important applications.
+
+Background: auxetic materials and conformal surface mapping
+-----------------------------------------------------------
+
+I just watched the presentations of “Beyond Developable” from SIGGRAPH
+2016 and “Rapid Deployment of Curved Surfaces via Programmable
+Auxetics” from SIGGRAPH 2018, collectively by Mina Konaković-Luković,
+Julian Panetta, Keenan Crane, Mark Pauly, Sofien Bouaziz, Bailin Deng,
+and Daniel Piker.  (I think this is mostly Mark Pauly’s group at EPFL
+LGG.)
+
+In the 2016 paper, they cut relatively rigid sheets of material into
+an auxetic triangular metamaterial pattern which can linearly stretch
+by up to a factor of 2, but more or less uniformly — that is, if a
+region of it is stretched by a factor of 1.3 along the *x*-axis, it's
+also stretched by about 1.3 along the *y*-axis, along the *x* = *y*
+line, along the *x* = -*y* line, and so on.  The stretch can vary from
+one region of the material to another, but only gradually.  These work
+out to mean that it expands *conformally*, which turns out to mean
+that it can be relatively easily hand-bent into computer-designed
+shapes or adapt to the form of the wearer’s body.
+
+In the 2018 paper, they extend this work in a couple of ways: cutting
+some of the material “pre-expanded”, distorting the triangular mesh to
+vary the properties of the metamaterial, and sometimes replacing the
+cut sheet of material with a bunch of solid triangles linked together,
+with the sizes varied to limit the expansion.  Then they force it to
+expand in different ways: by inflating it with a polyethylene bag or a
+balloon or by allowing it to hang freely from a frame.
+
+Laser-cut netting from fabric
+-----------------------------
+
+Although I haven’t tried, converting fabric to netting by laser
+cutting should be straightforward: you just cut some holes in it.
+This is probably better to do with acrylic†, cotton, or silk fabric
+than nylon or polyester, although [Engadget says] it is also used with
+nylon and polyester.  Cotton cut this way without further treatment
+will probably fray, but the other materials might form melted edges
+that impede fraying.
+
+[Engadget says]: https://www.engadget.com/2014/06/17/laser-cut-clothing-explainer/
+
+If you draw a Voronoi diagram of the hole centers, each vertex of the
+Voronoi diagram is in the middle of a piece of cloth which is
+connected along lines to adjacent vertices; these adjacent vertices
+are connected by cloth “bridges” under the Voronoi lines.  If we
+expand the holes without allowing them to cross these lines, the
+bridges become thinner, but the overall surface retains the same
+Gaussian curvature as the original cloth, which had better be zero if
+we are going to be doing this on a garden-variety laser cutter.
+
+If we want to allow a region of the netting to develop positive
+Gaussian curvature, the simplest thing we can do is to make the
+Voronoi lines of that region follow the bias rather than the threads
+of the fabric, assuming it’s a woven or nonwoven fabric.  (Actually,
+even simpler is to use a knit fabric, which is stretchy enough to
+curve any which way, but that gives up precisely the control I’m
+exploring here.)
+
+However, we can do better than that.  By making the fabric bridges
+squiggle, we can make them longer — potentially by orders of
+magnitude, serpentining almost arbitrarily far across the space from
+one node to another, filling in most the neighboring holes with their
+squiggling.  The inside radii of these squiggles need to be large
+enough to prevent stress risers, also known as “rips”, from starting;
+in some cases this will require discarding a teardrop shape from the
+inside of the curve, but in other cases the outside radius of a
+neighboring squiggle can fill the space, thus maximizing the use of
+cloth.
+
+In this way, it should be possible to expand a 100-mm square of fabric
+(or even less) into a 1-m square (or more) of netting which assumes
+some complicated three-dimensional shape when fully inflated — either
+a fully determined form, if the graph of net nodes consists entirely
+of triangles (Bucky Fuller’s “omnitriangulated”), or a more flexible
+form if some or all of the holes in the net have other shapes.  By
+applying the process to heavy, strong fabrics such as twill, denim,
+seatbelt webbing, canvas, or burlap, it should be possible to quickly
+manufacture fairly complex, strong three-dimensional forms.
+
+In some cases, particularly without omnitriangulation, squiggling is
+not necessary, because the nodes can be mapped into the plane of the
+original fabric in such a way as to put network-nearby nodes far
+apart.  Consider, for example, a series of concentric rings of cloth
+linked together by quarter-turn spirals: if hung from the center of
+the cloth, the spirals untwist and become lines along a cone from its
+vertex, while the rings run around the cone.  Some teardrops will
+still be needed at junctions to prevent stress risers.
+
+Uniform amounts of squiggling over an area will not produce positive
+curvature when fully extended, but zero Gaussian curvature; in that
+case, a local reduction in squiggling will produce a region of
+*negative* Gaussian curvature, as demonstrated in the 2018 paper
+mentioned above.
+
+† “Acrylic” fiber is polyacrylonitrile, which is not the same chemical
+as the poly(methyl methacrylate) “acrylic glass” (Lucite, Plexiglas,
+or Perspex) which is so popular as a laser-cutting medium.  So it
+might not be as safe or convenient.
+
+Geometry limitations
+--------------------
+
+The shapes you can make from the fully extended omnitriangulated nets
+will necessarily be pretty convex; they can’t have “pockets” in them,
+in the machining sense of a cavity eaten out of a surface, rather than
+the sartorial sense.  Moreover, the net geometry, even if
+omnitriangulated, only controls the local curvature of the surface,
+not its global curvature.  Once an omnitriangulated surface curves
+around to form a closed surface, the global curvature becomes fully
+determined, but until then it is potentially kind of floppy.  For
+clothing this is usually considered advantageous, but not for some
+other possible applications.
+
+Long protrusions are possible, but limited — they necessarily imply
+cloth density limited to their circumference-to-length ratio.  That
+is, if they are twenty times longer than their circumference, they
+cannot have more than 5% cloth coverage.
+
+Further alternative materials
+-----------------------------
+
+Although ordinary textiles are probably the best material to use for
+this for many purposes, other possibilities exist.  Nonwoven polyester
+(polar-fleece and *friselina*) can be dramatically cheaper and may be
+more computationally predictable, though not as strong or as stiff.
+Paper or Tyvek are cheaper still, and probably faster to cut.  EVA
+foam (“foam rubber”) is laser-cuttable and is widely used for shoes.
+
+I haven’t personally seen gel-spun UHMWPE fabric yet, whether woven or
+knit, but if you can get it woven, it might offer better strength and
+enormously better dimensional control than the other fabrics mentioned
+above.  I’ve seen advertisements for pantyhose and backpacks made from
+gel-spun UHMWPE fabric, knit in both cases.
+
+Other sheet-cutting processes, such as high-powered laser cutting,
+waterjet cutting, and CNC torch cutting, could be used to cut sheet
+metal into similar netting-like structures, though its behavior under
+strain would be different; if you do manage to stretch it into shape,
+it will probably work-harden in the process, especially if you’re
+using annealed copper or aluminum.  Your dimensional precision is
+going to be shit.
+
+Cloth made from carbon fiber, glass fiber, or basalt fiber would also
+provide higher strength and better dimensional control than more
+common fibers, but they might not be cuttable with a low-power laser.
+
+Woven aluminum or steel window-screen material is another candidate
+for a higher-strength, higher-dimensional-precision material (though
+perhaps inferior to UHMWPE), and it could be cut very rapidly,
+possibly in several layers at a time, with plasma torches or
+high-powered lasers.
+
+Coloring the net
+----------------
+
+The amount of fabric in an area has an upper bound determined by the
+degree of expansion that area experiences when going from the original
+flat fabric to the fully extended net, and a lower bound determined by
+the required strength of the netting.  However, these will commonly be
+quite wide limits.  This means that you can vary the net coverage in
+an area to moderate its color.  In particular, white netting over a
+black background should be able to produce significant changes in
+luminance, though the maximum contrast will be limited as described.
+
+Moreover, by using three or four layers of netting nested inside one
+another — red, green, blue, and possibly white — full-color images
+should be feasible, as long as moiré patterns and coregistration can
+be kept under adequate control.
+
+Uses of shaped netting
+----------------------
+
+Clothing and hammocks are the most immediately obvious uses.  A
+laser-cut woven or nonwoven netting layer can provide shape, while a
+fine knit layer underneath can prevent the netting from being
+uncomfortable or transparent when those are not desired.  Netting
+shirts are already popular for hot days and for dance clubs.
+
+Aeron-style chairs typically use knit netting for the seats and backs,
+providing much better ventilation than more traditional styles of
+chairs; laser-cut netting should be a reasonable alternative.
+Director’s chairs and foldable camping chairs traditionally have
+canvas seats, but breathable fine netting would be an improvement.
+
+Some other household items can be feasibly made in this way.  My shoes
+hang in the closet in a cloth organizer that I think could be made
+from netting.  A collapsible bucket for carrying water can consist of
+a hoop, some a plastic-bag liner, and netting to support the bag.
+Stuffed animals can be made of netting to give shape to fine knit
+cloth containing the stuffing.  Houseplants can be potted in netting
+pockets suspended from railings.  Backpacks, curtains, and clothes
+hampers can be made from netting.
+
+Breathable shoe uppers can be made from EVA-foam “netting”, and other
+uses might include objects like toolboxes that would benefit from
+being flexible and lightweight but cannot afford cloth netting's
+tendency to snag on anything sharp.
+
+Inflatable sculptures, like those made by Ophélie Dorgans, can be
+easily inflated to multi-meter size, but historically it has been
+somewhat difficult to control their shape; most bouncy castles and
+advertising balloon critters are, geometrically speaking, kind of
+shitty.  This approach offers an alternative: inflate a big shapeless
+plastic bag inside a shaping net.  (This is demonstrated in the 2018
+paper mentioned above.)  As explained above, the shaping net can also
+provide color.
+
+Such an inflatable sculpture could be inflated with methane, hydrogen,
+or helium and unleashed over a city, as with the 1970s UFO art prank
+Theo Jansen participated in and the earlier Los Angeles Meteor prank.
+(I can’t remember if that last one is still anonymous or not.)
+
+Blow molding of plastic bottles and vacuum molding of sheets of PET
+and other thermoplastics should be feasible using netting forms made
+in these ways, particularly if the fabric is cotton or nylon.  As with
+clothing, a layer of fine knit fabric between the net and the hot
+plastic may be a useful mechanism for reducing netting marks on the
+surface.
+
+With a reasonably flexible and gritproof liner — again, perhaps fine
+knit cotton — these netting forms could be suspended from frames and
+used as molds for poured-in plaster, concrete (which additionally
+demands alkali resistance, which cellulose and polyester have), lime
+cement, fluidized greensand, waterglass-bonded sand, or perhaps even
+slip (*barbotina*) for slipcasting.
+
+Many of the above-mentioned castable materials are most interesting as
+refractory mold materials for metal casting, but of course in metal
+casting usually you want pocketing, which is, as I said above,
+impossible — assuming that the molding materials are on the convex
+side of the netting.  An alternative might be to inflate the netting
+with a plastic bag, then pour plaster (or cement or whatever) around
+it to make the mold.
+
+By painting, epoxy-impregnating, airplane-doping, sizing, stuccoing,
+spraycreting, or applying *barbotina* to an inflated net, perhaps with
+knit-fabric layers on one side or the other, you should be able to
+make a thin composite material, reinforced by the fabric layer or
+layers to reduce its brittleness.  Depending on the composition, this
+composite may be adequately sturdy even for some metal-casting
+processes.
+
+In some cases, just filling the netting with sand may be sufficient; I
+suspect this may be one of the lowest-cost ways to get acoustic
+panels.
+
+Cutting starched cloth board
+----------------------------
+
+The only laser-cutting machine I’ve used can cut 6-mm MDF at about
+24 mm/s, but can cut thinner materials faster.  Many interesting
+laser-cuttable fabrics are in the neighborhood of 200 μm thick,
+suggesting that the laser could cut them at a speed on the order of
+1 m/s.  However, particularly cutting complex shapes, the machine is
+mechanically capable only of a dramatically lower speed than that.
+
+As I understand it, typical mass textile fabrication is done by
+cutting a thick stack of fabric to the pieces of the pattern with a
+bandsaw knife before sending the pieces out to be pieced together.
+Hundreds or thousands of layers of cloth are cut at once.  (Mistakes
+here are ruinously expensive, ruining thousands of meters of cloth
+with a single bad cut.)
+
+Typically the laser-cutting shop is not willing to cut multiple sheets
+of material at once, perhaps because they blow apart under the air
+blast, ruining the laser focus.  But perhaps we could laminate several
+layers of cloth together with an adhesive to form a board similar to
+MDF, cut them, and later remove the adhesive.
+
+One promising adhesive for this purpose is food starch: it is a
+polysaccharide like cellulose, so it doesn’t stink when it burns, and
+it is commonly used for stiffening common fabrics, even polyester,
+which is a material notoriously resistant to being stuck to.  As
+“wheat paste”, it is also commonly used as an adhesive in bookbinding
+and papier-mâché.  In fabrics that can withstand boiling — basically
+anything *but* polyester — removing it is also easy.
+
+Papier-mâché practice demonstrates a risk of the cloth-board approach:
+drying time is necessary between layers in order to avoid trapping
+excessive moisture within the material.  A warm air blast should be
+able to speed up this process.
+
+This approach should make it possible to cut dozens of layers of cloth
+at once at MDF-like speeds, thus greatly reducing the cost of complex
+shapes, if you wanted more than one of them, anyway.
+
+### Alternative chemistries ###
+
+Other candidate dissolvable adhesives for this purpose include sugar,
+PMMA, polystyrene, carrageenan, gelatin (or hide glue), calcium
+stearate, albumin, urea, and pectin.  All of these could also be used
+as sizing to paint inflated netting to solidify it, as described
+earlier.
+
+Salt is probably bad because it would produce HCl, chlorine, and
+sodium gases; waterglass is probably bad because it wouldn’t cut with
+a low-power laser, and might swell up and block the cut instead;
+baking soda might work but might produce NaOH when cutting; nitrates
+are probably bad because they might offgas nitric acid and nitrate the
+cellulose when fiercely heated; sulfates probably wouldn’t cut (and
+might offgas acid sulfur oxides and produce toxic sodium sulfide); and
+soluble phosphates might have similar problems.  (Ammonium phosphates
+in particular decompose to ammonia and molten anhydrous phosphoric
+acid upon fierce heating.)  Some of these, especially waterglass and
+in-situ-formed phosphates of calcium or copper, might be suitable for
+painting onto an already-cut inflated netting form.
+
+In other contexts, the possibility of selectively and precisely
+forming such gases on a surface or within a material with a
+laser-cutting machine might be very useful.  Ben Krasnow on his
+Applied Science YouTube channel has reviewed a tactile-printing paper
+whose surface swells up when locally heated, for example.
