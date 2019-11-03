@@ -1,0 +1,174 @@
+The classic shortest-path algorithms on graphs such as Dijkstra-Moore,
+Floyd-Warshall, and Bellman-Ford are commonly applied specifically to
+digraphs.  In particular, Bellman-Ford is much slower than
+Dijkstra-Moore for graphs of any reasonable size, but is guaranteed to
+be correct on a more general class of graphs --- those including
+negative arc costs, but not negative cycles.
+
+The usual reduction from weighted graphs to weighted digraphs replaces
+each undirected arc with a pair of antiparallel arcs of equal cost.
+Unfortunately, from Bellman-Ford's point of view, this transforms a
+negative arc cost into a negative-cost cycle.  So, what's the best way
+to find lowest-cost paths in a weighted *undirected* graph with
+negative arc costs, but no negative cycles?
+
+[Manfred Weis discussed this in the Bellman-Ford context last
+year][0].  He found a transformation from an undirected weighted arc
+into five directed arcs (three zero-weight) and two new vertices that
+seems to have the right properties.  And [Johnson's algorithm][1] is
+another known approach.  To my surprise, this seems to be a somewhat
+active research area.
+
+[0]: https://mathoverflow.net/questions/300026/known-methods-for-mutexing-antiparallel-arcs-in-graphs
+[1]: https://en.wikipedia.org/wiki/Johnson's_algorithm
+
+I thought it should be straightforward to modify the Floyd-Warshall
+algorithm to handle this situation.  But now that I think about it
+further, I'm not so sure.
+
+Floyd-Warshall, like Dijkstra-Moore and Bellman-Ford, proceeds by
+successive relaxations, but those relaxations amount to adding a
+possible intermediate node *k* to the set of all possible paths.  The
+central step in Floyd-Warshall is
+
+> *d<sub>ij</sub>* ← *d<sub>ij</sub>* ∧ *d<sub>ik</sub>* + *d<sub>kj</sub>*
+
+where ∧ is the binary minimum function.  This amounts to considering
+whether the best known path from *i* to *j* can be improved by
+chaining together the best known path from *i* to *k* with the best
+known path from *k* to *j*; at the point that the algorithm does this
+update, all paths through all nodes preceding *k* have already been
+taken into account.  (So doing this update for a given *k* and all
+*i*, *j* ensures that *k* and all the nodes before it have been taken
+into account.)
+
+That is, either node *k* isn't an intermediate node on an optimal path
+from *i* to *j*, or it is; the two possibilities are handled by the
+two operands of ∧.  In some sense, the possible paths Floyd-Warshall
+considers between any two vertices are the powerset of all the
+vertices.  In particular, this means that non-simple paths --- those
+that visit the same node more than once --- are not contemplated,
+except that a path is (in some sense vacuously) permitted to pass
+through either or both of its own endpoints.
+
+Let's consider 2-cycles, paths from some node *p* to some other node
+*q* back to *p*, without any intermediate nodes.  These can only exist
+in digraphs. (Cycles in either graphs or digraphs can only include the
+same arc once.)  If our weighted digraph represents a plain weighted
+graph in the way described above, the two costs are equal; if they are
+positive, this cycle cannot form a part of any optimal path (since you
+could improve the path by removing it), but if they are negative, they
+form a negative-cost cycle that means that there is no shortest path
+anywhere reachable from them.  But this does not carry over to the
+original undirected graph: it may well have no negative-cost
+undirected cycles, because the single undirected arc is not a cycle.
+
+So, either way, if we're trying to apply Floyd-Warshall to an
+undirected graph, we'd like to avoid considering these 2-cycles.
+
+I thought I saw a simple way to do this, but now I'm not so sure.  I
+thought it would be straightforward: just don't create paths from *i*
+back to *i* with only a single intermediate *k*.  But now I see that
+paths from *i* back to *i* that run through multiple intermediate *k*
+nodes will necessarily start out as paths with only a single
+intermediate *k*.
+
+A couple of ideas:
+
+1. When you decide to overwrite an optimum cost using nodes prior to
+    *k* with an optimum cost going through *k*, you could compute how
+    many arcs are on that path; say, start with an array of path
+    lengths *p<sub>ij</sub>* entirely filled with ones, and when you
+    update *d<sub>ij</sub>* ← *d<sub>ik</sub>* + *d<sub>kj</sub>*,
+    also update *p<sub>ij</sub>* ← *p<sub>ik</sub>* +
+    *p<sub>kj</sub>*, which may amount to either increasing it or
+    decreasing it.  This enables you to add a special case: when
+    considering updating a cost *d<sub>ij</sub>* ← *d<sub>ik</sub>* +
+    *d<sub>kj</sub>*, you can check whether either *d<sub>ik</sub>* or
+    *d<sub>kj</sub>* is a length-2 cycle (i.e., the two coordinates
+    are equal and *p<sub>kk</sub>* = 2) and just not update in that
+    case.
+
+    (There's an algorithm which stores the actual paths in rope form
+    rather than just their lengths, but if you want the paths rather
+    than their lengths, using ropes is no faster than the standard
+    next-pointer modification of Floyd-Warshall for path
+    reconstruction, and it needs more space.)
+
+2. But why bother with *p*?  Including cycles in your candidate
+    optimal path is never beneficial: either they have positive cost
+    and you can eliminate them, or they have negative cost and the
+    optimal path fails to exist.  You could just decline to include
+    cycles altogether by the simple expedient of not considering the
+    possibilities *i* = *k* and *j* = *k*.  Then the algorithm will
+    compute the lowest-cost *simple* path between each pair of nodes.
+
+    Well, not quite!  It turns out that it can still unintentionally
+    consider cycles in the following way.  Suppose that the
+    lowest-cost path from a to c goes through b, and the lowest-cost
+    path from c to d also goes through b.  If *k* = b before *k* = c,
+    in the b step, we will compute a *d*<sub>ac</sub> and a
+    *d*<sub>cd</sub> that each depend on going through b.  Later, in
+    the c step, one of the candidates we will consider for
+    *d*<sub>ad</sub> is *d*<sub>ac</sub> + *d*<sub>cd</sub>.  If this
+    is cheaper than *d*<sub>ab</sub> + *d*<sub>bd</sub>, which can
+    happen if there's a negative-cost cycle between b and c, we may
+    take it.  The same logic shows that the approach in point 1 is
+    also flawed.
+
+    However, I assert without proof that it does still consider all
+    the simple paths, even if it considers some nonsimple paths as
+    well.
+
+Here's the implementation of Floyd-Warshall I was using, which appears
+to work in cases without negative-cost cycles:
+
+    def floydwarshall(edges):
+        V = {u for u, v, w in edges} | {v for u, v, w in edges}
+        inf = float('inf')
+        d = {(i, j): inf for i in V for j in V}
+
+        for u, v, w in edges:
+            d[u, v] = min(d[u, v], w)
+
+        for k in V:
+            for i in V:
+                for j in V:
+                    d[i, j] = min(d[i, j], d[i, k] + d[k, j])
+
+        return d
+
+For reproducibility and to attempt the possibility #2 above, I
+modified it as follows:
+
+    def floydwarshall(edges):
+        V = {u for u, v, w in edges} | {v for u, v, w in edges}
+        inf = float('inf')
+        d = {(i, j): inf for i in V for j in V}
+
+        for u, v, w in edges:
+            d[u, v] = min(d[u, v], w)
+
+        # Sorted order so that cases where the algorithm doesn't give
+        # incorrect results at least get repeatable results:
+        for k in sorted(V):
+            for i in sorted(V - {k}):
+                for j in sorted(V - {k}):
+                    d[i, j] = min(d[i, j], d[i, k] + d[k, j])
+
+        return d
+
+I was generating the graphs to run it on with this routine:
+
+    def randomgraph(n, m, o=10, p=1):
+        rv = []
+        existing = set()
+
+        for i in range(m):
+            u = v = None
+            while u == v or (u, v) in existing:
+                u, v = random.choice(n), random.choice(n)
+            existing.add((u, v))
+            rv.append((u, v, random.randrange(o)-p))
+
+        return rv

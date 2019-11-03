@@ -1,0 +1,99 @@
+Tonight I was reading _Software Abstractions_, by Daniel Jackson,
+Michael Jackson's son. and came across the specification of a
+hotel-room rekeying protocol that uses only keycards to communicate
+between the hotel front desk and the door locks.  When it is desired
+to rekey the lock, thus locking out the previous "guest", the front
+desk issues a new key; the battery-powered lock can recognize both the
+current key and the new key, and upon recognizing the new key, it
+updates its "current-key state" to refer to that new key.
+
+This is vaguely reminiscent of the problem [Stajano and Anderson] set
+out to solve: "secure transient association of a device with multiple
+serialised owners", the "owners" in this case being the hotel
+"guests", and the "device" being the door lock.
+
+[Stajano and Anderson] https://www.cl.cam.ac.uk/~fms27/papers/1999-StajanoAnd-duckling.pdf "The Resurrecting Duckling, 1999"
+
+The keycard protocol is an ingenious approach, but it can be refined
+further and applied more broadly.
+
+The weak protocol suggested in the book
+---------------------------------------
+
+The suggestion in the book was that the lock could use, for example,
+an LFSR to compute the "new key" from the "current key".  This
+approach is unnecessarily vulnerable to some attacks.  Most simply,
+the "guest" could compute the successor of their own room key, and
+after checking out, come back to rob the new occupant.  Slightly more
+annoyingly, they could compute the successor of the successor, and not
+only rob the new occupant but also lock them out.  Furthermore, they
+could extend this attack arbitrarily far into the future, computing
+keys far into the future.
+
+A better protocol
+-----------------
+
+Given a one-way function, instead of computing a *successor* key, the
+door lock can recognize a *predecessor* key.  It compares the
+presented key contents to its "current key", opening if there is a
+match; if that fails, it computes a one-way function of the presented
+key and compares *that* to the current key.  If there is a match, it
+updates its current key to be the new key, thus locking out the old
+key.  (This "comparison to the current key" could be achieved by way
+of a salted KDF such as bcrypt() so that even with knowledge of the
+lock's memory contents, however acquired, it is infeasible to
+fabricate even a current key.)
+
+To initialize the lock, the front desk generates and stores a hash
+iteration count *N* of, say, a billion, and a random bitstring; it
+hashes the bitstring *N* times; and sets the lock's "current key" to
+the billion-hashed version, which is not stored.  To generate the new
+key, the front desk decrements *N* and repeats the computation, thus
+producing a key that will rekey the lock.
+
+The crucial factor here is that the initial *N* should be large enough
+that we will not run out of keys before the door lock (or other
+device) needs to be repaired for some other reason, at which point it
+can be reinitialized.  Even 9999 is likely sufficient for a hotel-room
+door lock.
+
+As I understand it, this is more or less the OPIE or S/KEY approach.
+
+### Performance optimizations ###
+
+If the direct approach of performing nearly a billion hashing
+operations per rekey is too slow, it is straightforward to cache
+hashes *N* - 1, *N* - 2, *N* - 4, *N* - 8, and so on, such that the
+amortized average number of hashing operations required per rekey is
+just under 2, at a logarithmic space cost --- 30 keys for this
+example.
+
+Most of the cache space is used for the last few levels --- if you
+could afford a million hashing operations per rekey, you could cache
+only 10 keys instead of 30, still getting a thousandfold speedup over
+the cacheless case.  That is, from a certain point of view, 99.9% of
+the speedup comes from 33.3% of the cache.
+
+As usual, in exchange for a higher space cost, the amortized bound can
+be made into a worst-case bound.  The first rekey operation consumes
+the cached key *N* - 1 and computes keys *N* - 3 and *N* - 7; the
+second rekey operation consumes *N* - 2 and computes keys *N* - 6 and
+*N* - 5; the third consumes *N* - 3 and computes *N* - 15 and *N* -
+14; the fourth consumes *N* - 4 and computes *N* - 12 and *N* - 11;
+the fifth consumes *N* - 5 and computes *N* - 10 and *N* - 9; the
+sixth consumes *N* - 6 and computes *N* - 31 and *N* - 30; and so on.
+In this case the space cost becomes linear if we pay only two hashing
+operations per rekey, which is likely unacceptable.  I think that if
+we pay four hashing operations per rekey, we can keep the space cost
+logarithmic, though still up to twice the space cost of the
+amortized-only algorithm.
+
+Reverse metempsychosis and imprinting an ignition key
+-----------------------------------------------------
+
+[Stajano and Anderson] suggest that an IoT device should "imprint on"
+or "be ensouled by" the first public key it receives when it hatches;
+this allows the owner to establish a relationship with it that its
+manufacturer cannot participate in.  The rekeying protocol plays the
+role their paper calls "escrowed seppuku", allowing the manufacturer
+to command the duckling to die and prepare to be ensouled anew.
