@@ -148,6 +148,126 @@ of a week, organized around daily modem telephone calls, and each of
 whose links might or might not function on any given occasion.  So
 Usenet used a different approach for duplicate suppression.
 
-CCN message IDs
+The Usenet message-ID approach
+------------------------------
 
-FidoNet message-IDs: (network, zone, region, board, sub, message)
+The Usenet approach is to identify each message with a "Message-ID"
+unique to that message, but much shorter than the entire message.
+Then, before transmitting the entire message from one node to another,
+the communicating nodes verify that the message isn't already present
+on the receiving node; the Usenet protocol NNTP has commands called
+IHAVE and SENDME for this purpose.  `IHAVE foo` indicated the
+availability of the message with the message-ID `foo`; `SENDME foo`
+requested its transmission, if possible.
+
+A serious weakness of the Usenet implementation was that the
+message-ID is chosen by the sender, typically a string something like
+"trn.20190822.1830.10831@canonical.org", incorporating the hostname,
+the date and time, the software being used, the PID of the running
+process, and so on, in an effort to avoid accidental duplication.
+Nevertheless, bugs did sometimes result in unintentional duplication,
+and people sometimes engaged in intentional duplication to attempt
+censorship.
+
+Git uses a similar approach, but uses the SHA-1 of the "objects" as
+the message-ID rather than a sender-computed string.  It is
+conjectured to be computationally infeasible to produce a different
+object with the same SHA-1, even intentionally, much less
+accidentally.
+
+I think FidoNet used this approach to propagate messages in its
+"echos", which were distributed message bases similar to Usenet
+newsgroups, but somewhat more primitive.  The Doctor tells me that the
+message-IDs FidoNet could use to avoid unlimited duplication of
+messages were tuples of the form (network, zone, region, board, sub,
+message), where the (zone, region, board) was a hierarchically
+assigned numerical address space uniquely identifying the particular
+bulletin board on which the message originated, and "network"
+presumably distinguished FidoNet proper from other networks that might
+use the same protocols.
+
+(However, I'm not as familiar with FidoNet's protocols as I am with
+the internet protocols, and so I might have gotten that wrong.)
+
+A weakness with the message-ID approach is that it still scales only
+linearly with the number of messages.  If you have a billion messages
+comprising ten terabytes, each with a 20-byte message-ID, then an
+IHAVE command for each message-ID will still cost 28 gigabytes of
+network bandwidth in every conversation, even if only one or two new
+messages are to be transmitted.  There are protocols involving more
+round trips, such as ping-pong breadth-first trie traversal, that can
+reduce this cost by a significant factor, but still only a linear
+factor.
+
+Evidently some way of naming large, coherent groups of messages is
+needed if we are to get the desired superlinear speedup.
+
+The per-publisher log approach
+------------------------------
+
+Kafka is a distributed modern publish-subscribe system used in
+high-bandwidth data-center environments.  The way it works is that
+each new message is apended to a log and assigned an ordinal sequence
+number in that log; subscribers send requests not for individual
+messages but for ranges of ordinal numbers in a given log.  Each
+subscriber remembers the ordinal number of the last log message it has
+seen on a given log, and when it loses a connection and reconnects, it
+requests the next, say, 100 messages after that point.  This frees the
+server from maintaining any persistent per-subscriber state, allowing
+it to scale both to large numbers of messages per second and large
+numbers of subscribers.
+
+This protocol permits a subscriber to efficiently mirror the log, if
+it wishes.  It can then provide the same subscriber interface to other
+subscribers, as long as only the origin server is assigning new
+ordinal numbers to new messages.  In fact, it can update its mirror
+from other subscribers in the same way; it doesn't need to talk to the
+origin server directly.  (Kafka itself doesn't take advantage of this
+possibility, as far as I know.)
+
+I think this is the way Secure Scuttlebutt works, as well.  Each
+participant in the chat has their own append-only log of messages that
+it has published, and upon conversing with a peer, it asks for updates
+to the logs that it is a subscriber to.
+
+Van Jacobson's "Content-Centric Networking" project (a generalization
+of which is known as "Named Data Networking", or NDN) uses this
+approach to handle streams of data.
+
+In CCN, routing is done by naming pieces of data, not network nodes.
+Each router remembers some set of interests associated with its
+network links and some set of messages; it exchanges interests and
+messages with its peers.  When it sees a message whose identifier
+matches an interest it has pending, it forwards the message to the
+router from which it got the interest, and if it receives an interest
+that matches a message that it has stored, it replies to the interest
+with a copy of the message.  In either of these cases, it forgets the
+interest, since it has been satisfied.
+
+On the other hand, if it receives a new interest that it cannot
+satisfy, it remembers it and uses some algorithm to choose which
+network links to forward the interest on to, perhaps related to which
+network links it has received similar messages on before, or some kind
+of hierarchical network addressing scheme and dynamically updated
+routing table.  The interest being forwarded through the network
+leaves a path of backpointers which give a route back to the original
+requester, without that requester needing any kind of network address.
+
+In this way, messages are only forwarded to routers that have
+requested them, eliminating many opportunities for denial-of-service
+attacks, and one copy of a message going into a router can evantually
+result in many copies flowing out of it, as if the router were a
+caching HTTP proxy, eliminating many other opportunities for denial of
+service.
+
+The obvious question is how to handle things like streaming voice and
+video in a system like this: interests in data that doesn't yet exist.
+The answer is simply that you assign sequence numbers to the frames of
+streaming data ("ElRubius/videostream/d8s0g03402e/frame/3302") and the
+subscribers send interests for some window of sequence numbers that
+have not yet been produced, but which will be delivered to them when
+they have.  As long as the window is large enough to compensate for
+the latency of propagation of new in
+
+This works out to be precisely the same per-publisher log protocol
+used by Kafka.
