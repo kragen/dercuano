@@ -4,6 +4,11 @@ computer-mediated communication systems with an entity known as The
 Doctor, and they suggested the use of the rsync algorithm and its
 variants, which I thought was really interesting.
 
+As it turns out, the rsync delta-transfer algorithm offers an
+interestingly scalable approach to synchronizing eventually-consistent
+data stores like these, one that has not been exploited previously to
+my knowledge.
+
 Broadcast and flooding
 ----------------------
 
@@ -195,7 +200,9 @@ comprising ten terabytes, each with a 20-byte message-ID, then an
 IHAVE command for each message-ID will still cost 28 gigabytes of
 network bandwidth in every conversation, even if only one or two new
 messages are to be transmitted.  There are protocols involving more
-round trips, such as ping-pong breadth-first trie traversal, that can
+round trips, such as ping-pong breadth-first trie traversal
+and some approaches using compressed Golomb sets
+or Bloom filters, that can
 reduce this cost by a significant factor, but still only a linear
 factor.
 
@@ -267,7 +274,211 @@ streaming data ("ElRubius/videostream/d8s0g03402e/frame/3302") and the
 subscribers send interests for some window of sequence numbers that
 have not yet been produced, but which will be delivered to them when
 they have.  As long as the window is large enough to compensate for
-the latency of propagation of new in
+the latency of propagation of new interests, this will result in
+immediate and efficient streaming.
 
 This works out to be precisely the same per-publisher log protocol
-used by Kafka.
+used by Kafka for the analogous problem.
+
+Cryptographic authentication of messages in the log is useful in some
+cases to prevent one publisher from interfering with another.  In the
+message-ID IHAVE/SENDME protocol this could be done simply by using
+cryptographic hashes as message-IDs, as Git does, but in the
+log-appending protocol, some different approach is needed; for
+example, each new message in the log could be signed with a private
+key associated with that log.  Such an approach will only be
+successful, however, if the routing nodes in the system are checking
+the signatures, which is a potential scalability bottleneck.
+
+XXX how does Git's protocol actually work?  Originally it used rsync,
+but not the rsync delta-transfer algorithm mentioned below.
+
+This per-publisher-log protocol is only more efficient than the
+per-message ID IHAVE/SENDME protocol as long as the set of publishers
+remains small, which, admittedly, covers many important cases.  But if
+each message has a new publisher, it reduces to the per-message-ID
+algorithm.
+
+Approaches based on rsync's delta-transfer algorithm
+----------------------------------------------------
+
+Rsync contains [a delta-transfer algorithm] designed to save bandwidth
+over Australia's undersea cables.  Transmitting data to or from
+Australia was very expensive, so if you had slightly different copies
+of a file on opposite sides of the Pacific, it was important to find
+the parts that were different and transmit only those.  If you have
+both versions of the file on one side of the connection, you can use
+the standard longest-common-subsequence ("LCS") dynamic-programming
+algorithm to find the minimal edit sequence.  But how do you
+efficiently compute a small edit sequence between two files, each of
+which is only available to one of the parties in the protocol?
+
+[a delta-transfer algorithm]: https://rsync.samba.org/tech_report/
+
+The simplest approach is of course to divide the file into blocks of
+some fixed size and use the message-ID approach, using the SHA-256 or
+whatever of each block.  This would work well for files that are
+modified by overwriting some part of the middle of the file; only the
+modified parts will have a different SHA-256, and so only those
+modified parts (plus the rest of the blocks containing them) will be
+transmitted.
+
+But if you insert a byte at the beginning of the file, shifting the
+rest of the data in the file by one byte, none of your hashes will
+match, and so the entire file will be transmitted even though the edit
+distance was one byte.
+
+The bupsplit algorithm used by Avery Pennarun's bup backup program,
+and also the basis of Jumprope, attempts to overcome this problem by
+breaking the file into blocks of variable sizes in a way that will
+usually be consistent after insertions and deletions, similar to the
+"fuzzy hashing" used in forensics.  (See file `immutable-filesystem`
+for some related notes.)
+
+The rsync algorithm takes a different approach.  One of the versions
+of the file is broken into fixed-size blocks in the usual way,
+typically using a block size of a few hundred bytes, and each block is
+hashed with two different algorithms: a weak linear [rolling-checksum]
+algorithm (in rsync, a modified version of Adler32) and a stronger
+hashing algorithm --- originally rsync defaulted to MD4 for this,
+which was cryptographically very weak, and even nowadays uses MD5,
+which has also been broken.  The resulting collection of hashes (let's
+call it a "digest", since the rsync papers don't give it a name) is
+transmitted to the other participant, where the rolling checksum is
+computed over *every length-N substring* of the other version of the
+file; any matches found in the digest are checked with the strong
+checksum.  This allows the relatively efficient and precise
+computation of the byte-ranges of either file that are present at any
+offset in the other, as long as the shared data is more than a block
+in length.
+
+[rolling-checksum]: https://en.wikipedia.org/wiki/Rolling_hash
+
+It is interesting to note, as [Andrew Tridgell does in his
+dissertation][0], that in some cases the rsync algorithm finds smaller
+deltas than the LCS algorithm used by diff(1), because rsync can
+detect and take advantage of transpositions, while LCS cannot.
+
+The rsync algorithm is used not only in rsync but also in zsync,
+rdiff, and some other software.  zsync in particular allows a
+sender-server participant in the protocol to be nothing more than a
+dumb HTTP server capable of byte-range access; this is achieved by
+precomputing the digest and placing it in a "zsync file" on a web
+server that points to the real file.  The zsync client, upon fetching
+the digest file, can run the rolling checksum over its local version,
+occasionally running the strong checksum, and compute the set of
+byte-ranges that it needs to fetch from the origin server to
+reconstruct the origin server's version of the file.
+
+If you want to rsync a mebibyte of data using a block size of 4
+kibibyte ([Tridgell's dissertation][0] discusses block-size tradeoffs
+in chapter 3, finding optimal block sizes in the range of 256 bytes to
+8 kibibytes for a few datasets), the digest to be transmitted will be
+5 kibibytes, 0.5% of the total.
+
+[0]: https://www.samba.org/~tridge/phd_thesis.pdf
+
+Note, however, that this 0.5% doesn't decrease as the file size
+increases, unless you also increase the block size.  If you were to
+digest 10 tebibytes using 4-KiB blocks and 20-byte digest entries,
+your digest would be 50 gibibytes.
+
+As a simple intermediate step between the IHAVE/SENDME system and the
+log-appending system, you could imagine using some variant of the
+rsync protocol on a document containing the concatenation of all
+messages in some well-defined order.  In effect, this assigns a
+message-ID to each entire block of messages, rather than each
+individual message.
+
+A key difference from the usual use of rsync is that the receiver
+don't want to delete messages that the sender doesn't have from their
+own database; instead they want the union of all interesting messages.
+
+For this to be efficient, you want the ordering chosen for the
+messages to make the likely updates somewhat local, in the sense that
+they leave large chunks of the file untouched.  For example, you could
+order the messages in the file temporally, so that new messages are
+usually added near the end, or by a combination between temporal order
+and publisher ID, or a combination of temporal order and topic.
+
+This approach also permits participants, in theory, to blacklist
+certain known blocks to save space --- rather than storing a tebibyte
+of uninteresting data (last year's Wikipedia edits, say), they can
+just store its hashes and its sorting key range.  However, if new data
+appears that belongs to that sorting key range, it would change the
+hashes, making the simple blacklist approach fragile.
+
+A potentially more interesting approach is to store the ranges of
+sorting keys, or at least their longest common prefixes, in the digest
+along with the hashes, permitting participants to choose which
+subrange of the keyspace they bother to replicate.
+
+### Recursive rsync delta transfer ###
+
+Suppose that instead of using a single block size, we use several
+different block sizes on the same file.  For example, we compute
+digests for block sizes of 1 KiB, 1 MiB, 1 GiB, and 1 TiB.  If our
+total dataset is 16 TiB, its 1-TiB-level digest might be 320 bytes
+(assuming, for now, no sorting keys --- just treating the file as
+opaque); a peer who fetches that digest can efficiently discover
+whether it matches their local replica, or matches it except for a few
+bytes inserted at the beginning.
+
+But suppose they find that the last TiB-sized block in the 1-TiB-level
+digest doesn't match any of the 17.59 trillion overlapping
+tebibyte-sized blocks in their own replica.  Rather than sending a
+network request or a purchase order to have that tebibyte of data
+shipped to them, they can fetch the corresponding block of the
+1-GiB-level index.  The entire 1-GiB-level index has 16384 entries,
+but it's only interested in the last 1024 of them, totaling 20 KiB, to
+discover whether any of the gibibytes comprising that tebibyte are
+among the 17.59 trillion overlapping gibibytes in their existing
+dataset.
+
+Perhaps all but one of those gibibytes is a known gibibyte; in this
+case it can recurse down to the mebibyte level, and then down to the
+kibibyte level.
+
+In this way, if anywhere from 1 to 1024 bytes have been inserted or
+deleted in any single place in this 16-TiB dataset, our peer can
+discover them by transfering 320 + 20480 + 20480 + 20480 + 1024 =
+62784 bytes.  This is what rsync would report as a "speedup factor" of
+about 280 million, although it's still worse than the theoretical
+limit by a factor of between 61 and 62784.  Note that this is amenable
+to zsync's digest-precomputation approach.
+
+The overhead in the worst case is 20 parts in 1023, or 1.96%, the same
+as nonrecursive rsync.  But there are important cases that should
+admit these higher efficiencies.
+
+Storing the file in such a way that this can be done quickly,
+including a summary of the 70 trillion rolling hashes involved to
+avoid needing eight passes over the 16-tebibyte dataset, and the
+desire to keep a local "virtual copy" of the sending peer's dataset
+(to avoid re-transferring blocks the next time around whose only sin
+was that they lacked a message, rather than having new ones) seems
+like it might be a challenging problem both in terms of algorithms and
+in terms of systems design.  However, I think it's in some sense
+straightforward; it doesn't require any novel inventions.
+
+### Recursive rsync delta transfer applied to message bases and similar CRDTs ###
+
+Suppose we have a nearly-16-TiB data store and we append one message
+to it, a message of under 1024 bytes.  This can be synchronized with
+the 62784 bytes mentioned above.  Once we bump past the 16-TiB line
+things get even a bit better still: 340 + 20 + 20 + 20 + 1024 bytes,
+since all the recursion levels except the top one only contain a
+single hash.
+
+This is considerably better than the 50 gibibytes required for
+non-recursive rsync or the 28 gigabytes I suggested the IHAVE/SENDME
+approach would need for a similar-sized base of messages (although
+there I was postulating an average message size of 10 kilobytes).  But
+it remains efficient if we have, say, a mebibyte of new messages to
+sync.  If they're scattered in 1024 random places through the
+16-tebibyte base, due to a poor choice of sorting keys, we need on the
+order of 63 mebibytes of bandwidth to sync them, a 63x multiplier, but
+several hundred times better than the other protocols.  If, instead,
+they are gathered together more or less in one place, we need to
+transfer 320 + 20480 + 20480 + 20480 + 1048576 = 1110336 bytes, an
+overhead of about 6%.
