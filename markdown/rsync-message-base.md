@@ -163,7 +163,12 @@ the communicating nodes verify that the message isn't already present
 on the receiving node; the Usenet protocol NNTP has commands called
 IHAVE and SENDME for this purpose.  `IHAVE foo` indicated the
 availability of the message with the message-ID `foo`; `SENDME foo`
-requested its transmission, if possible.
+requested its transmission, if possible.  In [the Bitcoin
+protocol][1], the `inv` message lists data blocks, block headers, or
+mempool transactions, like a bulk IHAVE; and the `getdata` message
+plays the role of `SENDME`.
+
+[1]: https://en.bitcoin.it/wiki/Protocol_documentation
 
 A serious weakness of the Usenet implementation was that the
 message-ID is chosen by the sender, typically a string something like
@@ -278,7 +283,10 @@ the latency of propagation of new interests, this will result in
 immediate and efficient streaming.
 
 This works out to be precisely the same per-publisher log protocol
-used by Kafka for the analogous problem.
+used by Kafka for the analogous problem.  And in some sense the
+`getblocks` message in the Bitcoin protocol does the same thing ---
+but the "publisher" is the Satoshi consensus of the participating
+nodes, so blocks might sometimes be superseded.
 
 Cryptographic authentication of messages in the log is useful in some
 cases to prevent one publisher from interfering with another.  In the
