@@ -1,3 +1,4 @@
+In talking with banyaszvonat, the following idea arose:
 I think it's possible to speed up raymarching with signed distance
 fields enormously using affine arithmetic and possibly even interval
 arithmetic.
