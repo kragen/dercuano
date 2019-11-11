@@ -35,19 +35,23 @@ A better protocol
 
 Given a one-way function, instead of computing a *successor* key, the
 door lock can recognize a *predecessor* key.  It compares the
-presented key contents to its "current key", opening if there is a
-match; if that fails, it computes a one-way function of the presented
-key and compares *that* to the current key.  If there is a match, it
+presented key PK contents to its "current key" CK, opening if there is a
+match PK = CK; if that fails, it computes a one-way function of the presented
+key H(PK) and compares *that* to the current key.  If there is a match H(PK) = CK, it
 updates its current key to be the new key, thus locking out the old
 key.  (This "comparison to the current key" could be achieved by way
 of a salted KDF such as bcrypt() so that even with knowledge of the
 lock's memory contents, however acquired, it is infeasible to
-fabricate even a current key.)
+fabricate even a current key.  That is, instead of storing CK,
+the lock would store some salt S and CKK = KDF(CK, S), and instead of
+comparing PK = CK, it would compare KDF(PK, S) = CKK.)
 
 To initialize the lock, the front desk generates and stores a hash
-iteration count *N* of, say, a billion, and a random bitstring; it
-hashes the bitstring *N* times; and sets the lock's "current key" to
-the billion-hashed version, which is not stored.  To generate the new
+iteration count *N* of, say, a billion, and a random bitstring R; it
+hashes the bitstring *N* times --- K[0] = R; K[1] = H(K[0]);
+K[2] = H(K[1]); ... K[N] = H(K[N-1]); and sets the lock's "current key" CK to
+the billion-hashed version K[N], and then it erases all of K except *N* and R.
+To generate the new
 key, the front desk decrements *N* and repeats the computation, thus
 producing a key that will rekey the lock.
 
@@ -57,13 +61,15 @@ device) needs to be repaired for some other reason, at which point it
 can be reinitialized.  Even 9999 is likely sufficient for a hotel-room
 door lock.
 
-As I understand it, this is more or less the OPIE or S/KEY approach.
+As I understand it, this is more or less the OPIE or S/KEY approach,
+and it's probably in Merkle's dissertation, which I haven't read yet.
 
 ### Performance optimizations ###
 
 If the direct approach of performing nearly a billion hashing
 operations per rekey is too slow, it is straightforward to cache
-hashes *N* - 1, *N* - 2, *N* - 4, *N* - 8, and so on, such that the
+hashes K[*N* - 1], K[*N* - 2], K[*N* - 4], K[*N* - 8],
+and so on, such that the
 amortized average number of hashing operations required per rekey is
 just under 2, at a logarithmic space cost --- 30 keys for this
 example.
@@ -97,3 +103,33 @@ this allows the owner to establish a relationship with it that its
 manufacturer cannot participate in.  The rekeying protocol plays the
 role their paper calls "escrowed seppuku", allowing the manufacturer
 to command the duckling to die and prepare to be ensouled anew.
+
+Extension to further applications
+---------------------------------
+
+Because this protocol only depends on the strength of a hash function,
+it's a good candidate for being resisting quantum cryptanalysis, which
+is good news, since Google has just announced that they have
+demonstrated quantum supremacy.  But in the form above it can't do
+very much; it can't even authenticate any other information on the
+keycard, such as the "guest"'s checkout date or public key, since that
+other information would break the hash chain.
+
+Suppose that instead of computing the keys by merely hashing their
+predecessor, we additionally generate a private-key seed D[0], and
+compute a series of private-key seeds D[1], D[2], ... D[N] from it by
+the recurrence D[I] = H(D[I - 1]), as we were doing before with the
+room keys.  And suppose we have some computation A to generate a
+public key from one of these private key seeds: Q = A(D[I]), which
+perhaps also generates a private key into the bargain.  Now, instead
+of computing the new room key as K[I] = H(K[I - 1]), we compute that
+key as K[I] = H(K[I - 1] || A(D[I])), and we put both K[I] and A(D[I])
+on the keycard.  The verification step changes accordingly.
+
+Now, however, the room lock can verify both the newly presented key
+and this other datum A(D[I]), which it does not understand and
+therefore could not have used to verify that it was used to derive the
+A(D[I + 1]) that it previously held.  The front desk, however, can
+perhaps use the corresponding private key to sign other attestations
+that the room lock can verify, at least until its next reverse
+metempsychosis.
