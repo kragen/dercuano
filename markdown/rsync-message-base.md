@@ -23,19 +23,19 @@ host broadcasts on that Ethernet.  Moreover, rather than achieving
 this through a centralized bulletin board or a shared broadcast medium
 like thinnet, you want to achieve it via some potentially complex and
 changing topology of interconnected network nodes (originally,
-"gateways"; nowadays sometimes "routers").
+“gateways”; nowadays sometimes “routers”).
 
 (For the time being I will ignore the questions of multiple channels,
 unicast messages as well as broadcast, whether the subscribers and the
 publishers are the same set, whether there are some security
-requirements on their membership, and whether there's some kind of
-need for load-balancing or "sharding" for performance.)
+requirements on their membership, and whether there’s some kind of
+need for load-balancing or “sharding” for performance.)
 
 The obvious thing to try is for each node to send each message it
 receives to all of the other nodes to which it is connected.  So if
 you have the topology A -- B -- C -- D; B -- E, then if node A sends a
 message, it will arrive at node B, which will forward it to nodes C
-and E; node C will then forward it to node D; and we're done.  This
+and E; node C will then forward it to node D; and we’re done.  This
 simple flooding approach has one main problem: first, any cycle in the
 connectivity graph will produce an infinite number of copies of every
 message.
@@ -49,7 +49,7 @@ TTLs and return-paths
 ---------------------
 
 The most basic approach to limiting broadcast message duplication by
-routing loops is a "time-to-live" field on each message sent across
+routing loops is a “time-to-live” field on each message sent across
 the network.  This field is decremented at each router, and messages
 with TTL of 0 or less are discarded.  So a message originally sent
 with a TTL of 5 is guaranteed to reach a distance of no more than 5
@@ -65,8 +65,8 @@ clockwise around the loop 10 times, while the other will travel
 counterclockwise around the loop 10 times; each node will receive the
 message (and every other message) 20 times.
 
-But the number can be exponentially large.  Consider the "diamond
-graph" A -- B -- C -- A; B -- D -- A.  Every time a message reaches B
+But the number can be exponentially large.  Consider the “diamond
+graph” A -- B -- C -- A; B -- D -- A.  Every time a message reaches B
 or A, two copies of it will be made; for a copy arriving at B from D,
 for instance, copies will be sent to C and A, and A will then send
 copies to C and D.  So a message with a TTL of 5 sent from A will go
@@ -89,7 +89,7 @@ under load.
 
 A slight refinement of this approach was used on Usenet (though not as
 the primary duplicate-suppression mechanism); each copy of a message
-carries a "return path" that describes the path it took to get to
+carries a “return path” that describes the path it took to get to
 where it is, which could typically be used as an email routing path to
 send a reply to the poster.  The obsolete SSRR option in IP and the
 obsolete multihop mail routing system in SMTP work the same way
@@ -135,7 +135,7 @@ The topology of the network is assumed to change on a much slower
 timescale than the transit time of individual messages.  Any message
 that is transiting the network when the topology changes may be lost
 or duplicated, so reliability and semantic deduplication must be done
-by network endpoints; if a message's transit is slow enough to include
+by network endpoints; if a message’s transit is slow enough to include
 many topology changes, it may be duplicated many times.
 
 Moreover, for the topology to avoid containing many cycles all the
@@ -156,10 +156,10 @@ Usenet used a different approach for duplicate suppression.
 The Usenet message-ID approach
 ------------------------------
 
-The Usenet approach is to identify each message with a "Message-ID"
+The Usenet approach is to identify each message with a “Message-ID”
 unique to that message, but much shorter than the entire message.
 Then, before transmitting the entire message from one node to another,
-the communicating nodes verify that the message isn't already present
+the communicating nodes verify that the message isn’t already present
 on the receiving node; the Usenet protocol NNTP has commands called
 IHAVE and SENDME for this purpose.  `IHAVE foo` indicated the
 availability of the message with the message-ID `foo`; `SENDME foo`
@@ -172,31 +172,31 @@ plays the role of `SENDME`.
 
 A serious weakness of the Usenet implementation was that the
 message-ID is chosen by the sender, typically a string something like
-"trn.20190822.1830.10831@canonical.org", incorporating the hostname,
+“trn.20190822.1830.10831@canonical.org”, incorporating the hostname,
 the date and time, the software being used, the PID of the running
 process, and so on, in an effort to avoid accidental duplication.
 Nevertheless, bugs did sometimes result in unintentional duplication,
 and people sometimes engaged in intentional duplication to attempt
 censorship.
 
-Git uses a similar approach, but uses the SHA-1 of the "objects" as
+Git uses a similar approach, but uses the SHA-1 of the “objects” as
 the message-ID rather than a sender-computed string.  It is
 conjectured to be computationally infeasible to produce a different
 object with the same SHA-1, even intentionally, much less
 accidentally.
 
 I think FidoNet used this approach to propagate messages in its
-"echos", which were distributed message bases similar to Usenet
+“echos”, which were distributed message bases similar to Usenet
 newsgroups, but somewhat more primitive.  The Doctor tells me that the
 message-IDs FidoNet could use to avoid unlimited duplication of
 messages were tuples of the form (network, zone, region, board, sub,
 message), where the (zone, region, board) was a hierarchically
 assigned numerical address space uniquely identifying the particular
-bulletin board on which the message originated, and "network"
+bulletin board on which the message originated, and “network”
 presumably distinguished FidoNet proper from other networks that might
 use the same protocols.
 
-(However, I'm not as familiar with FidoNet's protocols as I am with
+(However, I’m not as familiar with FidoNet’s protocols as I am with
 the internet protocols, and so I might have gotten that wrong.)
 
 A weakness with the message-ID approach is that it still scales only
@@ -233,8 +233,8 @@ This protocol permits a subscriber to efficiently mirror the log, if
 it wishes.  It can then provide the same subscriber interface to other
 subscribers, as long as only the origin server is assigning new
 ordinal numbers to new messages.  In fact, it can update its mirror
-from other subscribers in the same way; it doesn't need to talk to the
-origin server directly.  (Kafka itself doesn't take advantage of this
+from other subscribers in the same way; it doesn’t need to talk to the
+origin server directly.  (Kafka itself doesn’t take advantage of this
 possibility, as far as I know.)
 
 I think this is the way Secure Scuttlebutt works, as well.  Each
@@ -242,8 +242,8 @@ participant in the chat has their own append-only log of messages that
 it has published, and upon conversing with a peer, it asks for updates
 to the logs that it is a subscriber to.
 
-Van Jacobson's "Content-Centric Networking" project (a generalization
-of which is known as "Named Data Networking", or NDN) uses this
+Van Jacobson’s “Content-Centric Networking” project (a generalization
+of which is known as “Named Data Networking”, or NDN) uses this
 approach to handle streams of data.
 
 In CCN, routing is done by naming pieces of data, not network nodes.
@@ -273,9 +273,9 @@ caching HTTP proxy, eliminating many other opportunities for denial of
 service.
 
 The obvious question is how to handle things like streaming voice and
-video in a system like this: interests in data that doesn't yet exist.
+video in a system like this: interests in data that doesn’t yet exist.
 The answer is simply that you assign sequence numbers to the frames of
-streaming data ("ElRubius/videostream/d8s0g03402e/frame/3302") and the
+streaming data (“ElRubius/videostream/d8s0g03402e/frame/3302”) and the
 subscribers send interests for some window of sequence numbers that
 have not yet been produced, but which will be delivered to them when
 they have.  As long as the window is large enough to compensate for
@@ -285,7 +285,7 @@ immediate and efficient streaming.
 This works out to be precisely the same per-publisher log protocol
 used by Kafka for the analogous problem.  And in some sense the
 `getblocks` message in the Bitcoin protocol does the same thing ---
-but the "publisher" is the Satoshi consensus of the participating
+but the “publisher” is the Satoshi consensus of the participating
 nodes, so blocks might sometimes be superseded.
 
 Cryptographic authentication of messages in the log is useful in some
@@ -298,7 +298,7 @@ key associated with that log.  Such an approach will only be
 successful, however, if the routing nodes in the system are checking
 the signatures, which is a potential scalability bottleneck.
 
-XXX how does Git's protocol actually work?  Originally it used rsync,
+XXX how does Git’s protocol actually work?  Originally it used rsync,
 but not the rsync delta-transfer algorithm mentioned below.
 
 This per-publisher-log protocol is only more efficient than the
@@ -307,16 +307,16 @@ remains small, which, admittedly, covers many important cases.  But if
 each message has a new publisher, it reduces to the per-message-ID
 algorithm.
 
-Approaches based on rsync's delta-transfer algorithm
+Approaches based on rsync’s delta-transfer algorithm
 ----------------------------------------------------
 
 Rsync contains [a delta-transfer algorithm] designed to save bandwidth
-over Australia's undersea cables.  Transmitting data to or from
+over Australia’s undersea cables.  Transmitting data to or from
 Australia was very expensive, so if you had slightly different copies
 of a file on opposite sides of the Pacific, it was important to find
 the parts that were different and transmit only those.  If you have
 both versions of the file on one side of the connection, you can use
-the standard longest-common-subsequence ("LCS") dynamic-programming
+the standard longest-common-subsequence (“LCS”) dynamic-programming
 algorithm to find the minimal edit sequence.  But how do you
 efficiently compute a small edit sequence between two files, each of
 which is only available to one of the parties in the protocol?
@@ -336,11 +336,11 @@ rest of the data in the file by one byte, none of your hashes will
 match, and so the entire file will be transmitted even though the edit
 distance was one byte.
 
-The bupsplit algorithm used by Avery Pennarun's bup backup program,
+The bupsplit algorithm used by Avery Pennarun’s bup backup program,
 and also the basis of Jumprope, attempts to overcome this problem by
 breaking the file into blocks of variable sizes in a way that will
 usually be consistent after insertions and deletions, similar to the
-"fuzzy hashing" used in forensics.  (See file `immutable-filesystem`
+“fuzzy hashing” used in forensics.  (See file `immutable-filesystem`
 for some related notes.)
 
 The rsync algorithm takes a different approach.  One of the versions
@@ -348,10 +348,10 @@ of the file is broken into fixed-size blocks in the usual way,
 typically using a block size of a few hundred bytes, and each block is
 hashed with two different algorithms: a weak linear [rolling-checksum]
 algorithm (in rsync, a modified version of Adler32) and a stronger
-hashing algorithm --- originally rsync defaulted to MD4 for this,
+hashing algorithm — originally rsync defaulted to MD4 for this,
 which was cryptographically very weak, and even nowadays uses MD5,
-which has also been broken.  The resulting collection of hashes (let's
-call it a "digest", since the rsync papers don't give it a name) is
+which has also been broken.  The resulting collection of hashes (let’s
+call it a “digest”, since the rsync papers don’t give it a name) is
 transmitted to the other participant, where the rolling checksum is
 computed over *every length-N substring* of the other version of the
 file; any matches found in the digest are checked with the strong
@@ -371,22 +371,22 @@ The rsync algorithm is used not only in rsync but also in zsync,
 rdiff, and some other software.  zsync in particular allows a
 sender-server participant in the protocol to be nothing more than a
 dumb HTTP server capable of byte-range access; this is achieved by
-precomputing the digest and placing it in a "zsync file" on a web
+precomputing the digest and placing it in a “zsync file” on a web
 server that points to the real file.  The zsync client, upon fetching
 the digest file, can run the rolling checksum over its local version,
 occasionally running the strong checksum, and compute the set of
 byte-ranges that it needs to fetch from the origin server to
-reconstruct the origin server's version of the file.
+reconstruct the origin server’s version of the file.
 
 If you want to rsync a mebibyte of data using a block size of 4
-kibibyte ([Tridgell's dissertation][0] discusses block-size tradeoffs
+kibibyte ([Tridgell’s dissertation][0] discusses block-size tradeoffs
 in chapter 3, finding optimal block sizes in the range of 256 bytes to
 8 kibibytes for a few datasets), the digest to be transmitted will be
 5 kibibytes, 0.5% of the total.
 
 [0]: https://www.samba.org/~tridge/phd_thesis.pdf
 
-Note, however, that this 0.5% doesn't decrease as the file size
+Note, however, that this 0.5% doesn’t decrease as the file size
 increases, unless you also increase the block size.  If you were to
 digest 10 tebibytes using 4-KiB blocks and 20-byte digest entries,
 your digest would be 50 gibibytes.
@@ -399,7 +399,7 @@ message-ID to each entire block of messages, rather than each
 individual message.
 
 A key difference from the usual use of rsync is that the receiver
-don't want to delete messages that the sender doesn't have from their
+don’t want to delete messages that the sender doesn’t have from their
 own database; instead they want the union of all interesting messages.
 
 For this to be efficient, you want the ordering chosen for the
@@ -410,8 +410,8 @@ usually added near the end, or by a combination between temporal order
 and publisher ID, or a combination of temporal order and topic.
 
 This approach also permits participants, in theory, to blacklist
-certain known blocks to save space --- rather than storing a tebibyte
-of uninteresting data (last year's Wikipedia edits, say), they can
+certain known blocks to save space — rather than storing a tebibyte
+of uninteresting data (last year’s Wikipedia edits, say), they can
 just store its hashes and its sorting key range.  However, if new data
 appears that belongs to that sorting key range, it would change the
 hashes, making the simple blacklist approach fragile.
@@ -427,18 +427,18 @@ Suppose that instead of using a single block size, we use several
 different block sizes on the same file.  For example, we compute
 digests for block sizes of 1 KiB, 1 MiB, 1 GiB, and 1 TiB.  If our
 total dataset is 16 TiB, its 1-TiB-level digest might be 320 bytes
-(assuming, for now, no sorting keys --- just treating the file as
+(assuming, for now, no sorting keys — just treating the file as
 opaque); a peer who fetches that digest can efficiently discover
 whether it matches their local replica, or matches it except for a few
 bytes inserted at the beginning.
 
 But suppose they find that the last TiB-sized block in the 1-TiB-level
-digest doesn't match any of the 17.59 trillion overlapping
+digest doesn’t match any of the 17.59 trillion overlapping
 tebibyte-sized blocks in their own replica.  Rather than sending a
 network request or a purchase order to have that tebibyte of data
 shipped to them, they can fetch the corresponding block of the
 1-GiB-level index.  The entire 1-GiB-level index has 16384 entries,
-but it's only interested in the last 1024 of them, totaling 20 KiB, to
+but it’s only interested in the last 1024 of them, totaling 20 KiB, to
 discover whether any of the gibibytes comprising that tebibyte are
 among the 17.59 trillion overlapping gibibytes in their existing
 dataset.
@@ -450,10 +450,10 @@ kibibyte level.
 In this way, if anywhere from 1 to 1024 bytes have been inserted or
 deleted in any single place in this 16-TiB dataset, our peer can
 discover them by transfering 320 + 20480 + 20480 + 20480 + 1024 =
-62784 bytes.  This is what rsync would report as a "speedup factor" of
-about 280 million, although it's still worse than the theoretical
+62784 bytes.  This is what rsync would report as a “speedup factor” of
+about 280 million, although it’s still worse than the theoretical
 limit by a factor of between 61 and 62784.  Note that this is amenable
-to zsync's digest-precomputation approach.
+to zsync’s digest-precomputation approach.
 
 The overhead in the worst case is 20 parts in 1023, or 1.96%, the same
 as nonrecursive rsync.  But there are important cases that should
@@ -462,12 +462,12 @@ admit these higher efficiencies.
 Storing the file in such a way that this can be done quickly,
 including a summary of the 70 trillion rolling hashes involved to
 avoid needing eight passes over the 16-tebibyte dataset, and the
-desire to keep a local "virtual copy" of the sending peer's dataset
+desire to keep a local “virtual copy” of the sending peer’s dataset
 (to avoid re-transferring blocks the next time around whose only sin
 was that they lacked a message, rather than having new ones) seems
 like it might be a challenging problem both in terms of algorithms and
-in terms of systems design.  However, I think it's in some sense
-straightforward; it doesn't require any novel inventions.
+in terms of systems design.  However, I think it’s in some sense
+straightforward; it doesn’t require any novel inventions.
 
 ### Recursive rsync delta transfer applied to message bases and similar CRDTs ###
 
@@ -483,7 +483,7 @@ non-recursive rsync or the 28 gigabytes I suggested the IHAVE/SENDME
 approach would need for a similar-sized base of messages (although
 there I was postulating an average message size of 10 kilobytes).  But
 it remains efficient if we have, say, a mebibyte of new messages to
-sync.  If they're scattered in 1024 random places through the
+sync.  If they’re scattered in 1024 random places through the
 16-tebibyte base, due to a poor choice of sorting keys, we need on the
 order of 63 mebibytes of bandwidth to sync them, a 63x multiplier, but
 several hundred times better than the other protocols.  If, instead,

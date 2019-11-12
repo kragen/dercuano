@@ -367,6 +367,60 @@ pipeline had three pixels active was ill-founded; in fact the optimum
 is two, because you find the minimum of two pixels in one operation,
 not two.
 
+Urbach–Wilkinson with an ascending minima stack
+-----------------------------------------------
+
+The Urbach–Wilkinson algorithm computes one eroded image for each
+distinct horizontal chord length in time logarithmic in the maximum
+chord length and linear in the number of chord lengths, then combines
+these horizontally-eroded images with vertical and horizontal offsets
+to get the final result.  Above I point out that there are sometimes
+more efficient ways to combine the horizontally-eroded images that
+require less than the one operation per chord Urbach–Wilkinson give.
+Also, though, we can compute those horizontally-eroded images in a
+more efficient manner than Urbach and Wilkinson’s algorithm when we
+have a small number of chord lengths — by using the ascending-minima
+algorithm.
+
+As an extreme case, consider using Urbach–Wilkinson to erode by a
+paraxial square 65×65 kernel.  Each final image pixel is the minimum
+of 65 vertically-adjacent pixels in a single intermediate image that
+is eroded by a 65-pixel horizontal-line kernel; to compute this
+intermediate image, the UW algorithm first computes the erosions by
+horizontal-line kernels of 2, 4, 8, 16, 32, and 64 pixels, requiring 6
+min operations per pixel.  A seventh min operation per pixel gives the
+65-pixel erosion we needed.  (This doesn’t require nearly as much
+memory traffic as you might think, because you can pipeline it just as
+you can some of the algorithms discussed earlier, or as in file
+`dsp-pipeline`.)
+
+By contrast, the ascending-minima algorithm does 2 pixel-min
+operations per pixel, plus some pointer comparisons, to achieve this
+or any other single-window-width sliding-window erosion.
+
+You might think that the ascending-minima algorithm would require a
+separate deque for multiple window widths.  But consider what happens
+if we implement the deque as a stack of all nondecreasing pixels on
+the line, with a “bottom pointer” that we sometimes increment and
+never decrement.  When we push a new pixel onto the stack, we need to
+check to see if the bottom pointer must be incremented because its
+pixel has aged out; when we pop pixels from the stack in order to push
+a smaller pixel, we need to ensure that the bottom pointer points to
+the newly pushed pixel or something to its left.
+
+But the actual contents of the stack do not depend on the bottom
+pointer, and the bottom pointer is the only thing that depends on the
+window width.  So many bottom pointers can share the same pixel stack.
+And so adding more bottom pointers doesn’t add more pixel comparisons;
+those remain at 2 per pixel, regardless of the number of chord lengths
+demanded.  The extra bottom pointers do, however, add more index
+comparisons, which are about 2 per chord length per pixel.
+
+Conceivably in practice the extra log-N factor is too small to matter.
+
+Of course all of this is applicable to other applications of
+sliding-window RMQ, not just image erosion.
+
 Linear convolution
 ------------------
 

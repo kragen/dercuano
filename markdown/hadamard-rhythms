@@ -7,12 +7,12 @@ timing offset of each of the 8 beats.  Some of the volumes might be 0,
 silencing those beats; some of the offsets might be nonzero, swinging
 those beats a bit.
 
-A problem with this representation is that usually you don't want to
+A problem with this representation is that usually you don’t want to
 adjust just one beat at a time; you might want to do something to all
 the odd beats, for example, or all the even beats.  A possible
 solution to this is to transform 8 volume variables and 8
 timing-offset variables each through a 8x8 Walsh matrix, here given in
-"sequency order" rather than as a Hadamard matrix:
+“sequency order” rather than as a Hadamard matrix:
 
      1  1  1  1  1  1  1  1
      1  1  1  1 -1 -1 -1 -1
@@ -40,9 +40,9 @@ will note is still symmetric though no longer normalized:
 
 So, for example with volumes, the first variable is a master volume
 control; the last variable is a master volume control for the major
-beats (assuming we're in 4/4 time); the second variable controls the
+beats (assuming we’re in 4/4 time); the second variable controls the
 volume on the first half of the measure; the fourth variable controls
-the first and third beats (the "on" beats, giving you a backbeat if
+the first and third beats (the “on” beats, giving you a backbeat if
 you turn them down); the fifth variable controls the first halves of
 the first and third beats, and the second halves of the second and
 fourth beats; and so on.  It might make the most sense to have scale
@@ -60,7 +60,7 @@ is no need for the first variable in that case.  If the last timing
 variable (10101010) is pushed to an extreme, it could perhaps push the
 eighth notes to coincide with the quarter notes.
 
-Here's the corresponding 4x4 binary matrix:
+Here’s the corresponding 4x4 binary matrix:
 
     1 1 1 1
     1 1 0 0
@@ -111,6 +111,6 @@ This was derived as follows:
             print(' '.join(binrow(row)))
 
 It is possible to use the fast Hadamard transform to efficiently
-transform between the two representations --- the set of user
-parameters and the set of music parameters --- but that isn't really
+transform between the two representations — the set of user
+parameters and the set of music parameters — but that isn’t really
 important in this case.
