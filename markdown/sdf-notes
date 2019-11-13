@@ -301,3 +301,12 @@ has a typed array interface for raw pixel access I used in Aikidraw,
 so you don’t need a DOM call for every pixel you draw.  I think I can
 render raster graphics into that interface pretty easily, fast enough
 at least for still images.
+
+Specifically, you can call [`ctx.putImageData(data, x, y)`][2] on a 2d
+`<canvas>` drawing context, where `data` is an `ImageData` object made
+out of a width `.width`, a height `.height`, and a `Uint8ClampedArray`
+in RGBA order `.data`; there are also `ctx.createImageData(w, h)` and
+`ctx.getImageData(x, y, w, h)` methods.  The `ImageData` constructor
+is more experimental but available in Web Workers.
+
+[2]: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/putImageData
