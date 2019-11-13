@@ -1,0 +1,43 @@
+Suppose you want a logic analyzer, and you have electronics, but you
+don’t have a screen; you only have a speaker or headphone jack and
+perhaps an LED or two.  What can you do?
+
+It seems sensible to map the time domain to the time domain. (However,
+you will often want about six orders of magnitude slowdown: a logic
+analyzer needs to be measuring signals of at least 20 MHz, and the
+humans can only hear signals up to about 20 Hz.  Then you can loop the
+capture if desired.)  Then what do you map the different logic
+channels to?
+
+Probably the most sensible thing to do is to map them to different
+pitches in the same octave, synthesizing those pitches with rich
+harmonic content in order to make the perception of both pitch and
+envelope more precise.  Emphasizing onsets with an attack-decay
+envelope, or the variation in harmonic content that comes inevitably
+from Karplus–Strong or other waveguide synthesis or that can easily be
+produced with FM synthesis, might help with some kinds of debugging.
+
+Unfortunately the choice of pitches has a tradeoff between
+interpretability and aesthetic quality: dissonant pitches are easier
+to distinguish, particularly if they happen to start and end
+simultaneously, which will happen frequently on a logic analyzer.
+Additional features that may help to distinguish the notes might
+include different speeds, depths, and phases of vibrato, and the kind
+of flanging effect produced by the beating of the harmonics of
+nearly-equal-delay strings, as in a piano or a 12-string guitar.
+
+(A counterintuitive feature of modern microcontrollers is that even
+low-end microcontrollers are more than powerful enough to do real-time
+multichannel Karplus–Strong synthesis with all-pass filters for
+variable fractional-sample delays, and additionally they can do
+digital logic analyzer data acquisition at megasamples per second.)
+
+You probably need some way to configure a Boolean function to trigger
+a capture.  Since you’re fiddling around with wires anyway in this
+scenario, the simplest approach is to use jumper wires to hook up some
+of the input lines to particular pins — some designated such that
+their conjunction will trigger a capture, others designated such that
+any of them will inhibit it.  This is not universal but might be
+enough.  However, here in CMOS land, we need to hook those input pins
+up to *something*; probably the best approach is to just enable
+pullups or pulldowns and hope that doesn’t disturb the DUT too much.

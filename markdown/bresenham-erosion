@@ -418,8 +418,28 @@ comparisons, which are about 2 per chord length per pixel.
 
 Conceivably in practice the extra log-N factor is too small to matter.
 
-Of course all of this is applicable to other applications of
-sliding-window RMQ, not just image erosion.
+Of course this whole technique to get an arbitrary number of sliding
+windows out of a single ascending-minima stack is applicable to other
+applications of sliding-window RMQ, not just image erosion.
+
+> You could try to make a sort of “spaghetti stack” out of this
+approach by making a note under each pixel of the pixel index at which
+it gets popped off the stack and of the index of the pixel under it on
+the stack, but in this simple form, this modification doesn’t buy you
+anything useful — computing a sliding-window RMQ is already as fast as
+it’s going to get, and it doesn’t make it fast to compute a
+random-access RMQ, because the “stack” isn’t random-access — you have
+to chase the pointers up it, and you can’t traverse it downwards at
+all except by linearly searching all the pixels.  If you additionally
+note the replacement of each pixel (if any) when you pop it, a sort of
+next-child pointer, it becomes possible to traverse the tree downwards
+in a useful way, but you still have no guarantee of the kind of
+balance or random access among children that would make this
+efficient — if the pixels happen to be in descending order, the root
+will have them all as its children.
+
+> You could maybe do some kind of skip-list or tree-balancing thing,
+but this avenue of investigation seems progressively less appealing.
 
 Linear convolution
 ------------------
