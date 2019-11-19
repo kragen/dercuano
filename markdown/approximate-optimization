@@ -1,0 +1,72 @@
+Many successive-approximation algorithms for mathematical optimization
+--- including the variants of gradient descent that are currently
+fashionable for training ANNs, but especially things like
+Newton-Raphson iteration, the method of secants, and the method of
+Halley --- are quick to converge to a global optimum once they are
+close to it, but can take a long time to get anywhere close to that
+optimum.
+
+This suggests that it may be advantageous to do the first iterations
+of these algorithms using relatively imprecise but cheap means, then
+do only the last few iterations using higher precision.  What kinds of
+imprecise means might work for the early iterations?
+
+Analog computation
+------------------
+
+Differential analyzers and similar analog "computers" are commonly
+accurate to 2% or so, although it depends on the computation, since
+errors in numerical integration of ODEs, for example, can grow
+exponentially with time (and this applies equally to analog
+"computers", even though no actual numbers are involved).
+Successive-approximation algorithms are something of a best case,
+though, since rather than growing over time, errors tend to die out
+over time.
+
+So it seems likely that a properly configured analog computation
+circuit could approximate the solution within the limit of whatever
+its signal-to-noise ratio is; commonly 60dB (0.1%) to 80dB (0.01%) is
+reached.  You could imagine some kind of crossbar interconnect made
+out of CMOS analog switches --- multiplexor/demultiplexors --- to
+interconnect op-amps, resistors, capacitors, OTAs, and entire analog
+processing blocks.
+
+0.01% is close enough that two further iterations of a
+quadratic-convergence method such as Newton-Raphson iteration would
+reach the precision limits of double-precision floating point.
+
+One difficulty is that, with the exception of integration over time
+provided by capacitors and differentiation over time provided by
+inductors or gyrators or the like, analog circuits normally have no
+memory --- their output is a function of their input, not a function
+of all their past inputs.  This means that you need separate circuits
+for each scalar variable in your problem state; a single vector
+equation like *a* = *b* + *c* might require hundreds or thousands of
+op-amps, unless you can arrange for those vector variables to be
+indexed by time.
+
+Analog delay lines of various kinds can improve this situation
+considerably; the old standards for slow signals were
+thermostatically-controlled piezoelectric mercury delay lines and
+later torsional magnetostrictive delay lines, with Pupin-like cascades
+of inductors and capacitors or coaxial transmission lines for faster
+signals.  The approach of using a CCD or similar camera sensor
+described in file `ccd-oscilloscope` is a potential pure-analog
+solution that permits some degree of out-of-order access.
+
+In this context, though, it may not be necessary; maybe we can offload
+the problem of memory onto digital circuitry and feed it through a DAC
+feeding the analog circuitry, then digitize the result with an ADC to
+store it again.
+
+Low-precision floating-point and fixed-point
+--------------------------------------------
+
+"Half-precision" 16-bit floating-point is commonly available in GPUs,
+"TPUs", and modern SIMD instructions; typically it runs at the same
+cycle time as double-precision floating point, but four times the
+parallelism.  So it's an obvious candidate.
+
+Even lower precisions may be useful for computing initial
+approximation.  Some kind of 8-bit floating-point format, for example,
+or 8-bit saturating fixed point.
