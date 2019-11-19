@@ -1,16 +1,16 @@
 Tonight I was reading _Software Abstractions_, by Daniel Jackson,
-Michael Jackson's son. and came across the specification of a
+Michael Jackson’s son. and came across the specification of a
 hotel-room rekeying protocol that uses only keycards to communicate
 between the hotel front desk and the door locks.  When it is desired
-to rekey the lock, thus locking out the previous "guest", the front
+to rekey the lock, thus locking out the previous “guest”, the front
 desk issues a new key; the battery-powered lock can recognize both the
 current key and the new key, and upon recognizing the new key, it
-updates its "current-key state" to refer to that new key.
+updates its “current-key state” to refer to that new key.
 
 This is vaguely reminiscent of the problem [Stajano and Anderson] set
-out to solve: "secure transient association of a device with multiple
-serialised owners", the "owners" in this case being the hotel
-"guests", and the "device" being the door lock.
+out to solve: “secure transient association of a device with multiple
+serialised owners”, the “owners” in this case being the hotel
+“guests”, and the “device” being the door lock.
 
 [Stajano and Anderson] https://www.cl.cam.ac.uk/~fms27/papers/1999-StajanoAnd-duckling.pdf "The Resurrecting Duckling, 1999"
 
@@ -21,9 +21,9 @@ The weak protocol suggested in the book
 ---------------------------------------
 
 The suggestion in the book was that the lock could use, for example,
-an LFSR to compute the "new key" from the "current key".  This
+an LFSR to compute the “new key” from the “current key”.  This
 approach is unnecessarily vulnerable to some attacks.  Most simply,
-the "guest" could compute the successor of their own room key, and
+the “guest” could compute the successor of their own room key, and
 after checking out, come back to rob the new occupant.  Slightly more
 annoyingly, they could compute the successor of the successor, and not
 only rob the new occupant but also lock them out.  Furthermore, they
@@ -35,21 +35,21 @@ A better protocol
 
 Given a one-way function, instead of computing a *successor* key, the
 door lock can recognize a *predecessor* key.  It compares the
-presented key PK contents to its "current key" CK, opening if there is a
+presented key PK contents to its “current key” CK, opening if there is a
 match PK = CK; if that fails, it computes a one-way function of the presented
 key H(PK) and compares *that* to the current key.  If there is a match H(PK) = CK, it
 updates its current key to be the new key, thus locking out the old
-key.  (This "comparison to the current key" could be achieved by way
+key.  (This “comparison to the current key” could be achieved by way
 of a salted KDF such as bcrypt() so that even with knowledge of the
-lock's memory contents, however acquired, it is infeasible to
+lock’s memory contents, however acquired, it is infeasible to
 fabricate even a current key.  That is, instead of storing CK,
 the lock would store some salt S and CKK = KDF(CK, S), and instead of
 comparing PK = CK, it would compare KDF(PK, S) = CKK.)
 
 To initialize the lock, the front desk generates and stores a hash
 iteration count *N* of, say, a billion, and a random bitstring R; it
-hashes the bitstring *N* times --- K[0] = R; K[1] = H(K[0]);
-K[2] = H(K[1]); ... K[N] = H(K[N-1]); and sets the lock's "current key" CK to
+hashes the bitstring *N* times — K[0] = R; K[1] = H(K[0]);
+K[2] = H(K[1]); ... K[N] = H(K[N-1]); and sets the lock’s “current key” CK to
 the billion-hashed version K[N], and then it erases all of K except *N* and R.
 To generate the new
 key, the front desk decrements *N* and repeats the computation, thus
@@ -62,7 +62,7 @@ can be reinitialized.  Even 9999 is likely sufficient for a hotel-room
 door lock.
 
 As I understand it, this is more or less the OPIE or S/KEY approach,
-and it's probably in Merkle's dissertation, which I haven't read yet.
+and it’s probably in Merkle’s dissertation, which I haven’t read yet.
 
 ### Performance optimizations ###
 
@@ -71,10 +71,10 @@ operations per rekey is too slow, it is straightforward to cache
 hashes K[*N* - 1], K[*N* - 2], K[*N* - 4], K[*N* - 8],
 and so on, such that the
 amortized average number of hashing operations required per rekey is
-just under 2, at a logarithmic space cost --- 30 keys for this
+just under 2, at a logarithmic space cost — 30 keys for this
 example.
 
-Most of the cache space is used for the last few levels --- if you
+Most of the cache space is used for the last few levels — if you
 could afford a million hashing operations per rekey, you could cache
 only 10 keys instead of 30, still getting a thousandfold speedup over
 the cacheless case.  That is, from a certain point of view, 99.9% of
@@ -97,22 +97,22 @@ amortized-only algorithm.
 Reverse metempsychosis and imprinting an ignition key
 -----------------------------------------------------
 
-[Stajano and Anderson] suggest that an IoT device should "imprint on"
-or "be ensouled by" the first public key it receives when it hatches;
+[Stajano and Anderson] suggest that an IoT device should “imprint on”
+or “be ensouled by” the first public key it receives when it hatches;
 this allows the owner to establish a relationship with it that its
 manufacturer cannot participate in.  The rekeying protocol plays the
-role their paper calls "escrowed seppuku", allowing the manufacturer
+role their paper calls “escrowed seppuku”, allowing the manufacturer
 to command the duckling to die and prepare to be ensouled anew.
 
 Extension to further applications
 ---------------------------------
 
 Because this protocol only depends on the strength of a hash function,
-it's a good candidate for being resisting quantum cryptanalysis, which
+it’s a good candidate for being resisting quantum cryptanalysis, which
 is good news, since Google has just announced that they have
-demonstrated quantum supremacy.  But in the form above it can't do
-very much; it can't even authenticate any other information on the
-keycard, such as the "guest"'s checkout date or public key, since that
+demonstrated quantum supremacy.  But in the form above it can’t do
+very much; it can’t even authenticate any other information on the
+keycard, such as the “guest”’s checkout date or public key, since that
 other information would break the hash chain.
 
 Suppose that instead of computing the keys by merely hashing their

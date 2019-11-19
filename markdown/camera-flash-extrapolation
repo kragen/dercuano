@@ -1,0 +1,97 @@
+One hot summer night recently, I guided a tourist through the streets
+of Palermo, the chichi Buenos Aires neighborhood.  She was enthralled
+by the colorful murals that cover the walls of many of the alleyways
+(*pasajes*) and stopped to take many photos.  (Incredibly, during her
+entire trip, she didn’t get even a single hand computer stolen, just a
+jacket and some colored pencils.)
+
+Her hand computer camera’s wimpy LED flash was not enough to
+illuminate the murals clearly; unfortunately she wasn’t able to visit
+them during the day.  It occurred to me that it should be possible
+with multiple coregistered camera frames to artificially amplify the
+brightness of the flash somewhat.
+
+The scheme is as follows.  First, we take some frames with the flash
+and other frames without it, and perhaps frames with different
+quantities of flash or different exposure times (and variation in
+“ISO” gain to compensate for the exposure time).  Then, we coregister
+them to find the corresponding pixels.  For each pixel, we compute a
+linear regression of its color in each frame against the amount of
+flash in that frame; this resolves the various frames into a frame of
+“biases” representing the color of the pixel under existing lighting,
+a frame of “slopes” representing the per-spectral-band reflectance of
+the pixel to the flash, and what we hypothesize is random noise.
+
+This allows us to extrapolate what the image would look like if the
+flash had been brighter than it was in fact.  This will amplify errors
+and measurement noise to some degree, but if we are amplifying the
+flash signal by less than an order of magnitude, the effect should be
+small enough not to overwhelm the quality improvement from the added
+light.
+
+The flash may cause some pixels to saturate, and saturated or
+near-saturated pixels should either be excluded from the linear
+regression or given a very small regression weight.  A potentially
+worse problem is that the extrapolated image may saturate pixels that
+were not saturated in the input images.  This can be handled by doing
+the extrapolation with extra bits of precision or in floating point to
+handle the larger dynamic range, then translating these linear
+high-dynamic-range values to the final image in a way that preserves
+as much information as possible.  As I understand it, ACES recommends
+using a sigmoid curve per color channel to imitate the
+gradual-saturation nonlinear behavior of film emulsions, thus avoiding
+the total loss of information in particularly dark or light areas,
+providing higher dynamic range in digital images without the spatial
+filtering we usually see in HDR images.
+
+Pixels spatially closer to the camera will experience more flash
+illumination, at least if we’re using an on-camera flash (typical for
+photos from hand computers).  However, they will also experience more
+flash illumination if they have higher reflectance, so by itself this
+does not turn a camera with an on-camera flash into a depth camera; it
+cannot untangle reflectance from closeness to the camera.  If the
+non-flash illumination were constant everywhere in the scene, like a
+naïve ambient light source in a raytracer without ambient occlusion,
+then we could use the ambient light source to derive the raw
+reflectance, then divide the flash slope of each pixel by its
+reflectance to derive its (inverse square) distance.  However, this
+seems unlikely to work in practice.
+
+A different way to take advantage of this phenomenon that might work
+better is to use even fairly imprecise SfM depth data derived from
+camera parallax to figure out which parts of the image are unusually
+close to the camera, then artificially attenuate the flash on them.
+This give the effect of a flash positioned further from the scene than
+it really is, thus evening out the flash illumination across the scene
+somewhat.
+
+If we have this crude SfM data available, we should also be able to
+determine that certain pixels are at very nearly the same depth — for
+example, nearby pixels on the surface of a single object — so they
+should be receiving very nearly the same illumination from the flash.
+This means that differences in their flash slopes reliably indicate
+differences in their reflectances; this enables local correction of
+the “bias” image for reflectance to get an image that is purely a map
+of non-flash ilumination (plus non-Lambertian phenomena such as
+specular glints).  Since we’re talking about pixels that are close
+together in three-space, the *intensity* of non-flash illumination on
+them should be the nearly the same, except in shadows; only its
+*direction* varies.  So we can use this to get information about the
+angle between the surface and the non-flash illumination and thus
+about its geometry.
+
+Of course, if we have multiple flashes in different positions
+available, we can use them to illuminate the scene from different
+angles in different frames, thus giving us lots of great information
+about surface geometry.  This might sound like an expensive setup that
+is unrealistic in most circumstances, but in fact with the advent of
+widespread forward-facing cameras on hand computers, it’s eminently
+feasible for small objects: the different “flashes” are just different
+regions of the screen.  (Some researchers also noted that this allows
+you to get nine or twelve channels of spectral information rather than
+the usual three, since the spectra of the RGB or RGBW filters on the
+screen will usually imperfectly match the spectra of the RGB filters
+on the camera focal plane.  Unfortunately, some shithead reporter
+mischaracterized the research as providing “hyperspectral”
+capabilities, and so most of the commentary I saw focused on debunking
+the lie rather than the actual research.)

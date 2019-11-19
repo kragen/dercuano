@@ -1,0 +1,47 @@
+Electromechanical relays have some lovely features: they can provide
+galvanic isolation, very high crosstalk immunity, enormous gain, very
+low on-impedance, and, in locking designs, bistability even when the
+power goes out.
+
+However, they have some big problems: they’re power-hungry and their
+operating speed is limited to the kHz to tens of kHz and their
+operating life is limited to thousands to millions of operations,
+which usually limits them to *average* operating speeds in the
+millihertz or less.
+
+The reason for the short operating life is contact oxidation.  (In
+theory elastic metal fatigue or creep could play a role too, but those
+are easy enough to avoid.)  Mercury-wetted relays are a common design
+to lengthen this life, and file `paper-foil-relays` discusses the
+possibility of using contacts of carbon (like keyboard dome switches),
+silver, or gold instead.
+
+In other sense-switch applications, a common approach to avoiding the
+oxidation problem is to use phenomena other than conduction to
+transfer the energy.  The TRS-80 keyboard, for example, was capacitive
+(though using springs made of polyurethane foam, which degraded
+rapidly), as are modern touchscreens, touchpads, and some touch panels
+in embedded devices.  And there are numerous inductive sensors for
+position, orientation, and so on.
+
+It occurs to me that relays can work through these media as well.
+
+For example, if you have two ferrite rods with one winding around each
+of them, you can make them into a transformer that efficiently
+transfers AC power from one to the other, from dozens of Hz up to
+several kHz, by completing the magnetic circuit with more ferrite.  By
+moving this additional ferrite under the control of a solenoid, you
+have a relay, one that will never suffer contact oxidation, because
+the contacts are magnetic rather than electrical.
+
+Similarly, although the circuits described in file `paper-foil-relays`
+are the usual kind of dc-coupled contact circuits, you could use a
+similar design to bring one of the plates of a variable capacitor into
+contact with the dielectric from a distance far enough to drop the
+capacitance by orders of magnitude.  This could easily have enough
+capacitance to efficiently transmit power at frequencies of 100 MHz
+and up, again without any electrical contact and thus no oxidation.
+Such capacitive relays could move smaller amounts of mass, and over
+shorter distances, than the inductive relays described above, and so
+they should be able to operate much faster.
+

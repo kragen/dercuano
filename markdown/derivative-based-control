@@ -1,0 +1,105 @@
+In cybernetics, hierarchical control systems have a “higher-level”
+control system which provides set points to (possibly multiple)
+“lower-level” control systems, which the lower-level systems then
+seek.  For example, a reaction-wheel-robot attitude-control system
+might plan a maneuver and then command reaction-wheel control systems
+to seek particular velocities for their respective reaction wheels.
+
+It occurs to me that under some circumstances it makes sense to send
+more than just a set point.  For example, if the central control
+system for a robot arm commands the servo in each of its joints to a
+particular position, the force the servo applies to reach that
+position will depend on the difficulty of the movement — the
+mechanical impedance, as they say, and may reach a very high level if
+unexpected impedance is encountered, perhaps because a research
+assistant’s head is unexpectedly in the way of the arm.  It is
+possible for the central control system to pay attention to these
+error signals and send new commands under those circumstances, but
+this puts stringent demands on the response time of the central
+control system.
+
+It might make more sense to command the lower-level control with not
+just a set point but also a gradient, including a derivative with
+respective to any of a variety of variables — in the above case, it
+might be the force.  In particular, the derivative of position with
+respect to force is simply the mechanical compliance, so this amounts
+to commanding not just a position but also a compliance.
+
+Under some circumstances the commanded compliance (or other analogous
+gradient) would be achieved by electronic or other active feedback
+control — position sensors feeding back to motor-control systems, for
+example — but in other cases it could be achieved wholly or partly
+through passive means.
+
+For example, a “brushless DC motor” or a stepper motor has a variable
+stationary holding torque determined by the armature current when the
+motor is stopped; moreover, an analogous kind of control is possible
+when the motor is moving as well by controlling what percentage of the
+time the windings are carrying current that tends to slow down the
+rotation rather than no current; and a tendon-actuated system, such as
+parts of the humans’ bodies, will be stiffer when both the extensor
+and retractor tendons are under tension (“muscle tone”) than when both
+of them are relaxed.
+
+In other cases, mechanical compliance can be usefully altered by
+taking advantage of redundant degrees of control.  Holding chopsticks
+close to the base rather than close to the tip, for example, is a
+technique for increasing mechanical compliance and thus making it
+easier to pick up food.
+
+In an electronic context, this “variable compliance” might amount to
+things like a varying gain on an amplifier, a variable DC bias on a
+varactor, or a bias current on a secondary winding that varies the
+permeability of a magnetic core, as in a magamp.
+
+The variables whose values the lower-level control uses to perturb the
+set point are not necessarily directly related to the control
+mechanism.  For example, it sometimes makes sense for a hand computer
+display to brighten when the hand computer senses increased ambient
+light, even if the human using it doesn’t command it to brighten; a
+quadcopter rotor might reduce the setpoint of its speed if a local
+accelerometer indicates that it’s accelerating upwards; and so on.  In
+general, the idea is for the lower-level control loop to have a set
+point that is a locally-linear approximation to the potentially more
+complex and time-varying function used by the higher-level loop to
+figure out what set point to send to the lower-level loop.
+
+It is observable that the humans use mechanisms such as these at
+several levels in their motor control; this is demonstrated, for
+example, by attempting to use a mouse rotated 180° or to write legibly
+in a mirror.
+
+Controlling the gradients of such “reflexive” low-level control loops
+can dramatically reduce the demands on the high-level control, in
+particular often permitting much higher communication and processing
+latency before the whole system begins to unintentionally oscillate.
+Also, it can allow the high-level control loop to send commands that
+suppress, excite, or control oscillations in the lower-level control
+loop (such as human voices producing higher pitches and the humans
+doing that freaky thing where they vibrate their eye irises sideways),
+also reducing the demands on the stability of that lower-level control
+loop.
+
+Beyond just the gradient of the set point, it might make sense for the
+high-level control loop to alter other parameters of the low-level
+control loop; for example, if it’s a PID controller, it might make
+sense to alter the gains of the P, I, and D components depending on
+circumstances.  With modern electronics it is possible to get
+subnanosecond response times from analog electronic control loops and
+trivial to get submicrosecond response times.
+
+Note that a PD controller (a PID controller with no I term) will also
+perturb its operating point according to the plant’s
+response — linearly so if the plant is linear — and this can limit the
+force the robot arm exerts on the research assistant’s head.  So in a
+sense this is a special case of the more general concept I’m
+describing; but it is missing the crucial ability for the higher-level
+control loop to set the compliance separately from the set point, and
+it can only work at all in that context if the robot actuator is
+working against a spring or something.
+
+It isn’t necessary for the lower-level setpoint perturbation to be
+linear.  It might be whatever nonlinear function is most convenient to
+compute (for example, using the exponential Ebers–Moll response of
+BJTs) or it might be a precision higher-degree approximation, as in
+mechanical naval fire control computers.
