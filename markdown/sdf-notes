@@ -310,3 +310,70 @@ in RGBA order `.data`; there are also `ctx.createImageData(w, h)` and
 is more experimental but available in Web Workers.
 
 [2]: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/putImageData
+
+Computing normals from a Z-buffer
+---------------------------------
+
+The raycasting process from any given pixel produces, at least, a
+*z*-coordinate or distance at which the first intersection was found.
+(Maybe it also tells you things like how close the ray came to other
+objects, or how many iterations it took to converge, or which object
+it hit, and what the *x* and *y* coordinates were too, but at least it
+has a *z*-coordinate.)  So this gives us a map from screen coordinates
+(*u*, *v*) -> *z*, which is pretty much exactly a Z-buffer.
+
+Suppose we have nothing more than such a Z-buffer and we want to know
+the surface normals.  A first crude approximation comes from the first
+backward differences: Z[6, 2] - Z[5, 2] gives us some kind of
+approximation of d*z*/d*u* at (5.5, 2), and Z[5, 3] - Z[5, 2] gives us
+some kind of approximation of d*z*/d*v* at (5, 2.5).
+
+These two sets of first differences have three problems:
+
+1. They can't distinguish discontinuities (from running off the edge
+of an object, for example) from smooth differences.  If we're
+rendering smooth objects, this is an important difference.
+
+2. They're expressed in screen space.  What we have is (roughly)
+d*z*/d*u* and we want d*z*/d*x*.  *x* = *uz*, so d*x* = *u* d*z*, so
+we need to divide by *z*.  (Analogously for *y*.)
+
+3. They're offset by half a pixel from the pixels we want.
+
+I think we can remedy problems #1 and #3 by, from the two adjacent
+gradient pixels at (5, 1.5) and (5, 2.5), choosing the one with the
+*smallest absolute value*.  So, for example, if Z[5, 1] = 14, Z[5, 2]
+= 16, and Z[5, 3] = 15, we have deltas of +2 and -1 on each side of
+(5, 2), so we pick -1.  If Z[5, 4] = 13, that gives us a delta of -2,
+so from -1 and -2, we pick -1 for the gradient *y*-element at (5, 3).
+
+This will jitter some of the normals by half a pixel one way and
+others by half a pixel the other way, and it eliminates
+discontinuities unless there are discontinuities on both sides of the
+pixel, in which case it will pick the smaller discontinuity.
+
+(This jitter is sort of like morphological erosion of these
+depth-gradient values, but by half a pixel rather than an integer
+number of pixels, and using the absolute value rather than the signed
+value.  Maybe there's some kind of morphological dilation of
+depth-gradient values that could compensate, but I don't know how to
+dilate by fractional pixels.)
+
+So this gives us an estimate of the gradient of the *z*-coordinate
+with respect to *x* and *y*.  But what we want is the surface normal.
+Let's say d*z*/d*x* = *d* and d*z*/d*y* = *e*.  Now vectors tangent to
+the surface include (1, 0, *d*) and (0, 1, *e*); their cross-product
+is a normal, which if I'm not confused is (-*d*, -*e*, 1), but that
+one points the wrong way, so we want (*d*, *e*, -1), which points
+toward the camera.  So you can normalize that (÷sqrt(*d*² + *e*² + 1))
+and you have some kind of reasonable approximation of the surface
+normal.
+
+Per pixel, this approach requires two subtractions, two
+binary-minimum-by-absolute-value operations, a reciprocal (of *z*),
+two multiplications by it, two squarings, two additions, a reciprocal
+square root, and three multiplications by it, 15 operations in all,
+two of which (the reciprocal and reciprocal square root) are slow.
+This is probably faster than automatic differentiation of the SDF, and
+it gains the benefit of antialiasing that the centered-differences
+approximation has.
