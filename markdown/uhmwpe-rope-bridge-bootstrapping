@@ -1,0 +1,78 @@
+Bootstrapping rope bridges and other tensile structures with UHMWPE-bearing drones
+==================================================================================
+
+To build a suspension bridge across a river, you hang it from a heavy
+cable.  To pull the heavy cable across, you use a rope.  To pull the
+rope across, you use a thin cord.  To pull the thin cord across, you
+use a fine thread.  But how do you pull the fine thread across?  Well,
+according to stories, you shoot an arrow.  But nowadays maybe a small
+quadcopter would be better.
+
+How fast can you do this kind of bootstrapping?  To simplify the
+problem, consider the problem of running a heavy cable 100 meters
+straight up, looping it over something smoothish with no significant
+friction, and running it back down.  Instead of using discrete sizes,
+let's suppose the cable tapers exponentially, and that it is made of
+UHMWPE with 2.4 GPa yield stress (see file `dyneema`) and 0.97 g/cc,
+and that our initial flight can lift 10 g.
+
+But let's save the initial flight for later.
+
+Once we're in steady state of cable embiggening, the weight of the 100
+m of up-going hanging cable needs to be supportable by the thinner
+cable looped over the top, and (more demandingly) the *difference* in
+the weight of the up-going cable and the down-going cable needs to be
+supportable by the still thinner cable we're reeling in at ground
+level.
+
+Before solving the problem exactly, let's consider a crude
+approximation: the cable reeling in at the ground needs to be able to
+support the 100 m of up-going cable, which is all the thickness of the
+cable leaving the ground, 200 m in the future.  So, over 200 m, the
+cable can only get thicker by a factor such that the cable 200 m ago
+is still thick enough to support 100 m of it.
+
+100 m of Dyneema weighs 97 g/cm², which is 97 tonnes/m², or 950 kPa.
+This is 2500 times less than the yield strength, so we're safe as long
+as the cross-sectional-area growth over 200 m is a factor of 2500 or
+less, or a factor of 50 or less in diameter.  So, by pulling on a
+100-micron-thick fiber, you can lift a 5-mm-thick cord on the other
+side, and by pulling on the 5-mm-thick cord when it gets to you, you
+can lift a 250-mm-thick cable on the other side.
+
+But that's actually ridiculously conservative, because at cable
+position *t* you're not actually lifting 100m *f*(*t* - 200m), where
+*f*(*s*) is the linear density of the cable at point *s*, but rather
+∫<sub>*a*</sub><sup>*b*</sup>*f*(*u*) d*u* -
+∫<sub>*b*</sub><sup>*t*</sup>*f*(*u*) d*u*, where *a* = *t* - 200m and
+*b* = *t* - 100m, and the second integral is insignificantly small.
+Solving this exactly is pretty easy.
+
+Even using the simple approximation, though, 10 g over 100 m at 0.97
+g/cc is 0.103 square millimeters, so the initial thread you send up to
+loop over the top can be 0.103 square mm (320 microns in diameter) at
+the bottom of the tower.  That, too, is ridiculously conservative if
+you taper it.
+
+In practice it is probably difficult and inconvenient to handle fibers
+of less than 10 microns in diameter; even though UHMWPE is highly
+biocompatible, inhaling tiny rigid fiber fragments may cause
+mechanical damage.  (By comparison, [spider silk] fibers are 2.5 to 4
+microns in diameter.)  They're also likely to run into significant
+trouble with wind, especially given UHMWPE's brittle nature.
+10-micron UHMWPE fibers can, if we extrapolate the mass yield stress
+downwards, withstand 0.19 N of force, the weight of 19 grams.
+10-micron-diameter UHMWPE weighs 76 micrograms per meter, which is 76
+mg per km.
+
+[spider silk]: https://en.wikipedia.org/wiki/Spider_silk#Attempts at producing synthetic spider silk
+
+Sending such tapered ultrastrong fibers around on microminiaturized
+drones or balloons may be a quick way to get hold of things that are
+far away, build enormous tensile structures between buildings and
+mountains, and snarl up rotating machinery, such as helicopter blades,
+although for such impact applications it might be useful to knit or
+zigzag the fibers in some way to reduce the acceleration shock, for
+example weaving them into a yielding net which, when hit, draws up
+heavier fibers from the ground.
+
