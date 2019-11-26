@@ -101,7 +101,10 @@ derivative in this case, in order to avoid aliasing artifacts.
 iq/rgba has shown compelling demonstrations of how using a too-small
 box to estimate the gradient can cause aliasing.
 
-(If your final top-level SDF is a tree of ∧ and ∨ operations, you
+(If your final top-level SDF is a tree of ∧ and ∨ operations,
+where *a* ∧ *b* gives you the lesser of *a* and *b* while *a* ∨ *b*
+gives you the greater (since real numbers have a total order),
+you
 could very reasonably trace the final result of the ∧/∨ back down the
 tree to its origin, finding the non-CSG surface it originated from.
 If you retained the computed values, you can do this in linear time in
@@ -372,7 +375,7 @@ normal.
 Per pixel, this approach requires two subtractions, two
 binary-minimum-by-absolute-value operations, a reciprocal (of *z*),
 two multiplications by it, two squarings, two additions, a reciprocal
-square root, and three multiplications by it, 15 operations in all,
+square root, its negation, and two multiplications by it, 15 operations in all,
 two of which (the reciprocal and reciprocal square root) are slow.
 This is probably faster than automatic differentiation of the SDF, and
 it gains the benefit of antialiasing that the centered-differences
@@ -387,7 +390,7 @@ it's signed and may have a large dynamic range.  The dynamic-range
 problem can maybe be handled by running it through some kind of
 sigmoid, like tanh or erf or something, although those only expand the
 dynamic range by like a factor of 2 or 3 or something; signedness can
-then be handled by truncating it with ReLU, i.e., *s* \\/ 0.  To get a
+then be handled by truncating it with ReLU, i.e., *s* ∨ 0.  To get a
 third light coming from the camera, a simple approach would be to take
 the un-truncated sigmoid values and subtract the average of their
 absolute values from 1, although of course the actually correct thing
@@ -464,9 +467,8 @@ A third possible way to add more detail to foreground objects is to
 perturb the scene SDFs slightly with some kind of noise field to give
 the surface some kind of texture, but make the noise function drop off
 at larger *z*-coordinates, or possibly even middle-clip it (*a* -
-(-*b* /\ *a* \\/ *b*), where *a* is the original noise function, *b*
-is the middle-clipping threshold, *x* /\ *y* is the lesser of *x* and
-*y*, and *x* \\/ y is the greater of *x* and *y*) with a threshold
+(-*b* ∧ *a* ∨ *b*), where *a* is the original noise function and *b*
+is the middle-clipping threshold) with a threshold
 that grows with distance.
 
 In *Happy Jumping*, iq/rgba demonstrated a technique for perturbing
