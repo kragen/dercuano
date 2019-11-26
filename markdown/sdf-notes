@@ -378,7 +378,104 @@ This is probably faster than automatic differentiation of the SDF, and
 it gains the benefit of antialiasing that the centered-differences
 approximation has.
 
-Non-photo-realistic rendering
------------------------------
+A simpler and cheaper function that might still provide a useful
+illusion of three-dimensionality is to take the gradient of *z* with
+respect to (*u*, *v*) thus estimated and use it directly for, say, red
+and cyan color channels, as if the object were illuminated from the
+right with a red light and from above with a cyan one.  Unfortunately,
+it's signed and may have a large dynamic range.  The dynamic-range
+problem can maybe be handled by running it through some kind of
+sigmoid, like tanh or erf or something, although those only expand the
+dynamic range by like a factor of 2 or 3 or something; signedness can
+then be handled by truncating it with ReLU, i.e., *s* \\/ 0.  To get a
+third light coming from the camera, a simple approach would be to take
+the un-truncated sigmoid values and subtract the average of their
+absolute values from 1, although of course the actually correct thing
+would be to take the square root of 1 minus the sum of their squares.
 
-Discontinuities
+Super cheap non-photo-realistic rendering from a Z-buffer
+---------------------------------------------------------
+
+Suppose that instead we want to outline objects at discontinuities of
+depth and discontinuities of slope.  The above gradient estimate
+attempts to smooth over single-pixel discontinuities by eroding them
+away, but if we skip that step, we can just use the total absolute
+gradient value (the L<sub>1</sub> norm; its Euclidean norm would be
+more correct) to select where to draw lines.  You could use
+quickselect to find, say, the 96th and 97th percentiles of absolute
+gradient values, then use a piecewise-linear "smoothstep" to highlight
+the pixels with those values.
+
+But that only gives us discontinuities *of depth*.  If we want
+discontinuities *of slope*, we need an additional level of derivation,
+to calculate the second-order derivatives of the *z*-value with
+respect to (*u*, *v*), which are ∂²*z*/∂*u*², ∂²*z*/∂*u*∂*v*, and
+∂²*z*/∂*v*², each of which is a single subtraction if we're satisfied
+with backward differences, as we should be.  These values will be very
+large for two pixels at depth discontinuities, and somewhat large for
+one pixel at slope discontinuities; this may be a useful way to
+approximate the "thick inked lines outline figures, thin inked lines
+show detail within figures" rule from cartoon drawing.
+
+In this case, although we have three values, we probably shouldn't map
+them to R, G, and B; it makes some visual sense to have an object
+diffusely illuminated from different directions with red and cyan
+lights, but it would make no visual sense to draw vertical lines in
+red, horizontal lines in blue, and saddle points and edge
+intersections in green.  Instead we should take some kind of norm of
+this four-element Hessian matrix (which has only three distinct
+elements because it's symmetric).
+
+Some kind of contouring may be a useful way to help make curved
+surfaces legible in diagrams; the simplest might be a checkerboard
+pattern in *x*, *y*, and *z*, formed by frobbing the pixel's
+brightness a bit with the XOR of some bit from each of the three
+coordinates.  Which bit is chosen determines the scale of the
+checkerboard pattern along that dimension; if the bits are too
+significant, the whole image will be within a single cube, while if
+they're too insignificant, they're much smaller than a pixel, so it
+amounts to aliasing noise.  So ideally you want them to be on the
+order of 32 pixels in size at the relevant distance.
+
+A drawback of that kind of contouring is that one of the spatial depth
+cues traditionally used in the visual arts is the amount of detail:
+foreground objects are drawn in more detail, as if the background
+objects were out of focus.  (Also, they're often reduced in contrast
+and shifted toward the background color, which makes their details
+harder to see.)  But the suggested checkerboard does just the
+opposite, putting the most detail in background objects.  The standard
+XOR texture, the three-dimensional version of the Hadamard-Walsh
+matrix (the parity of the bitwise AND of the three coordinates), and
+similar fractal volumetric textures seen in a million 1024-byte demos
+and in My Very First Raytracer are one way to escape from that: they
+provide detail at a wide range of scales, or even all scales.  But I'm
+not sure how to adjust the level of detail of such a volumetric
+texture to be coarser at further distances.
+
+Another way to reduce the detail of background objects, related to the
+sphere-tracing algorithm rather than shading, is to roughen the
+sphere-tracing termination threshold with distance.  If you do this
+merely proportional to distance, you just get cone-tracing
+antialiasing, but if you include a faster-growing term such as a
+quadratic term, you could maybe get background objects to lose surface
+detail faster than perspective shrinks that surface detail.
+
+A third possible way to add more detail to foreground objects is to
+perturb the scene SDFs slightly with some kind of noise field to give
+the surface some kind of texture, but make the noise function drop off
+at larger *z*-coordinates, or possibly even middle-clip it (*a* -
+(-*b* /\ *a* \\/ *b*), where *a* is the original noise function, *b*
+is the middle-clipping threshold, *x* /\ *y* is the lesser of *x* and
+*y*, and *x* \\/ y is the greater of *x* and *y*) with a threshold
+that grows with distance.
+
+In *Happy Jumping*, iq/rgba demonstrated a technique for perturbing
+SDFs slightly with a roughly isotropic volumetric texture made from a
+wavefunction with a feature size that was small relative to the
+objects but large relative to nearby pixels; the SDF perturbation was
+tightly clipped, so only its zero-crossings produced a relief on the
+surface.  Thus, it formed smoothly curved random blobby contours on
+the surface whose foreshortening helped greatly to visually indicate
+the orientation of the surface.  If you were doing such a thing I
+think you could reduce the level of detail with distance by reducing
+the amplitude of the higher-frequency components of the wavefunction.
