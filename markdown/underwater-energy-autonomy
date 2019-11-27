@@ -1,4 +1,4 @@
-Suppose you have built an [undersea or other underwater base][0], like
+Suppose you have built an [undersea or other underwater habitat][0], like
 Jacques Cousteau, Tom Swift, or many popular science articles from the
 1950s; but it's autonomous rather than having an umbilical to a
 surface support station.  How do you get energy to run and repair your
@@ -6,8 +6,11 @@ base?
 
 [0]: https://en.wikipedia.org/wiki/Underwater_habitat
 
-Nuclear power is clearly the best option, but suppose you can't use
-nuclear power for political reasons.
+The usual suspects: fission power, solar, fuel, buoys; and their drawbacks
+--------------------------------------------------------------------------
+
+Fission power is clearly the best option, but suppose you can't use
+fission power for political reasons.
 
 If you have sunlight, you can of course use solar panels, although the
 water will absorb some of it.  (See file `underground-arcology` for
@@ -29,6 +32,9 @@ in air for human respiration and perhaps fuel combustion.  But the
 buoy is visible, which may be undesirable, and also exposed to damage
 from heavy seas, ship collisions, oxygen, and sunlight.
 
+Underwater "kite" wind power
+----------------------------
+
 I think the best option in many places is analogous to kite wind
 power, using a reconfigurable-geometry buoy floated some distance
 below the surface but above the bed; when configured for high-drag
@@ -37,5 +43,109 @@ generating power; when the tether is nearly exhausted or it's too
 close to the surface, it's reconfigured for a lower-drag geometry and
 reeled back in at a much lower energy cost than what it generated when
 it was being let out.  This is much easier than the equivalent task in
-the air because the velocities are lower and it's easy to reconfigure
-the "kite's" buoyancy for a particular altitude
+the air because the velocities are lower, the forces are much higher,
+the rope length and therefore snapback potential energy is lower, and
+it's easy to reconfigure the "kite's" buoyancy for a particular
+altitude under the water.
+
+(I think passive altitude control via buoyancy control is much more
+difficult in water than in air; the density of air varies sufficiently
+with pressure for a balloon to hover within tens of centimeters of a
+constant height as the rubber holds its own volume relatively
+constant; on the other hand, in a submarine, water density varies only
+very slightly with pressure, but higher pressure will tend to collapse
+your swim bladder and reduce your buoyancy further.)
+
+Cables under tension can carry an amazing amount of power.  Consider
+gel-spun UHMWPE, with its 2.4 GPa yield stress (see file `dyneema`).
+At 10 m/s, a snappy but not insane speed (22 miles per hour, in
+medieval units), 2.4 GPa is 24 GW/m², which is 24 kW/mm².  According
+to file `induction-kiln`, AWG20 [copper] wire can safely carry 5 amps
+and is 0.812 mm in diameter (not counting the insulation), or 9.7
+megawatts/volt/m²; so, reaching the same 24 GW/m² with it requires
+2500 volts.  At 100 m/s, the UHMWPE cable carries 240 GW/m² = 240
+kW/mm², which requires 25 kV in the electrical wire.  Copper weighs 9
+g/cc, about 9× what UHMWPE weighs.
+
+Lower cable speeds require proportionally more tension and thus more
+cable thickness to deliver the same power.
+
+Regular air kites
+-----------------
+
+A regular air kite might be better in some sense, particularly at
+those underwater sites, such as those at the bottom of medium-sized
+lakes, that have no significant water currents.  It could be made of a
+hydrophobic material, floated to the surface of the water by slight
+inflation, and then floated to kite height by further inflation with
+hydrogen or helium.  Once in the air it can expand substantially to a
+size much larger than the underwater structure.
+
+In file `the-suburbean`, it is proposed to store some 500 MJ of energy
+in half a tonne of Li-ion batteries to provide a month's worth of
+180-watt autonomy without access to air, in a habitat equipped with,
+among other things, 25 kW of winches.  Suppose that the kite pulls 100
+kilonewtons, which is a bit over ten tonnes (42 mm² of UHMWPE, or
+maybe 100 mm² = 1 cm² to have a safety factor), and rises to a height
+of only 200 m in order to avoid interfering with aircraft; and suppose
+that the wind at that height is generally 20 m/s.  That provides a
+megawatt or two of power, enough to fully charge the batteries in five
+to twenty minutes, although it requires some kind of apparatus in the
+lake habitat capable of storing megawatts of power.
+
+So, like a ball python, this underwater habitat could lurk unobserved
+at the bottom of a still, dark lake, reaching out to replenish its
+energy from its environment once or twice a month; but instead of
+swallowing a rat, it silently flies a kite for a few minutes in the
+middle of the night.
+
+Hovering submarine assemblages
+------------------------------
+
+As I described previously in "hovering kite assemblages" (?) a flying
+machine large enough to simultaneously be at altitudes with winds in
+different directions can use those differing wind directions to
+maintain tautness in the tethers between its various otherwise
+disconnected parts, to control its direction of movement, and to
+generate energy to power it, in particular keeping it from falling out
+of the sky.  Similarly, a group of tethered submarines at different
+depths could harness the differing directions of deep-sea currents at
+those depths to generate energy and control their direction of
+movement.  (Lift in that case is unnecessary.)
+
+In a sense, that's what a sailboat is doing: harnessing energy from
+the relative movement between the air and water to move in any
+direction, including tacking upwind.
+
+Lift/drag calculations
+----------------------
+
+The hydrodynamic force of a fluid flowing past a body can act on it in
+almost any direction; in general it is proportional to the density of
+the fluid, the square of the impact velocity, and the cross-sectional
+area of the body perpendicular to the direction of the flow, and has
+an additional factor which I think is actually the "drag coefficient".
+Conventionally it's resolved into a scalar in the direction of the
+fluid flow called "drag" and a two-dimensional vector perpendicular to
+it called "lift".
+
+In a constant flow in the absence of any other applied force, drag
+gradually accelerates the body to the velocity of the flow, causing
+the hydrodynamic force to disappear.  This leads to an interesting
+phenomenon where the power produced at zero velocity and maximum force
+is zero, and the power produced at zero force and maximum velocity is
+also zero; maximum power is somewhere in between, specifically at one
+third of maximum velocity.  (Unless the drag coefficient changes,
+which it does.)
+
+Because drag is complicated --- the coefficients vary with flow speed
+and viscosity, and not even continuously or monotonically --- I
+hesitate to pronounce anything too pompous about this, but *very
+roughly* this suggests that water currents tend to produce about a
+thousand times as much force and power as wind of the same speed; for
+wind to provide the same force, it needs to go 32 times as fast, but
+to provide the same power, it only needs to go 10 times as fast.  Or,
+changing a different variable, wind needs a thousand times as much
+area to press on to be equivalent to a water current of the same
+speed.
+

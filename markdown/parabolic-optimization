@@ -1,0 +1,122 @@
+In file `$1-recognizer-diagrams` it is mentioned that the $1
+recognizer uses golden-section search, a la _Numerical Recipes_, to
+approximate the optimal rotation.  This algorithm has very slow
+convergence, similar to binary chop for finding function zeroes.
+
+Is there a way to adapt the method of secants (see file
+`genetic-secants`) to approximate the minimum faster?  If you have
+three points (suppose, WOLOG, in order) *x*<sub>0</sub>,
+*x*<sub>1</sub>, *x*<sub>2</sub> and the function values
+*y*<sub>0</sub> = *f*(*x*<sub>0</sub>), *y*<sub>1</sub> =
+*f*(*x*<sub>1</sub>), *y*<sub>2</sub> = *f*(*x*<sub>2</sub>), then you
+can calculate some divided differences: (*y*<sub>1</sub> -
+*y*<sub>0</sub>)/(*x*<sub>1</sub> - *x*<sub>0</sub>) gives you
+precisely the average of the derivative on (*x*<sub>0</sub>,
+*x*<sub>1</sub>), and similarly for (*x*<sub>1</sub>,
+*x*<sub>2</sub>).  If the second derivative is small, these give us
+good estimates for the derivative *f*' at ½(*x*<sub>0</sub> +
+*x*<sub>1</sub>) and ½(*x*<sub>1</sub> + *x*<sub>2</sub>).  From those
+two, we should be able to linearly interpolate or extrapolate to find
+where the derivative should have a zero crossing, and we can sample
+another point there, *y*<sub>4</sub> = *f*(*x*<sub>4</sub>).
+
+This vaguely sounds like Nelder-Mead simplex optimization, but in one
+dimension, but I don't understand Nelder-Mead well enough to know.
+
+Since this is just looking for a zero of the derivative, it will
+equally well find maxima or minima, depending on the average second
+derivative in the neighborhood.
+
+In essence, this amounts to calculating the extremum of a parabola fit
+to the last three points.  I'm pretty sure that has to be a known
+approach but I don't know what it's called.
+
+So let's work this out.
+
+<style>
+pre.loose { line-height: 1.2em }
+</style>
+
+<pre id="minimumfind" class="loose">
+min_next = (f, x0, x1, x2) => {
+    const y0 = f(x0)             // (redundant)
+        , y1 = f(x1)             // (redundant)
+        , y2 = f(x2)             // f at latest point
+        , d0 = (y1-y0)/(x1-x0)   // (redundant)
+        , d1 = (y2-y1)/(x2-x1)   // derivative near latest point
+        , xa0 = (x0+x1)/2        // (redundant)
+        , xa1 = (x1+x2)/2        // where that derivative is
+        , d2 = (d1-d0)/(xa1-xa0) // estimate of second derivative,
+                                 //     hope it's not zero
+        , dx = d1 / d2           // distance from xa1 to
+                                 //     extrapolated extremum
+    return xa1 - dx              // return extrapolated extremum
+}
+
+min_next_n = (f, x0, x1, n) => {
+    const xi = [x0, x1, (x0+x1)/2]
+
+    for (let i = 0; i < n; i++) {
+        const m = xi.length
+        if (isNaN(xi[m - 1])) break
+        xi.push(min_next(f, xi[m - 3], xi[m - 2], xi[m - 1]))
+    }
+
+    return xi
+}
+
+parabolic_extremum = (f, x0, x1, n) => {
+    const xi = min_next_n(f, x0, x1, n || 30), m = xi.length
+    return isNaN(xi[m - 1]) ? xi[m - 2] : xi[m - 1]
+}
+</pre>
+
+<script>
+eval(document.getElementById("minimumfind").innerText)
+</script>
+
+<form onsubmit="let mfout = document.getElementById('mfout');
+try{mfout.innerText = eval(document.getElementById('mfin').value).toSource()}
+catch(e){mfout.innerText = e}return false">
+<input size=80 id="mfin" value="min_next_n(x => x*(1-x)**2, 0, 0.1, 15)"/>
+<input type="submit" value="Eval" />
+<div id="mfout"></div>
+</form>
+
+On simple examples like `x => x * (1 - x) + 0.001 * x*x*x, 0.2, 0.1`
+it seems to have pretty fast convergence, appearing close to the order
+*φ* of convergence like the one-dimensional method of secants.  If it
+happens to run into a horizontal line, though, it fails; for example,
+`x => x * (1 - x)**2, 0, 1` crashes out at 0.5 because *f*(0) =
+*f*(1).  The actual maximum is, of course, 1/3, and a better starting
+point finds it.  (And there's a minimum at 1.)
+
+It seems to have some difficulty with rounding, only producing about 9
+places of accuracy in that last example, perhaps because the
+second-derivative expression above becomes very small.
+
+The lines marked `(redundant)` above are things that, after the first
+iteration, were already calculated in the previous iteration, so we
+can avoid calculating them again.  What's left over is one function
+evaluation, five subtractions, an addition, a division by two, three
+arbitrary divisions, and an operation that can be either a division or
+a multiplication.  To me four divisions per iteration seems kind of
+heavy-weight.
+
+You might think it would have poor convergence because when we sample
+the new point there, we are in effect sampling the derivative halfway
+between that new point and the last old point, so we're only getting
+halfway to the destination.  But we're only delaying convergence by
+one iteration --- if that derivative-average and the last one point to
+a place very close to the new point, because the second derivative is
+almost constant over that interval, the new new point will be very
+close indeed.  So it works out.
+
+It actually can tell whether the extremum it's approaching is a
+maximum or a minimum, because the estimate that it gets of the second
+derivative tells it.  By replacing a `d2` with `abs(d2)` in the above
+code, we could make it seek only extrema of one kind.
+
+Unlike the method-of-secants stuff in file `genetic-secants`, it isn't
+apparent to me how to extend this to functions of vector arguments,
+functions of more than one argument, or vector-valued functions.

@@ -88,6 +88,7 @@ class Bundle:
         return self.filename(self.output_dir, *parts)
 
     def generate_categories(self):
+        print("generating category pages in topics/")
         for category in self.categories():
             if len(self.notes_in_category(category)) > 1:
                 self.generate_category(category)
