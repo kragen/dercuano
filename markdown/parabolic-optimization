@@ -1,3 +1,12 @@
+There's a relatively simple derivative-free algorithm with superlinear
+convergence for finding minima or maxima of regular one-dimensional
+functions, analogous to the method of secants for finding their
+zeroes.  But under almost all circumstances there are better
+algorithms.
+
+Deriving successive parabolic interpolation
+-------------------------------------------
+
 In file `$1-recognizer-diagrams` it is mentioned that the $1
 recognizer uses golden-section search, a la _Numerical Recipes_, to
 approximate the optimal rotation.  This algorithm has very slow
@@ -28,8 +37,7 @@ equally well find maxima or minima, depending on the average second
 derivative in the neighborhood.
 
 In essence, this amounts to calculating the extremum of a parabola fit
-to the last three points.  I'm pretty sure that has to be a known
-approach but I don't know what it's called.
+to the last three points.
 
 So let's work this out.
 
@@ -72,6 +80,10 @@ parabolic_extremum = (f, x0, x1, n) => {
 </pre>
 
 <script>
+// Probably it would make more sense to load this (as a string) from a
+// JS file with script src and pop it into the <pre>.  Or maybe
+// interpolate it in in both places in dercuano.py.  That way I could
+// invoke it from other notes.
 eval(document.getElementById("minimumfind").innerText)
 </script>
 
@@ -120,3 +132,50 @@ code, we could make it seek only extrema of one kind.
 Unlike the method-of-secants stuff in file `genetic-secants`, it isn't
 apparent to me how to extend this to functions of vector arguments,
 functions of more than one argument, or vector-valued functions.
+
+This is called "successive parabolic approximation" and you should almost never use it
+--------------------------------------------------------------------------------------
+
+The realization that this amounts to fitting a parabola to the last
+three points led me to the discovery that the standard name for this
+method is "[successive parabolic interpolation]"; Wikipedia explains
+that it has an order of convergence of about 1.33 and has robustness
+problems.  In particular, though, the fact that it's less than √2
+means that it's slower than using Newton-Raphson iteration on a
+derivative evaluated using automatic differentiation, other than
+faster, as with the method of secants.
+
+[successive parabolic interpolation]: https://en.wikipedia.org/wiki/Successive_parabolic_interpolation
+
+The divided-differences approach given above is, I think, faster than
+the approach I've found elsewhere of solving the Vandermonde linear
+system, because it's more incremental.  But divided differences is of
+course a standard way to do polynomial interpolation, and its
+incrementality is one of its standard advantages.
+
+The only time when it is faster to use successive parabolic
+interpolation rather than Newton-Raphson iteration is when you can't
+differentiate the function you're optimizing, even though you believe
+it to be regular, for example because it's experimentally measured
+rather than computed, or because your software tools are outdated and
+don't support automatic differentiation, or because its second
+derivative fails to exist.  (If its first derivative fails to exist,
+successive parabolic interpolation won't work either.)  In such a
+situation, golden-section search is slower, but sometimes only for
+high precision; and golden-section search is more robust and doesn't
+have the rounding problems mentioned above.  (The `optimize` function
+in R uses a mixture of golden-section search and successive parabolic
+interpolation known as Brent's method.)
+
+So, for example, `min_next_n(x => (1/x - 4)**2 , 0.001, 0.1, 30)` in
+the above evaluator takes 7 iterations to converge to within 0.1 of
+the correct result (0.25), 6 more iterations to converge to within
+0.01 of the correct result, and 2 more iterations to converge to
+within 0.001 of the correct result, at which point it starts having
+reasonable convergence.  I think golden-section search would actually
+be faster up to that point, although I haven't tried it.  However, for
+functions that are well approximated by a quadratic, successive
+parabolic interpolation is really fast; for example, in `min_next_n(x
+=> Math.sin(x*Math.PI) + Math.sin(x*2*Math.PI), 0.001, 0.1, 30)` it
+eventually converges to 0.29791559955277436, but it's already at
+0.2987 in 5 iterations.
