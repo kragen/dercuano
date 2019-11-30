@@ -40,6 +40,17 @@ contains the display and keyboard and whatnot, it can only *display*
 one app.  But that one app could be a full-fledged multiplexed display
 server in its own right, spawning off ssh children and whatnot.
 
+Even Docker containers, for all their headaches, support an
+8-bit-clean bytestream interface on stdin and stdout, as long as you
+don't use `docker run -t`; this shows that all 256 bytes make it
+through safely:
+
+    docker run --rm python:2 python -c \
+        '__import__("sys").stdout.write("".join(map(chr, range(256))))' |
+        tee >(docker run --rm -i alpine od -t x1 >/dev/tty) | xxd
+
+(The `-i` keeps it from closing stdin.)
+
 This all assumes the usual app interaction model, as I called it in
 file `dehydrating-processes`, which suggests that for more flexible
 kinds of interaction that aren't tied to particular hosts, a different
@@ -50,7 +61,7 @@ ssh
 
 I just did a quick experiment with OpenSSH:
 
-    $ time ssh  -vC user@server dd if=/dev/zero bs=100M count=1 | dd bs=1k | wc -c
+    $ time ssh -vC user@server dd if=/dev/zero bs=100M count=1 | dd bs=1k | wc -c
     ...
     debug1: Sending command: dd if=/dev/zero bs=100M count=1
     1+0 records in
