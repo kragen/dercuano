@@ -247,7 +247,7 @@ Lempel-Ziv compression, so lower color depths are never going to be a
 big win.
 
 And you don't need text in the protocol.  In
-[dofonts-1k](http://canonical.org/~kragen/sw/netbook-misc/dofonts-1k.html)
+[dofonts-1k](http://canonical.org/~kragen/sw/netbook-misc-devel/dofonts-1k.html)
 I included a full printable-ASCII 6x8 font in 64x36 bits, 288 bytes
 uncompressed, or 482 bytes PNG-compressed and base64ed.  It's
 reproduced below.  The file, 1KiB in all, also includes a sort of
