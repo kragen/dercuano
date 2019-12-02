@@ -82,3 +82,14 @@ entire UHF TV band!
 Of course it would be foolish to attempt to transmit a signal in this
 way that you wanted to maintain confidential, since your neighbors can
 probably tune in to it.
+
+[Vladislav Fomitchev KM4VTH demonstrated this more or less working in
+2018](https://youtu.be/z8DMFo4atnM) using GNU Radio, a HackRF One
+(US$600 in Argentina), and a signal flow graph he constructed, and
+[marble has demonstrated doing something similar with GNU Radio, a
+HackRF One and
+PAL](https://hackaday.io/project/14904-analog-tv-broadcast-of-the-new-age).
+[Argilo has published a flow graph for transmitting ATSC on 438 MHz
+with GNU Radio and a BladeRF](https://github.com/argilo/sdr-examples);
+the BladeRF has 61.44 MHz sampling and 2x2 MIMO and costs US$420 from
+SparkFun but isn't available in Argentina.

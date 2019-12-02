@@ -298,8 +298,16 @@ key associated with that log.  Such an approach will only be
 successful, however, if the routing nodes in the system are checking
 the signatures, which is a potential scalability bottleneck.
 
-XXX how does Git’s protocol actually work?  Originally it used rsync,
-but not the rsync delta-transfer algorithm mentioned below.
+How does Git’s protocol actually work?  Originally it used rsync, but
+not the rsync delta-transfer algorithm mentioned below.  Now it has
+"[the 'smart'
+protocol](https://git-scm.com/book/en/v2/Git-Internals-Transfer-Protocols)"
+(better documented in [the official
+documentation](https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt)
+and also [the v2 protocol](https://git-scm.com/docs/protocol-v2).  I
+don't really understand how this works; it has `have` and `want`
+messages but I'm not clear on how many of them need to be sent but it
+sounds like it uses the DAG structure to avoid sending all of them.
 
 This per-publisher-log protocol is only more efficient than the
 per-message ID IHAVE/SENDME protocol as long as the set of publishers

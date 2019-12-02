@@ -1,0 +1,34 @@
+I was thinking about capacitive-dropper power supplies, which limit
+the current from the 120V ac or 240V ac powerline with capacitive
+reactance (see file `capacitor-dropper` for more.).  These can only
+supply a very small current without using very beefy capacitors and
+being quite hazardous.  And it has to drop a lot of voltage through
+those capacitors before it reaches the load, if the load is something
+like a 5V or 3.3V electronic device.
+
+In file `bitbang-am-radio` I concluded that a Cockcroft–Walton
+generator could be used as a sort of variable-ratio rectifying
+autotransformer, stepping up the output dc voltage from a fixed ac
+input level to a variable level determined by the load voltage.  But
+if you try to use it to get a ratio of less than 1, it won't work; in
+the limit of low output impedance, you just get the input ac voltage
+at the output plus a dc offset that just keeps it from going negative.
+
+Is there a Cockcroft–Walton-like circuit that works for stepping
+voltages *down*?  Because then you could use a capacitive dropper to
+reduce the input voltage to, say, 48 V, limited to 30 mA,
+"galvanically isolated" from the input powerline by the capacitors,
+and then use the Notlaw–Tforckcoc circuit to step that down to
+something like 5 V at 280 mA, enough for a standard USB1 charger.
+
+The way the Cockcroft–Walton circuit works, from a certain point of
+view, is that the diodes in its string are in parallel across the ac
+input (since the capacitors act somewhat like wires at ac, albeit
+wires with some reactance), but in series across the dc output.  In
+this case what we want is the opposite: for the diodes to be
+effectively in series across the ac input while being in parallel
+across the dc output.
+
+It isn't yet obvious to me how to do this (without active control
+circuitry, which can of course do this by switching capacitors around
+using MOSFETs), but I suspect there might be a way.
