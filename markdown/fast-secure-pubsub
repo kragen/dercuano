@@ -9,7 +9,11 @@ receiver, and possibly intermediate routing entities run in
 very-short-lived ephemeral processes which have relevant information
 mapped into their memory space.  Even on Linux, it’s possible to spawn
 off 7000 processes per second; we should be able to do better with a
-custom kernel.  Processes that exceed their CPU allocation are
+custom kernel, and for example [Fastly's Lucet WebAssembly
+runtime](https://www.fastly.com/blog/announcing-lucet-fastly-native-webassembly-compiler-runtime)
+"can instantiate WebAssembly modules in under 50 microseconds", thus
+potentially permitting the creation of some 20,000 "processes" per
+second per core.  Processes that exceed their CPU allocation are
 ruthlessly killed.
 
 Processes running sender-supplied code can be run with access to

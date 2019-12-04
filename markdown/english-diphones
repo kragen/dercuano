@@ -1,0 +1,153 @@
+How much speech would you need to sample to make a diphone synthesis
+engine out of it?
+
+How many diphones are there in English?  The following set of words
+more or less covers the phoneme set:
+
+> Ack, ache, mother, father, bet, cite, done, leash, gum, hedge, sip,
+  rot, sought, room, foot, azote, few, valley, which, yet, think,
+  pleasure.
+
+`espeak --ipa` renders this as follows:
+
+     ˈak
+     ˈeɪk
+     mˈʌðə
+     fˈɑːðə
+     bˈɛt
+     sˈaɪt
+     dˈʌn
+     lˈiːʃ
+     ɡˈʌm
+     hˈɛdʒ
+     sˈɪp
+     ɹˈɒt
+     sˈɔːt
+     ɹˈuːm
+     fˈʊt
+     ˈazəʊt
+     fjˈuː
+     vˈalɪ
+     wˈɪtʃ
+     jˈɛt
+     θˈɪŋk
+     plˈɛʒə
+
+To this we need to add at least æ, which I'm not sure how to do with
+espeak without -v en-us.
+
+This reduces to this set of phonemes, as I understand them:
+
+    ʌ
+    ɑː
+    a
+    aɪ
+    æ
+    b
+    d
+    ð
+    dʒ
+    ʒ
+    eɪ
+    ə
+    əʊ
+    f
+    h
+    iː
+    j
+    uː
+    k
+    l
+    m
+    n
+    ɔː
+    p
+    s
+    t
+    tʃ
+    ʃ
+    uː
+    ʊ
+    v
+    w
+    z
+    θ
+
+That's 34 phonemes.  That means that English can't have more than 34²
+= 1156 diphones, although in practice English phonotactics exclude
+most of these.
+
+English speech is typically on the order of 200 wpm, and each word
+might average 5 phonemes, so this is about 1000 phonemes (and thus 999
+diphones) per minute of speech, which is to say that you could in
+theory capture all the English diphones from roughly one
+carefully-constructed minute of speech.  If instead the diphones are
+uniformly randomly distributed, the number of uncovered diphones will
+drop by a factor of 2.7195 (about *e*) per 1156 phonemes uttered, an
+exponential progression 1156, 425.1, 156.3, 57.5, 21.1, 7.8, 2.9, 1.1,
+0.39, 0.14, so complete coverage would usually require some 7 or 8
+minutes of recorded speech.
+
+But in fact some phonemes and thus some diphones are much less
+frequent than average: the order is very crudely something like,
+first, n, ə, d, and t; a factor of 2 lower, a, f, z, s, m, l, and iː;
+a factor of two lower, v, p, k, ð, w, uː, j, b, and ɔː; and so on.  A
+standard Zipfian guess is that the 34th phoneme is about 3% as common
+as the most frequent one.  This would tend to lengthen the time
+required for complete coverage, just as phonotactic restrictions would
+tend to shorten it.
+
+Crudely, though, I think it's reasonable to guess that sampling a few
+minutes of speech should be enough to produce a comprehensible
+approximation of a person's speech, without requiring previous
+knowledge like statistics of other people's speech in the language.
+
+An interesting question is how to formulate a prepared speech that you
+could read in a minute or so that would provide a richer-than-average
+set of diphones.  Given, say, the pronunciation of each word in
+/usr/share/dict/words, you can formulate this as a combinatorial
+optimization problem: the shortest set of words containing all the
+diphones contained in all the words.  Analyzing a recording of such a
+prepared speech would be easier than analyzing arbitrary speech
+because the alignment problem would be much easier.
+
+As a quick experiment, I recorded myself reading the above list of 22
+words, about 72 phonemes, slowly, in 21 seconds, under relatively poor
+recording conditions, with `rec words.wav`.  Then I encoded it with
+LPC-10 with `sox words.wav words.lpc10`.  The resulting LPC-10 file
+was 6447 bytes (293 bytes per word, 90 bytes per phoneme) and was
+pretty comprehensible; it would surely contain enough information for
+phoneme alignment.
+
+How exactly do phoneme alignment?
+---------------------------------
+
+Maybe the matrix profile would help, for example, over a time series
+of mel-frequency cepstral coefficient (MFCC) vectors, for example, or
+of LPC coefficient vectors.  Maybe for a sufficiently small dataset
+the whole correlation matrix that the matrix profile is a "profile" of
+would be more useful; the peaks in that correlation matrix might tell
+you at which time points the same phoneme occurred previously and
+later, which you could compare against the temporal distribution
+patterns of phonemes in the supposed phoneme sequence.
+
+Maybe you could use something like the Viterbi algorithm, in which the
+"symbols being transmitted" are positions in the supposed phoneme
+sequence rather than phonemes, each with a transition to itself (that
+is, the phoneme continued from one time window to the next) and to the
+following phoneme in the sequence --- although this requires some a
+priori knowledge of what each phoneme sounds like.  But once you have
+even the most basic guess about alignment, you can use that to get an
+improved guess about what each phoneme sounds like, then repeat the
+procedure.
+
+This is surely a problem that is well explored in the research
+literature.
+
+An interesting possibility is to try to use some kind of
+self-organizing maps to map the space of observed sounds, perhaps
+using three or four dimensions conjectured to correspond to tongue
+position and nasality; the idea is that the continuous changes in
+sound harmonic content provide you with information about which sounds
+are physically adjacent to which other sounds.  (Voice pitch and
+sibilance are probably independent dimensions there.)

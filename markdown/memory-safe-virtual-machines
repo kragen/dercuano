@@ -1,0 +1,260 @@
+Pointer arithmetic gives your languages freedom to implement different
+kinds of storage, including stack-allocated, heap-allocated, structs,
+arrays, struct extension with new fields on the end, linked lists, and
+whatnot.  But it poses difficulties for safety.
+
+The Forth virtual machine is fairly simple; as described in
+`eforth-notes`, Bill Muench's eForth model, about 176 machine-code
+instructions for the 8086, consists of EXIT, EXECUTE, _LIT, _ELSE,
+_IF, C!, C@, !, @, RP@, RP!, >R, R@, R>, SP@, SP!, DROP, SWAP, DUP,
+OVER, CHAR-, CHAR+, CHARS, CELL-, CELL+, CELLS, 0<, AND, OR, XOR, UM+,
+REDIRECT, !IO, ?RX, TX!, and BYE, plus the machine-code routines
+RESET, LIST1, and VCOLD.  Of these, the ones that access linear memory
+are just C!, C@, !, and @, about 10% of the total.  Everything that
+accesses memory does so by way of these four primitives.
+
+However, when developing software and sometimes even when running it,
+it's very convenient to get crashes and exceptions rather than wrong
+answers, ideally as close to the bug as possible.  Using such a simple
+memory model sacrifices that possibility, since there's no way to
+distinguish out-of-array-bounds accesses, or integers wrongly
+interpreted as pointers, from valid pointers.  Moreover, this makes
+garbage collection impossible.  Can we define a virtual machine that
+is *almost* as simple and flexible, but provides better safety
+properties?
+
+The rest of the Forth model
+---------------------------
+
+We can categorize the eForth code into control flow --- EXIT (i.e.,
+return), EXECUTE, _IF, _ELSE, and LIST1; stack manipulation --- >R,
+R@, R>, DROP, SWAP, DUP, OVER; meta-stack manipulation --- RP@, RP!,
+SP@, and SP!; I/O operations --- REDIRECT, !IO, ?RX, TX!; startup and
+shutdown --- RESET, VCOLD, and BYE; ALU operations --- _LIT, 0<, AND,
+OR, XOR, and UM+; and portability helpers --- CHAR-, CHAR+, CHARS,
+CELL-, CELL+, and CELLS.  This is a good approximation of a minimal
+usable virtual machine, although probably subtraction, multiplication,
+and division would be welcome additions.
+
+My [StoneKnifeForth], inspired by eForth, has a different set of
+primitives, some of which are things eForth implements in interpreted
+Forth rather than in machine code, such as comments.  SKF is about
+1400 instructions.  Its memory operations are @, !, and store, which
+last is C!.
+
+[StoneKnifeForth]: https://github.com/kragen/stoneknifeforth
+
+The C pointer approach
+----------------------
+
+Suppose we define an untyped virtual machine whose memory supports the
+four operations fetch word, store word, fetch byte, and store byte,
+with register arguments to indicate the memory location to access, and
+an allocate operation to allocate N bytes of new memory.  How can we
+implement it efficiently with some degree of memory safety?
+
+Maybe we can codify more or less the C pointer rules: make pointers be
+(segment, offset) pairs, say 32 bits for each; mere integers have a
+distinguished invalid segment value for the segment part, such as 0.
+Subtraction of two pointers produces an integer if the segments are
+the same or crashes your program if not.  Addition or subtraction of a
+mere integer to a pointer produces another pointer within the same
+segment.  Pointer comparisons for equality compare both the segment
+and the offset.  Pointer comparisons for ordering crash if the segment
+differs.  No other pointer arithmetic is valid.  The virtual machine
+checks dereferences against an upper bound it stores for the segment.
+
+The allocate operation creates a new segment and returns a pointer to
+its start.
+
+None of this stops programs from storing pointers in memory with the
+store-word operation and then altering their segment bits; for
+example, the XOR one-pointer double-linked-list hack can be
+implemented in this way.  That means that garbage collection is not
+safe.
+
+This approach allows, for example, moving a struct that mixes pointers
+and non-pointers to a different part of memory, in the same or a
+different segment, merely using memcpy.  Note, though, that the
+situation where this is most advantageous --- persistence to files or
+transmission across a network --- can't take advantage of this,
+because the segment bits will not be valid in the other process,
+whether separated by space or by time.
+
+The KeyKOS approach
+-------------------
+
+Suppose we want to be sure that a subroutine we invoke cannot forge
+pointers to random memory, but only access data it has been given
+segments for.  To prevent pointer forgery, we must strictly segregate
+segment identifiers from character data and, for example, ordinary
+integers.  It is okay for offsets into a segment to be freely
+intermixed with character data, though.
+
+One way to do this is to have separate byte segments ("segments" in
+KeyKOS) and descriptor segments ("nodes" in KeyKOS).  Descriptor
+segments contain only descriptors; byte segments contain only bytes.
+The virtual CPU contains both descriptor registers and integer
+registers.  Memory access instructions take an address consisting of a
+descriptor and an integer offset; there are six of them --- load
+descriptor, store descriptor, load integer, store integer, load byte,
+and store byte.  Descriptors can only be loaded from and stored to
+descriptor segments, while integers and bytes can only be loaded from
+and stored to byte segments.  The only operation on descriptors, other
+than storing them or using them in a memory access, is comparison for
+equality.
+
+There are a few variants of this approach.  Rather than having
+separate segments, you could have a "data fork" (of bytes) and a
+"resource fork" (of descriptors) for each segment; this avoids the
+dynamic check, but means that instead of having separate
+`allocate_byte_segment` and `allocate_descriptor_segment` calls, you'd
+have one call that takes two arguments.  This way, a data structure
+that contains both pointers (to, potentially, other segments) and byte
+data can be a single segment, rather than a descriptor segment that
+points to a byte segment.
+
+Or the virtual machine could maintain a bit for each byte in the
+segment, indicating whether it currently contains descriptor bytes or
+non-descriptor bytes; loading it with the wrong operation would crash
+your program.  Alternatively, only attempting to load a descriptor
+register from non-descriptor bytes would crash the program, while
+loading descriptor bytes into a data register would be fine.
+
+This approach is not very compatible with the C or Forth view of the
+world, and like varying-sized inline objects, it leads to a certain
+amount of duplication in machine code --- you can't write generic
+virtual machine code that agnostically handles either pointers or byte
+data without caring which, even if you pass in a size, as you do with
+qsort().  But it does seem like it would be workable, and it permits
+garbage collection and prevents pointer forgery.
+
+The Unix approach
+-----------------
+
+Suppose that a "process" identifies descriptors with integers, like
+Unix programs identify files, when it makes "system calls"; we could
+call them "handles".  It can never see the contents of the descriptors
+themselves, just the integers that refer to them in its own local
+namespace.  (KeyKOS did this in practice too, but the integers were in
+a limited range, I think 0 to 15.)  If a different process has access
+to the same descriptor, it is probably referred to using a different
+handle.
+
+For accessing byte data, rather than using effectively pread(2) and
+pwrite(2) as in the proposals above, we can have an mmap(2)
+instruction which maps the descriptor's byte data into the process's
+linear memory space.  But what about accessing descriptor data, as in
+`SCM_RIGHTS`, so that one descriptor can point to another?  Well, I
+suppose you want an instruction something like openat(2), but taking
+an offset rather than a filename.
+
+So this gives us something like the following interface:
+
+1. call(code1, handle1): starts a "new process" running code1 and
+   waits for it to terminate.  Code1 runs in a new linear memory space
+   with access only to the resource identified by handle1; a handle to
+   that resource is passed to code1 at startup.
+2. ret(): terminates the current "process".
+3. open(handle1, offset): returns a newly allocated handle to the
+   offsetth descriptor in the directory identified by handle1.
+4. new(nbytes): returns a handle to a newly allocated segment of size
+   nbytes.
+5. del(handle1): deallocates the resource identified by handle1, which
+   may be a segment or a directory.
+6. mkdir(n): allocates a new directory with space for n descriptors in
+   it.
+7. link(handle1, offset, handle2): sets the offsetth descriptor in the
+   directory identified by handle1 to the descriptor identified by
+   handle2.
+8. map(handle1): maps the segment identified by handle1 into the
+   caller's linear memory space and returns the address where this
+   happened.
+
+Maybe not quite as clean as Unix's open, close, read, write, fork,
+exec, exit, wait, or Forth's C!, C@, !, and @, but it's manageable;
+and, unlike Unix, it provides full confinement.  And it doesn't have a
+way to prevent child processes from leaking memory; I thought about
+adding a "pool" parameter to "new" and "mkdir" and a "spawn" call that
+creates a child pool, and making "free" take a (handle to a) pool
+rather than a segment; this would allow limiting the resources used by
+child processes as well.  But it does permit precise garbage
+collection, so in some sense pools are extraneous.
+
+Of course, unlike in Unix, these operations are virtual machine
+instructions rather than system calls.
+
+KeyKOS had an operation to weaken a regular key to a "sense key", a
+read-only capability, so that you could provide read-only access to a
+resource you had read-write access to.
+
+This interface doesn't permit multithreading, since call() is
+synchronous, and so it can't be robust in this form against child
+processes that hang forever.  KeyKOS handled this in part by requiring
+a "clock key" to run a process; if the referenced clock didn't have
+any time on it, the process couldn't run.  The Unix approach is,
+rather alarmingly, to make subprocess invocation implicitly
+asynchronous, thus requiring the creation of a new task.
+
+A transactional linear-logic approach
+-------------------------------------
+
+If you add any concurrency or crash recovery to the approach described
+above, there is a new class of serious potential bugs that the virtual
+machine cannot detect and signal.  If a segment can be concurrently
+mapped by two different threads and is writable by at least one of
+them, they can have race conditions.  If we were to take the Unix
+approach and make call() asynchronous, this would implicitly happen on
+every call(), since the parent process still has access to everything
+it's passed to the child.
+
+If instead we *transfer ownership* of resources to the newly created
+child process, so that the parent cannot access them until and unless
+the child returns them, we can avoid this problem.  But this means
+that, if recovery from failure is to be possible, the child must
+return them in case of failure and also in case of success.
+
+Handling failures this way suggests that perhaps the child should be
+run in a separate transaction, with all of its writes held in abeyance
+until its successful completion.  Handling successes this way suggests
+that perhaps freeing a resource should only be possible to someone who
+holds a descriptor to the pool the resource was allocated from.  But,
+by itself, that will not prevent the child from linking its resources
+into a cycle that is inaccessible from outside.  Something like the
+tree discipline of the Unix filesystem is needed to prevent that.  See
+file `failure-free` section "Pointer-reversal tree traversal" about
+why I think approaches like this will tend to be insufficient.
+
+A Rustier approach
+------------------
+
+If the same segment is mapped more than once by the same process, and
+one or more of the mappings is read-write, it may suffer aliasing
+bugs.  The classic example of this is the trick for swapping two
+values without a temporary variable:
+
+    a ^= b;  // a == a0 ^ b0
+    b ^= a;  // b == a0 ^ b0 ^ b0 == a0
+    a ^= b;  // a == a0 ^ b0 ^ a0 == b0
+
+which you would want to be a no-op if a and b were the same value, but
+which instead obliterates the value and replaces it with a 0.
+
+Rust avoids this problem by "borrowing" references for a statically
+determined lifetime; although my Rust is pretty limited so far, if I
+understand correctly, the creation of mutable references and of
+read-only references is a prerequisite to accessing an object, no
+mutable reference to it can be created during the lifetime of any
+reference to it, and no reference to it can be created during the
+lifetime of any mutable reference to it.
+
+You could imagine segments being treated in this way, dynamically
+rather than statically.  To map a descriptor read/write into your
+memory space or to pass a mutable reference to it to another process
+or store it in a directory, there would need to exist no references or
+mappings to it anywhere; to map it read-only or to pass a read-only
+reference to it to another process or store it in a directory, there
+would need to exist no read/write mappings or mutable references to it
+anywhere.
+
+I'm not sure if that approach is feasible, but it seems promising.

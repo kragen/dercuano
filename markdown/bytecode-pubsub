@@ -1,0 +1,112 @@
+In a publish-subscribe system you have a message bus to which messages
+are posted.  The message bus may be a literal wire (as in thinnet
+Ethernet, CAN, and RS-485), a computer (as in Ethernet with a switch),
+a running program on a computer (as in D-BUS), a group of running
+programs on one or more computers (as in IRC or IP multicast), a data
+storage device (sort of as in Kafka), or some combination.  The
+messages posted to it are then received by some subset of subscribers
+to the message bus.
+
+Why filtering?
+--------------
+
+The simplest approach is to send every message to every subscriber,
+but this has both performance problems and security problems: making a
+copy of the message for a subscriber who doesn't want it is wasted
+work, and maybe so is the work the subscriber has to do to determine
+that they don't want it; and if you have a security policy that
+prohibits some subscribers from looking at some messages, this
+approach makes that policy entirely dependent on those subscribers not
+attempting to violate it.
+
+So most pub-sub systems have some kind of filtering system that only
+sends each message to some subset of subscribers.  These filtering
+systems can be more or less expressive; for example, you can have a
+disjoint set of topics (like IRC and IP multicast), a hierarchy of
+topics (like ZeroMQ), a non-disjoint set of tags with single-tag
+subscriptions, boolean tag subscriptions, boolean queries on message
+field values, and so on.  The more elaborate filters let through a
+more precise approximation of the messages the subscriber is really
+interested in, wasting less work on forwarding messages the subscriber
+will ultimately discard.
+
+Turing-complete interests
+-------------------------
+
+The subscriber's real interests may be Turing-complete (assuming the
+subscriber is a computer program --- human interests might be more
+complex); determining whether a packet fulfills them or not may in
+fact be uncomputable.  In file `fast-secure-pubsub` I talked about
+running a subscriber-provided interest function in a time-limited
+sandbox where its accesses to message fields are recorded; if it
+rejects the message, those accesses are added to a cache so that any
+future messages with the same values in those fields will also be
+rejected without rerunning the function, thus saving time.  Similarly,
+if it accepts the message or times out, any future messages that are
+similar in that way will be forwarded to the subscriber.  (And senders
+can provide a filter function that determines whether or not a
+subscriber is allowed to examine a message; its behavior differs in
+that if it times out, the message is not forwarded.)
+
+In addition to just "accepting" a message, the interest function might
+reasonably take other actions as well; in particular, it might post a
+message somewhere, and it might map the accepted message to a smaller
+message, so that less data needs to be copied to the subscriber
+itself.  However, these actions are much harder to memoize with the
+purely-sandboxing approach described above.  Suppose the incoming
+message says {x: 32, y: 31, topic: "mouse"}, and the interest function
+inspects the topic and x fields before mapping the message to the
+message {p: 32} to be sent to the subscriber.  The sandbox is able to
+determine that the y field does not matter, so future messages with
+the same x and mouse fields should be handled the same way.  But it
+has no way to determine whether the message {x: 48, topic: "mouse"}
+should even be accepted, much less whether the resulting message
+should be {p: 32}, {p: 48}, {p: 16}, or something else.
+
+Non-Turing-complete interests
+-----------------------------
+
+But a different approach is suggested by BPF and Bitcoin Script, as
+described in file `wercam-scriptable-windows` in a different context.
+Instead of having the subscribers send a Turing-complete program to
+the message bus, they can send a program in a non-Turing-complete
+bytecode, perhaps one without loops or subroutines, so its execution
+time can be statically bounded.
+
+This is pretty close to the original purpose of BPF and its 1980
+predecessor CSPF: the packet-dumping program, tcpdump or whatever,
+gives the kernel a "subscription request" in the form of a BPF
+program, and the kernel evaluates all such program on all incoming
+packets, forwarding only the accepted packets to the userspace
+program.
+
+The subscriber can generate the bytecode program by doing abstract
+interpretation of the Turing-complete program representing its
+interests, somewhat like a tracing JIT, but using abstract values.
+This generates a safe conservative bytecode approximation of its
+original Turing-complete program; this bytecode can then be sent to
+the message bus to do the prefiltering.
+
+There is an example of how to do this in file `failure-free` in the
+section "Abstract interpretation with non-standard semantics".
+
+This abstract-interpretation approach is applicable to a variety of
+situations in which a non-Turing-complete program is required,
+especially if a conservative approximation is acceptable.  So, for
+example, given some Turing-complete specification of a security rule
+to make a message visible only to certain subscribers, a conservative
+approximation is not acceptable; this approach is only applicable to
+that problem if the full execution tree can be successfully explored.
+
+Database queries
+----------------
+
+From a certain point of view, a database query is just a pubsub
+subscription that is immediately run on a stored history of past
+events; but this point of view doesn't have an obvious way to account
+for sorting specifications and joins, which do things like index
+traversals and intermediate materializations.  However, the comparison
+operators used to construct and traverse indices, as well as the
+tuplewise computations used to filter and transform result streams,
+could profitably be specified by such bytecode chunks, rather than by
+an ever-growing set of data types built into the database engine.
