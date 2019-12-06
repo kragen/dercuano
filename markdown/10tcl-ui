@@ -1,0 +1,334 @@
+I was talking with the entity known as The Doctor.  They mentioned
+that they really liked the idea of having a tiny programming language
+in your boot ROM, but had found the Forth in OpenBoot to be fiddly,
+requiring a lot of effort to do simple things like changing the MAC of
+a Sun NIC.
+
+Usually what I've done with the boot ROM is to boot, though, maybe
+occasionally from alternative boot media.  I found that to be kind of
+fiddly in OpenBoot too.  (I also wrote a graphics demo in OpenBoot on
+an OLPC, but [because I couldn't figure out how to abort back to the
+interpreter, my first infinite loop ended the experiment][1]†.)
+
+[1]: http://wiki.laptop.org/go/Forth_Lesson_4
+
+Tcl
+---
+
+This reminded me of Yossi Kreinin's wonderful 2008 essay [I can't
+believe I'm praising Tcl][0], about why Tcl is a terrible programming
+language but a good command language:
+
+[0]: https://yosefk.com/blog/i-cant-believe-im-praising-tcl.html
+
+> Well, in Tcl that's as simple as it gets. Tcl likes to generate and
+  evaluate command strings. More generally, Tcl likes strings. In
+  fact, it likes them more than anything else. In normal programming
+  languages, things are variables and expressions by default. In Tcl,
+  they are strings. `abc` isn't a variable reference – it's a
+  string. `$abc` is the variable reference. `a+b/c` isn't an
+  expression – it's a string. `[expr $a+$b/$c]` is the
+  expression. Could you believe that? `[expr $a+$b/$c]`. Isn't that
+  ridiculous? ...
+
+> And the nice thing about my retarded debugger front-end is that it
+  looks like shell commands: `blah blah blah`. As opposed to
+  `blah("blah","blah")`. And this, folks, is what I think Tcl, being a
+  tool command language, gets right. ...
+
+> And eventually, simple commands become all that matters for the
+  [interactive] user, because the sophisticated user grows personal
+  shortcuts, which abstract away variables and expressions, so you end
+  up with `pmem 0 bkpt nextpc` or something.  *Apparently, flat
+  function calls with literal arguments is what interactive program
+  usage is all about.* ...
+
+> I have a bug, I'm frigging anxious, I gotta GO GO GO as fast as I
+  can to find out what it is already, and you think now is the time to
+  type parens, commas and quotation marks?! Fuck you! By which I mean
+  to say, short code is important, short commands are a must.
+
+Tcl is also, it bears mentioning, quite a bit saner than bash as a
+programming language.
+
+In Tcl, `foo -x $bar -y $baz` invokes `foo` with four arguments: the
+string `-x`, the value of `bar`, the string `-y`, and the value of
+`baz`.  The equivalent command in bash sometimes does this and
+sometimes calls `foo` with some other random number of arguments,
+depending on what is in `bar` and `baz`.
+
+In Tcl, if your code has an error, your program will stop there with a
+backtrace (possibly popped up in a Tk window, if you're into that kind
+of thing), while in bash, it will probably continue as if nothing
+untoward had happened, unless you're running with `set -e`, which will
+crash perfectly working programs with some older versions of sh,
+because sh commands indicate failure in the same way that sh boolean
+expressions indicate falsehood: by returning nonzero.  And not only
+won't `set -e` give you no backtrace, it will give you no error
+message at all --- you may not notice that anything has gone wrong.
+
+And Tcl supports not only lists, which bash sort of does, but also
+nested lists and associative arrays ("dicts" or "hashes"), although
+like Perl 4 and Awk, the associative arrays are not first-class.
+
+(Tcl's nested lists are kind of shoddy, but they do exist.  An unusual
+thing about them that they sort of share with bash lists is that a
+list of one string is the same as that string; a string is a
+single-item list of itself, in the same way that Python uses
+single-character strings to represent characters, or Octave uses 1x1
+matrices to represent scalar numbers.  So you can't distinguish
+between the string `squizz` and a list of one item that contains a
+list of one item containing the string `squizz`.)
+
+Also, in Tcl, you can define subroutines that return values, including
+nested lists.  In bash instead your subroutines can just write bytes
+to their output channel, which by default displays the result on the
+terminal.
+
+Like Bash, Tcl unfortunately doesn't support named arguments or any
+other kind of name-value-pair interface that would make it reasonable
+to preserve backward compatibility, except by using some ad-hoc
+command-line parsing like Tk does:
+
+    button .x -text foo -command {puts bar}
+
+One way bash usability beats the *shit* out of Tcl usability, though,
+is in tab completion, which in modern bash setups is fairly
+context-sensitive, understanding the syntax of most commands well
+enough to complete the appropriate kind of thing for the context
+you're in, most of the time; so, for example, `sudo` will tab-complete
+to available commands, `sudo apt` tab-completes to the 11 `apt`
+commands, and `sudo apt install` tab-completes to the available `apt`
+packages (!).
+
+This is a huge timesaver; modern IDEs implement something similar,
+with dropdowns, by using static typing information which isn't present
+in Tcl, or for that matter bash.  IPython does it without static
+typing information but only for properties of a variable that's
+already defined.  Fecebutt and Slack provide dropdowns with substring
+search when you start to @mention somebody in a text box.
+
+Tab completion is extremely useful for navigating hierarchies; for
+example, when you're booting, there's often a hierarchy of possible
+boot media --- USB vs. hard disk vs. network, different USB mass
+storage devices, different partitions on the mass storage device,
+different files in the filesystem, etc.  Or, when you're debugging,
+you may have nested structs, or arrays of structs, or linked structs,
+that you maybe want to examine pieces of; or you might have nested
+dicts ("objects" in JS) with arbitrary sets of names.  In Tk you have
+a hierarchy of widgets.  (Though I think IMGUI is probably a better
+design than Tk on modern fast machines; see file `imgui-tk` for
+thoughts on that.)
+
+Noun-verb ordering rather than Tcl's verb-noun?
+-----------------------------------------------
+
+Verbs act on nouns.  Yossi's `pmem 0 bkpt nextpc` is a verb `pmem`,
+print memory, that acts on CPU 0 and, I think, prints out its
+breakpoints and next program counter value.  `mv
+Un_Yanqui_Enseñando_Dichos_Argentinos_a_otro_Yanqui-hBhrHaoYONs.mp4
+humor/.` is a verb `mv`, move, that acts on a video named by the first
+argument, moving it into a named directory.
+
+Verbs and nouns have some type-compatibility requirements, so if you
+know one of them, you can narrow down the candidates for the other,
+making it easier to choose.  `mv` above only acts on filenames, and if
+it's given more than two arguments its destination argument needs to
+be a directory, while `mpv` only acts on *some* filenames, those that
+name directories or video or audio.  `pmem` presumably only acts on
+CPUs for its first argument.
+
+If you have more verbs than nouns, tab completion is probably easier
+if you specify the noun, or *a* noun, first.  If you have more nouns
+than verbs, tab completion is probably easier if you specify the verb
+first.  So, for example, my /usr/bin directory has 4652 verbs in it,
+most of which are only applicable to a few kinds of nouns, but none of
+my own directories have that many nouns in them.  `tiff2bw` is only
+applicable to TIFFs, `pdftotext` is only applicable to PDFs, and
+`avrdude` is only applicable to AVR flash memory images.  So probably
+a noun-verb order would be more usable.
+
+In either case, there's the possibility of needing a space-filler of
+whichever syntactic category comes first.  If I don't want to do any
+particular operation on some file, just see it, I still need to invoke
+Unix `cat` or `less` or `xdg-open` or `ls`.  Similarly, in Smalltalk,
+verbs that don't really operate on any object have to get arbitrarily
+attached to some class as class methods.
+
+If you have a lot of nouns --- or for that matter verbs --- you
+probably want a better way of choosing one than reading through a list
+of all of them or typing a memorized name.  As alluded to above, a
+hierarchy is one possibility, while search (for example, using
+substrings, as in Fecebutt, or arbitrary database queries) is another.
+Bash tab-completion does a prefix search which doubles as hierarchy
+navigation.  But bash tab-completion is copied from csh and tcsh,
+which come from a time when avoiding process context switches was an
+important consideration (so, for example, csh completions were
+triggered with ^D!) and terminals were commonly 2400 baud --- 3 lines
+of text per second.  Most modern computer systems have much larger
+display bandwidth, often in the gigabits per second, and can thus
+afford to be more proactive about presenting candidates.
+
+Most OO and OO-influenced programming languages put object properties
+(forming, sometimes, a hierarchy) and operations (verbs) in the same
+namespace; Smalltalk uses the same syntax for `anArray size`, which
+returns a number, and `anArray inspect`, which opens an inspector
+window; or for `anArray at: 3` and `anArray at: 3 put: 4`; and, in
+Python or JS, `foo.bar` can be either the instance variable `bar` or a
+method `bar` of the object `foo`, although they do distinguish between
+merely *reading* the property and *invoking* an arbitrary operation.
+
+Making such a distinction, like the HTTP distinction between GET and
+POST, is crucially important for tab completion: if evaluating
+`foo.bar` can cause serious side effects, you don't want the UI to do
+it peremptorily.  But, of the things that *can* be evaluated without
+serious side effects, you would like to maximize the number that the
+UI can look at peremptorily.
+
+Another usability-maximizing design feature (missing from Tcl! but not
+from bash!) is being able to write to things in a way consistent with
+reading them.  That is, if reading `foo.bar.baz` gives you 3, it is
+often useful to define `foo.bar.baz <- 3` or something similar as a
+way to establish the same state of affairs in the future.  It's much
+worse for usability to have to wander around looking for an operation
+on `foo.bar` or perhaps even `foo` that has the effect of changing
+`baz`.
+
+An excellent example of the utility of writability and hierarchies was
+The Doctor's original example; under Linux:
+
+    $ cat /sys/devices/pci0000:00/0000:00:1c.0/0000:01:00.0/ieee80211/phy0/macaddress
+    00:24:2c:97:d8:58
+
+Sadly, this kernel does not provide the ability to change the MAC
+address by writing to that pseudo-file.
+
+Most of Yossi's hardware-debugging example from before could quite
+reasonably be implemented as a mere object graph like this, with
+custom getters performing the operations he'd decided were safely
+side-effect-free.  (He mentions in the article that reading
+memory-mapped I/O regions wasn't always safe, which is a pretty common
+situation in device drivers.)  Occasionally you'd maybe need to apply
+a verb to it.  Here's a fragment of a recent GDB session as I was
+tracking down a bug, a fragment which consisted almost entirely of
+such navigation:
+
+    (gdb) p symbol
+    $1 = (HCFChoice *) 0x1e
+    (gdb) frame 1
+    #1  0xb79ecacd in collect_nts (grammar=0x83e92e0, symbol=0x83e9258)
+        at build/debug/src/cfgrammar.c:121
+    121	        collect_nts(grammar, *x);
+    (gdb) p symbol
+    $2 = (HCFChoice *) 0x83e9258
+    (gdb) p *symbol
+    $3 = {type = HCF_CHOICE, {charset = 0x83e92b0, seq = 0x83e92b0, 
+        chr = 176 '\260'}, reshape = 0xb79f0202 <h_act_first>, action = 0x0, 
+      pred = 0x0, user_data = 0x4c3b433d}
+    (gdb) p *symbol->seq
+    $4 = (HCFSequence *) 0x83e92c0
+    (gdb) p **symbol->seq
+    $5 = {items = 0x83e92d0}
+    (gdb) p (*symbol->seq)->items
+    $6 = (HCFChoice **) 0x83e92d0
+    (gdb) p (*symbol->seq)->items@10
+    $7 = {0x83e92d0, 0xb7f89450 <main_arena+48>, 0x3c, 0x11, 0x1e, 0x0, 0x41, 
+      0x29, 0x0, 0x83e431c}
+
+You could imagine this whole transcript collapsing down to
+`stack.1.symbol.dest.seq.dest.dest.items dump 10`, or even
+`stack.1.symbol.seq.0.items d 10`.
+
+Similarly, most of the booting I do could be accomplished by
+navigating through a device tree and finally applying a "boot" verb.
+
+A thing that is mentioned in this transcript, but missing from my
+commands and from bash, Forth, and Tcl, is GDB's ability to refer back
+to previous results; for example, instead of `p **symbol->seq`, I
+could have written `p *$4`.
+
+This kind of navigation does not entirely replace the need to pass
+string --- or other! --- parameters to verbs.
+
+GUIs
+----
+
+Noun-then-verb interaction is of course entirely standard in GUIs;
+even SKETCHPAD had you select onscreen objects with the light pen
+before applying actions to them by flipping switches.  It's still
+uncommon in command-line interfaces.
+
+10tcl
+-----
+
+Originally I was thinking of something fairly traditional: a simple
+Lisp dialect, but with more Tclish syntax, in which symbols and lists
+are quoted by default and require some kind of explicit sigil to
+unquote them --- perhaps "," rather than Tcl's "$" --- and in which
+the outermost parentheses are unnecessary.  And called "10tcl" as in
+"tentacle".  And maybe with dicts, like Clojure.  But then I started
+thinking about how to handle tab completion, and the noun-then-verb
+thing popped up, and the RESTish distinction between properties and
+verb invocations.
+
+This suggests a connection with [Darius Bacon's language Cant][2], a
+dialect of Scheme in which the basic procedure-definition system
+includes a pattern-matching system, so that it is easy to define a
+procedure which returns `#no` if invoked with the argument
+`.interactive?` and a different form if invoked with two arguments the
+first of which is `.pick-move`:
+
+    (make greedy-player
+      (to ~.interactive? #no)
+      (to (~ .pick-move board)
+        (for min-by ((move board.gen-legal-moves))
+          (greedy-evaluate (update move board)))))
+
+[2]: https://github.com/darius/cant
+
+Specifically, you could imagine that invoking `sys.class.block.sda1
+boot` would invoke the procedure denoted by `sys.class.block.sda1`
+with the symbol `boot` as its single argument.  This is the same as
+Tcl as far as it goes, except that `sys.class.block.sda1` is actually
+an expression interpreted as it would be in Python or JS: as a series
+of property accesses.  But a facility for defining actors like the
+Cant `greedy-player` above would make it convenient and idiomatic to
+define entities that responded to such invocations.
+
+However, a significant difference is that these 10tcl objects
+*additionally* have properties which can be, by convention, safely
+enumerated and read; they might be a statically determined set or a
+set computed by arbitrary code invoked at runtime, like Python
+`__dir__`, `__getattr__`, and `__getattribute__`.  That is, like JS or
+Python functions, 10tcl objects can have *both* behavior *and*
+attributes.
+
+As in Tcl, the first word of the command is evaluated under different
+rules than the rest of it: namely, the first word is *evaluated*
+(rather than used to look up a proc, as in Tcl), while if there is
+more to the command, it is *quasiquoted*.
+
+The grammar might look something like this:
+
+    command ::= expr (hwsp quasiquoted)* newline
+    hwsp ::= (' ' | '\t')*
+    expr ::= '(' command ')' | name | expr '.' name | number | obj
+    quasiquoted ::= '(' command  ')' | name | number | ',' expr | obj
+
+Here "obj" is intended to represent things like lists and
+dictionaries, whose syntax I haven't thought about yet.
+
+I think the Common Lisp, Forth, and Scheme approach of defining new
+control structures through compile-time metaprogramming is probably
+better than the Tcl and MACLISP approach of defining them through
+fexprs, partly because you can inspect the results of the compile-time
+metaprograming more easily.
+
+Footnote
+--------
+
+† It turns out that to interrupt an infinite loop in OLPC Open
+Firmware/OpenBoot, the answer is that the DEL key or the key with a
+rectangle on it in the upper right will abort, although after that you
+have to type `enable-interrupts` to run it again, except on later
+models of the XO.
