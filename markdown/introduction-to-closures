@@ -1,0 +1,100 @@
+Many programmers who haven't delved deeply into functional programming
+are puzzled about what closures are and why they would care.  And this
+confusion sometimes gets worse when they find explanations that
+explain how closures are implemented, namely by storing some extra
+values along with a pointer to some function code and supplying those
+values to the function when it is invoked.  But that doesn't get to
+the heart of the matter, which is:
+
+Closures are the language feature that allow you to create new functions at runtime.
+----------------------
+
+Here's an example.  You can express the function (+) that adds two
+numbers in just about any programming language. In old-style JS you
+would write `function foo(a, b) { return a + b; }`, for example. And
+similarly you can express the function (3+) that adds three to things:
+`function foo(b) { return 3 + b; }`. But (3+) is obviously just one
+example of a large class of functions like (4+), (5+), (-3 +), and so
+on; it would clearly be nice to be able to generate instances of this
+class of functions automatically instead of copying and pasting code
+and editing the constant in it.
+
+Closures are the language feature that make this possible; in JS, for
+example, you can write `function adder(a) { function foo(b) { return a
++ b; } return foo; }` and you have a function which, at runtime,
+creates arbitrary new instances of this adder class. This clearly
+requires the binding of `a` to, say, 3 or 4 or 5 or -3, to stick
+around somewhere, rather than being discarded when `adder` exits,
+which you will note is not at all explicit in the original code.
+Forth doesn't have closures but gets a similar ability in a different,
+more explicit way, "at compile-time", that is, when you're building
+the dictionary; you say `: adder create , does> @ + ;` which allows
+you to say things like `3 adder 3+`.
+
+You might think that closures only allow the creation of a limited
+class of copy-and-paste functions at run-time, but in fact they allow
+you to create *any computable function* at run-time. In fact, you only
+need *one function that creates closures* to do this; Moses
+Schönfinkel showed in the 1920s† that it was possible with two curried
+functions, conventionally called S and K:
+
+    function S(x) {
+        function S2(y) {
+            function S3(z) { return x(z)(y(z)); }
+            return S3;
+        }
+        return S2;
+    }
+
+    function K(x) {
+        function K2(y) { return x; }
+        return K2;
+    }
+
+Or, in modern JS:
+
+    const S = x => y => z => x(z)(y(z)), K = x => y => x
+
+And, in 2001, [Chris Barker demonstrated][0] that you can do it with
+just one, which can be written as `function ι(f) { return f(S)(K);
+}`. The reductions from things like ordinary arithmetic, to the
+λ-calculus, to S and K, to Barker's ι combinator, are an interesting
+kind of mind-bending, the kind that makes you wonder why it took you
+so long to understand them once you finally do understand them.
+
+[0]: https://www.nyu.edu/projects/barker/Iota/
+
+Pascal supports closures in a limited form that keeps them from
+surviving the function that instantiated them, while some other
+programming languages like Smalltalk-80 and GCC C have that
+restriction but don't enforce it, so your program will probably just
+crash if you violate it. Modern Smalltalk has full-fledged
+unlimited-extent garbage-collected closures like JS and Scheme, as do
+most modern languages: modern C++, Perl since Perl 5, Ruby since
+forever, Kotlin, Java since Java 8 (?), and so on. Smalltalk is
+particularly interesting in this regard because it uses closures
+instead of conditionals and loops, using an extremely lightweight
+syntax and some cheats in the compiler to make this practical. Some
+Scheme implementations actually use closures to implement not only
+conditionals and loops but even local variable declarations and
+statement sequencing; [Olin Shivers wrote a widely-cited
+dissertation][1] on how to make *that* insanity practical after
+struggling with the problem for years.
+
+[1]: http://www.ccs.neu.edu/home/shivers/papers/diss.pdf
+
+That might be more information about closures than you wanted, but
+hopefully it's enough to orient you and let you figure out what you
+want to know more about.
+
+Footnote
+--------
+
+† Actually, Schönfinkel invented the SKI-combinator system in the
+1920s, but Curry's further work on it and Church's invention of the
+λ-calculus had to wait for the 1930s, and it wasn't until the 1940s
+that the concept of "computable functions" was really clear, thanks to
+the work of Curry, Gödel, Church, and Turing in the 1930s; at which
+point it became clear what Schönfinkel had really proved.  At least
+that's my understanding of the history, but I've never read
+Schönfinkel's paper.
