@@ -1,3 +1,12 @@
+Could you write an assembler with a smooth, backward-compatible path
+from raw binary (or, say, hexadecimal or octal) code up to a
+reasonable macro-assembler programming environment?  Could it be
+smaller than existing assemblers?  Maybe, but it's much easier to make
+a wrong turn and fall into the Turing tarpit.
+
+The background
+--------------
+
 In an assembly-language program, traditionally, you have a sequence of
 operations that add bytes to the program being assembled and resolve
 labels, which may result in changing bytes that have already been
@@ -41,7 +50,8 @@ recognizes instruction opcode mnemonics and handles labels --- but
 it's undeniably a very useful tool for bootstrapping.
 
 So, for example, here's [an MS-DOS 64-byte demo][0] I wrote a few
-years ago, in an octal format such a program might accept:
+years ago, in an octal format such a program might accept, which can
+be obtained from `od -vbAn`:
 
     260 023 315 020 304 057 211 350 367 056 001 001 211 305 061 306
     061 322 211 301 061 333 210 367 211 337 301 373 002 001 337 211
@@ -142,7 +152,7 @@ addresses.  So a bare-kernel version might be more appealing:
             .globl _start
     _start: 
     main:   xor %esi, %esi          # flag for whether we have data
-            xor %edi, %edi          # the data we maybe have
+            xor %ebp, %ebp          # the data we maybe have
     next:   push %esi               # stack balance, also zero the buffer
             xor %eax, %eax
             mov $3, %al             # __NR_read
@@ -158,9 +168,9 @@ addresses.  So a bare-kernel version might be more appealing:
             sub $'0, %eax
             cmp $7, %eax
             ja emit                 # if non-digit, emit buffered byte if any
-            shl $3, %edi            # otherwise shift to make space for digit
+            shl $3, %ebp            # otherwise shift to make space for digit
             inc %esi                # and set flag
-            or %eax, %edi
+            or %eax, %ebp
             jmp next
     emit:   test %esi, %esi         # Do we have buffered data to emit?
             je next
@@ -168,7 +178,7 @@ addresses.  So a bare-kernel version might be more appealing:
             mov $4, %al             # __NR_write
             xor %ebx, %ebx          # fd =
             inc %ebx                #      stdout, 1
-            push %edi
+            push %ebp
             mov %esp, %ecx          # buf on stack again
             xor %edx, %edx
             inc %edx                # count = 1
@@ -189,4 +199,218 @@ trickery.
 
 [1]: https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 
-An interesting idea here is to add more traditional assembly 
+Backwards-compatible assembly features
+--------------------------------------
+
+An interesting idea here is to add more traditional assembly-language
+capabilities in a backward-compatible way to this octal-dump language.
+A really straightforward thing to add would be an RPN operation like
+`|`, which replaces the last two bytes emitted with their bitwise OR.
+(More traditional operations include things like `+` and `-`, but `|`
+is more immediately useful.)  So, for example, you could write the
+`211 305` in the above code, meaning `mov %ax, %bp`, as `210 1 | 0 5
+300 | |`; in this case `210` is `mov` (or `lea` or `pop`), and `1` is
+the Ev <- Gv variant of it, while `300` is the "mod" for the
+register-register mod-r/m byte, `0` is `%ax`, and `5` is `%bp`.
+
+This requires buffering up the program to be output, unlike the
+"assemblers" above.  This expands it significantly to 88 bytes of
+code:
+
+            .globl _start
+    _start: mov $output, %edi       # output pointer
+    reset:  xor %esi, %esi          # flag for whether we have data
+            xor %ebp, %ebp          # the data we maybe have
+    next:   push %esi               # stack balance, also zero the buffer
+            xor %eax, %eax
+            mov $3, %al             # __NR_read
+            xor %ebx, %ebx          # fd = stdin, 0
+            mov %esp, %ecx          # buf on stack
+            xor %edx, %edx          # count =
+            inc %edx                #         1
+            int $0x80               # system call, results in %eax
+            dec %eax
+            test %eax, %eax         # if not 1:
+            jnz end                 # bail out
+            pop %eax                # fetch character read
+            sub $'0, %eax
+            cmp $7, %eax
+            ja emit                 # if non-digit, emit buffered byte if any
+            shl $3, %ebp            # otherwise shift to make space for digit
+            inc %esi                # and set flag
+            or %eax, %ebp
+            jmp next
+    emit:   test %esi, %esi         # Do we have buffered data to emit?
+            je ops
+            mov %ebp, (%edi)
+            inc %edi
+    ops:    cmp $('| - '0), %eax     # was the character a |?
+            jne reset                # if so, OR the last two bytes:
+            dec %edi
+            mov (%edi), %dl
+            or %dl, -1(%edi)
+            jmp reset
+    end:    xor %eax, %eax
+            mov $4, %al             # __NR_write
+            xor %ebx, %ebx          # fd =
+            inc %ebx                #      stdout, 1
+            mov $output, %ecx       # buf = output
+            mov %edi, %edx          # count = output pointer
+            sub %ecx, %edx          #                        - buf
+            int $0x80
+            xor %eax, %eax          # __NR_exit =
+            inc %eax                #             1
+            int $0x80
+            .bss
+    output: .fill 65536, 1, 0
+
+That 88-byte program, given the input `300 50 1 | | 300 50 1 | 300 50
+1`, does output the bytes (represented in octal) 351 300 051 300 050
+001.
+
+Passing that assembly through `cc -nostdlib`, `objcopy -S -R
+.note.gnu.build-id`, and `od -vbAn` gives the following byte listing,
+from which the executable can reproduce itself:
+
+     177 105 114 106 001 001 001 000 000 000 000 000 000 000 000 000
+     002 000 003 000 001 000 000 000 270 200 004 010 064 000 000 000
+     050 001 000 000 000 000 000 000 064 000 040 000 003 000 050 000
+     004 000 003 000 001 000 000 000 000 000 000 000 000 200 004 010
+     000 200 004 010 020 001 000 000 020 001 000 000 005 000 000 000
+     000 020 000 000 001 000 000 000 000 020 000 000 000 220 004 010
+     000 220 004 010 000 000 000 000 000 000 001 000 006 000 000 000
+     000 020 000 000 004 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 004 000 000 000
+     004 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 277 000 220 004 010 061 366 061
+     355 126 061 300 260 003 061 333 211 341 061 322 102 315 200 110
+     205 300 165 045 130 203 350 060 203 370 007 167 010 301 345 003
+     106 011 305 353 334 205 366 164 003 211 057 107 203 370 114 165
+     314 117 212 027 010 127 377 353 304 061 300 260 004 061 333 103
+     271 000 220 004 010 211 372 051 312 315 200 061 300 100 315 200
+     000 056 163 150 163 164 162 164 141 142 000 056 164 145 170 164
+     000 056 142 163 163 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     013 000 000 000 001 000 000 000 006 000 000 000 270 200 004 010
+     270 000 000 000 130 000 000 000 000 000 000 000 000 000 000 000
+     001 000 000 000 000 000 000 000 021 000 000 000 010 000 000 000
+     003 000 000 000 000 220 004 010 000 020 000 000 000 000 001 000
+     000 000 000 000 000 000 000 000 001 000 000 000 000 000 000 000
+     001 000 000 000 003 000 000 000 000 000 000 000 000 000 000 000
+     020 001 000 000 026 000 000 000 000 000 000 000 000 000 000 000
+     001 000 000 000 000 000 000 000
+
+More or less translating this back to C, we get this:
+
+    #include <stdio.h>
+
+    char output[65536];
+
+    int main() {
+        char *op = output;
+        int b = 0, c, d = 0;
+
+        while ((c = getchar()) != EOF) {
+            if ('0' <= c && c <= '7') b = (b << 3) | (c - '0'), d++;
+            else {
+                if (d) *op++ = b, b = d = 0;
+                if (c == '|') op--, op[-1] |= *op;
+            }
+        }
+
+        fwrite(output, op - output, 1, stdout);
+        return 0;
+    }
+
+Or, in GForth:
+
+    : getchar tib 1 stdin read-file  swap 1- or if 0 else tib c@ 1 then ;
+    : read-to-end  begin  getchar while  over execute  repeat  drop  ;
+    create output 65536 allot   output value op  0 value b  0 value d
+    : digit 3 lshift or ;  : handle-digit  b digit to b  1 to d ;
+    : out d if  b op c!  op 1+ to op  then  0 to d  0 to b ;
+    : do-or op 1- dup to op  @  op 1- @ or  op 1- ! ;
+    : dispatch [char] | = if do-or then ;
+    : octal [char] 0 - >r  r@ 0 >=  r@ 7 <=  and if r> 1 else rdrop 0 then ;
+    : handle-byte dup octal if handle-digit drop else out dispatch then ;
+    : main ['] handle-byte read-to-end  output op output - type  bye ;
+
+(That took me an hour to get working; I didn't know how file I/O
+worked in ANS Forth, and it took me quite a while to work out that I'd
+left out the `drop` in `handle-byte`.  I ran this as `gforth osmdf.fs
+-e main < foo.oct > foo.com`; it doesn't do the right thing when fed
+from a terminal.)
+
+Or, in Python 2:
+
+    import sys
+
+
+    output = []
+    b = None
+
+    for c in iter(lambda: sys.stdin.read(1), ''):
+        if '0' <= c <= '7':
+            b = ((b or 0) << 3) | int(c)
+        else:
+            if b is not None:
+                output.append(b)
+                b = None
+            if c == '|':
+                output[-2:] = [output[-2] | output[-1]]
+
+    sys.stdout.write(''.join(map(chr, output)))
+
+The next obvious step in the direction of a real assembler with
+mnemonics is enough of a macro system to enable you to write that as
+`mov1 %ax %bp rr | |`, which requires only being able to define words
+that expand to numbers, like EQU.  And then after that you probably
+want something that allows you to write `%ax %bp mov-rr`, which
+requires `mov-rr` to be able to somehow insert an instruction byte
+*before* its arguments.  We'd like to be able to define it at least as
+something like `: mov-rr swap 3 << | 300 | 211 swap ;` and maybe
+better as something like `: mov-rr { src dest } 211 300 src 3 << |
+dest | ;`.
+
+So we end up in Forth
+---------------------
+
+And the off-the-shelf design for that kind of thing is an
+indirect-threaded Forth.  Minimally, it has an operand stack (in this
+case, this doubles as the code being generated, although with one word
+per item rather than one byte per item), a return stack so that
+subroutines can call other subroutines, and a dictionary it can look
+subroutines up in.  Some subroutines in the dictionary, like the
+hardcoded `|` above, are implemented by machine code (the six bytes
+117 212 027 010 127 377 above --- `dec %edi; mov (%edi), %dl; or %dl,
+-1(%edi)`).  Normally it also has `@` and `!` operations to access a
+random-access memory.  It has the possibility of adding new items to
+the dictionary, which can only be freed in a LIFO order.
+
+And it's fairly straightforward to see how you could accumulate label
+relocations in the Forth dictionary as linked lists of pointers into
+the growing code, skip the operand-stack pointer around as desired to
+deposit code into different segments, and the other kinds of things
+you'd want to do in an assembler.
+
+And, once we've settled on having a flexible interpreter in our
+assembler, we can implement core "assembler" functionality in the
+interpreted language.  Above there's an example of how 10 lines of
+interpreted Forth can implement the functionality we needed 43 lines
+of assembly language for, but that difference is mostly because the
+assembly is in a more vertical format.
+
+But maybe we wouldn't want the interpreter to be Forth.  If we're just
+looking for the absolute minimum interpreter that lets us shove the
+main assembler functionality out into macro libraries that get loaded
+when we run the "assembler", there may be a number of Turing tarpit
+possibilities, things like the lambda-calculus or SKI-combinators,
+although probably in Polish Notation or RPN syntax.  So maybe the
+question of "the minimal assembler for bootstrapping" boils down to
+the well-trodden ground of designing a minimal interpreter instead.
+And maybe that's still true even if your interpreter also contains, in
+some form, the capability of the 49-byte octal bootstrapping program
+above, so that if you feed it a stream of octal bytes it will still
+faithfully convert them to binary.
