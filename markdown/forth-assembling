@@ -1,0 +1,192 @@
+In an assembly-language program, traditionally, you have a sequence of
+operations that add bytes to the program being assembled and resolve
+labels, which may result in changing bytes that have already been
+assembled.  The simplest operation is something like `db`:
+
+        db 0x1a                  ; clear screen
+
+This appends the byte 0x1a at the current pointer (which I think is
+called `$` in traditional assembly-language syntax used by, for
+example, the CP/M assembler for the Intel 8080, as in this case; or
+`.` in AT&T or gas syntax) and advances that current pointer by one
+byte.
+
+In an RPN calculation, by contrast, you have a sequence of operations
+that add numbers to a stack, advancing the stack pointer.  If your RPN
+calculator is in hexadecimal mode and it processes the operation `1A`
+then it appends the number 0x1a at the current stack pointer and
+advances that current pointer by one stack item.
+
+There is an obvious similarity between these two operations.  But
+adding programmability to an RPN calculator is very easy.  Can we
+exploit this?  What happens if we try to incrementally add RPN
+calculation abilities to a minimal assembler?  Can we put entire
+instruction sets into macro libraries, as file
+`assembler-bootstrapping` suggests (and points out was common in the
+past), if we simply conflate the operand stack with the memory space
+we're assembling intoo?
+
+The simplest assembler
+----------------------
+
+Jeremiah Orians took exception to my claim in
+`assembler-bootstrapping` that a *minimal* assembler would have labels
+and macros, since his stage0, like Edmund GRIMLEY EVANS's bcompiler
+and various things we've discussed on kragen-tol and kragen-discuss
+over the years, starts from simply converting hexadecimal or octal
+into machine code.  Now, it's merely a question of semantics whether
+such a program, which recognizes only hexadecimal or octal input,
+should be called an "assembler" or not --- normally an assembler
+recognizes instruction opcode mnemonics and handles labels --- but
+it's undeniably a very useful tool for bootstrapping.
+
+So, for example, here's [an MS-DOS 64-byte demo][0] I wrote a few
+years ago, in an octal format such a program might accept:
+
+    260 023 315 020 304 057 211 350 367 056 001 001 211 305 061 306
+    061 322 211 301 061 333 210 367 211 337 301 373 002 001 337 211
+    303 301 373 010 001 337 001 367 133 046 210 075 103 123 211 303
+    301 373 004 001 332 211 323 301 373 004 051 330 342 326 353 306
+
+[0]: http://canonical.org/~kragen/sw/dev3/morecircles.s
+
+As explained in file `8080-opcode-map`, the Intel family of machine
+languages, including the 8080, the 8086, the i386, and amd64, and even
+the 8008 (as explained in file `computer-algebras-ii`), are much
+easier to read in octal than in hexadecimal, and the code to convert
+from octal to binary is simpler than the code to convert from
+hexadecimal to binary (especially traditional 0123456789abcdef
+hexadecimal instead of 0123456789jklmno).
+
+Here's such an octal converter in C:
+
+    #include <stdio.h>
+
+    int main() {
+        int b = 0, c, d = 0;
+        while ((c = getchar()) != EOF) {
+            if ('0' <= c && c <= '7') d++, b = (b << 3) | (c - '0');
+            else if (d) putchar(b), b = d = 0;
+        }
+        return 0;
+    }
+
+`gcc -fomit-frame-pointer -Os -Wall -Werror -std=gnu99` on i386
+compiles this function into 29 instructions in 63 bytes, although the
+executable file is 7340 bytes with 434 bytes of .text and hundreds of
+bytes of other cruft.
+
+This is an assembly version of the machine code GCC generated:
+
+            .globl main
+    main:   push   %ebp
+            mov    %esp, %ebp
+            push   %esi
+            push   %ebx
+            and    $~0xf, %esp
+            sub    $0x10, %esp
+    reset:  xor    %esi, %esi
+            xor    %ebx, %ebx
+    next:   call   getchar
+            cmp    $-1, %eax
+            je     end
+            sub    $'0, %eax
+            cmp    $7, %eax
+            ja     emit
+            shl    $3, %ebx
+            inc    %esi
+            or     %eax, %ebx
+            jmp    next
+    emit:   test   %esi, %esi
+            je     next
+            mov    %ebx, (%esp)
+            call   putchar
+            jmp    reset
+    end:    lea    -8(%ebp), %esp
+            xor    %eax, %eax
+            pop    %ebx
+            pop    %esi
+            pop    %ebp
+            ret    
+
+This is pretty reasonable code but it can obviously be cleaned up and
+whittled down a bit, especially if we suppose that crt0 doesn't care
+if we preserve its %esi and %ebx:
+
+            .globl main
+    main:   xor    %esi, %esi
+            xor    %ebx, %ebx
+    next:   call   getchar
+            cmp    $-1, %eax
+            je     end
+            sub    $'0, %eax
+            cmp    $7, %eax
+            ja     emit
+            shl    $3, %ebx
+            inc    %esi
+            or     %eax, %ebx
+            jmp    next
+    emit:   test   %esi, %esi
+            je     next
+            push   %ebx
+            call   putchar
+            pop    %ebx
+            jmp    main
+    end:    xor    %eax, %eax
+            ret
+
+That's 49 bytes of machine code, but of course it depends on C stdio
+and exiting via crt0, and also 8 of those 49 bytes are C stdio
+addresses.  So a bare-kernel version might be more appealing:
+
+            .globl _start
+    _start: 
+    main:   xor %esi, %esi          # flag for whether we have data
+            xor %edi, %edi          # the data we maybe have
+    next:   push %esi               # stack balance, also zero the buffer
+            xor %eax, %eax
+            mov $3, %al             # __NR_read
+            xor %ebx, %ebx          # fd = stdin, 0
+            mov %esp, %ecx          # buf on stack
+            xor %edx, %edx          # count =
+            inc %edx                #         1
+            int $0x80               # system call, results in %eax
+            dec %eax
+            test %eax, %eax         # if not 1:
+            jnz end                 # bail out
+            pop %eax                # fetch character read
+            sub $'0, %eax
+            cmp $7, %eax
+            ja emit                 # if non-digit, emit buffered byte if any
+            shl $3, %edi            # otherwise shift to make space for digit
+            inc %esi                # and set flag
+            or %eax, %edi
+            jmp next
+    emit:   test %esi, %esi         # Do we have buffered data to emit?
+            je next
+            xor %eax, %eax
+            mov $4, %al             # __NR_write
+            xor %ebx, %ebx          # fd =
+            inc %ebx                #      stdout, 1
+            push %edi
+            mov %esp, %ecx          # buf on stack again
+            xor %edx, %edx
+            inc %edx                # count = 1
+            int $0x80
+            pop %edx
+            jmp main
+    end:    xor %eax, %eax          # __NR_exit =
+            inc %eax                #             1
+            int $0x80
+
+This is considerably more instructions, 37, and back up to 67 bytes of
+code.  But, linking with `-nostdlib`, the static stripped executable
+is 416 bytes with only 67 bytes of `.text`, without any trickery with
+minimizing ELF headers; Brian Raiter's [whirlwind teensy tutorial][1]
+succeeded in getting a 45-byte Linux ELF executable, so probably it's
+possible to get this executable to be about 112 bytes with such
+trickery.
+
+[1]: https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
+
+An interesting idea here is to add more traditional assembly 
