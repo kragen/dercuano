@@ -1,0 +1,438 @@
+Immediate-mode PEG parsers in assembly language
+===============================================
+
+I think I've reinvented an interesting design for how to do parsing
+efficiently and straightforwardly in machine code; it seems eminently
+workable and quite efficient, at least for grammars without an unusual
+amount of ambiguity, probably achieving parsing speeds of dozens of
+megabytes per second with easy-to-write assembly code.  It's an
+approach to parsing analogous to the IMGUI approach to building user
+interfaces.
+
+I've been working with Meredith Patterson and Andrea Shepard on the
+Hammer parsing engine.  This isn't intended as a proposal for Hammer,
+but it is certainly inspired by Hammer.  Andrea's been working on an
+LLVM backend for Hammer, and that, along with the difficulties
+Jeremiah Orians reports in writing interpreters in assembly, has led
+me to think about these problems.
+
+In file `immediate-mode-productive-grammars` I wrote about how to use
+a similar design for *bidirectional* parsing *and deparsing*, that is,
+serialization.  Deparsing is not considered in this note.
+
+The basic correspondence
+------------------------
+
+Consider the design of Hammer.  Hammer is a relatively traditional
+parsing combinator library in C; you call a bunch of Hammer functions
+to incrementally build up an object graph representing your grammar,
+in much the same way a user of a traditional widget toolkit calls
+widget-creation functions to build up an object graph representing
+their GUI.  Is there an alternative that would look more like IMGUI?
+
+The fundamental combining operations of PEGs are greedy choice,
+concatenation, indirection, and negation.  These are pretty close to
+the usual programming operations of conditionals, sequencing,
+subroutine call, and iteration; although negation and iteration do not
+correspond, the others do.  It would be nice to directly implement
+concatenation of languages with sequencing of programs, so that you
+could compile the tiny language `'h' 'i'` into, for example:
+
+        mov $'h, %al
+        call letter
+        mov $'i, %al
+        call letter
+
+That much is fairly easy to do: the `letter` subroutine checks the
+next byte of input, explodes if it's not 'h' or 'i', and otherwise
+advances the input pointer, something like this:
+
+    letter:
+        mov (%esi), %bl
+        cmp %al, %bl
+        jne explode
+        inc %esi
+        clc
+        ret
+
+This takes seven instructions per character on the happy path; you
+probably want a sentinel EOF character which, if you want to recognize
+it, gets handled specially.  (The `clc` is explained later.)
+
+### Choice and backtracking ###
+
+Backtracking can't be done quite as simply as 'h' 'i' / 'j', because
+somehow the failure of 'h' needs to know to backtrack to the 'j'
+instead of somewhere else.
+
+Well, it *could* be done that simply by no-opping the intermediate
+operations, just as in IMGUI toolkits you can call a bunch of
+functions that don't draw anything because they are off the screen or
+something, or just as you can null out the effect of all future writes
+to a file descriptor by closing it (they just get back EBADF).  All
+your side effects need to be indirected anyhow in case you have to
+backtrack (see the section "Data store" below).  But I think a more
+efficient and more comprehensible approach is something more like
+this, if I can figure out how to make it work:
+
+        jc 1f
+        mov $'h, %al
+        call letter
+        mov $'i, %al
+        call letter
+    1:  call backtrack
+        jc 1f
+        mov $'j, %al
+        call letter
+    1:  ret
+
+The idea is that, on entry to the parser subroutine, the carry flag is
+initially cleared; but, if 'h' or 'i' fails, the subroutine is
+restarted with the carry flag set, which leaps to the call to
+`backtrack`.  That redoubtable subroutine clears the carry flag,
+updates the backtracking state, and returns.  If instead it is reached
+with the carry flag *clear*, because execution fell through all the
+`letter` calls successfully, it knows that its immediate caller has
+succeeded, and so it returns *from* that caller, never returning *to*
+it.
+
+The disadvantage of this approach is that it requires the parsing
+subroutine to be called specially, via a magic
+parsing-subroutine-calling subroutine which saves the initial
+backtracking state, clears the carry flag, and upon the subroutine
+returning, discards that backtracking state.  (Although this would be
+needed in any case if you want Packrag memoization.)
+
+A less magical approach would look like this instead:
+
+        call choice
+        jc 1f
+        mov $'h, %al
+        call letter
+        mov $'i, %al
+        call letter
+    1:  call nextchoice
+        jc 1f
+        mov $'j, %al
+        call letter
+    1:  call endchoice
+        ret
+
+This requires you to bracket your alternatives with
+`choice`/`endchoice` calls, which will return twice if backtracking is
+needed but are otherwise ordinary.  Once one of the choices succeeds,
+the following `nextchoice` calls skip over the following bodies (by
+setting the carry flag, as before) until `endchoice` is reached.
+
+This approach has the disadvantage that you can forget the `endchoice`
+call, particularly if you have multiple return paths, and it requires
+writing a couple more instructions per choice.  It has the advantages
+that parsing subroutines can call each other directly, you can nest
+choices, and failure propagation to parents is faster and more
+straightforward to implement.
+
+This use of the carry flag is the reason that the `letter` routine
+given above clears the carry flag; otherwise a carry left over from
+its `cmp` instruction might result in spurious reports of parse
+failures.
+
+(I think this is more or less the aproach of the Warren Abstract
+Machine used for Prolog, but I don't understand the WAM, so I might be
+wrong about that.  I should probably read about it to see if I'm
+reinventing it in a way that is known to be broken.)
+
+### Negation ###
+
+Negation requires the same kind of backtracking transaction to be set
+up that choices do; the difference is that negation always aborts the
+transaction, but it fails if any of the choices succeeded.  I think we
+can make this work with a `negatechoice` subroutine; for example, to
+parse `!keyword identifier`:
+
+        call choice
+        jc 1f
+        call parse_keyword
+    1:  call negatechoice
+        jc 1f
+        call parse_identifier
+    1:  ret
+
+### Repetition ###
+
+I'm not *absolutely* sure of this, but it's a belief I have about
+PEGs.  Because repetition and alternation prune alternatives in the
+same way, strictly speaking, if you have recursion, repetition is
+unnecessary; these two grammars parse the same language:
+
+    aab <- 'a'* 'b'.
+    aab <- 'a' aab / 'b'.
+
+But the first one only saves a single backtracking state, which gets
+repeatedly updated, while the second one saves an arbitrarily large
+stack of useless backtracking states.  I'm not sure it's possible to
+implement that behavior in terms of the
+`choice`/`nextchoice`/`endchoice`/`negatechoice` primitives described
+earlier, so there might need to be a `repetition` subroutine to in
+effect commit the in-progress transaction so far and start a new one:
+
+        call choice
+        jc 1f
+    2:  mov $'a, %al
+        call letter
+        call repetition
+        jc 1f
+        jmp 2b
+    1:  call endchoice
+        mov $'b, %al
+        call letter
+
+I'm not sure if you can just use an `endchoice`/`choice` pair instead;
+I think it will do the wrong thing by propagating the failure of the
+last greedy advance.  There might be a tweak that makes it work.
+
+### More terminals ###
+
+Of course in practice you will want things like Hammer's `h_literal`
+which matches a literal string and `h_ch_range` which matches any byte
+within a byte range.  There are lots of ways these could be handled;
+for example:
+
+        mov $('a | 'z << 8), %ax
+        call range
+
+        .data
+    t:  .ascii "const"
+    t_end:
+        .text
+        mov $t, %eax
+        mov $(t_end - t), %ecx
+        call literal
+
+Byte classes, like regexp character classes, are also likely useful;
+these would have a string either in memory or in a register of the
+bytes they could accept.
+
+Hammer supports parsing by bitfield rather than by byte, but I think a
+significant number of things don't require that.
+
+Data store
+----------
+
+Generally you want to build up some kind of AST or something as you
+parse; the failure of a "transaction" ought to efficiently backtrack
+whatever you did when you were building that AST.  One reasonable way
+to handle this is to build up the AST in a pointer-bumping allocation
+arena (like Hammer's arena allocators, GCC's obarrays, or the Java
+GC's nursery) and bump the pointer back when a transaction fails.
+This is only safe if all the pointers into the backtracked part of the
+arena also become inaccessible, so it's also necessary to supply some
+kind of variable-bindings construct that gets backtracked too.
+
+Maybe the following API would work well for within-transaction code:
+
+- new(*nbytes*) -> fresh *pointer* to a node of *nbytes* bytes;
+- dup(*pointer*, *nbytes*) -> fresh *pointer*; creates a copy of the
+  *nbytes* at the old *pointer* so that you can modify it in the new
+  transaction;
+- put(*opaque*, *pointer*); updates the "variable" "named" by *opaque*
+  to have the value *pointer*;
+- get(*opaque*) -> *pointer* to the current value associated with
+  *opaque* (the last thing you called set() with for that value of
+  *opaque*), or 0 if none exists.
+
+You can have a relatively small number of distinct *opaque* values
+("variable" "names"), for which you can use function pointers or
+something else guaranteed to be unique; this is pretty similar to
+thread-local storage.  They can be stored in an alist in arena nodes.
+If you have five of them, for example, each associated with a
+five-word node, you have 25 state variables for your parse.  (Maybe
+you'd want to bloat the alist a bit to bound the depth to which you'd
+have to search it to the number of variables, or twice the number of
+variables, or something.)
+
+This approach permits the backtracking of the arena state by resetting
+two pointers, the head of the alist and the allocation pointer.
+
+With such an implementation, you can also easily supply an additional
+backtrackable operation that is probably frequently useful in parsers:
+
+- pop(*opaque*); undoes the latest put to *opaque*, restoring it to
+  its previous value.  This could be useful, for example, for
+  indentation levels.  This requires the bindings for each variable to
+  be linked together in a separate list from the list that unites the
+  current bindings of all the variables.
+
+To some extent you might be able to entirely avoid using the variable
+store, since you can return pointers to arena nodes in registers.
+
+In addition to the calls above for code *within* transactions, you
+need the usual begin/abort/commit calls for transaction management.
+
+This allocation approach is, however, entirely incompatible with
+Packrat memoization.  The transactional variable-store thing could
+maybe survive, but the deallocation thing can't, because the memoized
+return values of nonterminals invoked from within a transaction that
+later failed would need to survive.  Memoizing a nonterminal that
+might depend on the state of the variable store would be sort of
+dubious, too, though.
+
+Overall parsing context
+-----------------------
+
+I think we can do most of this entirely in registers, which should
+speed it up considerably.  You need:
+
+- PC, which tells you where you are in the parsing of the current
+  nonterminal;
+- the stack pointer, which tells you what other nonterminals you're in
+  the middle of parsing, when you get done with this one, with their
+  PC values;
+- the input pointer, assuming the data to be parsed is in RAM;
+- the backtracking stack pointer, which might be a pointer into the PC
+  stack;
+- the allocation arena pointer;
+- the current variable bindings pointer;
+- the "skip" flag (the carry flag above), which indicates that we want
+  to skip a choice, either because it has failed or because an earlier
+  choice has succeeded.
+
+That's six or seven registers, only three or four of which are
+general-purpose, plus the skip flag.  This should fit even the
+impoverished i386 register set.
+
+Of these, all but the skip flag would be saved and restored for
+backtracking.  This suggests that the context-save code, part of
+`choice` and `nextchoice`, might look something like this on i386:
+
+        pop %eax               # pc
+        push %ebp              # backtracking stack pointer
+        push %esi              # input pointer
+        push %edi              # allocation arena pointer
+        push %ebx              # variable bindings pointer
+        push %eax              # pc
+        mov %esp, %ebp         # point backtrack stack to newly allocated state
+        push %eax
+        clc
+        ret
+
+A similar sequence of about ten or so instructions would be needed to
+backtrack.  This suggests possible parsing performance in the
+neighborhood of 20 clocks per byte on modern CPUs, which could
+conceivably reach speeds of hundreds of megabytes per second, but
+probably won't.
+
+(I think there might need to be a bit in that backtracking state
+record where we can note that it corresponds to a choice that has
+*succeeded* and we are just skipping over the remaining branches.)
+
+Arbitrary computation
+---------------------
+
+Although we have to be careful not to have any effects we might wish
+we hadn't had if we backtrack, we can freely intersperse pure
+computation with the parsing, and even use it to decide whether or not
+to continue with a parse or fail.  This computation can freely read
+and write the transactional data store described earlier, which might
+include information like type information for identifiers or
+indentation levels.
+
+Another less pure thing we can freely do is to skip the read pointer
+to arbitrary places in the input text; the read pointer will be
+restored automatically if we backtrack, just as it would for normal
+sequential reading.  This is interesting for things like parsing PDF
+files, which store byte offsets in their structure for random access
+to the object tree.  (This is, of course, inspired by some work with
+Hammer to parse PDF files.)
+
+Immediate-mode PEG parsing in other programming languages
+---------------------------------------------------------
+
+As described above, this sounds like an approach that's pretty
+strongly tied to assembly language (although not any particular
+assembly language) because it relies on being able to manipulate
+stacks and control flow in a counterintuitive way.  But it turns out
+to map in a reasonable way onto *some* other programming languages.
+
+### Doing it in C ###
+
+You can do most of these things in C; `choice`/`nextchoice` require
+using `setjmp`/`longjmp`, and you'd probably want to use an integer
+return value from them rather than the carry flag.  And of course you
+can't do alloca()-like things or keep your allocation pointer in a
+register, and C function calls are usually a lot more expensive,
+though, e.g., things like `__attribute__((fastcall))`,
+`__attribute__((regparm(3)))`, and the amd64 ABI can help.  The rest is
+pretty much the same:
+
+    if (choice()) letter('h'), letter('i');
+    if (nextchoice()) letter('j');
+    endchoice();
+
+    void *rv = 0;
+    if (choice()) parse_keyword();
+    if (negatechoice()) return parse_identifier();
+
+In C++ or Rust or D, you might be able to use RAII to automatically do
+the `endchoice()` calls for you (though I'm not sure Rust or D have
+the requisite `longjmp` equivalent, and using it in C++ is pretty
+risky because of the profusion of invisible destructors you might be
+jumping over); in C the only way to do that is to abuse the
+preprocessor.  Which brings us to macro assembly.
+
+### Or macro assembly ###
+
+A macro assembler with enough of a context-stack facility to implement
+if-then-else and do-while should enable you to write a PEG grammar in
+a fairly literal fashion, maybe something like this:
+
+    expr: either(go(term); either(eat('+'); or eat('-')); go(expr)
+                 or go(term)); ret
+    term: either(go(atom); either(eat('*'); or eat('/')); go(term)
+                 or go(atom)); ret
+    atom: either(number; or eat('('); go(expr); eat(')')); ret
+    number: some(range('0', '9')); ret
+
+This would keep you from accidentally failing to balance your
+`choice`/`endchoice` pairs, leaving out a `jc`, or jumping to the
+wrong label.
+
+### Doing it in Scheme ###
+
+Earlier I said that `longjmp` was in short supply in modern languages;
+but Scheme of course has `call-with-current-continuation`, which is a
+generalization of `setjmp` that could easily be used to implement the
+above.  Scheme also has a solid macro system.  So Scheme is in some
+sense the best-suited language to this, except that all Scheme
+implementations are slow.
+
+### Or Ruby ###
+
+Yeah, Ruby also has call/cc, and it's designed for embedded DSLs like
+this, although it uses reflection and a lightweight closure syntax
+rather than a macro system.
+
+### Or Forth ###
+
+I'm pretty sure I've seen exactly this done in Forth decades ago ("BNF
+parsing in one screen of code!"); I just had no idea how it worked.
+Forth implementations also typically have the equivalent of `setjmp`
+and `longjmp`, and I suspect they're less dangerous due to the rarity
+of stack-allocated variables in Forth; and, of course, Forth is
+ideally suited to embedded DSLs.
+
+### How about Python, JS, or Lua? ###
+
+Python of course doesn't have call/cc, setjmp, macros, or a reasonable
+lambda syntax.  What it does have is generators, which have been
+adopted by JS now as well, and which are pretty straightforward to use
+to lazily generate candidate parses of strings, handling backtracking
+by resuming a generator rather than trashing it.  This is a pretty
+different paradigm and I'm not sure how to map the immediate-mode
+stuff above onto it; it almost seems easier to do general context-free
+parsing by backtracking that way, although by default that will take
+exponential time.
+
+Lua has "coroutines" which are really full-fledged cooperative
+threads, which provide similar functionality to Python generators but
+with per-thread stacks, but it doesn't have call/cc or anything
+similar.

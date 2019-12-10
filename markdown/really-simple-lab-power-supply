@@ -1,0 +1,133 @@
+In file `lab-power-supply` and file `bench-trash-power-supply` I wrote
+about adjustable power supplies for electronic benchwork.  But I think
+I was overcomplicating the problem.
+
+Basic design: a PWM-controlled buck converter
+---------------------------------------------
+
+An AVR is sufficient for the control problem, though see below about
+STM32s.  You can hook a couple of potentiometers up to it easily
+enough as a user interface.  At some point you will want a screen to
+see how much current is being drawn, but that's a rathole we can avoid
+at first by way of using a USART.
+
+To limit the output voltage you can rely on an ATX power supply's
+high-current 12-volt output regulation; you can use a buck converter
+consisting of a P-channel MOSFET, a freewheel schottky up from ground,
+and a small inductor.  Such a device can have its voltage controlled,
+even open-loop, with a PWM or PDM signal from the AVR.  Any random NPN
+BJT will work as a gate pulldown driver unless you use a monster
+MOSFET; switching frequencies in the tens to hundreds of kHz are not
+demanding either on the gate capacitance or the microcontroller.  (To
+drain 100 nC of Qg in 2 microseconds at 5 volts, you need a 100-ohm
+pullup, so a 47-ohm pullup will work even for monster MOSFETs; using
+such a high-current resistor would start to limit your options for the
+BJT.)  Also most of the P-channel MOSFETs I've seen would work fine.
+
+How much inductance do you need?  I don't know.  Not very much I
+think.  Enough to avoid discontinuous conduction mode, I guess.  If
+you use a too-big inductor you'll be fine except that you'll also have
+to use a too-big capacitor to prevent voltage spikes when the load
+comes unplugged.
+
+A back-biased beefy rectifier from the output to the input will reduce
+the risk that input-supply crowbarring will nuke the circuit if its
+output is feeding voltage back into it (for example, because you were
+charging a battery with it).
+
+Current sensing with a shunt
+----------------------------
+
+Bench power supplies need current limiting, both because otherwise
+it's too easy to get smoke, and because sometimes you want to test
+things with a current source.  Typically an ATX power supply will do
+some limiting, but not in a pleasant way.  Since you want to measure
+the output current anyway, you might as well do the current limiting
+in software.
+
+There are lots of ways to measure the output current but probably the
+easiest is to use a precise sense resistor in series with the inductor
+to measure the inductor current.  High-impedance voltage dividers from
+the two ends of the sense resistors connect them to the
+microcontroller's pins, and the difference between the two
+measurements gives us our current measurement.
+
+To be concrete about current sensing, say you're using an AVR with its
+1.1V bandgap reference (1.0V to be safe) and its 10-bit ADC, and you
+want to measure voltages up to, say, 13V, and currents down to 10 mA,
+which is not a very ambitious milliammeter but probably adequate for a
+quick-and-dirty power supply.  If your voltage divider is made out of
+a 100-kilohm resistor and a 6.8-kilohm resistor, the full-scale 13V is
+divided down to 844 mV, at most 865 counts on the ADC and at least (if
+the bandgap reference is 1.2V) 720 counts; one count is thus divided
+down from 18 mV, so you need at least a 1.8-ohm sense resistor, and
+probably a 2.2-ohm sense resistor in practice.  Using such a big sense
+resistor is an annoying limitation on how much current the power
+supply could source at low voltages.
+
+### STM32 possibilities ###
+
+Although an AVR would be adequate, an STM32 (see file `stm32`) would
+be dramatically better; a 12-bit ADC means you could use a four times
+smaller sense resistor (0.47 ohms), and the higher 1Msps sampling rate
+means you can react more quickly to load changes and have more
+confidence in the current measurement, which in turn means you can use
+higher switching frequencies and smaller inductors and capacitors,
+although at some point you start needing an active pullup for the
+MOSFET gate, maybe a gate driver chip.
+
+Current sensing without a shunt
+-------------------------------
+
+Instead of using a shunt to sense the current you're charging the
+output cap with, you could use two caps in parallel across the output
+with a new switch between them:
+
+           L1          S2
+    ____()()()()_______/._________ out
+      |            |       |
+     _|_           |       |
+      ^  D1       === C1  === C2
+     /_\           |       |
+    __|__        __|__   __|__
+     ___          ___     ___
+      _            _       _
+
+I'm not sure what to use for this switch, other than some kind of
+transistor, but the idea is that you leave it closed almost all the
+time, but occasionally you open it to find out how much current is
+flowing.  The voltage across C2 will start falling, but C2 is in
+parallel with the input capacitance of the load, and you don't know
+what that capacitance is.  More useful is that the voltage across C1
+will start rising, and the speed with which it's rising tells you the
+current that's running through L1 at that moment.  If C1 is much
+smaller than C2, say by a factor of 40, the rise in voltage will be
+much faster than the fall on C2; if you leave the switch open long
+enough for C1's voltage to rise by 25%, the voltage across C2 will
+have fallen by 0.6%; and once you close the switch again the droop
+will be instantly corrected.  (Oof, might want a little inductance or
+resistance there to keep the switch from exploding from the
+singularity.)
+
+This is handy because, for a good current measure, you'd want C1 to
+have a pretty precise and stable capacitance, and those are a lot
+easier to find in lower capacitance values.  Electrolytic and
+ferroelectric-ceramic capacitors have very imprecise capacitances.
+
+This design can use one ADC pin instead of two, but I think it
+requires two digital output pins instead of one.
+
+Basic BoM
+---------
+
+So, with the shunt design, that works out to a microcontroller, two
+pots, seven resistors, a random inductor, a random capacitor, a
+schottky, the protection rectifier, a P-MOSFET, and an NPN BJT, 15
+non-microcontroller components.  And if you fuck up the firmware the
+ATX power supply will probably save you but maybe not.  All of these
+except the microcontroller can be easily scavenged.
+
+You can hang a bunch of these puppies off a single ATX power supply if
+they don't overload it.  You might be able to hang a bunch of them off
+a single STM32; you need a couple of ADC input pins per power-supply
+line.

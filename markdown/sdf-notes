@@ -193,6 +193,59 @@ I understand that on the GPU it’s dumb to try to do things like that
 because communication between pixels is super expensive.  On the CPU,
 though, it might be a sensible thing to do.
 
+### A *much simpler* way to propagate SDF values to neighboring rays ###
+
+The above algorithm with its various resolutions of Z-buffers and so
+on would seem to require a lot of memory management complexity.  But
+one of the appealing things about both raymarching by sphere tracing
+and Whitted-style raytracers is the simplicity of their memory
+management: every ray is traced totally independently, though the
+process of tracing a ray may result in tracing some more rays,
+recursively.
+
+It occurred to me that this recursive structure is potentially a good
+way to handle the multiple resolutions.  Initially trace a cone that's
+big enough to encompass, say, a 16x16-pixel region, by marching a ray
+down its center.  When this ray encounters a low enough SDF that the
+corners of that region are, say, closer to objects than they are to
+the ray you're marching, split it up into four rays, one marching down
+the center of each 4x4 quadrant, with a narrower cone; trace one of
+them at a time.  When one of those rays encounters a low enough SDF
+that the corners of its region are maybe closer to geometry than they
+are to the ray, break down into 2x2 quadrants, which break down into
+pixels.  And when one of those rays reaches its destination, you
+invoke a pixel-found callback, or store a value in the single,
+full-resolution Z-buffer, and backtrack to complete the recursion.
+
+And of course you don't really start at 16x16.  You start at 512x512
+or 1024x1024 or 2048x2048, whatever your screen is.
+
+The amount you advance is less than with standard SDF sphere tracing,
+because you want to make sure that you aren't smashing any of the
+corners of your current pixel region into an object.  The simplest
+bound is to advance from point *p* by *d*(*p*) - *r*, where *d* is the
+SDF and *r* is the distance from *p* to the furthest corner of the
+projection of the current pixel region onto a sphere of radius |*p*|
+(assuming the eye is at 0).  But this is a pessimistic bound; the
+precise bound is the positive solution for *e* of the quadratic
+equation (*e* + |*p*| - |*p*| cos *θ*)² + (|*p*| sin *θ*)² =
+*d*(*p*)², where *θ* is the angle from *p* to the corner of the
+region, as seen from the eye.  When the angle is large, this could
+give a significantly better bound, but when the angle and the SDF are
+small, the improvement in the bound is also small in absolute terms,
+and the angle is almost always small.  However, this small improvement
+is probably usually close to a factor of 2, and my guess is that it
+might cut the recursion depth needed by a factor of 3 or so in typical
+cases.  So the tighter bound might be worth the extra complexity, or
+it might not.
+
+This doesn't fit well into a fragment shader, which may be the reason
+I haven't seen it discussed even though it seems obvious in
+retrospect, but it seems like it should fit beautifully into a CPU.
+It's somewhat less optimal than the more complex approach described
+earlier with the multiple Z-buffers, but it's also enormously simpler,
+and it's embarrassingly parallel.
+
 Multithreading and SIMD
 -----------------------
 
