@@ -1,0 +1,754 @@
+My very first toddling steps in ARM assembly language
+=====================================================
+
+It’s long past time I learned to write a little bit of ARM assembly
+and machine code!  So I spent two hours and was able to get
+hello-world running.
+
+Basic tools
+-----------
+
+As it happens, although this laptop is an amd64, it
+has cross-compilation and transparent CPU emulation stuff installed,
+so this works:
+
+    $ cat hello.c
+    #include <stdio.h>
+
+    int main() { printf("hello, world\n"); return 0; }
+    $ arm-linux-gnueabihf-gcc-5 -static hello.c -o hello.arm
+    $ ./hello.arm 
+    hello, world
+    $
+
+Specifically I have these Linux Mint packages installed:
+
+- gcc-5-arm-linux-gnueabihf
+- gcc-5-arm-linux-gnueabihf-base (its prerequisite)
+- binutils-arm-linux-gnueabihf
+- libc6-armhf-cross
+- qemu-user
+- qemu-user-binfmt
+
+(Warning: much of the following is quoted from glibc, a copyrighted
+work licensed under the GNU Lesser General Public License.)
+
+Although I do have libc6-armhf-cross installed, running dynamic
+executables does not work.  This makes disassembly kind of a pain:
+
+    $ arm-linux-gnueabihf-objdump -d !$
+    arm-linux-gnueabihf-objdump -d ./a.out
+
+    ./a.out:     file format elf32-littlearm
+
+
+    Disassembly of section .init:
+
+    00010160 <_init>:
+       10160:	e92d4008 	push	{r3, lr}
+       10164:	eb000092 	bl	103b4 <call_weak_fn>
+       10168:	e8bd8008 	pop	{r3, pc}
+
+    Disassembly of section .iplt:
+
+    0001016c <.iplt>:
+       1016c:	4778      	bx	pc
+       1016e:	46c0      	nop			; (mov r8, r8)
+       10170:	e28fc600 	add	ip, pc, #0, 12
+       10174:	e28cca68 	add	ip, ip, #104, 20	; 0x68000
+       10178:	e5bcfe94 	ldr	pc, [ip, #3732]!	; 0xe94
+
+    Disassembly of section .text:
+
+    00010180 <backtrace_and_maps>:
+       10180:	2801      	cmp	r0, #1
+       10182:	f340 8084 	ble.w	1028e <backtrace_and_maps+0x10e>
+       10186:	2900      	cmp	r1, #0
+    (97,167 more lines follow)
+    $
+
+My first steps
+--------------
+
+We can see that this is Thumb-2 machine code, with some instructions
+16-bit and others 32-bit.
+
+Buried in there is the way system calls work on ARM Linux:
+
+    00010aa0 <__libc_do_syscall>:
+       10aa0:	b580      	push	{r7, lr}
+       10aa2:	4667      	mov	r7, ip
+       10aa4:	df00      	svc	0
+       10aa6:	bd80      	pop	{r7, pc}
+
+At a guess, r7 selects the system call.
+
+And exit(2):
+
+    00020648 <_exit>:
+       20648:	b500      	push	{lr}
+       2064a:	4603      	mov	r3, r0
+       2064c:	f04f 0cf8 	mov.w	ip, #248	; 0xf8
+       20650:	f7f0 fa26 	bl	10aa0 <__libc_do_syscall>
+       20654:	f510 5f80 	cmn.w	r0, #4096	; 0x1000
+       20658:	d810      	bhi.n	2067c <_exit+0x34>
+       2065a:	4618      	mov	r0, r3
+       2065c:	f04f 0c01 	mov.w	ip, #1
+       20660:	f7f0 fa1e 	bl	10aa0 <__libc_do_syscall>
+       20664:	f510 5f80 	cmn.w	r0, #4096	; 0x1000
+       20668:	d800      	bhi.n	2066c <_exit+0x24>
+       2066a:	deff      	udf	#255	; 0xff
+       2066c:	4b07      	ldr	r3, [pc, #28]	; (2068c <_exit+0x44>)
+       2066e:	ee1d 2f70 	mrc	15, 0, r2, cr13, cr0, {3}
+       20672:	4240      	negs	r0, r0
+       20674:	447b      	add	r3, pc
+       20676:	681b      	ldr	r3, [r3, #0]
+       20678:	50d0      	str	r0, [r2, r3]
+       2067a:	deff      	udf	#255	; 0xff
+       2067c:	4a04      	ldr	r2, [pc, #16]	; (20690 <_exit+0x48>)
+       2067e:	ee1d 1f70 	mrc	15, 0, r1, cr13, cr0, {3}
+       20682:	4240      	negs	r0, r0
+       20684:	447a      	add	r2, pc
+       20686:	6812      	ldr	r2, [r2, #0]
+       20688:	5088      	str	r0, [r1, r2]
+       2068a:	e7e6      	b.n	2065a <_exit+0x12>
+       2068c:	000589cc 	.word	0x000589cc
+       20690:	000589bc 	.word	0x000589bc
+
+I’m guessing that this is the actual exiting part:
+
+       2065c:	f04f 0c01 	mov.w	ip, #1
+       20660:	f7f0 fa1e 	bl	10aa0 <__libc_do_syscall>
+
+So I tried putting this in a file and compiling it:
+
+            ; Attempt to write an ARM assembly program that exits
+            ; successfully.
+    main:   
+            mov.w r7, #1
+            svc 0
+    loop:   b.n loop
+
+But it seems like that is completely the wrong syntax.  I asked GCC
+for a listing please:
+
+    $ arm-linux-gnueabihf-gcc-5 -static -Wa,-adhlns=hello.lst hello.c
+
+It obliged:
+
+       1              		.arch armv7-a
+       2              		.eabi_attribute 28, 1
+       3              		.fpu vfpv3-d16
+       4              		.eabi_attribute 20, 1
+       5              		.eabi_attribute 21, 1
+       6              		.eabi_attribute 23, 3
+       7              		.eabi_attribute 24, 1
+       8              		.eabi_attribute 25, 1
+       9              		.eabi_attribute 26, 2
+      10              		.eabi_attribute 30, 6
+      11              		.eabi_attribute 34, 1
+      12              		.eabi_attribute 18, 4
+      13              		.file	"hello.c"
+      14              		.section	.rodata
+      15              		.align	2
+      16              	.LC0:
+      17 0000 68656C6C 		.ascii	"hello, world\000"
+      17      6F2C2077 
+      17      6F726C64 
+      17      00
+      18              		.text
+      19              		.align	2
+      20              		.global	main
+      21              		.syntax unified
+      22              		.thumb
+      23              		.thumb_func
+      25              	main:
+      26              		@ args = 0, pretend = 0, frame = 0
+      27              		@ frame_needed = 1, uses_anonymous_args = 0
+      28 0000 80B5     		push	{r7, lr}
+      29 0002 00AF     		add	r7, sp, #0
+      30 0004 40F20000 		movw	r0, #:lower16:.LC0
+      31 0008 C0F20000 		movt	r0, #:upper16:.LC0
+      32 000c FFF7FEFF 		bl	puts
+      33 0010 0023     		movs	r3, #0
+      34 0012 1846     		mov	r0, r3
+      35 0014 80BD     		pop	{r7, pc}
+      37              		.ident	"GCC: (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609"
+      38 0016 00BF     		.section	.note.GNU-stack,"",%progbits
+    DEFINED SYMBOLS
+                                *ABS*:0000000000000000 hello.c
+         /tmp/cc20XqWG.s:15     .rodata:0000000000000000 $d
+         /tmp/cc20XqWG.s:16     .rodata:0000000000000000 .LC0
+         /tmp/cc20XqWG.s:25     .text:0000000000000000 main
+         /tmp/cc20XqWG.s:28     .text:0000000000000000 $t
+
+    UNDEFINED SYMBOLS
+    puts
+
+Evidently r0 contains the argument for `puts` and also the return
+value for `main`.
+
+Aping the syntax therein, I tried this:
+
+            @ Attempt to write an ARM assembly program that exits
+            @ successfully.
+            .arch armv7-a
+            .syntax unified
+            .thumb
+            .globl main
+    main:   
+            mov.w r7, #1
+            svc 0
+    loop:   b.n loop
+
+That does build successfully; `arm-linux-gnueabihf-objdump` on the
+resulting executable suggests that the requested instructions were
+emitted:
+
+    (322 lines omitted)
+    0001049c <main>:
+       1049c:	f04f 0701 	mov.w	r7, #1
+       104a0:	df00      	svc	0
+
+    000104a2 <loop>:
+       104a2:	e7fe      	b.n	104a2 <loop>
+    (87108 lines omitted)
+
+However, upon execution, the program segfaults.  So I guessed wrong
+about *something* but without a debugger or knowing how to print
+things it’s hard to tell what still.
+
+Let’s try building a program that exits successfully with GCC:
+
+    $ cat return42.c
+    int main(int argc, char **argv)
+    {
+      return 42;
+    }
+    $ make return42
+    cc -Wall -Werror -std=gnu99    return42.c   -o return42
+    $ ./return42 
+    $ echo $?
+    42
+    $ arm-linux-gnueabihf-gcc-5 -static -Wa,-adhlns=return42.lst return42.c
+    $ cat return42.lst 
+    ...
+      21              	main:
+      22              		@ args = 0, pretend = 0, frame = 8
+      23              		@ frame_needed = 1, uses_anonymous_args = 0
+      24              		@ link register save eliminated.
+      25 0000 80B4     		push	{r7}
+      26 0002 83B0     		sub	sp, sp, #12
+      27 0004 00AF     		add	r7, sp, #0
+      28 0006 7860     		str	r0, [r7, #4]
+      29 0008 3960     		str	r1, [r7]
+      30 000a 2A23     		movs	r3, #42
+      31 000c 1846     		mov	r0, r3
+      32 000e 0C37     		adds	r7, r7, #12
+      33 0010 BD46     		mov	sp, r7
+      34              		@ sp needed
+      35 0012 5DF8047B 		ldr	r7, [sp], #4
+      36 0016 7047     		bx	lr
+    ...
+
+Maybe bx is “branch indirect”.  Also maybe I should use some optimization:
+
+      21              	main:
+      25 0000 2A20     		movs	r0, #42
+      26 0002 7047     		bx	lr
+
+That’s more like it.  Can I get that to build?
+
+    $ cat return42-arm.s
+            @ Attempt to write an ARM assembly program that exits
+            @ successfully.
+            .arch armv7-a
+            .syntax unified
+            .thumb
+            .globl main
+    main:   
+            mov.w r0, #42
+            bx lr
+    loop:   b.n loop
+    $ arm-linux-gnueabihf-gcc-5 -static return42-arm.s
+    $ file a.out
+    a.out: ELF 32-bit LSB executable, ARM, EABI5 version 1 (GNU/Linux), statically linked, for GNU/Linux 3.2.0, BuildID[sha1]=6ddb42d20b6cff668f5c6ded33b82eeda0e3bec3, not stripped
+    $ ./a.out
+    qemu: uncaught target signal 4 (Illegal instruction) - core dumped
+    Illegal instruction
+    $
+
+Hmm, that’s not what I was hoping for.  Maybe some of the other
+assembly directives are needed to build a runnable executable?
+
+            @ An ARM assembly program that exits successfully.
+            .arch armv7-a
+            .syntax unified
+            .thumb
+            .thumb_func
+            .globl main
+    main:   
+            mov.w r0, #42
+            bx lr
+
+It turned out to be .thumb_func.  The Gas manual explains, “This
+directive specifies that the following symbol is the name of a Thumb
+encoded function.  This information is necessary in order to allow the
+assembler and linker to generate correct code for interworking [sic]
+between Arm and Thumb instructions and should be used even if
+interworking is not going to be performed. The presence of this
+directive also implies ‘.thumb’.  This directive is not necessary when
+generating EABI objects.  On these targets the encoding is implicit
+when generating Thumb code.”
+
+(The manual is apparently wrong about it not being necessary when
+generating EABI objects.)
+
+A little more perusing of the manual allows me to reduce this to the
+following:
+
+            @ An ARM assembly program that exits successfully.
+            .arch armv7-a
+            .syntax unified
+            .thumb_func
+            .globl main
+    main:   mov.w r0, $42
+            bx lr
+
+Adding this line before the return instruction converts the program
+into an infinite loop, as expected:
+
+    loop:   b.n loop
+
+This program runs, prints “hello, world” as hoped for, and exits:
+
+            .globl main
+    main:   push {lr}
+            movw r0, #:lower16:hi
+            movt r0, #:upper16:hi
+            bl puts
+            mov r0, $0
+            pop {pc}
+    hi:     .ascii "hello, world\0"
+
+`$` doesn’t work for the half-symbols.  Note no `.thumb_func`, and
+consequently it generates non-Thumb code!
+
+    0001049c <main>:
+       1049c:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+       104a0:	e30004b4 	movw	r0, #1204	; 0x4b4
+       104a4:	e3400001 	movt	r0, #1
+       104a8:	fa00120e 	blx	14ce8 <_IO_puts>
+       104ac:	e3a00000 	mov	r0, #0
+       104b0:	e49df004 	pop	{pc}		; (ldr pc, [sp], #4)
+
+Sticking `.thumb_func` back in there corrects this:
+
+    0001049c <main>:
+       1049c:	b500      	push	{lr}
+       1049e:	f240 40ae 	movw	r0, #1198	; 0x4ae
+       104a2:	f2c0 0001 	movt	r0, #1
+       104a6:	f004 fc1f 	bl	14ce8 <_IO_puts>
+       104aa:	2000      	movs	r0, #0
+       104ac:	bd00      	pop	{pc}
+
+Okay, let’s try something with real computation:
+
+    #include <stdlib.h>
+
+    int main(int argc, char **argv)
+    {
+      if (atoi(argv[1]) == 37) printf("whoa\n");
+      return 0;
+    }
+
+This compiles to more or less the following:
+
+      21              	main:
+      24 0000 08B5     		push	{r3, lr}
+      25 0002 4868     		ldr	r0, [r1, #4]
+      26 0004 0A22     		movs	r2, #10
+      27 0006 0021     		movs	r1, #0
+      28 0008 FFF7FEFF 		bl	strtol
+      29 000c 2528     		cmp	r0, #37
+      30 000e 05D1     		bne	.L2
+      31 0010 40F20000 		movw	r0, #:lower16:.LC0
+      32 0014 C0F20000 		movt	r0, #:upper16:.LC0
+      33 0018 FFF7FEFF 		bl	puts
+      34              	.L2:
+      35 001c 0020     		movs	r0, #0
+      36 001e 08BD     		pop	{r3, pc}
+      38              		.section	.rodata.str1.4,"aMS",%progbits,1
+      39              		.align	2
+      40              	.LC0:
+      41 0000 77686F61 		.ascii	"whoa\000"
+      41      00
+
+So it looks like it’s calling strtol(argv[1], 0, 10), passing the args
+in r0, r1, and r2, and getting the result in r0.  Why it’s saving r3 I
+have no idea.  I’m guessing the `ldr r0, [r1, #4]` syntax is for
+indexing 4 bytes off r1 and loading the result into register r0.  The
+rest is the same.
+
+Does it use this same register-passing convention for varargs
+functions?  Let’s see:
+
+    #include <stdio.h>
+    #include <stdlib.h>
+
+    int main(int argc, char **argv)
+    {
+      int n = atoi(argv[1]);
+      if (n != 37) printf("whoa %d\n", n);
+      return 0;
+    }
+
+      21              	main:
+      22              		@ args = 0, pretend = 0, frame = 0
+      23              		@ frame_needed = 0, uses_anonymous_args = 0
+      24 0000 08B5     		push	{r3, lr}
+      25 0002 4868     		ldr	r0, [r1, #4]
+      26 0004 0A22     		movs	r2, #10
+      27 0006 0021     		movs	r1, #0
+      28 0008 FFF7FEFF 		bl	strtol
+      29 000c 2528     		cmp	r0, #37
+      30 000e 07D0     		beq	.L2
+      31 0010 0246     		mov	r2, r0
+      32 0012 40F20001 		movw	r1, #:lower16:.LC0
+      33 0016 C0F20001 		movt	r1, #:upper16:.LC0
+      34 001a 0120     		movs	r0, #1
+      35 001c FFF7FEFF 		bl	__printf_chk
+      36              	.L2:
+      37 0020 0020     		movs	r0, #0
+      38 0022 08BD     		pop	{r3, pc}
+      40              		.section	.rodata.str1.4,"aMS",%progbits,1
+      41              		.align	2
+      42              	.LC0:
+      43 0000 77686F61 		.ascii	"whoa %d\012\000"
+      43      2025640A 
+      43      00
+
+This looks pretty similar but it seems to be passing the format
+argument in r1, the int argument in r2, and the number of arguments in
+r0, to a function called `__printf_chk`.  I can ape this pretty well:
+
+    $ cat you-arm.s
+            @ Simple ARM assembly program to say "hello, Fred" when run with "Fred"
+            .globl main
+            .thumb_func
+    main:   push {r3, lr}
+            ldr r2, [r1, #4]    @ argv[1]
+            mov r0, $1
+            movw r1, #:lower16:hi
+            movt r1, #:upper16:hi
+            bl __printf_chk
+            mov r0, $0
+            pop {r3, pc}
+    hi:     .ascii "hello, %s\n\0"
+    $ arm-linux-gnueabihf-gcc-5 -static you-arm.s
+    $ ./a.out Fred
+    hello, Fred
+
+So based on the above, I can do the dumb Fibonacci benchmark program:
+
+            @ Simple ARM assembly program to compute dumb Fibonacci
+            .thumb_func
+    fib:    push {r3, lr}
+            cmp r0, $0
+            beq basecase
+            cmp r0, $1
+            beq basecase
+            push {r0}
+            sub r0, r0, $1
+            bl fib
+            mov r1, r0
+            pop {r0}
+            push {r1}
+            sub r0, r0, $2
+            bl fib
+            pop {r1}
+            add r0, r1, r0
+            pop {r3, pc}
+    basecase:
+            mov r0, $1
+            pop {r3, pc}
+
+
+            .globl main
+            .thumb_func
+    main:   push {r3, lr}
+            ldr r0, [r1, #4]    @ argv[1]
+            mov r1, $0
+            mov r2, $10
+            bl strtol
+            bl fib
+            mov r2, r0
+            mov r0, $1
+            movw r1, #:lower16:hi
+            movt r1, #:upper16:hi
+            bl __printf_chk
+            mov r0, $0
+            pop {r3, pc}
+    hi:     .ascii "fib = %d\n\0"
+
+This comes out as the following:
+
+    0001049c <fib>:
+       1049c:	b508      	push	{r3, lr}
+       1049e:	2800      	cmp	r0, #0
+       104a0:	d00e      	beq.n	104c0 <basecase>
+       104a2:	2801      	cmp	r0, #1
+       104a4:	d00c      	beq.n	104c0 <basecase>
+       104a6:	b401      	push	{r0}
+       104a8:	3801      	subs	r0, #1
+       104aa:	f7ff fff7 	bl	1049c <fib>
+       104ae:	1c01      	adds	r1, r0, #0
+       104b0:	bc01      	pop	{r0}
+       104b2:	b402      	push	{r1}
+       104b4:	3802      	subs	r0, #2
+       104b6:	f7ff fff1 	bl	1049c <fib>
+       104ba:	bc02      	pop	{r1}
+       104bc:	1808      	adds	r0, r1, r0
+       104be:	bd08      	pop	{r3, pc}
+
+    000104c0 <basecase>:
+       104c0:	2001      	movs	r0, #1
+       104c2:	bd08      	pop	{r3, pc}
+
+    000104c4 <main>:
+       104c4:	b508      	push	{r3, lr}
+       104c6:	6848      	ldr	r0, [r1, #4]
+       104c8:	2100      	movs	r1, #0
+       104ca:	220a      	movs	r2, #10
+       104cc:	f003 ff9e 	bl	1440c <__strtol>
+       104d0:	f7ff ffe4 	bl	1049c <fib>
+       104d4:	1c02      	adds	r2, r0, #0
+       104d6:	2001      	movs	r0, #1
+       104d8:	f240 41e8 	movw	r1, #1256	; 0x4e8
+       104dc:	f2c0 0101 	movt	r1, #1
+       104e0:	f012 fa88 	bl	229f4 <___printf_chk>
+       104e4:	2000      	movs	r0, #0
+       104e6:	bd08      	pop	{r3, pc}
+
+So I guess I can say that’s the first program I’ve written in ARM
+assembly, since the others were mostly just slight modifications of
+GCC output.  I’m still cargo-culting the saving of r3, and I probably
+should use a less-than comparison rather than two equal-to
+comparisons, and I don’t know what order registers get pushed.
+
+It segfaults if you feed it -1, and I think maybe this system is
+configured with apport to send the core dumps to Ubuntu or something.
+
+A minimal -nostdlib program in ARM assembly
+-------------------------------------------
+
+And here’s a program that successfully invokes `_exit` via the SVC
+instruction instead of using the standard library, and thus can be
+linked with -nostdlib and doesn’t make a humongous executable:
+
+            @ Attempt to write an ARM assembly program that exits
+            @ successfully with -nostdlib.  cf. return42.c.
+            .syntax unified
+            .thumb_func
+            .globl _start
+    _start: mov r7, #1   @ system call 1: _exit
+            mov r0, #42  @ exit return value?
+            svc 0
+    loop:   b.n loop
+
+This produces a reasonable disassembly:
+
+    $ arm-linux-gnueabihf-gcc-5 -static -nostdlib goodbyearm.s
+    $ ./a.out
+    $ echo $?
+    42
+    $ arm-linux-gnueabihf-objdump -d a.out
+
+    a.out:     file format elf32-littlearm
+
+
+    Disassembly of section .text:
+
+    00010098 <_start>:
+       10098:	f04f 0701 	mov.w	r7, #1
+       1009c:	f04f 002a 	mov.w	r0, #42	; 0x2a
+       100a0:	df00      	svc	0
+
+    000100a2 <loop>:
+       100a2:	e7fe      	b.n	100a2 <loop>
+    $
+
+So, that took a couple of hours to figure out, but it did eventually
+work.
+
+Machine instructions seen thus far
+----------------------------------
+
+Destination register always comes first.
+
+- svc: supervisor call; in Linux we use svc 0 with the system call
+  number in r7.
+- b.n: branch always
+- beq, bne: branch if equal or not equal
+- bx: branch to register
+- bl: branch and link (i.e., call)
+- push, pop: take sets of registers; can push lr and pop pc.  Not sure
+  how order is determined yet.
+- mov: can load an immediate constant into a register or copy register
+  to register
+- movt: sets upper 16 bits of register to immediate constant
+- movw: sets register to 16-bit immediate constant (or maybe sets
+  lower 16 bits?)
+- ldr, str: load or store registers to memory, supporting index-offset
+  and I think decrement addressing modes
+- cmp: can compare registers to immediate constants
+- sub/subs, add/adds: can add or subtract registers, immediate
+  constants, or both
+- nop: nop.
+
+Still mysterious: cmn.w, bhi.n, udf, mrc, negs, the whole .w and .n
+and “s” suffix thing, and what is this “ip” register?
+
+write(2), and a -nostdlib hello, world
+--------------------------------------
+
+If we want to get output without stdlib, we need to be able to invoke
+the SVC for write(2); looks like maybe that’s the system call with
+r7=4:
+
+    00021180 <__libc_write>:
+       21180:	f8df c04a 	ldr.w	ip, [pc, #74]	; 211ce <__libc_write+0x4e>
+       21184:	44fc      	add	ip, pc
+       21186:	f8dc c000 	ldr.w	ip, [ip]
+       2118a:	f09c 0f00 	teq	ip, #0
+       2118e:	b480      	push	{r7}
+       21190:	d108      	bne.n	211a4 <__libc_write+0x24>
+       21192:	2704      	movs	r7, #4
+       21194:	df00      	svc	0
+       21196:	bc80      	pop	{r7}
+       21198:	f510 5f80 	cmn.w	r0, #4096	; 0x1000
+       2119c:	bf38      	it	cc
+       2119e:	4770      	bxcc	lr
+       211a0:	f002 bb4e 	b.w	23840 <__syscall_error>
+       211a4:	b50f      	push	{r0, r1, r2, r3, lr}
+       211a6:	f001 f9d9 	bl	2255c <__libc_enable_asynccancel>
+       211aa:	4684      	mov	ip, r0
+       211ac:	bc0f      	pop	{r0, r1, r2, r3}
+       211ae:	2704      	movs	r7, #4
+       211b0:	df00      	svc	0
+       211b2:	4607      	mov	r7, r0
+       211b4:	4660      	mov	r0, ip
+       211b6:	f001 fa15 	bl	225e4 <__libc_disable_asynccancel>
+       211ba:	4638      	mov	r0, r7
+       211bc:	f85d eb04 	ldr.w	lr, [sp], #4
+       211c0:	bc80      	pop	{r7}
+       211c2:	f510 5f80 	cmn.w	r0, #4096	; 0x1000
+       211c6:	bf38      	it	cc
+       211c8:	4770      	bxcc	lr
+       211ca:	f002 bb39 	b.w	23840 <__syscall_error>
+       211ce:	9d40      	.short	0x9d40
+       211d0:	bf000005 	.word	0xbf000005
+
+I don’t know what all the extra stuff is in there for but presumably
+it covers up some impedance mismatch between the Linux system call and
+what the standard library behavior is supposed to be.
+
+On this basis I achieved a stdlibless hello, world:
+
+    $ cat hellobarearm.s
+            @ Attempt to write an ARM assembly program that hellos
+            @ successfully with -nostdlib.  cf. goodbyearm.s
+            .syntax unified
+            .thumb_func
+            .globl _start
+    _start: mov r7, #4   @ system call 4: write
+            mov r0, #0
+            movw r1, #:lower16:hello
+            movt r1, #:upper16:hello
+            mov r2, #(helloend - hello)
+            svc 0
+
+            mov r7, #1   @ system call 1: _exit
+            mov r0, #0   @ exit return value
+            svc 0
+    hello:  .ascii "hello, world\n"
+    helloend:       
+    $ arm-linux-gnueabihf-gcc-5 -static -nostdlib hellobarearm.s
+    $ ./a.out
+    hello, world
+    $ ls -l a.out
+    -rwxr-xr-x 1 user user 964 Dec 11 02:56 a.out
+    $ arm-linux-gnueabihf-objdump -d a.out
+
+    a.out:     file format elf32-littlearm
+
+
+    Disassembly of section .text:
+
+    00010098 <_start>:
+       10098:	f04f 0704 	mov.w	r7, #4
+       1009c:	f04f 0000 	mov.w	r0, #0
+       100a0:	f240 01b8 	movw	r1, #184	; 0xb8
+       100a4:	f2c0 0101 	movt	r1, #1
+       100a8:	f04f 020d 	mov.w	r2, #13
+       100ac:	df00      	svc	0
+       100ae:	f04f 0701 	mov.w	r7, #1
+       100b2:	f04f 0000 	mov.w	r0, #0
+       100b6:	df00      	svc	0
+
+    000100b8 <hello>:
+       100b8:	6c6c6568 	.word	0x6c6c6568
+       100bc:	77202c6f 	.word	0x77202c6f
+       100c0:	646c726f 	.word	0x646c726f
+       100c4:	0a          	.byte	0x0a
+
+    000100c5 <helloend>:
+            ...
+    $
+
+Note that `strip` or rather `arm-linux-gnueabihf-strip` seems to break
+objdump’s ability to disassemble the code, but it still runs.  Here’s
+a dump of the stripped executable:
+
+    $ od -vbAn a.out
+     177 105 114 106 001 001 001 000 000 000 000 000 000 000 000 000
+     002 000 050 000 001 000 000 000 231 000 001 000 064 000 000 000
+     034 001 000 000 000 002 000 005 064 000 040 000 002 000 050 000
+     005 000 004 000 001 000 000 000 000 000 000 000 000 000 001 000
+     000 000 001 000 306 000 000 000 306 000 000 000 005 000 000 000
+     000 000 001 000 004 000 000 000 164 000 000 000 164 000 001 000
+     164 000 001 000 044 000 000 000 044 000 000 000 004 000 000 000
+     004 000 000 000 004 000 000 000 024 000 000 000 003 000 000 000
+     107 116 125 000 005 140 061 140 131 337 041 016 031 220 022 215
+     156 115 132 247 261 367 300 226 117 360 004 007 117 360 000 000
+     100 362 270 001 300 362 001 001 117 360 015 002 000 337 117 360
+     001 007 117 360 000 000 000 337 150 145 154 154 157 054 040 167
+     157 162 154 144 012 000 101 036 000 000 000 141 145 141 142 151
+     000 001 024 000 000 000 005 067 055 101 000 006 012 007 101 010
+     001 011 002 012 004 000 056 163 150 163 164 162 164 141 142 000
+     056 156 157 164 145 056 147 156 165 056 142 165 151 154 144 055
+     151 144 000 056 164 145 170 164 000 056 101 122 115 056 141 164
+     164 162 151 142 165 164 145 163 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000
+     000 000 000 000 013 000 000 000 007 000 000 000 002 000 000 000
+     164 000 001 000 164 000 000 000 044 000 000 000 000 000 000 000
+     000 000 000 000 004 000 000 000 000 000 000 000 036 000 000 000
+     001 000 000 000 006 000 000 000 230 000 001 000 230 000 000 000
+     056 000 000 000 000 000 000 000 000 000 000 000 004 000 000 000
+     000 000 000 000 044 000 000 000 003 000 000 160 000 000 000 000
+     000 000 000 000 306 000 000 000 037 000 000 000 000 000 000 000
+     000 000 000 000 001 000 000 000 000 000 000 000 001 000 000 000
+     003 000 000 000 000 000 000 000 000 000 000 000 345 000 000 000
+     064 000 000 000 000 000 000 000 000 000 000 000 001 000 000 000
+     000 000 000 000
+
+Although, doh, I seem to be writing to fd 0, not fd 1.  QEMU confirms:
+
+    $ qemu-arm -strace ./a.out
+    30784 write(0,0x100b8,13)hello, world
+     = 13
+    30784 exit(0)
+
+read(2) seems to be syscall 3. open(2) syscall 5, and close(2) syscall
+6, and maybe brk() 45 and getpid() 20.
