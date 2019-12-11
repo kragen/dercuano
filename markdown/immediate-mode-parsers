@@ -18,7 +18,9 @@ me to think about these problems.
 
 In file `immediate-mode-productive-grammars` I wrote about how to use
 a similar design for *bidirectional* parsing *and deparsing*, that is,
-serialization.  Deparsing is not considered in this note.
+serialization.  Deparsing is not considered in this note.  I also
+considered a vaguely similar idea for compiling a syntax tree into
+machine code that iterates over it in file `executable-quaject-dom`.
 
 The basic correspondence
 ------------------------
@@ -48,8 +50,8 @@ next byte of input, explodes if it's not 'h' or 'i', and otherwise
 advances the input pointer, something like this:
 
     letter:
-        mov (%esi), %bl
-        cmp %al, %bl
+        mov (%esi), %cl
+        cmp %al, %cl
         jne explode
         inc %esi
         clc
@@ -323,7 +325,12 @@ probably won't.
 
 (I think there might need to be a bit in that backtracking state
 record where we can note that it corresponds to a choice that has
-*succeeded* and we are just skipping over the remaining branches.)
+*succeeded* and we are just skipping over the remaining branches.
+Also, there isn't enough information there to tell when our arena is
+full; presumably arena allocations need a check for that unless it's
+okay for them to just crash or overwrite other data when it gets full,
+which is how execution stacks are often handled, I guess.  So we might
+need an additional register for that.)
 
 Arbitrary computation
 ---------------------
@@ -336,6 +343,15 @@ and write the transactional data store described earlier, which might
 include information like type information for identifiers or
 indentation levels.
 
+In particular, we can consult some other data structure to decide what
+to try to parse; for example, an in-memory grammar.  We can even
+translate the choice backtracking to traversals of that in-memory
+grammar, as long as we keep track of our traversal state in something
+that backtracking restores correctly, such as the data store.  If the
+backtracking stack is stored on the execution stack, as in the example
+code above, then your traversal will need to recurse in order to
+backtrack properly.
+
 Another less pure thing we can freely do is to skip the read pointer
 to arbitrary places in the input text; the read pointer will be
 restored automatically if we backtrack, just as it would for normal
@@ -343,6 +359,21 @@ sequential reading.  This is interesting for things like parsing PDF
 files, which store byte offsets in their structure for random access
 to the object tree.  (This is, of course, inspired by some work with
 Hammer to parse PDF files.)
+
+Suspend and resume
+------------------
+
+If we want to suspend parsing to do something else for a while --- for
+example, read more input from somewhere else, or parse something else
+for a while --- nearly all the state we need is either in the context
+data structure saved for backtracking, in the arena, or on the stack.
+Doing some other thing that can be done by calling a subroutine that
+doesn't interact with the arena or unwind the stack is perfectly safe
+--- that's pretty much just an instance of "arbitrary computation" in
+the previous section --- but if you need to switch to a different
+arena or stack, all you need to resume the parse (restoring the stack)
+is the pointer to the backtracking context.  And maybe the arena
+pointer, if that's not saved in the context.
 
 Immediate-mode PEG parsing in other programming languages
 ---------------------------------------------------------
@@ -374,7 +405,8 @@ pretty much the same:
 
 In C++ or Rust or D, you might be able to use RAII to automatically do
 the `endchoice()` calls for you (though I'm not sure Rust or D have
-the requisite `longjmp` equivalent, and using it in C++ is pretty
+the requisite `longjmp` equivalent, although presumably you can invoke
+`setjmp` and `longjmp`; and using them in C++ is pretty
 risky because of the profusion of invisible destructors you might be
 jumping over); in C the only way to do that is to abuse the
 preprocessor.  Which brings us to macro assembly.
@@ -413,9 +445,17 @@ rather than a macro system.
 
 ### Or Forth ###
 
-I'm pretty sure I've seen exactly this done in Forth decades ago ("BNF
-parsing in one screen of code!"); I just had no idea how it worked.
-Forth implementations also typically have the equivalent of `setjmp`
+Brad Rodriguez published an article in 1990 about "BNF parsing" in
+Forth in something like this way, in three or four screens of code,
+including language concatenation by execution sequencing, and I read
+it sometime in the 1990s but didn't understand it.  However, a lot of
+the details are different.  (He uses the "no-opping the intermediate
+operations" approach I rejected above, as well as the "accept an
+alternative by returning from the caller's caller" technique.)
+I think the implementation technique described
+ here might work better (more efficiently, more
+flexibly) in Forth than Rodriguez's method does.  Like C,
+Forth implementations typically have the equivalent of `setjmp`
 and `longjmp`, and I suspect they're less dangerous due to the rarity
 of stack-allocated variables in Forth; and, of course, Forth is
 ideally suited to embedded DSLs.
