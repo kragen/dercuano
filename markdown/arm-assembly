@@ -3,7 +3,8 @@ My very first toddling steps in ARM assembly language
 
 It’s long past time I learned to write a little bit of ARM assembly
 and machine code!  So I spent two hours and was able to get
-hello-world running.
+hello-world running, and then a few more hours and learned a bunch of
+other things.
 
 Basic tools
 -----------
@@ -590,7 +591,7 @@ Destination register always comes first.
   number in r7.
 - b.n: branch always
 - beq, bne: branch if equal or not equal
-- bx: branch to register
+- bx: "branch and exchange" (not necessarily indirect; see below)
 - bl: branch and link (i.e., call)
 - push, pop: take sets of registers; can push lr and pop pc.  Not sure
   how order is determined yet.
@@ -608,6 +609,10 @@ Destination register always comes first.
 
 Still mysterious: cmn.w, bhi.n, udf, mrc, negs, the whole .w and .n
 and “s” suffix thing, and what is this “ip” register?
+
+Hmm, the Gas manual actually explains the "s" suffix: that means to
+set the flags.  So presumably "add" just does an addition, while
+"adds" does an addition and also sets carry flags and whatnot.
 
 write(2), and a -nostdlib hello, world
 --------------------------------------
@@ -752,3 +757,540 @@ Although, doh, I seem to be writing to fd 0, not fd 1.  QEMU confirms:
 
 read(2) seems to be syscall 3. open(2) syscall 5, and close(2) syscall
 6, and maybe brk() 45 and getpid() 20.
+
+The ARM-THUMB Procedure Calling Standard
+----------------------------------------
+
+ARM publishes this document, called the ATPCS for short.  It explains
+the use of the registers: r0 and r1 are used for return values; r0 to
+r3 are used for arguments and are thus caller-saved; r4 to r11 are
+callee-saved general-purpose registers; r11 is also FP, the frame
+pointer; r12 is IP, the "intra-procedure-call scratch register"; r13
+is SP; r14 is LR, the link register used by the `bl` instruction; r15
+is PC.  The stack grows downwards, and the stack pointer (which must
+be 8-byte-aligned when calling a public function) points at the last
+thing that was pushed, not the next thing to push.  Interrupt handlers
+can execute on your stack, so if you have interrupts you can't depend
+on values you've popped staying put.
+
+Newer versions are longer and of poorer quality, though covering more
+modern CPU features; fortunately I was able to find an older version,
+"SWS ESPC 0002 B-01" (B-01 being the version number), from "24
+October, 2000", which is only 37 pages.
+
+Original-THUMB instructions can only access r0 to r7 for most
+operands, so you only have 8 general-purpose registers, like the 8088;
+more recent ones can access the other 8 registers but I think need
+longer instructions.
+
+There are also some special uses of r10 ("SL", "stack limit" in
+stack-checked variants), r9 ("SB", "static base" for shared libraries
+and other uses of position-independent data), and r7 ("WR",
+"Thumb-state Work Register"), but I don't think these affect their use
+most of the time --- from the perspective of writing assembly code,
+they're mostly just more callee-saved registers, except that I guess
+if your assembly code is in a shared library it will use r9.  More
+recent versions of the ATPCS eliminate SL and WR and give r9 an
+additional role, TR, the "thread register", for TLS I guess.
+
+I think the definition of "IP" means that the dynamic linker is free
+to clobber r12 when it's doing lazy dynamic linking, so the callee may
+see random crap in r12 if it just got loaded.  This also means it's
+caller-saved.
+
+So, in summary, r4-r11 and SP (r13) are callee-saved, and everything
+else is caller-saved.  (Except that r10 may get horked by
+"limit-checking support code".)
+
+Parameter passing is what you'd expect: everything gets widened to 32
+bits, except 64-bit values are split into two 32-bit values (not sure
+about endianness).  The first four parameters go into r0-r3, and
+subsequent parameters are passed on the stack, first argument last.
+(So the argument-count passing used by `__printf_chk` above is
+nonstandard, which I guess is why it was calling `__printf_chk` and
+not `printf`.)  Return values go in r0, r0-r1, r0-r2, or r0-r3, if
+they fit, while longer return values are returned "indirectly, in
+memory, via an additional address parameter."  Not sure whether that
+parameter is passed in by the caller as a ghostly first parameter or
+what.
+
+Floating-point parameter passing is different but uses floating-point
+registers.
+
+The floating-point story sounds remarkably like the 8086-family story.
+The old FPA register set has 8 extended-precision registers (I think
+12 bytes instead of the 8087's 10) that can be used as
+single-precision, which has recently been replaced by "VFP", "vector
+floating point", which has 16 double-precision registers that can be
+used as 32 single-precision registers instead.  A difference is that
+they are mutually exclusive: while an Atom supports both 80387
+instructions and SSE instructions, ARM chips support either FPA or VFP
+or neither, not both.
+
+The assembly-language examples use a syntax closely resembling Intel
+syntax, with `;` for comments and no `%`, but `.` to mean the current
+position:
+
+        MOV   LR, PC     ; VAL(C) = . + 8
+        MOV   PC, r4
+
+GCC and Gas use something like this syntax by default except for the
+comments.  The ATPCS sometimes says things like "-4[FP]" in the body
+text; it's not clear to me whether this is valid assembly syntax in
+ARM's mind, but Gas seems to be writing that as `[fp, #-4]`.
+
+"BX" is "branch and exchange", not "branch indirect" as I thought; it
+uses the LSB of the address to determine whether to use ARM or THUMB
+instructions after the jump.  There's a note: "In ARM architecture
+version 5T, a load (but not a move) to the PC also restores the
+instruction-set state, allowing an inter-working return to be
+performed using LDR, LDM, or POP," which I guess means that before
+arm5t that wasn't the case.
+
+### Shared libraries and position-independent code
+
+To get position-independent code, you have to use PC-relative
+references to all your read-only data, and you have to access
+read-write data by indexing off SB.  This in particular means that no
+static data can point to any other static data without dynamic-linker
+intervention, even inside the same segment; and read-only data, to be
+sharable, can only point to read-write data by indexing off SB.  I
+don't know how non-instruction read-only data can point to read-only
+data at all.
+
+There is a delightful hack for shared libraries to find their
+read-write data segments in their entry trampolines: every shared
+library has a "library index" set at load time, and every shared
+library read-write data segment starts with has four pointers into a
+"process data table" which lists the data segments of the shared
+libraries.  So you're supposed to do this, in THUMB code:
+
+        MOV LSB, SB            ; for some "low register" LSB
+        LDR LSB, [LSB, #my_segment]  ; 0, 1, 2, or 3
+        LDR LSB, [LSB, #my_index]    ; set by the dynamic linker
+
+Surprisingly, section 5.8 is about Chez-Scheme-style segmented stacks
+(called "chunked stacks").  Too bad there's no explicit support for
+closures, although maybe the GCC-style trampoline hack is better than
+an explicit context pointer in the ABI, which would slow down every
+call.  (Although the SB thing is pretty close to being exactly
+an explicit context pointer in the ABI...)
+
+### Stack unwinding ###
+
+A surprising thing about the ATPCS is that it contains an unwinding
+spec to make it possible for zero-overhead exception handlers to
+safely unwind the stack, even through shared libraries, restoring all
+callee-saved registers just as if the functions unwound had returned
+normally.  Even more surprising is that the recommended approach is to
+examine the binary code of the functions on the stack to identify
+their prologues or epilogues, and then either interpretively undo the
+effect of the prologue, or directly execute the epilogue.  This is
+very clever, but for it to work, you need to not move the stack
+pointer during the body of the function the way my dumb Fibonacci code
+above does.  If that requirement is satisfied, though, I think only a
+very minimal amount of auxiliary data is required to make the
+unwinding work.
+
+The Gas manual leads me to believe that this is not the method
+currently used for unwinding, because it demands that you tell it what
+registers you're saving with a `.save` directive.
+
+A bit more disassembly, exploring instruction set differences, and failing to figure out shared libraries
+---------------------------------------------------------------------------------------------------------
+
+I wrote this C program on a different computer and compiled it with
+`arm-none-eabi-gcc -S -mthumb -O`, with no `#include` files:
+
+    int main(int argc, char **argv) {
+        printf("%d\n", atoi(argv[1]) << 3 | atoi(argv[2]));
+        return 0;
+    }
+
+The assembly code generated inside `main` looks mostly like this:
+
+    main:
+            push    {r3, r4, r5, lr}
+            mov     r4, r1
+            ldr     r0, [r1, #4]
+            bl      atoi
+            mov     r5, r0
+            ldr     r0, [r4, #8]
+            bl      atoi
+            lsl     r1, r5, #3
+            orr     r1, r0
+            ldr     r0, .L2
+            bl      printf
+            mov     r0, #0
+            @ sp needed for prologue
+            pop     {r3, r4, r5}
+            pop     {r1}
+            bx      r1
+    .L3:
+            .align  2
+    .L2:
+            .word   .LC0
+            .size   main, .-main
+            .section        .rodata.str1.4,"aMS",%progbits,1
+            .align  2
+    .LC0:
+            .ascii  "%d\012\000"
+
+The `ldr` for the `atoi` arguments confirms that the #4 or #8 is a
+byte offset.  The `lsl` and `orr` mnemonics were what I was really
+looking for, but I'm surprised not to see the left-shift incorporated
+into an operand, because I thought ARM supported a left-shift in every
+operand or something.
+
+The `ldr r0, .L2` is presumably because the 32-bit constant address of
+the string at .LC0 is hard to fit into an instruction.  The separate
+`pop` for the return address is presumably because if it used `r1` in
+the same `pop` it would have been popped in the wrong order (because
+in the instruction encoding this is surely some kind of bitfield or
+something, not a variable-length list of 4-bit register numbers); this
+also clarifies that the first thing in the `push` or `pop` list is the
+one SP points at within the push/pop pair: the last one to be pushed
+and the first one to be popped.  But why didn't it just pop it into
+`pc` rather than using two more instructions?  I suspect the answer is
+what I saw earlier in the ATPCS: old ARMs needed an explicit BX to
+ensure a switch in instruction encoding.
+
+Previously I was compiling for `armv7-a` (by the default configuration
+of my toolchain on the other computer), and I wonder if that resulted
+in using the freer-form Thumb-2 instruction format, in which you *can*
+access the high registers.  Indeed, *all* of these instructions enter
+into 16 bits, except for the immediate operands of the call
+instructions:
+
+    $ arm-none-eabi-objdump -d shl.o
+
+    shl.o:     file format elf32-littlearm
+
+
+    Disassembly of section .text:
+
+    00000000 <main>:
+       0:	b538      	push	{r3, r4, r5, lr}
+       2:	1c0c      	adds	r4, r1, #0
+       4:	6848      	ldr	r0, [r1, #4]
+       6:	f7ff fffe 	bl	0 <atoi>
+       a:	1c05      	adds	r5, r0, #0
+       c:	68a0      	ldr	r0, [r4, #8]
+       e:	f7ff fffe 	bl	0 <atoi>
+      12:	00e9      	lsls	r1, r5, #3
+      14:	4301      	orrs	r1, r0
+      16:	4803      	ldr	r0, [pc, #12]	; (24 <main+0x24>)
+      18:	f7ff fffe 	bl	0 <printf>
+      1c:	2000      	movs	r0, #0
+      1e:	bc38      	pop	{r3, r4, r5}
+      20:	bc02      	pop	{r1}
+      22:	4708      	bx	r1
+      24:	00000000 	.word	0x00000000
+
+We can see that the `ldr` to get the constant has been compiled as a
+PC-relative reference, presumably to support position-independent code
+--- although I'm not sure how that word is supposed to get the address
+of the string in it in a relocatable way?
+
+It's not; if I instead compile with `arm-none-eabi-gcc -S -mthumb
+-fPIC -O`, I get this instead:
+
+            ldr     r0, .L2
+    .LPIC0:
+            add     r0, pc
+            bl      printf
+    ...
+    .L2:
+            .word   .LC0-(.LPIC0+4)
+            .size   main, .-main
+            .section        .rodata.str1.4,"aMS",%progbits,1
+            .align  2
+    .LC0:
+            .ascii  "%d\012\000"
+
+That is, instead of storing the address of the string, it stores the
+PC-relative offset from the place where the string's absolute address
+gets computed.  The (static) linker can freely relocate the string
+because the .LC0 relocation will fix up the word at .L2 when the final
+executable or shared library is built.
+
+With a non-Thumb non-PIC compilation `arm-none-eabi-gcc -S -O shl.c`
+the code for main() is instead:
+
+    main:
+            @ Function supports interworking.
+            @ args = 0, pretend = 0, frame = 0
+            @ frame_needed = 0, uses_anonymous_args = 0
+            stmfd   sp!, {r3, r4, r5, lr}
+            mov     r4, r1
+            ldr     r0, [r1, #4]
+            bl      atoi
+            mov     r5, r0
+            ldr     r0, [r4, #8]
+            bl      atoi
+            orr     r1, r0, r5, asl #3
+            ldr     r0, .L2
+            bl      printf
+            mov     r0, #0
+            ldmfd   sp!, {r3, r4, r5, lr}
+            bx      lr
+
+(Again, all of this is without `#include`s; thus the literal calls to
+`atoi` and `printf`.)
+
+These are 32-bit instructions, and it seems like it's using the
+`stmfd` and `ldmfd` instructions (rather than `push` and `pop`) to
+load and store multiple values; presumably the `sp!` addressing mode
+is some kind of magic autoincrement/autodecrement addressing mode.
+The fact that `sp` is an explicit operand makes it sound like r13 is
+just another register and its use as the stack pointer was just a
+convention, but I don't think that was really true --- I think even
+old ARM interrupt handlers used r13 to save the registers of the
+thread being interrupted.  (Certainly the ATPCS documents this as a
+thing that could happen in 2000.)
+
+Some of the instructions have three operands instead of two, and the
+built-in shift I thought I remembered does see to exist here: `orr r1,
+r0, r5, asl #3`.  Also it's worth noticing that these instructions are
+missing the `s` suffix in the disassembly:
+
+    $ arm-none-eabi-objdump -d shl.o
+
+    shl.o:     file format elf32-littlearm
+
+
+    Disassembly of section .text:
+
+    00000000 <main>:
+       0:	e92d4038 	push	{r3, r4, r5, lr}
+       4:	e1a04001 	mov	r4, r1
+       8:	e5910004 	ldr	r0, [r1, #4]
+       c:	ebfffffe 	bl	0 <atoi>
+      10:	e1a05000 	mov	r5, r0
+      14:	e5940008 	ldr	r0, [r4, #8]
+      18:	ebfffffe 	bl	0 <atoi>
+      1c:	e1801185 	orr	r1, r0, r5, lsl #3
+      20:	e59f000c 	ldr	r0, [pc, #12]	; 34 <main+0x34>
+      24:	ebfffffe 	bl	0 <printf>
+      28:	e3a00000 	mov	r0, #0
+      2c:	e8bd4038 	pop	{r3, r4, r5, lr}
+      30:	e12fff1e 	bx	lr
+      34:	00000000 	.word	0x00000000
+
+The Thumb assembly generated by GCC didn't have the `s` suffix on the
+instructions either, but the disassembly did; it turns out that Thumb
+instructions always update the flags,
+except for `mov` and `add` instructions with high registers.  Also note that the
+disassembly spells `stmfd sp!,` as `push`, just like the Thumb
+version.
+
+What about position-independent mutable data?  It turns out to use the
+same scheme as position-independent immutable data, contrary to what I
+had expected from the ATPCS.  I compiled this C module
+
+    static int accumulator;
+
+    int octal_digit(int digit) {
+        accumulator = accumulator << 3 | digit;
+        return accumulator;
+    }
+
+with `arm-none-eabi-gcc -mthumb -S -O -fPIC` and got this remarkable
+result:
+
+    octal_digit:
+            ldr     r3, .L2
+    .LPIC0:
+            add     r3, pc
+            ldr     r1, [r3]
+            lsl     r2, r1, #3
+            orr     r0, r2
+            str     r0, [r3]
+            @ sp needed for prologue
+            bx      lr
+    .L3:
+            .align  2
+    .L2:
+            .word   .LANCHOR0-(.LPIC0+4)
+            .size   octal_digit, .-octal_digit
+            .bss
+            .align  2
+            .set    .LANCHOR0,. + 0
+            .type   accumulator, %object
+            .size   accumulator, 4
+    accumulator:
+            .space  4
+
+And this disassembly:
+
+    00000000 <octal_digit>:
+       0:	4b03      	ldr	r3, [pc, #12]	; (10 <octal_digit+0x10>)
+       2:	447b      	add	r3, pc
+       4:	6819      	ldr	r1, [r3, #0]
+       6:	00ca      	lsls	r2, r1, #3
+       8:	4310      	orrs	r0, r2
+       a:	6018      	str	r0, [r3, #0]
+       c:	4770      	bx	lr
+       e:	46c0      	nop			; (mov r8, r8)
+      10:	0000000a 	.word	0x0000000a
+
+So we have .L2 in the code segment, just after the end of the
+function, which contains the BSS address of the read-write variable
+`accumulator`, relative to the instruction at .LPIC0.  So first the
+program does a PC-relative `ldr` to fetch that read-only datum, and
+then it adds PC to the fetched datum to obtain the address of
+.LANCHOR0, which is the part of BSS that holds this file's
+zero-initialized static variables.  This doesn't seem like it could
+possibly permit sharing the code segment, since the data at .L2 would
+need to be modified according to where (that piece of) BSS is
+positioned relative to where this code segment is mapped --- it would
+need a fixup by the dynamic linker.
+
+This code also shows that the `str` instruction has its destination
+field on the *right*.
+
+Without the `static`
+
+    int accumulator;
+
+    int octal_digit(int digit) {
+        accumulator = accumulator << 3 | digit;
+        return accumulator;
+    }
+
+we get a different piece of code that refers to a global offset table;
+it sure isn't the scheme described in the ATPCS:
+
+    octal_digit:
+            ldr     r3, .L2
+    .LPIC0:
+            add     r3, pc
+            ldr     r2, .L2+4
+            ldr     r3, [r3, r2]
+            ldr     r1, [r3]
+            lsl     r2, r1, #3
+            orr     r0, r2
+            str     r0, [r3]
+            @ sp needed for prologue
+            bx      lr
+    .L3:
+            .align  2
+    .L2:
+            .word   _GLOBAL_OFFSET_TABLE_-(.LPIC0+4)
+            .word   accumulator(GOT)
+            .size   octal_digit, .-octal_digit
+            .comm   accumulator,4,4
+
+I mean this still seems to demand that this code be mapped at a fixed
+memory location relative to the `_GLOBAL_OFFSET_TABLE_` if it isn't
+going to be fixed up at load time.  So, I don't know.
+
+Even still, it seems like a relatively heavy price to pay for code
+segment sharing that instead of accessing a variable by saying
+
+            ldr     r3, [pc, #12]
+
+you have to say
+
+            ldr     r3, [pc, #12]
+            add     r3, pc
+            ldr     r2, [pc, #something]
+            ldr     r3, [r3, r2]
+            ldr     r1, [r3]
+
+and also have a per-reference offset stored somewhere the static
+linker can fix it up; and so I wonder how often it is really worth it.
+
+### Costs of accessing variables allocated statically ###
+
+An interesting thing about this way of referring to variables (or that
+described in the ATPCS) is that it reverses the traditional costs of
+referring to statically and dynamically allocated variables.  From the
+1940s through the 1980s, accessing a statically allocated variable was
+cheap: it was at a known, constant address in memory, which could be
+baked into the instruction; while accessing a variable allocated
+dynamically, for example on the stack, required indexing off the stack
+pointer or some other kind of base pointer, which itself had some
+extra cost to create and maintain.  (Worse, until around 1970, there
+were a significant number of computers where an indexed memory access
+required self-modifying code, because they didn't have index
+registers.)  But in this case we see that accessing two
+dynamically-allocated variables can be as simple as `lsl r2, r1, #3`,
+while accessing a single statically-allocated variable requires a
+five-instruction watusi.
+
+At first blush this sounds like a straightforward case of
+architectural evolution, but it isn't really.  RAM is just a bunch of
+registers, after all.  There are only a couple of minor details of the
+ARM architecture that contribute to this situation: it has an
+efficient encoding for PC-relative addressing (like amd64, unlike
+i386); loading from a constant pointer requires three instructions
+(movw, movt, ldr) instead of one; and you only have 16 registers you
+can address directly, while everything else is much slower, because
+CPU speed has zoomed way ahead of RAM speed.
+
+Rather than a change in architecture, though, it's mostly an evolution
+of the execution model.  It's just a different way of using the
+machine that prioritizes different tradeoffs.  You could totally use a
+PDP-10 or 6502 in such a way: mostly reserve the 6502 zero page for
+local variables and frame pointers and whatnot rather than global
+variables, and index all your "statically allocated" variables off one
+of those registers so that separate processes sharing an address space
+store their mutable state in separate "segments".  And although the
+Cortex-A7 ARM in your cellphone might have gigabytes of RAM and a deep
+cache hierarchy, the Cortex-M0 in a small STM32 doesn't see a whole
+lot of difference between its speed of accessing CPU registers and
+accessing the on-die SRAM, except that it may need to run several
+instructions to compute an address into the on-die SRAM.
+
+Reading other stuff
+-------------------
+
+[ARM published an "assembler user guide" in 2001 that explains the
+assembly
+language](http://infocenter.arm.com/help/topic/com.arm.doc.dui0068b/DUI0068.pdf)
+fairly comprehensively (354 pages!).  Its chapter 4 is the ARM
+instruction set reference, and chapter 5 is the Thumb instruction set
+reference.  It's marked as "superseded" on ARM's unusably bad website,
+but without a link (that I could find) to the superseding version.  On
+the 15th page, it explains what ARM and Thumb are; on the 16th page,
+it describes the register-banking scheme used to separate user and
+supervisor (kernel) mode.  It has a wealth of information about the
+historical development of the instruction set, including explaining
+literal pools and whatnot.
+
+However, this version of the book lacks such crucial features as
+32-bit-wide Thumb-2 instructions and if-then-else blocks.
+
+[There's a decent but unfinished 15-page tutorial by Carl
+Burch](http://www.toves.org/books/arm/) under CC-BY-SA; it explains
+the -s suffix on instructions, the absence of an integer division
+instruction (though not the existence of extensions that have it), the
+built-in shift, the `umull` instruction, the limitations on `mov`
+immediate constants, `mvn`, {`ldr`,`str`}{`b`,},
+{`ld`,`st`}`m`{`i`,`d`}{`b`,`a`}, all the ALU instructions,
+conditional execution, all the condition codes, all the addressing
+modes (including examples of scaled-register-offset and
+immediate-post-indexed addressing), etc.
+
+Despite this admirable level of comprehensiveness, it's imperfect; it
+seems to be unfinished, stopping after explaining the above but before
+describing function call and return, and it doesn't cover Thumb at
+all.  Also, the "hailstone sequence" example program has a bug in it
+in which the `ands` instruction overwrites the accumulator, preventing
+the program from ever working, and at one point it erroneously says
+it's jumping to the beginning of an array of doublewords.  And,
+unfortunately, the tutorial uses ARM's assembly syntax instead of
+Gas's.
+
+[Azeria Labs wrote an ARM assembly cheat
+sheet](https://gumroad.com/l/arm-assembly-cheat-sheet), though it's
+mostly focused on breakins, and they want to charge you for the
+full-resolution version; it's associated with a poorly-written
+error-filled tutorial with t0tally k00l diagrams.  [The discussion of
+it in 2017 on the orange
+website](https://news.ycombinator.com/item?id=14432994) links to a lot
+of better resources.
+
+<https://www.coranac.com/tonc/text/asm.htm>?
+<http://www.davespace.co.uk/arm/introduction-to-arm/not-trivial.html>?
