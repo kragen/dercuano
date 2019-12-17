@@ -1,0 +1,82 @@
+David R. MacIver's generative testing system
+[Hypothesis](https://hypothesis.works/) is an example of a new breed
+of "lightweight formal methods" software that I think represents a
+significant advance in the state of the programming art.  Hypothesis
+works as follows: you state a hypothesis about your system's behavior;
+Hypothesis searches for a counterexample by, essentially, fuzzing the
+system; and if it finds a counterexample, it "shrinks" it by testing
+simpler and simpler examples until it finds one that it cannot
+simplify to a simpler counterexample.  (That is, any simplification it
+tries results in an example that isn't a counterexample.)  It tells
+you the simplest counterexample and records it in an [example
+database](https://hypothesis.readthedocs.io/en/latest/database.html)
+and then always or nearly always retries it in the future so that
+you'll know when you've fixed the bug.
+
+Contrary to 1980s QA dogma, random testing turns out to be an
+excellent way to find bugs, and Hypothesis's innovative approach to
+shrinking counterexamples is very helpful in getting useful bug
+reports.  But you know what would be even more helpful than a single
+minimal reproducing test case?  A thorough characterization of the
+bug, telling you not only one case where it does happen, but a formal
+model of when it does and doesn't happen.
+
+Evolution of a hypothesis population with adversarial experiment design
+-----------------------------------------------------------------------
+
+Suppose that your initial hypothesis is that no input sequence for
+your calculator program will produce a result that is incorrect by
+more than 0.01%, and random testing finds such a result by comparing
+against some kind of formal model of arithmetic --- perhaps another
+calculator program, one that doesn't have to run fast or use little
+memory, or perhaps some kind of sparer model.  The testing has
+probably found a large set of cases that produce the correct result
+and a smaller set of cases that don't.
+
+The initial hypothesis was that this second set would be empty.  Now
+we could generate a set of new hypotheses --- for example, that all
+input sequences containing division will produce an incorrect result
+--- and test them against the experimental data.  Hypotheses that do a
+better job of discriminating the two sets (per bit!) should be
+preferred, since the objective is to find a concise hypothesis that
+discriminates them perfectly.  Once we have several hypotheses that
+discriminate perfectly, or nearly equally well, we can do more
+experiments: generate more examples and test them to see what the
+result is.  We should prefer to spend our CPU budget on examples that
+do a good job of discriminating between our existing hypotheses.  Once
+we have more evidence, we can generate more hypotheses, and vice
+versa.
+
+The approach is very similar to generative adversarial networks:
+hypotheses attempt to evolve to predict the behavior of the system
+under test, while experiment design (test-case generation, example
+generation) attempts to confuse the existing hypotheses.
+
+What form should the hypotheses take?  There are many possibilities
+appropriate to different kinds of examples: predicate-logic
+expressions, regular expressions, neural networks, and context-free
+grammars, for example.  If an example can be described by some kind of
+abstract syntax tree, tree regular expressions can capture interesting
+properties of that tree, especially if augmented by predicate-logic
+expressions that can examine node properties.  The whole field of
+genetic programming can be applied to hypothesis generation.
+
+This may provide a useful way to take advantage of increased CPU power
+(see file `testing-introspection`).
+
+Genesis
+-------
+
+This was inspired by [a bug I'm investigating
+tonight](https://gitlab.special-circumstanc.es/hammer/hammer/issues/87)
+which Hypothesis is happily finding seven hundred times a day without
+providing much new insight into why it happens.  Of course,
+conventional debugging approaches based on inspecting the code are
+necessary and sufficient, and I probably should spend some time on
+them in this case rather than continuing with black-box testing, but I
+thought maybe I could write a simple model of the bug as I did with
+[another recent
+bug](https://gitlab.special-circumstanc.es/hammer/hammer/issues/83) to
+exclude it from the testing Hypothesis is doing.  This turned out to
+be more difficult than I anticipated, and I got to thinking about what
+kind of software would make the process easier.

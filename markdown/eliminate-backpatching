@@ -1,0 +1,203 @@
+Conventional compilers, assemblers, and linkers require some
+non-sequential access to their output stream in order to insert
+forward references: places where a piece of code must contain the
+address of some later piece of code or data.  Normally this is done by
+maintaining the output program in RAM along with a database of
+unresolved references and "backpatching" it when one of those
+references is resolved.
+
+But can we avoid this, so that all code can be output as soon as it is
+generated, and still have a practical programming system?  I mentioned
+this in a conversation with Jeremiah Orians, and I think I see a
+couple of ways.
+
+How assemblers backpatch
+------------------------
+
+In assemblers this is conventionally fairly unrestricted: you can
+mention an undeclared label `foobar` wherever, and this generates an
+undefined relocation for that label.  If you define `foobar` later on,
+either as a label or with EQU, the assembler may go back and backpatch
+all the previous `foobar` references, but if you don't (and maybe even
+if you do), it leaves the job to the linker.
+
+In conventional assemblers, this single mechanism provides for
+procedure call, looping, conditionals, exception handling, other local
+control flow, function pointer generation, and references to
+statically-allocated variables, and in some cases even to things like
+thread-local variables.
+
+How Forth backpatches
+---------------------
+
+Forth systems normally don't do a lot of this.  Forth words are
+defined purely in terms of words (subroutines and variables) defined
+previously, textually prior to them, so they don't need to do any
+forward referencing for procedure calls, access to
+statically-allocated variables, or function pointer generation, and so
+no backpatching is needed in these cases.  Mutual recursion can be
+arranged by defining a "DEFERred" word which is later updated to
+invoke a word defined textually later in the source; in a sense this
+is backpatching, but DEFER permits this definition to be changed
+multiple times, including at runtime --- it's a statically-allocated
+function pointer variable.
+
+For control flow within a subroutine, though, Forth systems
+conventionally do backpatch in three cases: loops that may run zero
+times (such as ?DO loops), loops that may exit in the middle (such as
+BEGIN WHILE REPEAT loops), and conditionals (IF ELSE THEN).  For these
+purposes, they maintain a compile-time stack both to compile backward
+jumps (which require no backpatching) and to backpatch forward jumps.
+
+Is there no way to avoid this?
+
+A sorting linker
+----------------
+
+As I said before, if your compiler or assembler relies on the linker
+to put in the forward references, it doesn't need to backpatch them
+itself, so it can emit code immediately, at least if it doesn't care
+too much about optimizing it.  But that just palms the distasteful
+random access off on the linker; it doesn't eliminate it.  Can you do
+a linker without random access?
+
+Well, sure, if you accept a lot of sequential access instead.  You can
+shred the code into snippets that start at each symbol reference, each
+tagged with its start address (which may mean that you have some
+zero-length snippets), and mergesort them by the symbol name, while
+you mergesort the symbol definitions in a separate file.  Then you can
+do a sort-merge join between the two files, formatting each symbol in
+the appropriate way for each relocation, to produce a file of properly
+linked snippets, still in symbol-name order.  Then you can sort this
+file by start addresses and merge the overlaps where there were
+multiple symbol references at the same address, probably of different
+relocation types.  Easy.  Lots of "compilers" in the 1950s worked this
+way, I imagine.
+
+But it's not highly efficient, if your objective really is to compile
+programs substantially larger than your RAM; you may need quite a few
+passes over your sequential files to finish the link.
+
+Conditional returns
+-------------------
+
+Suppose instead we structure all of our conditionals as conditional
+returns.  Consider abs(x) = x if x > 0 else -x.  You can compute this
+with the following sequence of operations:
+
+    result = x
+    x > 0?
+    if so, return
+    negate result
+    return
+
+The "if so, return" conditional requires no backpatching to implement,
+perhaps a forward jump over a return instruction, and indeed
+instruction sets like ARM (see file `arm-assembly`) implement it
+directly.
+
+However, this comes at a heavy cost.  The more general case f(x) =
+g(x) if h(x) else j(x) can be implemented straightforwardly like this:
+
+    result = g(x)
+    h(x)?
+    if so, return
+    result = j(x)
+    return
+
+But this involves computing g(x) in cases where we don't want it; this
+is at least computationally wasteful, and if g(x) has some observable
+effect, actually incorrect.  You can do it correctly at moderate cost
+with an auxiliary function:
+
+    f'(x, c) =
+        c?
+        if not, return
+        result = g(x)
+        return
+
+    f(x) =
+        c = h(x)
+        result = f'(x, c)
+        c?
+        if so, return
+        result = j(x)
+        return
+
+Note that this can be compiled purely in sequence from the definition
+"f(x) = g(x) if h(x) else j(x)", as long as we allow ourselves to
+revise our notion of f's entry point once we get to the "if"; and this
+is true for arbitrarily long inline computations in place of g, h, and
+j, *as long as j contains no conditionals*.  That is, it doesn't
+generalize to the usual conditional cascade form "g(x) if h(x) else
+(j(x) if k(x) else m(x))", since the test for h(x) would need to come
+after the test for k(x) in the object code to prevent forward
+references.  Although this is much less useful, it does generalize to
+the form "(g(x) if h(x) else j(x)) if k(x) else m(x)", which arises
+from PHP's incorrect associativity of `?:`:
+
+    f''(x, c') =
+        return unless c'
+        result = g(x)
+        return
+
+    f'(x, c) =
+        c' = h(x)
+        result = f''(x, c)
+        return if c'
+        result = j(x)
+        return
+
+    f(x) =
+        c = k(x)
+        result = f'(x, c)
+        return if c
+        result = m(x)
+        return
+
+All of these pieces can contain arbitrary exit-at-the-bottom loops and
+other computations, though.
+
+If we replace the `return` at the end with a jump back to the top of
+the function, what we have is a normal exit-at-the-top while loop
+where the code before the conditional can do arbitrary computation,
+like Forth BEGIN WHILE REPEAT.
+
+So this approach requires you to write your code in a pretty strange
+style with, usually, at most one conditional per function, and the
+conditional written *after* the consequent but before the alternate,
+as in Python conditional expressions.  But it does seem feasible.
+
+Conditional call and return
+---------------------------
+
+If we suppose that we have a conditional call instruction (or
+instruction sequence), we can do this a little more reasonably:
+
+    f'(x) =
+        result = g(x)
+        return
+
+    f(x) =
+        c = h(x)
+        result = f'(x) if c
+        return if c
+        result = j(x)
+        return
+
+If we have conditional call, we don't really need conditional return:
+
+    f'(x) =
+        result = g(x)
+        return
+
+    f(x) =
+        c = h(x)
+        result = f'(x) if c
+        result = j(x) unless c
+        return
+
+However, this restricts the form of the j(x) expression; it needs to
+be nothing more than a function call.  No such restriction applies to
+g or h, and if you have both conditional call and conditional return,
+it doesn't apply to j either.
