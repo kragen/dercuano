@@ -1,0 +1,99 @@
+Don Lancaster's "magic sinewaves" are functions from discrete time to
+{-1, 0, +1} intended for use, among other things, in modulating an
+H-bridge to approximate a sine wave for power electronics.  I think
+there's a way to use them to get a reasonably good and extremely
+efficient frequency-selective sparse filter (see file
+`sparse-filters`).
+
+Magic sinewaves
+---------------
+
+The simplest approximation of a sine wave of period, say, 4 samples,
+is a square wave: [-1, -1, +1, +1, -1, -1, +1, +1, ...].  But that
+isn't a very good approximation; it has a pretty loud third harmonic.
+(This is above Nyquist, so suppose we're using a zero-order hold
+here.)  A better approximation, though lower amplitude, includes a 0
+period instead: [0, -1, 0, +1, 0, -1, 0, +1, ...].  This has less
+harmonic distortion.  But if we expand this out with a zero-order hold
+it's still obviously imperfect: [0, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0,
+0, +1, +1, +1, +1, +1, 0, 0, 0, 0, ...].  We can twiddle the samples
+around a little to kind of dither the transition; for example, [0, -1,
+0, -1, -1, -1, 0, -1, 0, 0, 0, +1, 0, +1, +1, +1, 0, +1, 0, 0, 0,
+...]. This way, although we don't get lower total harmonic distortion,
+we can push more of it up to higher frequencies, which makes it easier
+to filter out.  Again, this gives us lower amplitude for the
+fundamental.
+
+If you want a sine wave, why not just use an actual sine wave, like
+[0, -0.3, -0.6, -0.8, -1, -1, -1, -0.8, -0.6, -0.3, 0, 0.3, 0.6, 0.8,
+1, 1, 1, 0.8, 0.6, 0.3...]?  In the case of power electronics with an
+H-bridge, it's because your H-bridge wastes no power when it's off, a
+tiny bit of power when it's fully on (either forward or reverse), and
+a massive amount of power when it's partway on.  So for an efficient
+system you want to switch between fully on and fully off as quickly
+(and infrequently!) as possible.
+
+For sample rates that are higher compared to the signal frequency,
+it's easy to push all the harmonic distortion many octaves away from
+the signal, making it easy to filter with efficient passive filters;
+this is pretty much the same principle behind delta-sigma DACs, though
+those usually use {0, 1} rather than {-1, 0, 1}.
+
+Filtering
+---------
+
+The example "reference signal" waveforms above have period 20.  If we
+were to multiply them elementwise by some signal, we would downconvert
+one phase of the frequency component with period 20 to DC, and then we
+could extract it by merely summing.  The actual sine wave would give
+us the pure frequency component, while the {-1, 0, +1} signals mix in
+some pretty significant harmonic distortion.  But multiplying by them
+is trivial: you add or subtract samples from your running total, no
+multiplication required.  You can do this a second time with a second
+reference signal in quadrature with the first to get a complete
+measurement of the amplitude and phase of a given frequency.
+
+If you maintain, say, 60 totals buckets, such that bucket *i* contains
+a total of the samples *x*[*j*] such that *j* % 60 == *i*, you can run
+this analysis over the period-20 component of your whole signal by
+doing 60 additions and subtractions; so, too, for components whose
+periods are other factors of 60, such as 30, 15, 12, 10, 6, 5, and 4.
+If instead of just maintaining 60 such buckets, you calculate a
+feedback comb filter *y*[*n*] = *x*[*n*] + *y*[*n* - 60], you can
+calculate such totals for any given segment of the signal by
+subtracting 60 subsequent *y* values at the beginning of that segment
+from 60 corresponding *y* values at its end; and the usual tricks to
+get a triangular or otherwise approximately gaussian temporal window
+apply, as described in some other notes here.
+
+You could, instead, do this kind of correlation by generating a
+dithered approximation "reference signal" dynamically, for example by
+running a delta-sigma conversion of the output of a free-running
+Goertzel or Minsky oscillator, and use that to decide whether to
+process the current sample by adding, subtracting, or neither, to each
+of your I and Q accumulators.  This has the great advantage that you
+can dynamically vary the frequency of your local oscillator, thus
+tracking chirp signals, such as whistles (see file
+`whistle-detection`.)  A lightweight low-pass filter applied to the
+input signal should be sufficient to eliminate the high-frequency
+signals that could otherwise produce spurious correlations, but with
+delta-sigma conversion of more than first order, I think the dither
+noise might be sufficiently random to not need this.
+
+Delta-sigma conversion in this case might be nothing more than a
+matter of the Bresenham line-drawing algorithm.
+
+Prefix sums
+-----------
+
+If the number of transitions per period is relatively small, as with
+magic-sinewave waveforms designed to reduce switching losses by
+switching less frequently, it may be more efficient to work from a
+prefix sum of the signal rather than the signal itself.  For example,
+the initial reference waveform suggested above has only four
+transitions per period; rather than doing five additions and five
+subtractions per period, you could do two additions and two
+subtractions from the prefix sum.  Of course the prefix sum itself
+requires 20 additions per period to compute, so this is only an
+improvement if you can share the prefix sum with some other
+computation, such as the detection of a second frequency.
