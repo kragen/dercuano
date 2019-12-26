@@ -14,14 +14,15 @@ Missing pieces include:
 - internal links (between pages)
 - external links (to URLs)
 - an outline that doesn't zoom you out to a whole page
-- font sizes
-- bold
 - not resetting <code> and <em> when spilling onto a new page
-- dingbats like × (no, that one is okay, also centered dot and degrees)
+- dingbats like × (no, that one is okay, also centered dot and degrees, but
+  not ⁑)
 - topic pages
 - main table of contents
 - JS tables of contents for individual notes
-- a layout engine capable of handling varying font sizes in a line
+- a layout engine capable of handling varying font sizes in a line (also this
+  one seems to have difficulty with varying font sizes on a page; see "fudge
+  factor" in the code)
 - chronological ordering
 - font fallbacks for missing characters
 - handling of non-well-formed HTML (maybe PyTidyLib)?
@@ -53,6 +54,7 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 roman = 'et-book-roman'
 italic = 'et-book-italic'
+bold = 'et-book-bold'
 # see dercuano-hand-computers for the origins of these numbers
 em = 12
 pagesize = (24 * em, 60 * em)
@@ -82,11 +84,11 @@ def render_text(c, t, text, font):
 block_fonts = {
     'p': (roman, 1*em),
     'h1': (roman, 2*em),
-    'h2': (roman, 1.7*em),
-    'h3': (roman, 1.4*em),
-    'h4': (roman, 1.2*em),
-    'h5': (roman, 1.1*em),
-    'h6': (roman, 1*em),
+    'h2': (roman, 1.59*em),
+    'h3': (roman, 1.26*em),
+    'h4': (bold, 1.1*em),
+    'h5': (bold, 1*em),
+    'h6': (italic, 1*em),
     'li': (roman, 1*em),
     }
 
@@ -96,9 +98,14 @@ def italicize(font):
 def codify(font):
     return 'Courier', font[1]
 
+def embolden(font):
+    return bold, font[1]
+
 inline_fonts = {'i': italicize,
                 'em': italicize,
-                'code': codify}
+                'code': codify,
+                'b': embolden,
+                'strong': embolden}
 
 def push_font(t, font_stack, font):
     font_stack.append(font)
@@ -155,6 +162,8 @@ def main(path):
     pdfmetrics.registerFont(TTFont(roman, rfname))
     ifname = liabilities + '/et-book-display-italic-old-style-figures.ttf'
     pdfmetrics.registerFont(TTFont(italic, ifname))
+    bfname = liabilities + '/et-book-bold-line-figures.ttf'
+    pdfmetrics.registerFont(TTFont(bold, bfname))
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
