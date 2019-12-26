@@ -37,6 +37,30 @@ Missing pieces include:
 It also takes three minutes to run on my netbook and generates a 3972-page PDF,
 so maybe some kind of output caching system would be useful.
 
+The codepoint coverage thing may be a bit tricky.  Really we probably need to
+extract the coverage information from the fonts rather than guessing at them;
+this seems to provide roughly the right information:
+
+    >>> from reportlab.pdfbase.ttfonts import TTFontFile
+    >>> f
+    'etbook/et-book-display-italic-old-style-figures.ttf'
+    >>> itf = TTFontFile(f)
+    >>> itf.charToGlyph
+    {0: 1, 8192: 198, 8194: 200, 8195: 201, 8196: 202, 8197: 203,
+    8198: 204, 8193: 199, 8200: 206, 8201: 207, 8202: 208, 13: 2,
+    8208: 209, 8209: 210, 8210: 211, 8211: 212, 8212: 213, 8216: 214,
+    ...
+    >>> sorted(itf.charToGlyph.keys())
+    [0, 13, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+    46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+    62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77,
+    ...
+    124, 125, 126, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169,
+    ...
+
+No idea how to tell what the coverage of the built-in Courier is,
+though.  Maybe I should just use whatever Android uses for that?
+
 """
 from __future__ import print_function
 
@@ -80,6 +104,7 @@ def render_text(c, t, text, font):
         if t[0].getX() + width > max_y:
             newline(c, t, font)
 
+        # XXX while it's still sticking past the right margin, chop it
         t[0].textOut(word + ' ')
 
 block_fonts = {
