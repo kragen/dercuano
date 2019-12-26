@@ -2,39 +2,37 @@
 # -*- coding: utf-8 -*-
 """Parse HTML output to generate a PDF.
 
-This is still just the crudest sketch of PDF generation for Dercuano.
+This is still very poor PDF generation for Dercuano.
 Missing pieces include:
 
-- internal links (between pages)
 - Greek
 - other math characters; ℓ doesn't even exist in Courier, and in ET Book,
   all of "ε₀ ≈" is no good
+- a layout engine capable of handling varying font sizes in a line (also this
+  one seems to have difficulty with varying font sizes on a page; see "fudge
+  factor" in the code)
 - <pre>
-- Unicode subscripts (superscripts are OK)
+- Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
+- handling of non-well-formed HTML (maybe PyTidyLib?  I have Beautiful Soup
+  installed.  Hmm, there's a python-elementtidy library; maybe I should use that)
 - bullets
 - tables
 - Chinese
-- external links (to URLs)
-- an outline that doesn't zoom you out to a whole page
 - wrapping overlong lines so they don't get cut off
 - dingbats like × (no, that one is okay, also centered dot and degrees, but
   not ⁑)
 - JS tables of contents for individual notes
 - <sub> and <sup> (maybe using t.setRise)
-- a layout engine capable of handling varying font sizes in a line (also this
-  one seems to have difficulty with varying font sizes on a page; see "fudge
-  factor" in the code)
 - chronological ordering
 - font fallbacks for missing characters
-- handling of non-well-formed HTML (maybe PyTidyLib?  I have Beautiful Soup
-  installed.)
 - not putting spaces after close tags
-- maybe making the output file less than 8.2 megabytes?? not using
+- maybe making the output file less than 11.8 megabytes?? not using
   base85 would fucking help
 - colored titles
 - hyphenation and justification
+- need to include ET Book license
 
-It also takes over three minutes to run on my netbook and generates a 4485-page PDF,
+It also takes over seven minutes to run on my netbook and generates a 4403-page PDF,
 so maybe some kind of output caching system would be useful.
 
 The codepoint coverage thing may be a bit tricky.  Really we probably need to
@@ -62,18 +60,28 @@ Also the TTFont has a .face property which inherits from TTFontFile and
 thus has ``charToGlyph`` too.  And TTFont has a .stringWidth method too.
 
 No idea how to tell what the coverage of the built-in Courier is,
-though.  Maybe I should just use whatever Android uses for that?
+though.  Maybe I should just use whatever Android uses instead of
+Courier?
+
+I'm thinking that high-level fonts will really be "font cascades", like in
+CSS, and a box styled with a particular cascade will get broken up into
+one or more boxes each styled with a particular low-level font.
+To allow ligatures and kerning to work, we want to avoid breaking it up
+into more boxes than needed.  <https://gankra.github.io/blah/text-hates-you/>
+goes into details on the complexities involved and advises you to just use
+HarfBuzz.
 
 """
 from __future__ import print_function
 
 import cgitb
+from collections import OrderedDict
 import sys
 import os
 import xml.etree.cElementTree as ET
 
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.colors import toColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -98,16 +106,39 @@ def newline(c, t, font):
         c.showPage()
         t[0] = start_page(c, font)
 
-def render_text(c, t, text, font):
-    max_y = pagesize[0] - right_margin
+def resolve_link(corpus, url):
+    while url.startswith('../'):
+        url = url[3:]
+    return 'bookmark' if url in corpus else 'URL', url
+
+def add_link(c, box, link):
+    if not link:
+        return
+    link_type, link_value = link
+    if link_type == 'bookmark':
+        c.linkRect('nonsense', link_value, box, thickness=0.1,
+                       color=toColor('#9999ff'))
+    else:
+        c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
+
+def render_text(c, t, text, font, link):
+    max_x = pagesize[0] - right_margin
     words = text.split()
+    x, y = t[0].getX(), t[0].getY()
+    box = [x, y - font[1] * 0.1, x, y + font[1]]
     for word in words:
         width = c.stringWidth(word, *font)
-        if t[0].getX() + width > max_y:
+        if t[0].getX() + width > max_x:
             newline(c, t, font)
+            add_link(c, box, link)
+            x, y = t[0].getX(), t[0].getY()
+            box = [x, y, x, y + font[1]]
 
         # XXX while it's still sticking past the right margin, chop it
         t[0].textOut(word + ' ')
+        box[2] = t[0].getX()
+
+    add_link(c, box, link)
 
 block_fonts = {
     'p': (roman, 1*em),
@@ -137,18 +168,24 @@ inline_fonts = {'i': italicize,
                 'em': italicize,
                 'code': codify,
                 'b': embolden,
-                'strong': embolden}
+                'strong': embolden,
+                }
+
+def get_link(node):
+    return node.get('href') if node.tag == 'a' else None
 
 def push_font(t, font_stack, font):
     font_stack.append(font)
     t[0].setFont(*font)
 
-def render(filename, c, xml):
-    c.bookmarkPage(filename)
-    title = filename
+def render(corpus, bookmark, c, xml):
+    print("rendering", bookmark)
+    c.bookmarkPage(bookmark, fit='XYZ')  # `fit` to suppress zooming out to whole page
+    title = bookmark
     font_stack = [(roman, 1*em)]
     t = [start_page(c, font_stack[-1])]
-    stack = [('element', xml.getroot())]
+    stack = [('element', xml)]
+    link = None
     while stack:
         kind, obj = stack.pop()
         new_font = False
@@ -167,16 +204,22 @@ def render(filename, c, xml):
                 new_font = True
             if obj.tag == 'title':
                 title = obj.text
+            if get_link(obj):
+                link = resolve_link(corpus, get_link(obj))
             if obj.text is not None and obj.tag != 'title':
-                render_text(c, t, obj.text, font_stack[-1])
+                render_text(c, t, obj.text, font_stack[-1], link)
             if obj.tail is not None:
                 stack.append(('text', obj.tail))
             if new_font:  # must go atop the tail!
                 stack.append(('restorefont', None))
+            if get_link(obj):
+                stack.append(('endlink', None))
             for kid in reversed(list(obj)):
                 stack.append(('element', kid))
         elif kind == 'text':
-            render_text(c, t, obj, font_stack[-1])
+            render_text(c, t, obj, font_stack[-1], link)
+        elif kind == 'endlink':
+            link = None
         else:
             assert kind == 'restorefont'
             font_stack.pop()
@@ -185,7 +228,7 @@ def render(filename, c, xml):
 
     c.drawText(t[0])
     c.showPage()
-    c.addOutlineEntry(title, filename, level=0)
+    c.addOutlineEntry(title, bookmark, level=0)
 
 def main(path):
     liabilities = path + '/liabilities'
@@ -198,10 +241,19 @@ def main(path):
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
-    render('index.html', canvas, ET.parse(path + '/index.html'))
+
+    corpus = OrderedDict()
+    corpus['index.html'] = path + '/index.html'
 
     notes = path + '/notes'
-    for basename in os.listdir(notes):#[:22]:
+    for basename in os.listdir(notes):#[:47]:
+        corpus['notes/' + basename] = notes + '/' + basename
+
+    topics = path + '/topics'
+    for basename in sorted(os.listdir(topics)):#[:47]:
+        corpus['topics/' + basename] = topics + '/' + basename
+
+    for bookmarkname in corpus:
         try:
             # Although this chews through all of Dercuano in 1.3
             # seconds on this netbook, it fails to parse 3% of the
@@ -211,15 +263,13 @@ def main(path):
             # with HTML Tidy or something.  sgmllib and htmllib are
             # removed in Python 3, and HTMLParser (html.parser) is a
             # tag-soup parser.
-            tree = ET.parse(notes + '/' + basename)
+            tree = ET.parse(corpus[bookmarkname])
         except Exception:
-            print("parse error on", basename + ":", sys.exc_info()[1])
+            print("parse error on", bookmarkname + ":", sys.exc_info()[1])
+            render(corpus, bookmarkname, canvas,
+                   ET.fromstring('<html>XML parse failure</html>'))
         else:
-            render('notes/' + basename, canvas, tree)
-
-    topics = path + '/topics'
-    for basename in sorted(os.listdir(topics)):
-        render('topics/' + basename, canvas, ET.parse(topics + '/' + basename))
+            render(corpus, bookmarkname, canvas, tree.getroot())
 
     canvas.save()
 
