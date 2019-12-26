@@ -58,16 +58,16 @@ em = 12
 pagesize = (24 * em, 60 * em)
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
-def start_page(c):
-    c.setFont(roman, em)
+def start_page(c, font):
+    c.setFont(*font)
     return c.beginText(left_margin, pagesize[1]-top_margin-em)
 
-def newline(c, t):
+def newline(c, t, font):
     t[0].textLine()
     if t[0].getY() < bottom_margin + 8*em:  # XXX fudge factor for layout bugs
         c.drawText(t[0])
         c.showPage()
-        t[0] = start_page(c)
+        t[0] = start_page(c, font)
 
 def render_text(c, t, text, font):
     max_y = pagesize[0] - right_margin
@@ -75,7 +75,7 @@ def render_text(c, t, text, font):
     for word in words:
         width = c.stringWidth(word, *font)
         if t[0].getX() + width > max_y:
-            newline(c, t)
+            newline(c, t, font)
 
         t[0].textOut(word + ' ')
 
@@ -107,9 +107,9 @@ def push_font(t, font_stack, font):
 def render(filename, c, xml):
     c.bookmarkPage(filename)
     title = filename
-    t = [start_page(c)]
-    stack = [('element', xml.getroot())]
     font_stack = [(roman, 1*em)]
+    t = [start_page(c, font_stack[-1])]
+    stack = [('element', xml.getroot())]
     while stack:
         kind, obj = stack.pop()
         new_font = False
@@ -119,7 +119,7 @@ def render(filename, c, xml):
                 size_diff = font[1] - font_stack[-1][1]
                 push_font(t, font_stack, font)
                 new_font = True
-                newline(c, t)
+                newline(c, t, font)
                 if size_diff > 0:
                     t[0].moveCursor(0, size_diff * 1.2)
             if obj.tag in inline_fonts:
