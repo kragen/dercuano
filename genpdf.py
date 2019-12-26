@@ -5,6 +5,7 @@
 This is still just the crudest sketch of PDF generation for Dercuano.
 Missing pieces include:
 
+- larger fonts for headers
 - bullets
 - tables
 - Greek
@@ -26,6 +27,7 @@ Missing pieces include:
 - not putting spaces after tags
 - maybe making the output file less than 6.8 megabytes?? not using
   base85 would fucking help
+- wrapping overlong lines so they don't get cut off
 
 It also takes three minutes to run on my netbook and generates a 3189-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -57,17 +59,20 @@ def start_page(c):
     c.setFont(roman, em)
     return c.beginText(left_margin, pagesize[1]-top_margin-em)
 
+def newline(c, t):
+    t[0].textLine()
+    if t[0].getY() < bottom_margin:
+        c.drawText(t[0])
+        c.showPage()
+        t[0] = start_page(c)
+
 def render_text(c, t, text):
     max_y = pagesize[0]-right_margin
     words = text.split()
     for word in words:
         width = c.stringWidth(word)
         if t[0].getX() + width > max_y:
-            t[0].textLine()
-            if t[0].getY() < bottom_margin + em:
-                c.drawText(t[0])
-                c.showPage()
-                t[0] = start_page(c)
+            newline(c, t)
 
         t[0].textOut(word + ' ')
 
@@ -80,7 +85,7 @@ def render(filename, c, xml):
         kind, obj = stack.pop()
         if kind == 'element':
             if obj.tag in ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'):
-                t[0].textLine()
+                newline(c, t)
             if obj.tag == 'title':
                 title = obj.text
             if obj.text is not None:
@@ -107,7 +112,7 @@ def main(path):
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
-    for html in os.listdir(notes):#[:2]:
+    for html in os.listdir(notes):#[:22]:
         try:
             # Although this chews through all of Dercuano in 1.3
             # seconds on this netbook, it fails to parse 3% of the
