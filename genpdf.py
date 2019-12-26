@@ -13,8 +13,6 @@ Missing pieces include:
   factor" in the code)
 - <pre>
 - Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
-- handling of non-well-formed HTML (maybe PyTidyLib?  I have Beautiful Soup
-  installed.  Hmm, there's a python-elementtidy library; maybe I should use that)
 - bullets
 - tables
 - Chinese
@@ -26,13 +24,16 @@ Missing pieces include:
 - chronological ordering
 - font fallbacks for missing characters
 - not putting spaces after close tags
-- maybe making the output file less than 11.8 megabytes?? not using
+- maybe making the output file less than 12.4 megabytes?? not using
   base85 would fucking help
 - colored titles
 - hyphenation and justification
 - need to include ET Book license
+- correct handling of files like high-temperature-semiconductors.html; I
+  think maybe elementtidy is providing me with a different interface than
+  ElementTree does, and it's also choking on the UTF-8
 
-It also takes over seven minutes to run on my netbook and generates a 4403-page PDF,
+It also takes over seven minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
 
 The codepoint coverage thing may be a bit tricky.  Really we probably need to
@@ -179,7 +180,7 @@ def push_font(t, font_stack, font):
     t[0].setFont(*font)
 
 def render(corpus, bookmark, c, xml):
-    print("rendering", bookmark)
+    print("PDFing", bookmark)
     c.bookmarkPage(bookmark, fit='XYZ')  # `fit` to suppress zooming out to whole page
     title = bookmark
     font_stack = [(roman, 1*em)]
@@ -254,6 +255,7 @@ def main(path):
         corpus['topics/' + basename] = topics + '/' + basename
 
     for bookmarkname in corpus:
+        filename = corpus[bookmarkname]
         try:
             # Although this chews through all of Dercuano in 1.3
             # seconds on this netbook, it fails to parse 3% of the
@@ -263,13 +265,20 @@ def main(path):
             # with HTML Tidy or something.  sgmllib and htmllib are
             # removed in Python 3, and HTMLParser (html.parser) is a
             # tag-soup parser.
-            tree = ET.parse(corpus[bookmarkname])
+            tree = ET.parse(filename)
         except Exception:
             print("parse error on", bookmarkname + ":", sys.exc_info()[1])
-            render(corpus, bookmarkname, canvas,
-                   ET.fromstring('<html>XML parse failure</html>'))
-        else:
-            render(corpus, bookmarkname, canvas, tree.getroot())
+            try:
+                from elementtidy import TidyHTMLTreeBuilder
+                tree = TidyHTMLTreeBuilder.parse(filename)
+                print("recovered using elementtidy")
+            except Exception:
+                print("elementtidy failed too:", sys.exc_info()[1])
+                render(corpus, bookmarkname, canvas,
+                    ET.fromstring('<html>XML parse failure</html>'))
+                continue
+
+        render(corpus, bookmarkname, canvas, tree.getroot())
 
     canvas.save()
 

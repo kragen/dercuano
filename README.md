@@ -57,3 +57,8 @@ Dependencies
 Dercuano depends on the Python Markdown module, the one started by
 Manfred Stienstra, and Python 2 or 3.  I’m using 2.7.12, but it seems to
 also work with 2.7.3, 2.7.6, and 3.4.3.
+
+The PDF generation depends on a Python PDF generation library called
+Reportlab.  It attempts to use the ElementTidy library if it is
+installed, but if not, it falls back on just using ElementTree's XML
+parser, which is part of the Python standard library.
