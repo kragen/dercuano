@@ -15,7 +15,8 @@ Missing pieces include:
 - external links (to URLs)
 - an outline that doesn't zoom you out to a whole page
 - font sizes
-- bold and italic
+- bold
+- not resetting <code> and <em> when spilling onto a new page
 - dingbats like × (no, that one is okay, also centered dot and degrees)
 - topic pages
 - main table of contents
@@ -89,6 +90,16 @@ block_fonts = {
     'li': (roman, 1*em),
     }
 
+def italicize(font):
+    return italic, font[1]
+
+def codify(font):
+    return 'Courier', font[1]
+
+inline_fonts = {'i': italicize,
+                'em': italicize,
+                'code': codify}
+
 def push_font(t, font_stack, font):
     font_stack.append(font)
     t[0].setFont(*font)
@@ -111,6 +122,10 @@ def render(filename, c, xml):
                 newline(c, t)
                 if size_diff > 0:
                     t[0].moveCursor(0, size_diff * 1.2)
+            if obj.tag in inline_fonts:
+                font = inline_fonts[obj.tag](font_stack[-1])
+                push_font(t, font_stack, font)
+                new_font = True
             if obj.tag == 'title':
                 title = obj.text
             if obj.text is not None:
