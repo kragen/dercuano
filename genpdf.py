@@ -117,7 +117,9 @@ def add_link(c, box, link):
         return
     link_type, link_value = link
     if link_type == 'bookmark':
-        c.linkRect('nonsense', link_value, box, thickness=0.1,
+        # Though other viewers ignore it, pdf.js displays the first
+        # argument in a popup.  Maybe look for @title?
+        c.linkRect(link_value, link_value, box, thickness=0.1,
                        color=toColor('#9999ff'))
     else:
         c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
@@ -242,6 +244,9 @@ def main(path):
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
+    # pdf.js and virtually nothing else displays this:
+    canvas.setTitle('Dercuano ' + os.path.basename(path)
+                    + ', by Kragen Javier Sitaker, 2019')
 
     corpus = OrderedDict()
     corpus['index.html'] = path + '/index.html'
@@ -254,7 +259,8 @@ def main(path):
     for basename in sorted(os.listdir(topics)):#[:47]:
         corpus['topics/' + basename] = topics + '/' + basename
 
-    for bookmarkname in corpus:
+    for i, bookmarkname in enumerate(corpus):
+        sys.stdout.write('%d/%d ' % (i, len(corpus)))
         filename = corpus[bookmarkname]
         try:
             # Although this chews through all of Dercuano in 1.3
