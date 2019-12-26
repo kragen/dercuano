@@ -119,13 +119,16 @@ block_fonts = {
     'h6': (italic, 1*em),
     'li': (roman, 1*em),
     'div': (roman, 1*em),
+    'pre': ('Courier', 0.8*em),
     }
 
 def italicize(font):
     return italic, font[1]
 
 def codify(font):
-    return 'Courier', font[1]
+    return ('Courier-Bold' if font[0] == bold or font[0].endswith('-Bold') else
+            'Courier-Oblique' if font[0] == italic or font[0].endswith('-Oblique') else
+            'Courier', font[1])
 
 def embolden(font):
     return bold, font[1]
