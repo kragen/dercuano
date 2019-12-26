@@ -14,7 +14,6 @@ Missing pieces include:
 - an outline that doesn't zoom you out to a whole page
 - font sizes
 - bold and italic
-- small paper size
 - dingbats like ×
 - topic pages
 - main table of contents
@@ -25,11 +24,11 @@ Missing pieces include:
 - font fallbacks for missing characters
 - handling of non-well-formed HTML (maybe PyTidyLib)?
 - not putting spaces after tags
-- maybe making the output file less than 5.9 megabytes?? not using
+- maybe making the output file less than 6.8 megabytes?? not using
   base85 would fucking help
 
-It also takes three minutes to run on my netbook, so maybe some kind of output
-caching system would be useful.
+It also takes three minutes to run on my netbook and generates a 3189-page PDF,
+so maybe some kind of output caching system would be useful.
 
 """
 from __future__ import print_function
@@ -49,19 +48,23 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 roman = 'et-book-roman'
 italic = 'et-book-italic'
+# see dercuano-hand-computers for the origins of these numbers
+em = 12
+pagesize = (24 * em, 60 * em)
+left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
 def start_page(c):
-    c.setFont(roman, 12)
-    return c.beginText(36, A4[1]-36)
+    c.setFont(roman, em)
+    return c.beginText(left_margin, pagesize[1]-top_margin-em)
 
 def render_text(c, t, text):
-    right_margin = A4[0]-36               # PostScript points
+    max_y = pagesize[0]-right_margin
     words = text.split()
     for word in words:
         width = c.stringWidth(word)
-        if t[0].getX() + width > right_margin:
+        if t[0].getX() + width > max_y:
             t[0].textLine()
-            if t[0].getY() < 72:
+            if t[0].getY() < bottom_margin + em:
                 c.drawText(t[0])
                 c.showPage()
                 t[0] = start_page(c)
@@ -76,7 +79,7 @@ def render(filename, c, xml):
     while stack:
         kind, obj = stack.pop()
         if kind == 'element':
-            if obj.tag in ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+            if obj.tag in ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'):
                 t[0].textLine()
             if obj.tag == 'title':
                 title = obj.text
@@ -102,8 +105,9 @@ def main(path):
     ifname = liabilities + '/et-book-display-italic-old-style-figures.ttf'
     pdfmetrics.registerFont(TTFont(italic, ifname))
 
-    canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True)
-    for html in os.listdir(notes):
+    canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
+                    pagesize=pagesize)
+    for html in os.listdir(notes):#[:2]:
         try:
             # Although this chews through all of Dercuano in 1.3
             # seconds on this netbook, it fails to parse 3% of the
