@@ -5,21 +5,23 @@
 This is still just the crudest sketch of PDF generation for Dercuano.
 Missing pieces include:
 
+- internal links (between pages)
+- Greek
+- other math characters; ℓ doesn't even exist in Courier, and in ET Book,
+  all of "ε₀ ≈" is no good
 - <pre>
 - Unicode subscripts (superscripts are OK)
 - bullets
-- Greek (all of "ε₀ ≈" is no good)
 - tables
 - Chinese
-- internal links (between pages)
 - external links (to URLs)
 - an outline that doesn't zoom you out to a whole page
-- not resetting <code> and <em> when spilling onto a new page
+- wrapping overlong lines so they don't get cut off
 - dingbats like × (no, that one is okay, also centered dot and degrees, but
   not ⁑)
 - topic pages
-- main table of contents
 - JS tables of contents for individual notes
+- <sub> and <sup> (maybe using t.setRise)
 - a layout engine capable of handling varying font sizes in a line (also this
   one seems to have difficulty with varying font sizes on a page; see "fudge
   factor" in the code)
@@ -29,11 +31,10 @@ Missing pieces include:
 - not putting spaces after tags
 - maybe making the output file less than 6.8 megabytes?? not using
   base85 would fucking help
-- wrapping overlong lines so they don't get cut off
 - colored titles
 - hyphenation and justification
 
-It also takes three minutes to run on my netbook and generates a 3803-page PDF,
+It also takes three minutes to run on my netbook and generates a 3972-page PDF,
 so maybe some kind of output caching system would be useful.
 
 """
@@ -90,6 +91,7 @@ block_fonts = {
     'h5': (bold, 1*em),
     'h6': (italic, 1*em),
     'li': (roman, 1*em),
+    'div': (roman, 1*em),
     }
 
 def italicize(font):
@@ -135,7 +137,7 @@ def render(filename, c, xml):
                 new_font = True
             if obj.tag == 'title':
                 title = obj.text
-            if obj.text is not None:
+            if obj.text is not None and obj.tag != 'title':
                 render_text(c, t, obj.text, font_stack[-1])
             if obj.tail is not None:
                 stack.append(('text', obj.tail))
@@ -156,7 +158,6 @@ def render(filename, c, xml):
     c.addOutlineEntry(title, filename, level=0)
 
 def main(path):
-    notes = path + '/notes'
     liabilities = path + '/liabilities'
     rfname = liabilities + '/et-book-roman-old-style-figures.ttf'
     pdfmetrics.registerFont(TTFont(roman, rfname))
@@ -167,6 +168,9 @@ def main(path):
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
+    render('index.html', canvas, ET.parse(path + '/index.html'))
+
+    notes = path + '/notes'
     for html in os.listdir(notes):#[:22]:
         try:
             # Although this chews through all of Dercuano in 1.3
@@ -181,7 +185,7 @@ def main(path):
         except Exception:
             print("parse error on", html + ":", sys.exc_info()[1])
         else:
-            render(html, canvas, tree)
+            render(notes + '/' + html, canvas, tree)
 
     canvas.save()
 
