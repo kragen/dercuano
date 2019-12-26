@@ -19,7 +19,6 @@ Missing pieces include:
 - wrapping overlong lines so they don't get cut off
 - dingbats like × (no, that one is okay, also centered dot and degrees, but
   not ⁑)
-- topic pages
 - JS tables of contents for individual notes
 - <sub> and <sup> (maybe using t.setRise)
 - a layout engine capable of handling varying font sizes in a line (also this
@@ -27,14 +26,15 @@ Missing pieces include:
   factor" in the code)
 - chronological ordering
 - font fallbacks for missing characters
-- handling of non-well-formed HTML (maybe PyTidyLib)?
-- not putting spaces after tags
-- maybe making the output file less than 6.8 megabytes?? not using
+- handling of non-well-formed HTML (maybe PyTidyLib?  I have Beautiful Soup
+  installed.)
+- not putting spaces after close tags
+- maybe making the output file less than 8.2 megabytes?? not using
   base85 would fucking help
 - colored titles
 - hyphenation and justification
 
-It also takes three minutes to run on my netbook and generates a 3972-page PDF,
+It also takes over three minutes to run on my netbook and generates a 4485-page PDF,
 so maybe some kind of output caching system would be useful.
 
 The codepoint coverage thing may be a bit tricky.  Really we probably need to
@@ -58,6 +58,9 @@ this seems to provide roughly the right information:
     124, 125, 126, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169,
     ...
 
+Also the TTFont has a .face property which inherits from TTFontFile and
+thus has ``charToGlyph`` too.  And TTFont has a .stringWidth method too.
+
 No idea how to tell what the coverage of the built-in Courier is,
 though.  Maybe I should just use whatever Android uses for that?
 
@@ -74,7 +77,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-
 
 
 roman = 'et-book-roman'
@@ -196,7 +198,7 @@ def main(path):
     render('index.html', canvas, ET.parse(path + '/index.html'))
 
     notes = path + '/notes'
-    for html in os.listdir(notes):#[:22]:
+    for basename in os.listdir(notes):#[:22]:
         try:
             # Although this chews through all of Dercuano in 1.3
             # seconds on this netbook, it fails to parse 3% of the
@@ -206,11 +208,15 @@ def main(path):
             # with HTML Tidy or something.  sgmllib and htmllib are
             # removed in Python 3, and HTMLParser (html.parser) is a
             # tag-soup parser.
-            tree = ET.parse(notes + '/' + html)
+            tree = ET.parse(notes + '/' + basename)
         except Exception:
-            print("parse error on", html + ":", sys.exc_info()[1])
+            print("parse error on", basename + ":", sys.exc_info()[1])
         else:
-            render(notes + '/' + html, canvas, tree)
+            render('notes/' + basename, canvas, tree)
+
+    topics = path + '/topics'
+    for basename in sorted(os.listdir(topics)):
+        render('topics/' + basename, canvas, ET.parse(topics + '/' + basename))
 
     canvas.save()
 
