@@ -95,8 +95,11 @@ italic = 'et-book-italic'
 bold = 'et-book-bold'
 # see dercuano-hand-computers for the origins of these numbers
 em = 12
-pagesize = (24 * em, 60 * em)
-#pagesize = reportlab.lib.pagesizes.A5  # thinking this might actually be better, gonna try it on a hand computer
+# this is too thin: pagesize = (24 * em, 60 * em)
+# This is too wide (35 em x 50 em) and doesn't give enough zoom options:
+#pagesize = reportlab.lib.pagesizes.A5
+# Hopefully this is a Goldilocks size:
+pagesize = (29 * em, 66 * em)
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
 def start_page(c, font):
@@ -156,7 +159,9 @@ block_fonts = {
     'h6': (italic, 1*em),
     'li': (roman, 1*em),
     'div': (roman, 1*em),
-    'pre': ('Courier', 0.8*em),
+    # 49.1 is chosen to fit 80 Courier characters onto a line; it works out to
+    # .57 for 29 em minus 1 em of margins
+    'pre': ('Courier', (pagesize[0] - left_margin - right_margin) / 49.1),
     }
 
 def italicize(font):
