@@ -77,11 +77,13 @@ from __future__ import print_function
 
 import cgitb
 from collections import OrderedDict
-import sys
 import os
+import re
+import sys
 import xml.etree.cElementTree as ET
 
 from reportlab.pdfgen.canvas import Canvas
+import reportlab.lib.pagesizes
 from reportlab.lib.colors import toColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -94,6 +96,7 @@ bold = 'et-book-bold'
 # see dercuano-hand-computers for the origins of these numbers
 em = 12
 pagesize = (24 * em, 60 * em)
+#pagesize = reportlab.lib.pagesizes.A5  # thinking this might actually be better, gonna try it on a hand computer
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
 def start_page(c, font):
@@ -201,24 +204,35 @@ def render(corpus, bookmark, c, xml):
                 newline(c, t, font)
                 if size_diff > 0:
                     t[0].moveCursor(0, size_diff * 1.2)
+
+            if obj.tag == 'p':
+                t[0].textOut(' ' * 4)               # paragraph indent
+            elif obj.tag == 'li':
+                t[0].textOut('• ') # a bullet that happens to be in ET Book
+
             if obj.tag in inline_fonts:
                 font = inline_fonts[obj.tag](font_stack[-1])
                 push_font(t, font_stack, font)
                 new_font = True
+
             if obj.tag == 'title':
-                title = obj.text
+                title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text)
             if get_link(obj):
                 link = resolve_link(corpus, get_link(obj))
+
             if obj.text is not None and obj.tag != 'title':
                 render_text(c, t, obj.text, font_stack[-1], link)
+
             if obj.tail is not None:
                 stack.append(('text', obj.tail))
             if new_font:  # must go atop the tail!
                 stack.append(('restorefont', None))
             if get_link(obj):
                 stack.append(('endlink', None))
+
             for kid in reversed(list(obj)):
                 stack.append(('element', kid))
+
         elif kind == 'text':
             render_text(c, t, obj, font_stack[-1], link)
         elif kind == 'endlink':
@@ -244,19 +258,20 @@ def main(path):
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
-    # pdf.js and virtually nothing else displays this:
+    # pdf.js, gv, and MuPDF Mini display this:
     canvas.setTitle('Dercuano ' + os.path.basename(path)
                     + ', by Kragen Javier Sitaker, 2019')
+    canvas.setAuthor('Kragen Javier Sitaker')
 
     corpus = OrderedDict()
     corpus['index.html'] = path + '/index.html'
 
     notes = path + '/notes'
-    for basename in os.listdir(notes):#[:47]:
+    for basename in os.listdir(notes):#[::20]:
         corpus['notes/' + basename] = notes + '/' + basename
 
     topics = path + '/topics'
-    for basename in sorted(os.listdir(topics)):#[:47]:
+    for basename in sorted(os.listdir(topics)):#[::20]:
         corpus['topics/' + basename] = topics + '/' + basename
 
     for i, bookmarkname in enumerate(corpus):
