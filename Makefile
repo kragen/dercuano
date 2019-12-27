@@ -1,5 +1,5 @@
 pdf: html
-	python genpdf.py dercuano-20191226
+	python genpdf.py dercuano-20191227
 
 html:
 	python go.py
