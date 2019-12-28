@@ -497,7 +497,7 @@ them:
   relative to their target text, and I have to leave a bunch of extra bottom
   margin to minimize the number of pages that get truncated.
 - I haven't implemented `<pre>` yet.
-- The 5% or so of notes that aren't well-formed XML are getting
+- The 3% or so of notes that aren't well-formed XML are getting
   totally mangled, with mojibake and total loss of formatting.  For
   many of these, getting the formatting totally right would require
   implementing tables and SVG, which may not be in the cards this
@@ -520,6 +520,7 @@ be easy to fix:
 - Notes aren't in any order in the PDF file.
 - I think it's splitting on no-break spaces as well as normal spaces,
   so they aren't no-break.
+- The link to lua-%23-operator may be broken.
 
 And other bugs that are serious but maybe aren't in either category:
 
@@ -600,7 +601,8 @@ or ɑ or ₂ or ⁴⁸ or ℤ.  It's somewhat more harmonious with ET Book.
 #### Misparsed data ####
 
 I've been trying to use ElementTidy to read in the things ElementTree
-can't handle directly, but this has been failing completely.  One
+can't handle directly, about 30 of the 997 notes in Dercuano,
+but this has been failing completely.  One
 reason is that the tag names it gives me are bullshit like
 '{http://www.w3.org/1999/xhtml}html'.  Another is that it seems to be
 parsing things as some incorrect encoding.
@@ -663,4 +665,7 @@ but just strip off the namespace tags?
     ... 
     >>> deprefix(t)
 
-That seems like it might have worked...
+That seems to have worked!  And tweaking the tidylib recipe above (no
+output-html, yes numeric-entities) allowed me to excise the
+ElementTidy dependency.  So that's one out of six showstopper bugs
+fixed.

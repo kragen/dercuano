@@ -29,8 +29,6 @@ Missing pieces include:
 - colored titles
 - hyphenation and justification
 - need to include ET Book license
-- I think it's splitting on no-break spaces as well as normal spaces, visible
-  in `household-thermal-stores`
 
 It also takes over seven minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -158,7 +156,7 @@ def add_link(c, box, link):
 
 def render_text(c, t, text, font, link):
     max_x = pagesize[0] - right_margin
-    words = text.split()
+    words = re.split('[ \n\r\t]+', text)
     x, y = t[0].getX(), t[0].getY()
     box = [x, y - font[1] * 0.1, x, y + font[1]]
     for word in words:
