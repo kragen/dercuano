@@ -160,14 +160,15 @@ def textOut(style, t, text):
 
 def render_text(c, t, text, style):
     max_x = pagesize[0] - right_margin
-    words = re.split('[ \n\r\t]+', text)
+    pre = style['white-space'] == 'pre'
+    words = (re.split('\n', text) if pre else re.split('[ \n\r\t]+', text))
     x, y = t[0].getX(), t[0].getY()
     font_family = style['font-family']
     font_size = style['font-size']
     box = [x, y - font_size * 0.1, x, y + font_size]
     for word in words:
         width = c.stringWidth(word, font_family, font_size)
-        if t[0].getX() + width > max_x:
+        if pre or t[0].getX() + width > max_x:
             newline(c, t, (font_family, font_size))
             add_link(c, box, style['link destination'])
             x, y = t[0].getX(), t[0].getY()
@@ -254,6 +255,8 @@ def render(corpus, bookmark, c, xml):
             elif obj.tag == 'li':
                 # a bullet that happens to be in ET Book
                 textOut(current_style, t, '• ')
+            elif obj.tag == 'pre':
+                push_style(stack, current_style, 'white-space', 'pre')
 
             if obj.tag in inline_fonts:
                 # XXX maybe refactor how these are specced
