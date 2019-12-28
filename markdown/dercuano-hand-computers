@@ -366,7 +366,8 @@ would cause an even larger disharmony between the two text sizes.
 ### Hyperlinks in PDF ###
 
 PDF supports tables of contents and hyperlinks, but at least the
-default PDF viewer on Android 7.0 doesn’t seem to have any way to see
+default PDF viewer on Android 7.0 (which is the Google Drive PDF viewer)
+doesn’t seem to have any way to see
 them.  It has a fairly effective scrollbar, though, so page numbers
 may be a reasonable replacement — but they need to count monotonically
 from 1 at the beginning, since the page numbers displayed in the
@@ -409,3 +410,257 @@ not done through MathJax), and writing MathML is worse.  With PDF, I
 can render equations at build time using T<sub>E</sub>X, subsetting
 Computer Modern fonts as necessary to include just the glyphs I’m
 using, and get well-formatted formulas.
+
+Further progress
+----------------
+
+### 2019-12-28 ###
+
+I've hacked together a janky PDF by parsing the Dercuano output HTML
+as XML, and now most of the content of Dercuano is readable in this
+format.
+
+#### Page sizes and typewriter font woes ####
+
+Initially I tried the "24 ems × 60 ems with ½ em of margin"
+configuration described above, but I found it to be uncomfortably
+narrow.  For regular running text it was reasonably okay, and for
+low-resolution cellphones that probably means "ideal", but for
+80-column-wide `<pre>` blocks, it was terrible --- that's 0.3 ems per
+character, and Courier really wants more like 0.63 ems per character,
+which would be over 50 ems, making non-`<pre>` text of the same size
+uncomfortably wide and also requiring a high-resolution screen for
+readability without constant diagonal scrolling.
+
+(I haven't actually implemented `<pre>` proper yet.)
+
+Another pressure is that 24 ems is too narrow for a large number of
+URLs.  At some point I guess I'll have to implement some kind of line
+continuation for long strings like that, but having less broken lines
+like that will always be better.
+
+However, to some extent text dimensions are fungible.  Making text
+taller makes it more legible, as does making it wider.  The much
+harder constraint on `<pre>` text is its width; scrolling more because
+it is taller than would be ideal is far preferable.  So, a reasonable
+alternative is to use a compressed font.  I found Bogusław Jackowski
+and Janusz M. Nowacki's font Latin Modern Mono Light Condensed, which
+comes in regular and oblique versions (but no bold), which is derived
+originally from Knuth's Computer Modern Teletype, which is in the
+public domain; but Latin Modern has much broader coverage of some 760
+Unicode characters than `cmtt` does.
+
+`lmtlc`, as this font is called in the T<sub>E</sub>X Live
+distribution, demands only about 0.36 ems of horizontal space per
+character, and is still quite readable, although visibly compressed.
+
+So I've widened the page width to some 29 ems (and extended it
+vertically to 66 ems, purely for reasons of silly nostalgic printer
+traditions --- US letter paper is, in medieval units, 11 inches long,
+and a standard 12-point line height thus gives you 66 lines).  This
+reduces the page count from some 4700 to 3700.  Even 3700 seems large
+for a book of only 1.3 million words or less, but 500 of those pages
+are the topic listings at the end.
+
+As I said before, a key consideration is for the PDF version of
+Dercuano to be readable on hand computers without diagonal scrolling
+or reflowing, because reflowing a PDF is pretty hard.  This has two
+aspects: pixel readability and absolute size.
+
+As for pixel readability, reviewing dimensions from above, the
+PalmPilot was 160x160, and the iPhone 1 was 320x480.  At 24 ems wide
+in landscape mode, 480 pixels is 20 pixels per em, like a 10x20 xterm
+font; this is quite comfortable.  160 pixels across 24 ems is only 6.7
+pixels per em, which is at the very edge of readability.  So, by going
+to 29 ems, I'm sacrificing PalmPilot readability, which would be 5.5
+PalmPilot pixels per em, but 16.6 original-iPhone pixels per em ---
+still quite readable in landscape mode.
+
+In addition to avoiding pixelation to prevent unreadability in an
+absolute sense, I'd also like to keep the letters reasonably large in
+millimeters to avoid sacrificing
+readability-without-a-magnifying-glass.  The original iPhone was 50x74
+mm; 50 mm across 29 ems is 1.72 pixels per em, which is 4.9 printer's
+points.  That's a pretty small font!  That's why I was trying to make
+do with 24 ems.  But in landscape mode on an iPhone-1-sized device
+that would be a 7.2-point font, suboptimal but not outside the realm
+of readability.  On the discount hand computer I was using earlier
+this year, the screen was 45x63 mm.  29 ems across 63 mm makes it a
+6.1-point font: painful to read, but, again, not infeasible.
+
+#### Remaining major bugs ####
+
+I have a number of showstopper bugs left in the PDF generation; among
+them:
+
+- The vertical positioning is wrong, so PDF links are displaced vertically
+  relative to their target text, and I have to leave a bunch of extra bottom
+  margin to minimize the number of pages that get truncated.
+- I haven't implemented `<pre>` yet.
+- The 5% or so of notes that aren't well-formed XML are getting
+  totally mangled, with mojibake and total loss of formatting.  For
+  many of these, getting the formatting totally right would require
+  implementing tables and SVG, which may not be in the cards this
+  weekend, but surely I can do better than this.
+- I haven't implemented font cascade fallbacks yet for missing characters.
+- The ET Book license needs to be included.
+- `<li><p>foo</p></li>` puts the paragraph on a separate line from the
+  `<li>` bullet.
+
+There are also a lot of other bugs that aren't showstoppers but might
+be easy to fix:
+
+- Headers aren't red.
+- Headers aren't underlined.
+- Line spacing is too tight.
+- Blockquotes aren't visibly distinct at all.
+- `<script>` and `<style>` contents are treated as text.
+- I don't have page numbers on links yet.
+- An extra space gets added after the ends of every HTML element.
+- Notes aren't in any order in the PDF file.
+- I think it's splitting on no-break spaces as well as normal spaces,
+  so they aren't no-break.
+
+And other bugs that are serious but maybe aren't in either category:
+
+- There are no per-note tables of contents.
+- There are no superscripts or subscripts.
+- `<ol>` isn't bulleted.
+- The PDF is huge, like 12 megs.
+
+#### Font cascade fallback fonts ####
+
+As a fallback for monospaced text,
+/usr/share/fonts/truetype/droid/DroidSansMono.ttf might work, although
+it's going to be much wider than lmtlc and only covers 874 codepoints
+(though some of those are things I use that aren't in lmtlc!).
+/usr/share/fonts/truetype/ttf-liberation/LiberationMono-Regular.ttf
+covers only 663.
+/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf has
+1225, comparable to the 1259 in
+/usr/share/fonts/truetype/msttcorefonts/cour.ttf.
+/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf has 3197, and
+/usr/share/fonts/truetype/freefont/FreeMono.ttf has 4126.  Moreover,
+FreeMono has 3511 codepoints that lmtlc doesn't, and DejaVu Sans Mono
+has 2645, of which 515 are also not in FreeMono.
+
+So, for monospace coverage, if you had to choose a single fallback
+font with no worries about licensing, it would be FreeMono, expanding
+lmtlc's 760 codepoints to 4271, but if you could choose a second one,
+DejaVu Sans Mono would expand that to 4786.
+
+For serif body text, ET Book (a copy of Bembo) covers only 233
+codepoints.  The corresponding brand-name fallback fonts would be
+/usr/share/fonts/truetype/freefont/FreeSerif.ttf with 6450 codepoints
+and /usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf (my browser's
+standard fallback) with 3331 codepoints.  From the size, it is clear
+that neither of these covers Chinese; the built-in PDF font that seems
+to work best for Chinese (in Reportlab, the PDF-generation library I'm
+using) is `reportlab.pdfbase.cidfonts.UnicodeCIDFont('STSong-Light')`,
+which is sadly a gothic monoline (I would say "sans-serif" but of
+course what's missing isn't really serifs) font.  Also, I've figured
+out how to tell which codepoints a TrueType font covers using
+Reportlab: `reportlab.pdfbase.ttfonts.TTFontFile(
+'/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf').charToGlyph`
+is a dict.  I don't know how to do this for STSong-Light, so I don't
+know how to fall back from it.
+
+[Freefont](http://savannah.gnu.org/projects/freefont/) is a GNU
+project, although it seems to have largely gone idle in 2012.  The
+licensing is GPLv3+, which is [somewhat aggressive as fonts
+go](https://lists.gnu.org/archive/html/freefont-bugs/2019-09/msg00009.html),
+and it's not clear that there's a legal way to embed it, or a subset
+of it, into a PDF file and then convey that PDF file to others.
+
+DejaVu is an extended version of Bitstream Vera, which was distributed
+under a BSD-like license that requires changing the name of extended
+versions; the DejaVu changes are in the public domain.  They are far
+from complete Unicode coverage, lacking even some Greek and Cyrillic
+and most Arabic, as well as all the Indic scripts.  Still, I think it
+might cover most of the characters I actually use.
+
+DejaVu Serif isn't very harmonious with ET Book; it's a slab-serif
+font with little emphasis and a tall x-height --- roughly as far as it
+could be from ET Book while still being technically a serif font.  It
+does have ℤ and ² and ³ and ⁶⁴ and μ and × and ∞ and ÷ and Ω and ≈ and
+⇒ ∃ ε ∈ ₀₁ †, though many of them copy and paste wrong.  Combining
+arrow above v⃗ is missing (renders as an empty box), but maybe I'm
+outputting it wrong.  And it's missing ℓ.  But those are the only
+things I've seen missing so far.
+
+The elusive 'ℓ' is found in FreeMono, Liberation Mono, (Microsoft's)
+Courier New, and Droid Sans Mono, and likely their non-monospaced
+equivalents as well.  Liberation is a Red Hat font set licensed under
+the GPLv2 with a document-embedding exception plus some other weird
+anti-Tivoization exception.
+
+Liberation Serif covers ≈, †, ∞, ←↓↑→, ² and ³ , and Greek, but not ⁻⁶
+or ɑ or ₂ or ⁴⁸ or ℤ.  It's somewhat more harmonious with ET Book.
+
+#### Misparsed data ####
+
+I've been trying to use ElementTidy to read in the things ElementTree
+can't handle directly, but this has been failing completely.  One
+reason is that the tag names it gives me are bullshit like
+'{http://www.w3.org/1999/xhtml}html'.  Another is that it seems to be
+parsing things as some incorrect encoding.
+
+[elementtidy is apparently
+dead](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=576343) having
+just been removed from Debian a few months ago, so it may not have
+been the best choice...
+
+This seems to work to solve the mojibake problem:
+
+    >>> b = TidyHTMLTreeBuilder.TidyHTMLTreeBuilder(encoding='utf-8')
+    >>> b.feed(open('dercuano-20191226/notes/nova-rdos.html').read())
+    >>> t = b.close()
+
+Although honestly, looking at the source, I think this does the same
+thing without TidyHTMLTreeBuilder:
+
+    import _elementtidy
+    t = ET.XML(_elementtidy.fixup(open(
+           'dercuano-20191226/notes/nova-rdos.html').read(), 'utf8')[0])
+
+...although that's not without ElementTidy, just without its Python.
+It still has the namespace problem, though.
+
+But the fixup() function there seems to just give us the stdout and
+stderr we would get from invoking HTML Tidy.  Which, as it turns out,
+has options `-ashtml` and `-utf8` that would probably do the right
+thing here without saddling us with an `xmlns`.  I wonder if Python
+tidylib has a way to get that?
+
+This looks promising:
+
+    >>> xs = tidylib.tidy_document(
+            open('dercuano-20191226/notes/nova-rdos.html').read(),
+            {'input-encoding': 'utf8',
+             'output-encoding': 'utf8',
+             'output-html': True})
+    >>> print xs[0][:1024].decode('utf-8')
+
+That *almost* works:
+
+    >>> t = ET.XML(xs[0])
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      File "<string>", line 124, in XML
+    cElementTree.ParseError: undefined entity: line 16, column 43
+
+It's complaining about `&nbsp;`.
+
+Well, can I use ElementTidy (or for that matter tidylib) in XML mode,
+but just strip off the namespace tags?
+
+    >>> t = ET.fromstring(_elementtidy.fixup(
+        open('dercuano-20191226/notes/nova-rdos.html').read(), 'utf8')[0])
+    >>> def deprefix(tree):
+    ...  for kid in tree:
+    ...   deprefix(kid)
+    ...  tree.tag = re.compile('{.*}').sub('', tree.tag)
+    ... 
+    >>> deprefix(t)
+
+That seems like it might have worked...
