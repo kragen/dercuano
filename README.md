@@ -8,7 +8,8 @@ Dercuano
 I have a few thousand pages of notes I mostly haven’t published in any
 form, and I’m not confident I’ll be able to keep a server running to
 serve them up.  So Dercuano (a mutated version of the Spanish word
-“cuaderno”, “notebook”) is a quick system I hacked together to bundle
+“cuaderno”, “notebook”, and also delightfully an anagram of “educaron”,
+as John Cowan points out) is a quick system I hacked together to bundle
 them up into an archive of pregenerated HTML, which anyone who has a
 copy can unpack and read, without requiring any online resources.
 
@@ -30,16 +31,7 @@ everyday fonts, have some drawbacks, which hopefully I can improve
 (see [dercuano-stylesheet-notes](markdown/dercuano-stylesheet-notes)
 for more details.)
 
-Navigability leaves something to be desired, although it’s more
-navigable than the kragen-tol archives were.
-
-I’ve put this together over the last four months.  I have about
-1200 individual notes I might include, totaling almost 5 megs
-compressed.  I
-am about two-thirds done;
-at this point I’m able to import existing notes into the system
-at about 16–32 notes per hour, which I might speed up with some more code.
-The
+I’ve put this together over the last nine months. The
 notes are now considerably easier to read in this form than as plain
 text files, due to the substantially improved formatting, hyperlinks
 between notes, chronological organization, and tagging by topics.
@@ -50,6 +42,22 @@ seems like the time is starting to be linear in the number of
 documents I add, largely having to do with manual categorization more
 than writing code.  I’ve made some crude efforts in the direction of
 Bayesian classification, but they need more work.
+
+Copyright status
+----------------
+
+The text of Dercuano, and the overall compilation, are by me and are
+in the public domain (see [`intro.md`](intro.md) for details); but it
+includes the ET Book font, which has its own license (see
+[`liabilities/LICENSE.ETBook`](liabilities/LICENSE.ETBook)), and as of
+this writing, the source repository also includes Bogusław Jackowski
+and Janusz M. Nowacki's font Latin Modern Mono Light Condensed
+(regular and oblique) for generating PDF files, which is licensed
+under the [GUST Font License](GUST-FONT-LICENSE.txt) and derived
+originally from Knuth's Computer Modern Teletype, which is in the
+public domain.  I translated it from [the OTF files on
+CTAN](https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm)
+using FontForge.
 
 Dependencies
 ------------

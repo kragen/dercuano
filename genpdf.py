@@ -32,6 +32,8 @@ Missing pieces include:
 - correct handling of files like high-temperature-semiconductors.html; I
   think maybe elementtidy is providing me with a different interface than
   ElementTree does, and it's also choking on the UTF-8
+- I think it's splitting on no-break spaces as well as normal spaces, visible
+  in `household-thermal-stores`
 
 It also takes over seven minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -72,6 +74,31 @@ into more boxes than needed.  <https://gankra.github.io/blah/text-hates-you/>
 goes into details on the complexities involved and advises you to just use
 HarfBuzz.
 
+The typewriter-text problem is serious for hand computers.  Reducing
+Courier to 6.8 points is a shitty solution.  Latin Modern
+<http://ctan.dcc.uchile.cl/fonts/lm/README>, which is included in TeX
+Live, includes a condensed typewriter font
+<https://tug.org/FontCatalogue/latinmodernmonolightcondensed/> which
+might help.  I think it might be called "clmtlc10" or "dd-lmtlc10", but
+not in OTF/TTF format; <https://www.ctan.org/tex-archive/fonts/lm/> has
+a version in OTF at <https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm>;
+specifically
+<http://mirrors.ctan.org/fonts/lm/fonts/opentype/public/lm/lmmonoltcond10-oblique.otf>
+and
+<http://mirrors.ctan.org/fonts/lm/fonts/opentype/public/lm/lmmonoltcond10-regular.otf>
+
+Sadly, this gives me:
+
+    reportlab.pdfbase.ttfonts.TTFError:
+    TTF file "lmmonoltcond10-oblique.otf":
+    postscript outlines are not supported
+
+But by converting to TTF with FontForge I think I can solve the problem.
+
+/usr/share/texlive/texmf-dist/fonts/opentype/public/cm-unicode/cmuntt.otf
+would have been another possibility, maybe with some kind of coordinate
+transformation.
+
 """
 from __future__ import print_function
 
@@ -93,6 +120,8 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 roman = 'et-book-roman'
 italic = 'et-book-italic'
 bold = 'et-book-bold'
+lmtlc = 'lmtlc'
+lmtlco = 'lmtlc-Oblique'
 # see dercuano-hand-computers for the origins of these numbers
 em = 12
 # this is too thin: pagesize = (24 * em, 60 * em)
@@ -159,9 +188,9 @@ block_fonts = {
     'h6': (italic, 1*em),
     'li': (roman, 1*em),
     'div': (roman, 1*em),
-    # 49.1 is chosen to fit 80 Courier characters onto a line; it works out to
-    # .57 for 29 em minus 1 em of margins
-    'pre': ('Courier', (pagesize[0] - left_margin - right_margin) / 49.1),
+    # With Latin Modern Mono Light Condensed, I need just over 28 ems for 80
+    # columns, so font-size:98% seems about right.
+    'pre': (lmtlc, 0.98*em),
     }
 
 def italicize(font):
@@ -169,8 +198,8 @@ def italicize(font):
 
 def codify(font):
     return ('Courier-Bold' if font[0] == bold or font[0].endswith('-Bold') else
-            'Courier-Oblique' if font[0] == italic or font[0].endswith('-Oblique') else
-            'Courier', font[1])
+            lmtlco if font[0] == italic or font[0].endswith('-Oblique') else
+            lmtlc, font[1])
 
 def embolden(font):
     return bold, font[1]
@@ -260,6 +289,11 @@ def main(path):
     pdfmetrics.registerFont(TTFont(italic, ifname))
     bfname = liabilities + '/et-book-bold-line-figures.ttf'
     pdfmetrics.registerFont(TTFont(bold, bfname))
+    mypath = os.path.dirname(os.path.abspath(__file__))
+    lmtlcname = mypath + '/LMMonoLtCond10-Regular.ttf'
+    pdfmetrics.registerFont(TTFont(lmtlc, lmtlcname))
+    lmtlconame = mypath + '/LMMonoLtCond10-Oblique.ttf'
+    pdfmetrics.registerFont(TTFont(lmtlco, lmtlconame))
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
