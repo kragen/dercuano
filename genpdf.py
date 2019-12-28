@@ -154,24 +154,30 @@ def add_link(c, box, link):
     else:
         c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
 
-def render_text(c, t, text, font, link):
+def textOut(style, t, text):
+    t[0].setFont(style['font-family'], style['font-size'])
+    t[0].textOut(text)
+
+def render_text(c, t, text, style):
     max_x = pagesize[0] - right_margin
     words = re.split('[ \n\r\t]+', text)
     x, y = t[0].getX(), t[0].getY()
-    box = [x, y - font[1] * 0.1, x, y + font[1]]
+    font_family = style['font-family']
+    font_size = style['font-size']
+    box = [x, y - font_size * 0.1, x, y + font_size]
     for word in words:
-        width = c.stringWidth(word, *font)
+        width = c.stringWidth(word, font_family, font_size)
         if t[0].getX() + width > max_x:
-            newline(c, t, font)
-            add_link(c, box, link)
+            newline(c, t, (font_family, font_size))
+            add_link(c, box, style['link destination'])
             x, y = t[0].getX(), t[0].getY()
-            box = [x, y, x, y + font[1]]
+            box = [x, y - font_size * 0.1, x, y + font_size]
 
         # XXX while it's still sticking past the right margin, chop it
-        t[0].textOut(word + ' ')
+        textOut(style, t, word + ' ')
         box[2] = t[0].getX()
 
-    add_link(c, box, link)
+    add_link(c, box, style['link destination'])
 
 block_fonts = {
     'p': (roman, 1*em),
@@ -209,68 +215,71 @@ inline_fonts = {'i': italicize,
 def get_link(node):
     return node.get('href') if node.tag == 'a' else None
 
-def push_font(t, font_stack, font):
-    font_stack.append(font)
-    t[0].setFont(*font)
+def push_style(stack, current_style, prop, value):
+    stack.append(('restore', (prop, current_style[prop])))
+    current_style[prop] = value
 
 def render(corpus, bookmark, c, xml):
     print("PDFing", bookmark)
     c.bookmarkPage(bookmark, fit='XYZ')  # `fit` to suppress zooming out to whole page
     title = bookmark
-    font_stack = [(roman, 1*em)]
-    t = [start_page(c, font_stack[-1])]
+    current_style = {
+        'font-family': roman,
+        'font-size': 1*em,
+        'link destination': None,
+        'white-space': 'normal',
+    }
+
+    t = [start_page(c, (current_style['font-family'],
+                        current_style['font-size']))]
     stack = [('element', xml)]
-    link = None
     while stack:
         kind, obj = stack.pop()
-        new_font = False
         if kind == 'element':
+            if obj.tail is not None:
+                stack.append(('text', obj.tail))
+
             if obj.tag in block_fonts:
-                font = block_fonts[obj.tag]
-                size_diff = font[1] - font_stack[-1][1]
-                push_font(t, font_stack, font)
-                new_font = True
-                newline(c, t, font)
+                font_family, font_size = block_fonts[obj.tag]
+                size_diff = font_size - current_style['font-size']
+                push_style(stack, current_style, 'font-family', font_family)
+                push_style(stack, current_style, 'font-size', font_size)
+                newline(c, t, (current_style['font-family'],
+                               current_style['font-size']))
                 if size_diff > 0:
                     t[0].moveCursor(0, size_diff * 1.2)
 
             if obj.tag == 'p':
-                t[0].textOut(' ' * 4)               # paragraph indent
+                textOut(current_style, t, ' ' * 4)  # paragraph indent
             elif obj.tag == 'li':
-                t[0].textOut('• ') # a bullet that happens to be in ET Book
+                # a bullet that happens to be in ET Book
+                textOut(current_style, t, '• ')
 
             if obj.tag in inline_fonts:
-                font = inline_fonts[obj.tag](font_stack[-1])
-                push_font(t, font_stack, font)
-                new_font = True
+                # XXX maybe refactor how these are specced
+                font = inline_fonts[obj.tag]((current_style['font-family'],
+                                              current_style['font-size']))
+                push_style(stack, current_style, 'font-family', font[0])
+                push_style(stack, current_style, 'font-size', font[1])
 
             if obj.tag == 'title':
                 title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text)
             if get_link(obj):
-                link = resolve_link(corpus, get_link(obj))
+                push_style(stack, current_style, 'link destination',
+                           resolve_link(corpus, get_link(obj)))
 
             if obj.text is not None and obj.tag not in ('title', 'script', 'style'):
-                render_text(c, t, obj.text, font_stack[-1], link)
-
-            if obj.tail is not None:
-                stack.append(('text', obj.tail))
-            if new_font:  # must go atop the tail!
-                stack.append(('restorefont', None))
-            if get_link(obj):
-                stack.append(('endlink', None))
+                render_text(c, t, obj.text, current_style)
 
             for kid in reversed(list(obj)):
                 stack.append(('element', kid))
 
         elif kind == 'text':
-            render_text(c, t, obj, font_stack[-1], link)
-        elif kind == 'endlink':
-            link = None
+            render_text(c, t, obj, current_style)
         else:
-            assert kind == 'restorefont'
-            font_stack.pop()
-            t[0].setFont(*font_stack[-1])
-            #newline(c, t)
+            assert kind == 'restore'
+            prop, val = obj
+            current_style[prop] = val
 
     c.drawText(t[0])
     c.showPage()

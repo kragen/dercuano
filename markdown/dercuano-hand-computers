@@ -669,3 +669,30 @@ That seems to have worked!  And tweaking the tidylib recipe above (no
 output-html, yes numeric-entities) allowed me to excise the
 ElementTidy dependency.  So that's one out of six showstopper bugs
 fixed.
+
+#### `<pre>` ####
+
+As MDN says about CSS "white-space: pre":
+
+> Sequences of white space are preserved. Lines are only broken at
+  newline characters in the source and at `<br>` elements.
+
+Right now I have a "font stack" which is separate from the element
+stack and also a "current link" which is restored from the element
+stack.  But now I'd need to have a "white-space" stack so that I
+restore white-space to its `normal` value at the proper place.
+
+I think a better alternative is to use the element stack to restore
+elements of the current style, which can include link destination,
+font-family, font-size, and white-space.  Then I can just pass the
+current style to `render_text`.
+
+`white-space: pre` is simple to implement:
+
+    #words = re.split('[ \n\r\t]+', text)
+    words = re.split('\n', text)
+
+        if True or t[0].getX() + width > max_x:
+            newline(c, t, font)
+
+        t[0].textOut(word)# + ' ')
