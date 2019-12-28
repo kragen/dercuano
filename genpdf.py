@@ -254,7 +254,7 @@ def render(corpus, bookmark, c, xml):
             if get_link(obj):
                 link = resolve_link(corpus, get_link(obj))
 
-            if obj.text is not None and obj.tag != 'title':
+            if obj.text is not None and obj.tag not in ('title', 'script', 'style'):
                 render_text(c, t, obj.text, font_stack[-1], link)
 
             if obj.tail is not None:
@@ -326,11 +326,21 @@ def main(path):
             # removed in Python 3, and HTMLParser (html.parser) is a
             # tag-soup parser.
             tree = ET.parse(filename)
+            root = tree.getroot()
         except Exception:
             print("parse error on", bookmarkname + ":", sys.exc_info()[1])
             try:
-                from elementtidy import TidyHTMLTreeBuilder
-                tree = TidyHTMLTreeBuilder.parse(filename)
+                # XXX use tidylib instead?  with {'input-encoding': 'utf8',
+                # 'output-encoding': 'utf8'}
+                import _elementtidy
+                xml = _elementtidy.fixup(open(filename).read(), 'utf8')[0]
+                root = ET.fromstring(xml)
+                # remove XML namespace prefixes:
+                deprefixnodes = [root]
+                while deprefixnodes:
+                    node = deprefixnodes.pop()
+                    deprefixnodes.extend(list(node))
+                    node.tag = re.compile('{.*}').sub('', node.tag)
                 print("recovered using elementtidy")
             except Exception:
                 print("elementtidy failed too:", sys.exc_info()[1])
@@ -338,7 +348,7 @@ def main(path):
                     ET.fromstring('<html>XML parse failure</html>'))
                 continue
 
-        render(corpus, bookmarkname, canvas, tree.getroot())
+        render(corpus, bookmarkname, canvas, root)
 
     canvas.save()
 
