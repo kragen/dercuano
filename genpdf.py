@@ -29,9 +29,6 @@ Missing pieces include:
 - colored titles
 - hyphenation and justification
 - need to include ET Book license
-- correct handling of files like high-temperature-semiconductors.html; I
-  think maybe elementtidy is providing me with a different interface than
-  ElementTree does, and it's also choking on the UTF-8
 - I think it's splitting on no-break spaces as well as normal spaces, visible
   in `household-thermal-stores`
 
@@ -317,23 +314,24 @@ def main(path):
         sys.stdout.write('%d/%d ' % (i, len(corpus)))
         filename = corpus[bookmarkname]
         try:
-            # Although this chews through all of Dercuano in 1.3
-            # seconds on this netbook, it fails to parse 3% of the
-            # notes because they have things like raw HTML blocks in
-            # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
-            # <td>1 <td>0.4%``.)  Maybe I can preprocess everything
-            # with HTML Tidy or something.  sgmllib and htmllib are
-            # removed in Python 3, and HTMLParser (html.parser) is a
-            # tag-soup parser.
             tree = ET.parse(filename)
             root = tree.getroot()
         except Exception:
             print("parse error on", bookmarkname + ":", sys.exc_info()[1])
             try:
-                # XXX use tidylib instead?  with {'input-encoding': 'utf8',
-                # 'output-encoding': 'utf8'}
-                import _elementtidy
-                xml = _elementtidy.fixup(open(filename).read(), 'utf8')[0]
+                # Although the above chews through all of Dercuano in 1.3
+                # seconds on this netbook, it fails to parse 3% of the
+                # notes because they have things like raw HTML blocks in
+                # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
+                # <td>1 <td>0.4%``.)  So we preprocess everything
+                # with HTML Tidy.  sgmllib and htmllib are
+                # removed in Python 3, and HTMLParser (html.parser) is a
+                # tag-soup parser.
+                import tidylib
+                xml = tidylib.tidy_document(open(filename).read(),
+                                            {'input-encoding': 'utf8',
+                                             'output-encoding': 'utf8',
+                                             'numeric-entities': True})[0]
                 root = ET.fromstring(xml)
                 # remove XML namespace prefixes:
                 deprefixnodes = [root]
@@ -341,9 +339,9 @@ def main(path):
                     node = deprefixnodes.pop()
                     deprefixnodes.extend(list(node))
                     node.tag = re.compile('{.*}').sub('', node.tag)
-                print("recovered using elementtidy")
+                print("recovered using tidylib")
             except Exception:
-                print("elementtidy failed too:", sys.exc_info()[1])
+                print("tidylib failed too:", sys.exc_info()[1])
                 render(corpus, bookmarkname, canvas,
                     ET.fromstring('<html>XML parse failure</html>'))
                 continue
