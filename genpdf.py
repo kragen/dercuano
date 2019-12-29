@@ -69,31 +69,6 @@ into more boxes than needed.  <https://gankra.github.io/blah/text-hates-you/>
 goes into details on the complexities involved and advises you to just use
 HarfBuzz.
 
-The typewriter-text problem is serious for hand computers.  Reducing
-Courier to 6.8 points is a shitty solution.  Latin Modern
-<http://ctan.dcc.uchile.cl/fonts/lm/README>, which is included in TeX
-Live, includes a condensed typewriter font
-<https://tug.org/FontCatalogue/latinmodernmonolightcondensed/> which
-might help.  I think it might be called "clmtlc10" or "dd-lmtlc10", but
-not in OTF/TTF format; <https://www.ctan.org/tex-archive/fonts/lm/> has
-a version in OTF at <https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm>;
-specifically
-<http://mirrors.ctan.org/fonts/lm/fonts/opentype/public/lm/lmmonoltcond10-oblique.otf>
-and
-<http://mirrors.ctan.org/fonts/lm/fonts/opentype/public/lm/lmmonoltcond10-regular.otf>
-
-Sadly, this gives me:
-
-    reportlab.pdfbase.ttfonts.TTFError:
-    TTF file "lmmonoltcond10-oblique.otf":
-    postscript outlines are not supported
-
-But by converting to TTF with FontForge I think I can solve the problem.
-
-/usr/share/texlive/texmf-dist/fonts/opentype/public/cm-unicode/cmuntt.otf
-would have been another possibility, maybe with some kind of coordinate
-transformation.
-
 """
 from __future__ import print_function
 
@@ -126,16 +101,45 @@ em = 12
 pagesize = (29 * em, 66 * em)
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
-def start_page(c, font):
-    c.setFont(*font)
-    return c.beginText(left_margin, pagesize[1]-top_margin-em)
+class Textobject:
+    def __init__(self, canvas, x, y, style):
+        self.c = canvas
+        self.x = x
+        self.y = y
+        self.font = style['font-family'], style['font-size']
 
-def newline(c, t, font):
-    t[0].textLine()
-    if t[0].getY() < bottom_margin + 8*em:  # XXX fudge factor for layout bugs
-        c.drawText(t[0])
-        c.showPage()
-        t[0] = start_page(c, font)
+    def start_page(self, style):
+        self.c.setFont(*self.font)
+        self.t = self.c.beginText(self.x, self.y)
+        self.tfont = self.font
+
+    def newline(self, style):
+        self.t.textLine()
+        if self.t.getY() < bottom_margin + 8*em:  # XXX fudge factor for layout bugs
+            self.end_page()
+            self.start_page(style)
+
+    def end_page(self):
+        self.c.drawText(self.t)
+        self.c.showPage()
+        del self.t
+        del self.tfont
+
+    def text_out(self, style, text):
+        self.font = style['font-family'], style['font-size']
+        if self.tfont != self.font:
+            self.t.setFont(*self.font)
+            self.tfont = self.font
+        self.t.textOut(text)
+
+    def move_cursor(self, dx, dy):
+        self.t.moveCursor(dx, dy)
+
+    def get_x(self):
+        return self.t.getX()
+
+    def get_y(self):
+        return self.t.getY()
 
 def resolve_link(corpus, url):
     while url.startswith('../'):
@@ -154,29 +158,25 @@ def add_link(c, box, link):
     else:
         c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
 
-def textOut(style, t, text):
-    t[0].setFont(style['font-family'], style['font-size'])
-    t[0].textOut(text)
-
 def render_text(c, t, text, style):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
     words = (re.split('\n', text) if pre else re.split('[ \n\r\t]+', text))
-    x, y = t[0].getX(), t[0].getY()
+    x, y = t.get_x(), t.get_y()
     font_family = style['font-family']
     font_size = style['font-size']
     box = [x, y - font_size * 0.1, x, y + font_size]
     for word in words:
         width = c.stringWidth(word, font_family, font_size)
-        if pre or t[0].getX() + width > max_x:
-            newline(c, t, (font_family, font_size))
+        if pre or t.get_x() + width > max_x:
+            t.newline(style)
             add_link(c, box, style['link destination'])
-            x, y = t[0].getX(), t[0].getY()
+            x, y = t.get_x(), t.get_y()
             box = [x, y - font_size * 0.1, x, y + font_size]
 
         # XXX while it's still sticking past the right margin, chop it
-        textOut(style, t, word + ' ')
-        box[2] = t[0].getX()
+        t.text_out(style, word + ' ')
+        box[2] = t.get_x()
 
     add_link(c, box, style['link destination'])
 
@@ -193,6 +193,7 @@ block_fonts = {
     # With Latin Modern Mono Light Condensed, I need just over 28 ems for 80
     # columns, so font-size:98% seems about right.
     'pre': (lmtlc, 0.98*em),
+    'br': (roman, 1*em),
     }
 
 def italicize(font):
@@ -231,8 +232,8 @@ def render(corpus, bookmark, c, xml):
         'white-space': 'normal',
     }
 
-    t = [start_page(c, (current_style['font-family'],
-                        current_style['font-size']))]
+    t = Textobject(c, left_margin, pagesize[1]-top_margin-em, current_style)
+    t.start_page(current_style)
     stack = [('element', xml)]
     while stack:
         kind, obj = stack.pop()
@@ -245,16 +246,15 @@ def render(corpus, bookmark, c, xml):
                 size_diff = font_size - current_style['font-size']
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
-                newline(c, t, (current_style['font-family'],
-                               current_style['font-size']))
+                t.newline(current_style)
                 if size_diff > 0:
-                    t[0].moveCursor(0, size_diff * 1.2)
+                    t.move_cursor(0, size_diff * 1.2)
 
             if obj.tag == 'p':
-                textOut(current_style, t, ' ' * 4)  # paragraph indent
+                t.text_out(current_style, ' ' * 4)  # paragraph indent
             elif obj.tag == 'li':
                 # a bullet that happens to be in ET Book
-                textOut(current_style, t, '• ')
+                t.text_out(current_style, '• ')
             elif obj.tag == 'pre':
                 push_style(stack, current_style, 'white-space', 'pre')
 
@@ -284,8 +284,7 @@ def render(corpus, bookmark, c, xml):
             prop, val = obj
             current_style[prop] = val
 
-    c.drawText(t[0])
-    c.showPage()
+    t.end_page()
     c.addOutlineEntry(title, bookmark, level=0)
 
 def main(path):

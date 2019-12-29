@@ -444,7 +444,8 @@ taller makes it more legible, as does making it wider.  The much
 harder constraint on `<pre>` text is its width; scrolling more because
 it is taller than would be ideal is far preferable.  So, a reasonable
 alternative is to use a compressed font.  I found Bogusław Jackowski
-and Janusz M. Nowacki's font Latin Modern Mono Light Condensed, which
+and Janusz M. Nowacki's font [Latin Modern Mono Light
+Condensed](https://tug.org/FontCatalogue/latinmodernmonolightcondensed/), which
 comes in regular and oblique versions (but no bold), which is derived
 originally from Knuth's Computer Modern Teletype, which is in the
 public domain; but Latin Modern has much broader coverage of some 760
@@ -453,6 +454,10 @@ Unicode characters than `cmtt` does.
 `lmtlc`, as this font is called in the T<sub>E</sub>X Live
 distribution, demands only about 0.36 ems of horizontal space per
 character, and is still quite readable, although visibly compressed.
+I had to use FontForge to convert it from [the OTF on
+CTAN](https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm)
+because Reportlab said, "TTF file "lmmonoltcond10-oblique.otf":
+postscript outlines are not supported."
 
 So I've widened the page width to some 29 ems (and extended it
 vertically to 66 ems, purely for reasons of silly nostalgic printer
@@ -487,6 +492,11 @@ that would be a 7.2-point font, suboptimal but not outside the realm
 of readability.  On the discount hand computer I was using earlier
 this year, the screen was 45x63 mm.  29 ems across 63 mm makes it a
 6.1-point font: painful to read, but, again, not infeasible.
+
+If that hadn't worked, maybe
+/usr/share/texlive/texmf-dist/fonts/opentype/public/cm-unicode/cmuntt.otf
+would have been another possibility, maybe with some kind of
+coordinate transformation.
 
 #### Remaining major bugs ####
 
@@ -572,6 +582,33 @@ licensing is GPLv3+, which is [somewhat aggressive as fonts
 go](https://lists.gnu.org/archive/html/freefont-bugs/2019-09/msg00009.html),
 and it's not clear that there's a legal way to embed it, or a subset
 of it, into a PDF file and then convey that PDF file to others.
+
+Oh, actually there's a special exception for document embedding in its
+README, which Debian left out of
+/usr/share/doc/fonts-freefont-ttf/copyright:
+
+> Free UCS scalable fonts is free software; you can redistribute it and/or
+> modify it under the terms of the GNU General Public License as published
+> by the Free Software Foundation; either version 3 of the License, or
+> (at your option) any later version.
+>
+> The fonts are distributed in the hope that they will be useful, but
+> WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+> for more details.
+>
+> You should have received a copy of the GNU General Public License along
+> with this program; if not, write to the Free Software Foundation, Inc.,
+> 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+>
+> As a special exception, if you create a document which uses this font, and
+> embed this font or unaltered portions of this font into the document, this
+> font does not by itself cause the resulting document to be covered by the
+> GNU General Public License. This exception does not however invalidate any
+> other reasons why the document might be covered by the GNU General Public
+> License. If you modify this font, you may extend this exception to your
+> version of the font, but you are not obligated to do so.  If you do not
+> wish to do so, delete this exception statement from your version.
 
 DejaVu is an extended version of Bitstream Vera, which was distributed
 under a BSD-like license that requires changing the name of extended
@@ -700,3 +737,13 @@ current style to `render_text`.
 Okay, I have that working.  Four showstopper bugs left: newlines after
 bullets, the ET Book license, vertical positioning, and font cascade
 fallbacks.
+
+In the process, though, the PDF seems to have grown by about 700K and
+become slower to display in some PDF viewers.  I suspect resetting the
+font on every word may be causing this, so I'm going to try adding
+another level of indirection so I can make an apples-to-apples test.
+
+Indeed, without redundant font setting, it takes 4m37s of user time
+and produces a 12.4 MB PDF, while with redundant font setting, it
+takes 5m45s and produces a 12.9 MB PDF.  So the extra complexity to
+avoid redundant font setting is worthwhile.
