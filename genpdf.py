@@ -11,7 +11,6 @@ Missing pieces include:
 - a layout engine capable of handling varying font sizes in a line (also this
   one seems to have difficulty with varying font sizes on a page; see "fudge
   factor" in the code)
-- <pre>
 - Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
 - bullets
 - tables
@@ -29,6 +28,8 @@ Missing pieces include:
 - colored titles
 - hyphenation and justification
 - need to include ET Book license
+- not putting more newlines in random places when there are elements inside
+  a <pre> (as in, for example, escheme.html)
 
 It also takes over seven minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -266,7 +267,7 @@ def render(corpus, bookmark, c, xml):
                 push_style(stack, current_style, 'font-size', font[1])
 
             if obj.tag == 'title':
-                title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text)
+                title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text).strip()
             if get_link(obj):
                 push_style(stack, current_style, 'link destination',
                            resolve_link(corpus, get_link(obj)))
