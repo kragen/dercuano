@@ -1,5 +1,10 @@
 Dercuano is a self-contained downloadable HTML tarball containing a
 book’s worth of disorganized notes I’ve made over the last few years.
+As a backup option for computer systems incapable of handling a
+downloadable HTML tarball, I've hacked together an inferior PDF
+rendering of it as well, which comes to some 4000 pages, formatted for
+comfortable reading on hand computers.
+
 Buried among the errors, red herrings, and ratholes, there
 are numerous wonderful insights (perhaps even a few of them original),
 many fascinating facts about the world (many of which are true, and a
@@ -53,9 +58,9 @@ or revised for readability.  So, beware.
 
 Many of the dates are only approximate.
 
-### Dercuano is not a scholarly work ###
+### Dercuano is not a scholarly publication ###
 
-One of the distinguishing features of scholarly work, as currently
+One of the distinguishing features of scholarly publications, as currently
 understood, is that it is consciously situated with regard to the
 existing state of knowledge: it is aware of the state of the art;
 builds on its successes (rather than falling victim to known
@@ -66,7 +71,7 @@ credit to existing scholarly work.
 
 By and large, I appreciate these values, and I would like to do work
 that practices them.  Sometimes, in the past, I have.  Dercuano is not
-that work.  It is full of cases where I rediscovered known ideas
+such a work.  It is full of cases where I rediscovered known ideas
 (sometimes incorrectly) and cases where I think something is true, due
 to other people’s previous work, but I don’t remember who demonstrated
 it, or in many cases, precisely what they demonstrated.  In many cases
@@ -79,16 +84,25 @@ haven’t done that work, and in fact I’ve given up on ever doing it for
 most of the notes in Dercuano.  From a scholarly perspective, Dercuano
 is best understood as a collection of unfinished notes on ideas that
 seem promising and merit further investigation, which could lead to
-scholarly work, rather than scholarly work itself.
+a scholarly publication, rather than a scholarly publication in itself.
+
+The work that leads up to a scholarly publication invariably involves
+a great deal of information-gathering, experimentation, thinking,
+revision, and usually discussion before reaching the point of actually
+representing an advance on the state of the art.  Sometimes this
+process is recorded, for example in laboratory notebooks, but it
+usually remains secret, in part because of all of the embarrassing
+errors during the process.  Preregistration of clinical trials is
+starting to reduce this secrecy in medicine, but 
 
 ### Size and public-domain dedication ###
 
-On 2019-07-24 as I write this, the Dercuano tarball is 3.0 megabytes
-and contains some 1.01 million  words in 775 notes,
+On 2019-12-28 as I write this, the Dercuano tarball is 3.6 megabytes
+and contains some 1.2 million words in 882 notes,
 about 3500 paperback pages’
-worth of text.  This is about two thirds of the total amount
-of text I have here and intend to include.  I’m still importing notes
-to add to it.
+worth of text.  The PDF rendering mentioned above uses a page size
+slightly smaller than standard for improved readability on hand
+computers.
 
 As far as I’m concerned, everyone is free to redistribute Dercuano, in
 whole or in part, modified or unmodified, with or without credit; I

@@ -30,6 +30,8 @@ Missing pieces include:
   a <pre> (as in, for example, escheme.html)
 - properly making the first part of a link a link when it crosses pages;
   instead the first part ends up at the bottom of the next page
+- page numbers for links
+- URLs for external links?
 
 It also takes over five minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -101,6 +103,16 @@ em = 12
 # Hopefully this is a Goldilocks size:
 pagesize = (29 * em, 66 * em)
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
+
+def load_fonts(path):
+    liabilities = path + '/liabilities'
+    yield TTFont(roman, liabilities + '/et-book-roman-old-style-figures.ttf')
+    yield TTFont(italic, liabilities + '/et-book-display-italic-old-style-figures.ttf')
+    yield TTFont(bold, liabilities + '/et-book-bold-line-figures.ttf')
+
+    mypath = os.path.dirname(os.path.abspath(__file__))
+    yield TTFont(lmtlc, mypath + '/LMMonoLtCond10-Regular.ttf')
+    yield TTFont(lmtlco, mypath + '/LMMonoLtCond10-Oblique.ttf')
 
 class Textobject:
     def __init__(self, canvas, x, y, style):
@@ -298,18 +310,8 @@ def render(corpus, bookmark, c, xml):
     c.addOutlineEntry(title, bookmark, level=0)
 
 def main(path):
-    liabilities = path + '/liabilities'
-    rfname = liabilities + '/et-book-roman-old-style-figures.ttf'
-    pdfmetrics.registerFont(TTFont(roman, rfname))
-    ifname = liabilities + '/et-book-display-italic-old-style-figures.ttf'
-    pdfmetrics.registerFont(TTFont(italic, ifname))
-    bfname = liabilities + '/et-book-bold-line-figures.ttf'
-    pdfmetrics.registerFont(TTFont(bold, bfname))
-    mypath = os.path.dirname(os.path.abspath(__file__))
-    lmtlcname = mypath + '/LMMonoLtCond10-Regular.ttf'
-    pdfmetrics.registerFont(TTFont(lmtlc, lmtlcname))
-    lmtlconame = mypath + '/LMMonoLtCond10-Oblique.ttf'
-    pdfmetrics.registerFont(TTFont(lmtlco, lmtlconame))
+    for font in load_fonts(path):
+        pdfmetrics.registerFont(font)
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
