@@ -1,0 +1,52 @@
+I was thinking about Prolog as I lay in bed last night, and I came up
+with this:
+
+    %% Sorting a sequence of numbers: a constructive definition.
+
+    %% Choosing an element from a nonempty sequence:
+    choose([X|Xs], X, Xs).
+    choose([X|Xs], Y, [X|Ys]) :- choose(Xs, Y, Ys).
+
+    %% Permutations of sequences.
+    perm([], []).
+    perm([X|Xs], [A|As]) :- choose([X|Xs], A, B), perm(B, As).
+
+    %% Ordering of sequences.
+    ordered([]).
+    ordered([_]).
+    ordered([X, Y | Xs]) :- X =< Y, ordered([Y | Xs]).
+
+    %% Sorting.
+    sorted(Xs, Sorted) :- perm(Xs, Sorted), ordered(Sorted).
+
+This can, in fact, be used in an ordinary Prolog system to sort a
+sequence of numbers:
+
+    ?- sorted([5, 1, 3, 7, 8, 9, 2, 6, 4], X).
+    X = [1, 2, 3, 4, 5, 6, 7, 8, 9] ;
+    false.
+
+However, Prolog's standard evaluation order makes this a ridiculously
+inefficient way to sort, taking a factorial number of steps.
+
+What would you do if you wanted to evaluate this definition
+efficiently?  `perm/2` with its first argument instantiated generates
+its permutations left to right, and `ordered/1` inspects permutations
+left to right; it is clear that no sequence of the form `[2, 1 | As]`
+can ever pass `ordered/1`, so there is no need for `perm/2` to recurse
+to generate alternatives for `As` in that case.  Suppose you could
+propagate that nogood set from one branch of the program to the other;
+would that give you an O(N²) sorting algorithm?
+
+I don't think so, because in the example above, there is only one
+correct initial sequence of 2 items, and 35 other pairs of 2 items
+that must be tried and rejected --- but rejecting them involves trying
+everything that can follow them.  I'm not totally sure.
+
+This is a reasonably efficient insertion sort with Prolog's usual
+semantics, but I think it's still O(N³):
+
+    isort([], []).
+    isort([X | Xs], Ys) :- isort(Xs, Sx), choose(Ys, X, Sx), ordered(Ys).
+
+This is vaguely related to file `generic-programming`.
