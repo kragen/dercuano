@@ -750,3 +750,19 @@ Indeed, without redundant font setting, it takes 4m37s of user time
 and produces a 12.4 MB PDF, while with redundant font setting, it
 takes 5m45s and produces a 12.9 MB PDF.  So the extra complexity to
 avoid redundant font setting is worthwhile.
+
+### 2019-12-29 ###
+
+Well, so, I revisited the code that emits textobjects, and I made it
+emit a new textobject for every line, which can be positioned with
+some appropriate Y-offset, and now I have the links actually over the
+text they're supposed to be (except when a link splits across pages,
+which is still a bug) although at the cost of an extra megabyte.  This
+also enables me to eliminate the fudge-factor margin at page bottoms,
+which cuts the book down to 3718 pages.
+
+So, that's one more showstopper bug down, and so now it's down to
+three remaining showstopper bugs: the missing ET Book license, the
+newlines following bullets, and tofu.  I think FreeSerif and FreeMono
+are reasonable fallback fonts, but I have to figure out how to do the
+fallbacking in practice.

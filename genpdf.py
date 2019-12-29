@@ -2,17 +2,15 @@
 # -*- coding: utf-8 -*-
 """Parse HTML output to generate a PDF.
 
-This is still very poor PDF generation for Dercuano.
+This is still pretty poor PDF generation for Dercuano.
 Missing pieces include:
 
 - Greek
 - other math characters; ℓ doesn't even exist in Courier, and in ET Book,
   all of "ε₀ ≈" is no good
-- a layout engine capable of handling varying font sizes in a line (also this
-  one seems to have difficulty with varying font sizes on a page; see "fudge
-  factor" in the code)
+- a layout engine capable of handling varying font sizes in a line
 - Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
-- bullets
+- proper indentation for lists (<ul>, <ol>)
 - tables
 - Chinese
 - wrapping overlong lines so they don't get cut off
@@ -30,8 +28,10 @@ Missing pieces include:
 - need to include ET Book license
 - not putting more newlines in random places when there are elements inside
   a <pre> (as in, for example, escheme.html)
+- properly making the first part of a link a link when it crosses pages;
+  instead the first part ends up at the bottom of the next page
 
-It also takes over seven minutes to run on my netbook and generates a 4685-page PDF,
+It also takes over five minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
 
 The codepoint coverage thing may be a bit tricky.  Really we probably need to
@@ -113,18 +113,32 @@ class Textobject:
         self.c.setFont(*self.font)
         self.t = self.c.beginText(self.x, self.y)
         self.tfont = self.font
+        self.drawn_anything = False
 
-    def newline(self, style):
+    def newline(self, style, extra_skip):
         self.t.textLine()
-        if self.t.getY() < bottom_margin + 8*em:  # XXX fudge factor for layout bugs
+        y = self.t.getY() - extra_skip
+        if y < bottom_margin:
             self.end_page()
             self.start_page(style)
+        else:
+            # XXX starting so many new texts and setting so many new
+            # fonts is adding over a megabyte to the PDF file: 12.37
+            # MB vs. 13.44 MB
+            self.flush()
+            self.c.setFont(*self.font)
+            self.t = self.c.beginText(self.x, y)
+            self.tfont = self.font
+            self.drawn_anything = False
+
+    def flush(self):
+        if self.drawn_anything:
+            self.c.drawText(self.t)
+        del self.t, self.tfont, self.drawn_anything
 
     def end_page(self):
-        self.c.drawText(self.t)
+        self.flush()
         self.c.showPage()
-        del self.t
-        del self.tfont
 
     def text_out(self, style, text):
         self.font = style['font-family'], style['font-size']
@@ -132,9 +146,7 @@ class Textobject:
             self.t.setFont(*self.font)
             self.tfont = self.font
         self.t.textOut(text)
-
-    def move_cursor(self, dx, dy):
-        self.t.moveCursor(dx, dy)
+        self.drawn_anything = True
 
     def get_x(self):
         return self.t.getX()
@@ -166,14 +178,14 @@ def render_text(c, t, text, style):
     x, y = t.get_x(), t.get_y()
     font_family = style['font-family']
     font_size = style['font-size']
-    box = [x, y - font_size * 0.1, x, y + font_size]
+    box = [x - font_size* 0.1, y - font_size * 0.1, x, y + font_size]
     for word in words:
         width = c.stringWidth(word, font_family, font_size)
         if pre or t.get_x() + width > max_x:
-            t.newline(style)
+            t.newline(style, 0)
             add_link(c, box, style['link destination'])
             x, y = t.get_x(), t.get_y()
-            box = [x, y - font_size * 0.1, x, y + font_size]
+            box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
 
         # XXX while it's still sticking past the right margin, chop it
         t.text_out(style, word + ' ')
@@ -244,12 +256,9 @@ def render(corpus, bookmark, c, xml):
 
             if obj.tag in block_fonts:
                 font_family, font_size = block_fonts[obj.tag]
-                size_diff = font_size - current_style['font-size']
+                t.newline(current_style, extra_skip = font_size - 1*em)
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
-                t.newline(current_style)
-                if size_diff > 0:
-                    t.move_cursor(0, size_diff * 1.2)
 
             if obj.tag == 'p':
                 t.text_out(current_style, ' ' * 4)  # paragraph indent
