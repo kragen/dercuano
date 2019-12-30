@@ -252,8 +252,10 @@ class Textobject:
     def start_page(self, style):
         self.font = style['postscript-font'], style['font-size']
         self.c.setFont(*self.font)
+        self.c.setFillColor(toColor(style['color']))
         self.t = self.c.beginText(self.x, self.y)
         self.tfont = self.font
+        self.color = style['color']
         self.drawn_anything = False
 
     def newline(self, style, extra_skip):
@@ -268,15 +270,17 @@ class Textobject:
             # MB vs. 13.44 MB
             self.flush()
             self.font = style['postscript-font'], style['font-size']
+            self.c.setFillColor(toColor(style['color']))
             self.c.setFont(*self.font)
             self.t = self.c.beginText(self.x, y)
             self.tfont = self.font
+            self.color = style['color']
             self.drawn_anything = False
 
     def flush(self):
         if self.drawn_anything:
             self.c.drawText(self.t)
-        del self.t, self.tfont, self.drawn_anything
+        del self.t, self.tfont, self.drawn_anything, self.color
 
     def end_page(self):
         self.flush()
@@ -287,6 +291,11 @@ class Textobject:
         if self.tfont != self.font:
             self.t.setFont(*self.font)
             self.tfont = self.font
+
+        if self.color != style['color']:
+            self.t.setFillColor(toColor(style['color']))
+            self.color = style['color']
+
         self.t.textOut(text)
         self.drawn_anything = True
 
@@ -427,6 +436,15 @@ block_fonts = {
 extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5, pre=1,
                                blockquote=0.5)
 
+block_colors = {
+    'h1': 'rgba(136,0,0,.794)',
+    'h2': 'rgba(136,0,0,.794)',
+    'h3': 'rgba(136,0,0,.794)',
+    'h4': 'rgba(136,0,0,.794)',
+    'h5': 'rgba(136,0,0,.794)',
+    'h6': 'rgba(136,0,0,.794)',
+}
+
 italicize_table = {
     'serif': 'serif-italic',
     'serif-italic': 'serif-italic',
@@ -494,6 +512,7 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
         'font-size': 1*em,
         'link destination': None,
         'white-space': 'normal',
+        'color': 'black',
     }
 
     start_page_style = style_override(current_style, 'postscript-font',
@@ -530,6 +549,9 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
                     push_style(stack, current_style, 'font-family', font_family)
                 if font_size is not None:    # inherit
                     push_style(stack, current_style, 'font-size', font_size)
+                if obj.tag in block_colors:
+                    push_style(stack, current_style, 'color',
+                               block_colors[obj.tag])
                 was_top_of_block = top_of_block
                 top_of_block = (obj.tag in ('li', 'blockquote'))
             else:
