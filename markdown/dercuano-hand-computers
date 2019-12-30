@@ -874,6 +874,7 @@ benefit):
 - Sometimes there are spurious blank lines between paragraphs and list
   items.
 - Superscript 0 and 456789 are larger than superscript 123.
+- Fallback characters in `<pre>` have the wrong width.
 
 This is a lot to fix in the next 22 hours and I'm definitely not going
 to finish all of it, but I ought to be able to make a significant dent.
@@ -895,4 +896,20 @@ hours left, which is 82 times 16 minutes.  I can only do 82 more full
 rebuilds at that pace.  This code will only ever be run 82 more times,
 ever.
 
-How about overlong lines?
+How about overlong lines?  I could use a regular "\\" to indicate the
+wrapping of the line, although I think an outdented "-" would be nice.
+But then I need to chop the overlong word up into lines somehow.  If I
+were just positioning it at an (x, y), I feel like I could easily
+enough position it a full column width to the left, but the textobject
+seems to be taking care of positioning for me, unfortunately.  So
+maybe a better option is to binary search on word widths.
+
+Damn it, I just scalded my hand with this teakettle.  Not sure being
+awake at 4 AM is such a good idea.  But I still have almost 20 hours
+left.
+
+All right, I have overlong lines chopped and marked with little
+circles, sort of like flowchart connector circles.  And it's almost
+sunrise, and damn is it hot, despite the air conditioner going full
+blast.
+

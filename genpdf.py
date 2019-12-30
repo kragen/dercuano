@@ -322,6 +322,21 @@ def add_link(c, box, link):
     else:
         c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
 
+def chop(cascade, font_size, string, max_width):
+    """Cut `string` into a left half that fits within max_width,
+    and a possibly empty right half that didn't."""
+    # Half-open interval for cut point: a:b.  len(string) is valid
+    # (and most common!) cut point, thus b is initially len(string)+1.
+    a, b = 0, len(string)+1
+    while a < b - 1:
+        c = a + (b - a) // 2
+        if cascade.width(string[:c], font_size) <= max_width:
+            a = c
+        else:
+            b = c
+
+    return string[:a], string[a:]
+
 def text_out(fonts, t, style, s):
     fonts[style['font-family']].text_out(t, style, s)
 
@@ -334,17 +349,33 @@ def render_text(c, t, text, style, fonts):
     font = fonts[font_family]
     font_size = style['font-size']
     box = [x - font_size* 0.1, y - font_size * 0.1, x, y + font_size]
+    newline_style = style_override(style, 'postscript-font',
+                                   font.default_postscript_font)
     for word in words:
-        width = fonts[font_family].width(word, font_size)
-        if pre or t.get_x() + width > max_x:
-            newline_style = style_override(style, 'postscript-font',
-                                           font.default_postscript_font)
+        width = font.width(word, font_size)
+        x = t.get_x()
+        if pre or x + width > max_x:
             t.newline(newline_style, 0)
             add_link(c, box, style['link destination'])
             x, y = t.get_x(), t.get_y()
             box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
 
-        # XXX while it's still sticking past the right margin, chop it
+        # chop up words too wide for lines
+        while word and x + width > max_x:
+            left, right = chop(font, font_size, word, max_x - x)
+            text_out(fonts, t, style, left)
+            x = box[2] = t.get_x()
+            add_link(c, box, style['link destination'])
+            # Add circles to indicate a broken line
+            c.circle(x + font_size * .2, y + font_size * .3, font_size/6)
+
+            t.newline(newline_style, 0)
+            x, y = t.get_x(), t.get_y()
+            c.circle(x - font_size * .2, y + font_size * .3, font_size/6)
+            box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
+            word = right
+            width = font.width(word, font_size)
+
         text_out(fonts, t, style, word + ' ')
         box[2] = t.get_x()
 
