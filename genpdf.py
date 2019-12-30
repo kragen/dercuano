@@ -337,6 +337,9 @@ def text_out(fonts, t, style, s):
 abbrevs = {'Mr.', 'vs.', 'cf.', 'Jr.', 'pp.', 'Ms.', 'Dr.', 'p.', 'St.', '(St.'}
 spacepunct = tuple('.?!:;')
 
+def start_box(x, y, font_size):
+    return [x - font_size * 0.1, y - font_size * 0.35, x, y + font_size * 0.85]
+
 def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
@@ -346,7 +349,7 @@ def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct
     font_family = style['font-family']
     font = fonts[font_family]
     font_size = style['font-size']
-    box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
+    box = start_box(x, y, font_size)
     newline_style = style_override(style, 'postscript-font',
                                    font.default_postscript_font)
     for wi, word in enumerate(words):
@@ -360,8 +363,7 @@ def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct
             t.newline(newline_style, 0)
             add_link(c, box, style['link destination'])
             x, y = t.get_x(), t.get_y()
-            box = [x - font_size * 0.1, y - font_size * 0.1,
-                   x + font_size * 0.1, y + font_size]
+            box = start_box(x, y, font_size)
 
         # chop up words too wide for lines
         while word and x + width > max_x:
@@ -376,7 +378,7 @@ def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct
             t.newline(newline_style, 0)
             x, y = t.get_x(), t.get_y()
             c.circle(x - font_size * .2, y + font_size * .3, font_size/6)
-            box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
+            box = start_box(x, y, font_size)
             word = right
             width = font.width(word, font_size)
 
