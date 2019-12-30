@@ -741,8 +741,8 @@ def main(path):
 
         render(pagenos, corpus, bookmarkname, canvas, root, fonts)
 
-    canvas.save()
     pagenos.save()
+    canvas.save()
 
 if __name__ == '__main__':
     cgitb.enable(format='text')
