@@ -407,7 +407,7 @@ embolden_table = {
 }
 
 def embolden(font):
-    return codify_table[font[0]], font[1]
+    return embolden_table[font[0]], font[1]
 
 inline_fonts = {'i': italicize,
                 'em': italicize,
@@ -439,23 +439,37 @@ def render(corpus, bookmark, c, xml, fonts):
     t = Textobject(c, left_margin, pagesize[1]-top_margin-em, start_page_style)
     t.start_page(start_page_style)
     stack = [('element', xml)]
+    top_of_block = True
     while stack:
         kind, obj = stack.pop()
         if kind == 'element':
             if obj.tail is not None:
                 stack.append(('text', obj.tail))
 
+            # Ignore whitespace so newlines don't clear top_of_block:
+            if obj.text and not obj.text.strip():
+                obj.text = None
+
             if obj.tag in block_fonts:
                 font_family, font_size = block_fonts[obj.tag]
-                newline_style = style_override(current_style, 'postscript-font',
-                    fonts[current_style['font-family']].default_postscript_font)
-                t.newline(newline_style, extra_skip = font_size - 1*em)
+                if not top_of_block:
+                    newline_style = style_override(current_style,
+                                                   'postscript-font',
+                        fonts[current_style['font-family']]
+                            .default_postscript_font)
+                    t.newline(newline_style, extra_skip = font_size - 1*em)
+
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
+                was_top_of_block = top_of_block
+                top_of_block = True
+            else:
+                top_of_block = False
 
             if obj.tag == 'p':
                 # paragraph indent
-                text_out(fonts, t, current_style, ' ' * 4)  
+                if not was_top_of_block:
+                    text_out(fonts, t, current_style, ' ' * 4)
             elif obj.tag == 'li':
                 text_out(fonts, t, current_style, u'• ')
             elif obj.tag == 'pre':
@@ -476,16 +490,19 @@ def render(corpus, bookmark, c, xml, fonts):
 
             if obj.text is not None and obj.tag not in ('title', 'script', 'style'):
                 render_text(c, t, obj.text, current_style, fonts)
+                top_of_block = False
 
             for kid in reversed(list(obj)):
                 stack.append(('element', kid))
 
         elif kind == 'text':
             render_text(c, t, obj, current_style, fonts)
+            top_of_block = False
         else:
             assert kind == 'restore'
             prop, val = obj
             current_style[prop] = val
+            top_of_block = False
 
     t.end_page()
     c.addOutlineEntry(title, bookmark, level=0)

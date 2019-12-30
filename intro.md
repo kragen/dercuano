@@ -1,6 +1,6 @@
 Dercuano is a self-contained downloadable HTML tarball containing a
 book’s worth of disorganized notes I’ve made over the last few years.
-As a backup option for computer systems incapable of handling a
+As an alternative option for computer systems incapable of handling a
 downloadable HTML tarball, I've hacked together an inferior PDF
 rendering of it as well, which comes to some 4000 pages, formatted for
 comfortable reading on hand computers.
@@ -28,7 +28,9 @@ you enjoy it!
 
 Much of what is written here is wrong in a variety of ways.
 
-- Some of it is factually wrong;
+- Some of it is factually wrong (for example, on many occasions I confused
+  the vector space GF(2)³² with the very different field GF(2³²) of degree-32
+  polynomials over GF(2));
 - some of it was factually correct at one point but has since become outdated;
 - some of it is okay at a factual level but has led me to incorrect
   conclusions due to my misunderstanding of the relationships between
@@ -58,15 +60,15 @@ or revised for readability.  So, beware.
 
 Many of the dates are only approximate.
 
-### Dercuano is not a scholarly publication ###
+### Dercuano is scholarly work in progress, but not a completed scholarly publication ###
 
 One of the distinguishing features of scholarly publications, as currently
-understood, is that it is consciously situated with regard to the
-existing state of knowledge: it is aware of the state of the art;
-builds on its successes (rather than falling victim to known
-pitfalls); it explicitly describes how it relates to that existing
+understood, is that they are consciously situated with regard to the
+existing state of knowledge: they are aware of the state of the art;
+build on its successes (rather than falling victim to known
+pitfalls); they explicitly describe how they relate to that existing
 knowledge, declaring which pieces of its foundation are sourced from
-existing work and what its novel contributions are; and it gives
+existing work and what its novel contributions are; and they give
 credit to existing scholarly work.
 
 By and large, I appreciate these values, and I would like to do work
@@ -80,20 +82,28 @@ understand; often I find that attempting to rederive such work from
 first principles is the best way for me to understand it, and much of
 Dercuano consists of such attempts.  This is not due to malice, but
 simply because doing scholarly work properly is a lot of effort, and I
-haven’t done that work, and in fact I’ve given up on ever doing it for
+haven’t finished that work, and in fact I’ve given up on ever finishing it for
 most of the notes in Dercuano.  From a scholarly perspective, Dercuano
 is best understood as a collection of unfinished notes on ideas that
-seem promising and merit further investigation, which could lead to
+mostly seem promising and merit further investigation, which could lead to
 a scholarly publication, rather than a scholarly publication in itself.
 
 The work that leads up to a scholarly publication invariably involves
 a great deal of information-gathering, experimentation, thinking,
 revision, and usually discussion before reaching the point of actually
-representing an advance on the state of the art.  Sometimes this
+representing an advance on the state of the art.  When you begin
+learning about a topic, you have no idea what the state of the art is,
+what is true or false, or what will work;
+bit by bit, you find these things out.  Sometimes this
 process is recorded, for example in laboratory notebooks, but it
 usually remains secret, in part because of all of the embarrassing
 errors during the process.  Preregistration of clinical trials is
-starting to reduce this secrecy in medicine, but 
+starting to reduce this secrecy in medicine, but it would be wonderful
+to see more people doing more of their thinking in the open.  Dercuano
+is an example of what I would like to see more of: scholarly work
+exposed and done in the open even before reaching the level of
+a scholarly publication.  I am fortunate to have been in the position
+where I could do this.
 
 ### Size and public-domain dedication ###
 
@@ -116,6 +126,9 @@ license](liabilities/LICENSE.ETBook).  This doesn’t impede you from
 redistributing or modifying Dercuano but does prohibit you from
 removing the font’s copyright notice and license (unless you also
 remove the font).
+
+(The source repository also contains some other fonts which are used
+to produce a PDF, but those are not included in the HTML tarball.)
 
 ### Gitlab ###
 

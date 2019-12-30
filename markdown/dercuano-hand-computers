@@ -813,3 +813,68 @@ that, unless there's something above it to push it down, their tops
 are at the same position.  But the janky PDF generation script doesn't
 have a box model; it just has newlines.  How could we avoid generating
 a newline?
+
+Well, the problem is specifically when a block element is the first
+thing inside another block element.  So maybe I can just have a
+boolean about whether we're at the top of a block.
+
+Okay, I was able to hack that in, and as a bonus I can use it to
+eliminate paragraph indents when paragraphs are the first thing inside
+a block element.  That avoids list items having an indent on the first
+line next to the bullet.  It will probably also help with blockquotes.
+Gah, blockquotes.
+
+That just leaves the ET Book license as a showstopper.
+
+### 2019-12-30 ###
+
+No, wait, another one just popped up: in between the two 6's in
+"m0oTzNujJpx 66\n" in the middle of powerful-primitives.html, the font
+switches to italic, which it doesn't in the browser, and stays that
+way for the rest of the note.  The culprit seems to be `m0oTzNujJpx
+6<I=EInw>6\n`.  I tweaked this to use ``` `` ``` in the Markdown,
+which hopefully will make the problem go away, but even if it
+interpreted that as an `<i>` tag, it should have at some point found
+an end to it --- maybe Tidy worked too hard here...
+
+Oh also I implemented **bold** as `typewriter` due to what looks like
+a copy-and-paste error.  Fixed!
+
+I've fixed another couple of problems mentioned earlier in a drive-by
+fashion: `<script>` and `<style>` contents and no-break spaces.
+
+So, the biggest remaining problems with the PDF, in more or less
+priority order (a sort of mix of estimated effort with estimated
+benefit):
+
+- The link to the ET Book license is broken.
+- Headers don't have enough padding above them.
+- Links are not indicated in any printable way, so they're invisible in,
+  for example, MuPDF.  Also, they don't have page numbers, even when they
+  are internal links, so PDF viewers without link support (such as printers
+  and Google Drive's PDF viewer, the default on Android) can't use them.
+- Overlong lines are cut off rather than wrapped.
+- Individual notes have no tables of contents.
+- `<sub>` and `<sup>` are not implemented.
+- Character-level markup like `<em>` produces spurious spaces.
+- Character-level markup inside `<pre>` produces spurious newlines.
+- The notes are not in any particular order, but they should be in the
+  roughly chronological order they are in the table of contents.
+- URL-encoded links are broken.
+- I haven't imported file `ceramics-notes`.
+- The PDF is humongous, 13.5 megabytes.
+- Tables aren't implemented.
+- Ordered lists `<ol>` are bulleted rather than numbered.
+- Headers aren't red or underlined.
+- Line spacing is too tight.
+- Blockquotes aren't visibly distinct at all.
+- Text isn't hyphenated, justified, or ligated (even things like "fi"
+  and "fl".)
+- SVG isn't implemented.
+- Sometimes there are spurious blank lines between paragraphs and list
+  items.
+- Superscript 0 and 456789 are larger than superscript 123.
+
+This is a lot to fix in the next 22 hours and I'm definitely not going
+to finish all of it, but I ought to be able to make a significant dent.
+
