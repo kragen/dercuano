@@ -137,7 +137,8 @@ class Bundle:
     def category_link(self, category_name, level=1):
         # XXX maybe we should really reify Category as its own class?
         return a(self.category_title(category_name),
-                 href='../' * level + self.category_localpart(category_name))
+                 href='../' * level
+                 + quote(self.category_localpart(category_name)))
 
     def generate_category(self, category):
         vomit_html(self.category_filename(category),
