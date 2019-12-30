@@ -984,8 +984,12 @@ following problems:
 - The notes are not in any particular order, but they should be in the
   roughly chronological order they are in the table of contents.
 - Blockquotes aren't visibly distinct at all.
+- Superscript and subscript screw up the line spacing.  One of the worst
+  examples is on the second page of file `sdf-notes`, which is totally
+  unreadable.  The beginning of file `diesel-electrolysis` also has a somewhat
+  less egregious example.
 - I haven't imported file `ceramics-notes`.
-- The PDF is humongous, 13.5 megabytes.
+- The PDF is humongous, 16 megabytes.
 - Tables aren't implemented.
 - Ordered lists `<ol>` are bulleted rather than numbered.
 - Headers aren't red or underlined.
@@ -998,8 +1002,48 @@ following problems:
   reasonable option.)
 - Sometimes there are spurious blank lines between paragraphs and list
   items.
-- Superscript 0 and 456789 are larger than superscript 123.
+- Unicode superscript 0 and 456789 are larger than superscript 123.
 - Fallback characters in `<pre>` have the wrong width.
+- Superscripts and subscripts don't nest; see file `dercuano-stylesheet-notes`
+  in the first example of superscripts to see an egregious error.
 
 I'm pretty pleased with how the result looks now, actually, although
 there are still clearly places where it does the wrong thing.
+
+#### After sleeping ####
+
+I tried an optimization that turned out to slow things down by 10%,
+that of handling word spaces separately from the words.  I hacked in a
+reasonable approximation of [English spacing, in the sense of larger
+spaces after
+sentences](https://en.wikipedia.org/wiki/History_of_sentence_spacing#French_and_English_spacing):
+colons, periods, exclamation marks, and question marks get a
+double-sized space after them, except when it's a period at the end of
+an abbreviation.  (In particular, an extra space is added after
+ordinals in sequences like "1. Ready. 2. Set. 3. Go!")
+
+This is a small change, but I think it improves nearly every
+paragraph, even though there are still much worse problems than the
+use of French equal sentence spacing throughout the book.
+
+It would probably work better to use the indication of double spaces
+(or newlines) after periods in the original Markdown, since I'm pretty
+consistent about doing that, but, bleh.
+
+So, what next?  I think I should see if any of the next three items
+turn out to be relatively yielding: individual-note tables of
+contents, ordering of notes, and blockquote formatting.
+
+I was thinking as I went to sleep that hanging indents (as are
+conventional for bulleted lists) should be relatively easy to handle:
+add a property to the style that has a string to place before each new
+line, and set it to a few spaces.  This is a crude approximation of
+proper indentation for bulleted lists, but it might be adequate, and
+in particular for blockquotes.  This does not exist as a CSS
+stylesheet property, except in the sense that `margin-left`, or
+`padding-left` can be used to indent the contents of a block with
+whitespace, and `text-indent` can be used to give the first line of
+each paragraph an extra indent.
+
+An absolute minimum thing to do for blockquote formatting is to reduce
+the font size, and that's easy, so I'll do that.

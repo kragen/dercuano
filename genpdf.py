@@ -333,7 +333,11 @@ def chop(cascade, font_size, string, max_width):
 def text_out(fonts, t, style, s):
     fonts[style['font-family']].text_out(t, style, s)
 
-def render_text(c, t, text, style, fonts):
+# Abbreviations not to put an extra space after
+abbrevs = {'Mr.', 'vs.', 'cf.', 'Jr.', 'pp.', 'Ms.', 'Dr.', 'p.', 'St.', '(St.'}
+spacepunct = tuple('.?!:;')
+
+def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
     words = (re.split('([^\n]+\n)', text) if pre else
@@ -342,7 +346,7 @@ def render_text(c, t, text, style, fonts):
     font_family = style['font-family']
     font = fonts[font_family]
     font_size = style['font-size']
-    box = [x - font_size* 0.1, y - font_size * 0.1, x, y + font_size]
+    box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
     newline_style = style_override(style, 'postscript-font',
                                    font.default_postscript_font)
     for wi, word in enumerate(words):
@@ -378,9 +382,14 @@ def render_text(c, t, text, style, fonts):
 
         # The last word in a string shouldn't have a space after it.
         # (re.split will give us an empty last word if the string ends
-        # in whitespace.)
+        # in whitespace.)  I tried emitting the space as a separate
+        # textOut in order to share the caches across the width and
+        # text_out operations, but that made the program slower, not
+        # faster, presumably because of the larger number of textOut
+        # operations.
         if wi < len(words) - 1 and not pre:
-            word = word + ' '
+            word = word + ('  ' if (word[-1:] in spacepunct
+                                    and word not in abbrevs) else ' ')
 
         text_out(fonts, t, style, word)
         if ends_in_newline:
@@ -622,11 +631,14 @@ class Pagenos:
 
 
 def main(path):
+    fast = True
     fonts = load_fonts(path)
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
-    pagenos = Pagenos('dercuano.tmp.pagenos')
+    # Avoid horking our page number database with fast debugging runs
+    pagenos = (Pagenos('dercuano.fast.pagenos') if fast else
+               Pagenos('dercuano.tmp.pagenos'))
     pagenos.load()
 
     # pdf.js, gv, MuPDF Mini, and Evince display this:
@@ -638,11 +650,12 @@ def main(path):
     corpus['index.html'] = path + '/index.html'
 
     notes = path + '/notes'
-    for basename in os.listdir(notes):#[::20]:
+    for basename in os.listdir(notes)[::20] if fast else os.listdir(notes):
         corpus['notes/' + basename] = notes + '/' + basename
 
     topics = path + '/topics'
-    for basename in sorted(os.listdir(topics)):#[::20]:
+    for basename in (sorted(os.listdir(topics))[::20] if fast else
+                     sorted(os.listdir(topics))):
         corpus['topics/' + basename] = topics + '/' + basename
 
     corpus['liabilities/LICENSE.ETBook'] = (
