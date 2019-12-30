@@ -49,7 +49,9 @@ Copyright status
 The text of Dercuano, and the overall compilation, are by me and are
 in the public domain (see [`intro.md`](intro.md) for details); but it
 includes the ET Book font, which has its own license (see
-[`liabilities/LICENSE.ETBook`](liabilities/LICENSE.ETBook)), and as of
+[`liabilities/LICENSE.ETBook`](liabilities/LICENSE.ETBook)).
+
+As of
 this writing, the source repository also includes Bogusław Jackowski
 and Janusz M. Nowacki's font Latin Modern Mono Light Condensed
 (regular and oblique) for generating PDF files, which is licensed
@@ -58,6 +60,15 @@ originally from Knuth's Computer Modern Teletype, which is in the
 public domain.  I translated it from [the OTF files on
 CTAN](https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm)
 using FontForge.
+
+Also, the source repository contains (Debian's version of) FreeFont,
+which is licensed under the GNU GPL with a special exception for
+document embedding.  FreeFont is used for generating PDF files, but is
+not used for HTML.  As the GPL requires, [the source code to
+FreeFont](fonts-freefont-20120503/) is included, as well as [the built
+TrueType files](freefont-built/).  I didn't do the build myself, so if
+there's some kind of version skew in Debian-land, it's possible the
+Dercuano repository has inherited it.
 
 Dependencies
 ------------

@@ -5,21 +5,15 @@
 This is still pretty poor PDF generation for Dercuano.
 Missing pieces include:
 
-- Greek
-- other math characters; ℓ doesn't even exist in Courier, and in ET Book,
-  all of "ε₀ ≈" is no good
 - a layout engine capable of handling varying font sizes in a line
 - Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
 - proper indentation for lists (<ul>, <ol>)
 - tables
-- Chinese
-- wrapping overlong lines so they don't get cut off
-- dingbats like × (no, that one is okay, also centered dot and degrees, but
-  not ⁑)
+- wrapping overlong lines so they don't get cut off (e.g., one of the
+  calculations in hot-wire-saw)
 - JS tables of contents for individual notes
 - <sub> and <sup> (maybe using t.setRise)
 - chronological ordering
-- font fallbacks for missing characters
 - not putting spaces after close tags
 - maybe making the output file less than 12.4 megabytes?? not using
   base85 would fucking help
@@ -32,6 +26,10 @@ Missing pieces include:
   instead the first part ends up at the bottom of the next page
 - page numbers for links
 - URLs for external links?
+- italic subscripts in *fₖₛ* in isotropic-texture-effects; also
+  *yₙ* = Σ*ᵢwᵢxₙ₋ᵢ* in observable-transaction-possibilities
+- computing-with-strain (computation-with-strain?) has a broken
+  diagram because of a missing space
 
 It also takes over five minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
@@ -90,6 +88,93 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 
+def style_override(style, prop, val):
+    rv = style.copy()
+    rv[prop] = val
+    return rv
+
+class Cascade:
+    """A font cascade is similar to a font (modulo point size) with fallback.
+
+    For code points not in the most preferred font, it falls back to
+    less-preferred fonts, finally using the fallback font if nothing
+    else has it.  To do this, it must be able to figure out if a font
+    has a given code point or not, which I don't know how to do for
+    arbitrary Reportlab fonts.  But I do know how to do it for
+    TrueType fonts, so those are the ones you can use in the cascade
+    list.
+
+    """
+    def __init__(self, fonts, fallback):
+        """Parameter ``fonts`` is a TTFont list, which have .face.charToGlyph.
+        Parameter ``fallback`` can be any Reportlab font; it will be used
+        peremptorily for any codepoint not found in ``fonts``.
+        """
+        self.fonts = fonts
+        self.fallback = fallback
+        self.default_postscript_font = (fonts[0] if fonts else
+                                        fallback).fontName
+        self.string_cache = {}
+        self.char_cache = {}
+
+    def register(self):
+        for font in self.fonts:
+            pdfmetrics.registerFont(font)
+
+        if self.fallback:
+            pdfmetrics.registerFont(self.fallback)
+
+    def find_fonts(self, string):
+        "Map a string of chars to (char, font) pairs."
+        char_cache = self.char_cache
+        for c in string:
+            if c in char_cache:
+                yield c, char_cache[c]
+                continue
+            
+            for f in self.fonts:
+                if ord(c) in f.face.charToGlyph:
+                    if len(char_cache) > 1024:
+                        char_cache.clear()
+                    char_cache[c] = f
+                    yield c, f
+                    break
+            else:
+                yield c, self.fallback
+
+    def _map(self, string):
+        last_font = object()
+        rv = []
+        for c, f in self.find_fonts(string):
+            if f == last_font:
+                chars.append(c)
+            else:
+                chars = [c]
+                rv.append((f, chars))
+                last_font = f
+
+        return tuple((f, ''.join(chars)) for f, chars in rv)
+
+    def map(self, string):
+        "Map a string to a tuple of (font, substring) pairs."
+        if string not in self.string_cache:
+            if len(self.string_cache) > 1024:
+                self.string_cache.clear()
+            self.string_cache[string] = self._map(string)
+        return self.string_cache[string]
+
+    def width(self, string, size):
+        "Equivalent of font.stringWidth or canvas.stringWidth."
+        return sum(f.stringWidth(s, size) for f, s in self.map(string))
+
+    def text_out(self, textobject, style, string):
+        "Equivalent of Textobject.text_out."
+        for f, s in self.map(string):
+            #print(u"Setting '%s' in %s" % (s, f.fontName))
+            substyle = style_override(style, 'postscript-font', f.fontName)
+            textobject.text_out(substyle, s)
+    
+
 roman = 'et-book-roman'
 italic = 'et-book-italic'
 bold = 'et-book-bold'
@@ -105,23 +190,55 @@ pagesize = (29 * em, 66 * em)
 left_margin = top_margin = bottom_margin = right_margin = 0.5 * em
 
 def load_fonts(path):
-    liabilities = path + '/liabilities'
-    yield TTFont(roman, liabilities + '/et-book-roman-old-style-figures.ttf')
-    yield TTFont(italic, liabilities + '/et-book-display-italic-old-style-figures.ttf')
-    yield TTFont(bold, liabilities + '/et-book-bold-line-figures.ttf')
+    stsong = UnicodeCIDFont('STSong-Light')
 
     mypath = os.path.dirname(os.path.abspath(__file__))
-    yield TTFont(lmtlc, mypath + '/LMMonoLtCond10-Regular.ttf')
-    yield TTFont(lmtlco, mypath + '/LMMonoLtCond10-Oblique.ttf')
+    flmtlc = TTFont(lmtlc, mypath + '/LMMonoLtCond10-Regular.ttf')
+    flmtlco = TTFont(lmtlco, mypath + '/LMMonoLtCond10-Oblique.ttf')
+
+    freefont = mypath + '/freefont-built'
+    
+    free = {}
+    for face in ['FreeMonoBoldOblique', 'FreeMonoBold', 'FreeMonoOblique',
+                 'FreeMono',
+                 'FreeSerifBoldItalic', 'FreeSerifBold', 'FreeSerifItalic',
+                 'FreeSerif']:
+        free[face] = TTFont(face, freefont + '/' + face + '.ttf')
+
+    liabilities = path + '/liabilities'
+    etbookroman = TTFont(roman,
+                          liabilities + '/et-book-roman-old-style-figures.ttf')
+    etbookitalic = TTFont(italic,
+                liabilities + '/et-book-display-italic-old-style-figures.ttf')
+    etbookbold = TTFont(bold, liabilities + '/et-book-bold-line-figures.ttf')
+
+    rv = {
+        'serif': Cascade([etbookroman, free['FreeSerif']], stsong),
+        'serif-italic': Cascade([etbookitalic, free['FreeSerifItalic']],
+                                 stsong),
+        'serif-bold': Cascade([etbookbold, free['FreeSerifBold']], stsong),
+        'serif-bold-italic': Cascade([free['FreeSerifBoldItalic']], stsong),
+        'fixed': Cascade([flmtlc, free['FreeMono']], stsong),
+        'fixed-oblique': Cascade([flmtlco, free['FreeMonoOblique']], stsong),
+        'fixed-bold': Cascade([free['FreeMonoBold']], stsong),
+        'fixed-bold-oblique': Cascade([free['FreeMonoBoldOblique']], stsong),
+    }
+
+    for cascade in rv:
+        rv[cascade].register()
+
+    return rv
+
 
 class Textobject:
     def __init__(self, canvas, x, y, style):
         self.c = canvas
         self.x = x
         self.y = y
-        self.font = style['font-family'], style['font-size']
+        self.font = style['postscript-font'], style['font-size']
 
     def start_page(self, style):
+        self.font = style['postscript-font'], style['font-size']
         self.c.setFont(*self.font)
         self.t = self.c.beginText(self.x, self.y)
         self.tfont = self.font
@@ -138,6 +255,7 @@ class Textobject:
             # fonts is adding over a megabyte to the PDF file: 12.37
             # MB vs. 13.44 MB
             self.flush()
+            self.font = style['postscript-font'], style['font-size']
             self.c.setFont(*self.font)
             self.t = self.c.beginText(self.x, y)
             self.tfont = self.font
@@ -153,7 +271,7 @@ class Textobject:
         self.c.showPage()
 
     def text_out(self, style, text):
-        self.font = style['font-family'], style['font-size']
+        self.font = style['postscript-font'], style['font-size']
         if self.tfont != self.font:
             self.t.setFont(*self.font)
             self.tfont = self.font
@@ -183,54 +301,93 @@ def add_link(c, box, link):
     else:
         c.linkURL(link_value, box, thickness=0.1, color=toColor('#ccccff'))
 
-def render_text(c, t, text, style):
+def text_out(fonts, t, style, s):
+    fonts[style['font-family']].text_out(t, style, s)
+
+def render_text(c, t, text, style, fonts):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
     words = (re.split('\n', text) if pre else re.split('[ \n\r\t]+', text))
     x, y = t.get_x(), t.get_y()
     font_family = style['font-family']
+    font = fonts[font_family]
     font_size = style['font-size']
     box = [x - font_size* 0.1, y - font_size * 0.1, x, y + font_size]
     for word in words:
-        width = c.stringWidth(word, font_family, font_size)
+        width = fonts[font_family].width(word, font_size)
         if pre or t.get_x() + width > max_x:
-            t.newline(style, 0)
+            newline_style = style_override(style, 'postscript-font',
+                                           font.default_postscript_font)
+            t.newline(newline_style, 0)
             add_link(c, box, style['link destination'])
             x, y = t.get_x(), t.get_y()
             box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
 
         # XXX while it's still sticking past the right margin, chop it
-        t.text_out(style, word + ' ')
+        text_out(fonts, t, style, word + ' ')
         box[2] = t.get_x()
 
     add_link(c, box, style['link destination'])
 
 block_fonts = {
-    'p': (roman, 1*em),
-    'h1': (roman, 2*em),
-    'h2': (roman, 1.59*em),
-    'h3': (roman, 1.26*em),
-    'h4': (bold, 1.1*em),
-    'h5': (bold, 1*em),
-    'h6': (italic, 1*em),
-    'li': (roman, 1*em),
-    'div': (roman, 1*em),
+    'p': ('serif', 1*em),
+    'h1': ('serif', 2*em),
+    'h2': ('serif', 1.59*em),
+    'h3': ('serif', 1.26*em),
+    'h4': ('serif-bold', 1.1*em),
+    'h5': ('serif-bold', 1*em),
+    'h6': ('serif-bold-italic', 1*em),
+    'li': ('serif', 1*em),
+    'div': ('serif', 1*em),
     # With Latin Modern Mono Light Condensed, I need just over 28 ems for 80
     # columns, so font-size:98% seems about right.
-    'pre': (lmtlc, 0.98*em),
-    'br': (roman, 1*em),
+    'pre': ('fixed', 0.98*em),
+    'br': ('serif', 1*em),
+    # Actual table support would be a lot better obviously but until then:
+    'tr': ('serif', 1*em),
     }
 
+italicize_table = {
+    'serif': 'serif-italic',
+    'serif-italic': 'serif-italic',
+    'serif-bold': 'serif-bold-italic',
+    'serif-bold-italic': 'serif-bold-italic',
+    'fixed': 'fixed-oblique',
+    'fixed-oblique': 'fixed-oblique',
+    'fixed-bold': 'fixed-bold-oblique',
+    'fixed-bold-oblique': 'fixed-bold-oblique',
+}
+
 def italicize(font):
-    return italic, font[1]
+    return italicize_table[font[0]], font[1]
+
+codify_table = {
+    'serif': 'fixed',
+    'serif-italic': 'fixed-oblique',
+    'serif-bold': 'fixed-bold',
+    'serif-bold-italic': 'fixed-bold-oblique',
+    'fixed': 'fixed',
+    'fixed-oblique': 'fixed-oblique',
+    'fixed-bold': 'fixed-bold',
+    'fixed-bold-oblique': 'fixed-bold-oblique',
+}
 
 def codify(font):
-    return ('Courier-Bold' if font[0] == bold or font[0].endswith('-Bold') else
-            lmtlco if font[0] == italic or font[0].endswith('-Oblique') else
-            lmtlc, font[1])
+    return codify_table[font[0]], font[1]
+
+embolden_table = {
+    'serif': 'serif-bold',
+    'serif-italic': 'serif-bold-italic',
+    'serif-bold': 'serif-bold',
+    'serif-bold-italic': 'serif-bold-italic',
+    'fixed': 'fixed',
+    'fixed-oblique': 'fixed-bold-oblique',
+    'fixed-bold': 'fixed-bold',
+    'fixed-bold-oblique': 'fixed-bold-oblique',
+}
 
 def embolden(font):
-    return bold, font[1]
+    return codify_table[font[0]], font[1]
 
 inline_fonts = {'i': italicize,
                 'em': italicize,
@@ -246,19 +403,21 @@ def push_style(stack, current_style, prop, value):
     stack.append(('restore', (prop, current_style[prop])))
     current_style[prop] = value
 
-def render(corpus, bookmark, c, xml):
+def render(corpus, bookmark, c, xml, fonts):
     print("PDFing", bookmark)
     c.bookmarkPage(bookmark, fit='XYZ')  # `fit` to suppress zooming out to whole page
     title = bookmark
     current_style = {
-        'font-family': roman,
+        'font-family': 'serif',
         'font-size': 1*em,
         'link destination': None,
         'white-space': 'normal',
     }
 
-    t = Textobject(c, left_margin, pagesize[1]-top_margin-em, current_style)
-    t.start_page(current_style)
+    start_page_style = style_override(current_style, 'postscript-font',
+        fonts[current_style['font-family']].default_postscript_font)
+    t = Textobject(c, left_margin, pagesize[1]-top_margin-em, start_page_style)
+    t.start_page(start_page_style)
     stack = [('element', xml)]
     while stack:
         kind, obj = stack.pop()
@@ -268,15 +427,17 @@ def render(corpus, bookmark, c, xml):
 
             if obj.tag in block_fonts:
                 font_family, font_size = block_fonts[obj.tag]
-                t.newline(current_style, extra_skip = font_size - 1*em)
+                newline_style = style_override(current_style, 'postscript-font',
+                    fonts[current_style['font-family']].default_postscript_font)
+                t.newline(newline_style, extra_skip = font_size - 1*em)
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
 
             if obj.tag == 'p':
-                t.text_out(current_style, ' ' * 4)  # paragraph indent
+                # paragraph indent
+                text_out(fonts, t, current_style, ' ' * 4)  
             elif obj.tag == 'li':
-                # a bullet that happens to be in ET Book
-                t.text_out(current_style, '• ')
+                text_out(fonts, t, current_style, u'• ')
             elif obj.tag == 'pre':
                 push_style(stack, current_style, 'white-space', 'pre')
 
@@ -294,13 +455,13 @@ def render(corpus, bookmark, c, xml):
                            resolve_link(corpus, get_link(obj)))
 
             if obj.text is not None and obj.tag not in ('title', 'script', 'style'):
-                render_text(c, t, obj.text, current_style)
+                render_text(c, t, obj.text, current_style, fonts)
 
             for kid in reversed(list(obj)):
                 stack.append(('element', kid))
 
         elif kind == 'text':
-            render_text(c, t, obj, current_style)
+            render_text(c, t, obj, current_style, fonts)
         else:
             assert kind == 'restore'
             prop, val = obj
@@ -310,8 +471,7 @@ def render(corpus, bookmark, c, xml):
     c.addOutlineEntry(title, bookmark, level=0)
 
 def main(path):
-    for font in load_fonts(path):
-        pdfmetrics.registerFont(font)
+    fonts = load_fonts(path)
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
@@ -364,10 +524,10 @@ def main(path):
             except Exception:
                 print("tidylib failed too:", sys.exc_info()[1])
                 render(corpus, bookmarkname, canvas,
-                    ET.fromstring('<html>XML parse failure</html>'))
+                    ET.fromstring('<html>XML parse failure</html>'), fonts)
                 continue
 
-        render(corpus, bookmarkname, canvas, root)
+        render(corpus, bookmarkname, canvas, root, fonts)
 
     canvas.save()
 

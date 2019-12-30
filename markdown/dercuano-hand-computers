@@ -766,3 +766,19 @@ three remaining showstopper bugs: the missing ET Book license, the
 newlines following bullets, and tofu.  I think FreeSerif and FreeMono
 are reasonable fallback fonts, but I have to figure out how to do the
 fallbacking in practice.
+
+#### Font cascades ####
+
+So, I've added FreeFont FreeSerif as a fallback font and added a bunch
+of logic for font fallback.  I probably should add some kind of
+regexp-based fast path for when all the characters in a word are in ET
+Book, because it's noticeably slower, but it does seem to cover nearly
+all the characters I use.  FreeSerif-Italic seems to be missing a
+bunch of subscript letters I use, though, unless I'm screwing
+something up.
+
+It takes about 9 minutes instead of about 5 minutes to generate the
+PDF now.
+
+This is most of a solution for the tofu showstopper.  What's left is
+the ET Book license and newlines following bullets.
