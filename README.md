@@ -51,6 +51,8 @@ in the public domain (see [`intro.md`](intro.md) for details); but it
 includes the ET Book font, which has its own license (see
 [`liabilities/LICENSE.ETBook`](liabilities/LICENSE.ETBook)).
 
+### PDF fonts ###
+
 As of
 this writing, the source repository also includes Bogusław Jackowski
 and Janusz M. Nowacki's font Latin Modern Mono Light Condensed
@@ -61,7 +63,7 @@ public domain.  I translated it from [the OTF files on
 CTAN](https://www.ctan.org/tex-archive/fonts/lm/fonts/opentype/public/lm)
 using FontForge.
 
-Also, the source repository contains (Debian's version of) FreeFont,
+The source repository also contains (Debian's version of) FreeFont,
 which is licensed under the GNU GPL with a special exception for
 document embedding.  FreeFont is used for generating PDF files, but is
 not used for HTML.  As the GPL requires, [the source code to
@@ -69,6 +71,12 @@ FreeFont](fonts-freefont-20120503/) is included, as well as [the built
 TrueType files](freefont-built/).  I didn't do the build myself, so if
 there's some kind of version skew in Debian-land, it's possible the
 Dercuano repository has inherited it.
+
+The source repository also contains (again, Debian's version of)
+[DejaVu Serif and SansMono](dejavu-built/), which are licensed under a
+simple permissive license by Bitstream.  In this case I didn't bother
+to add the source font files to the repo, because they're easy to find
+in any case.
 
 Dependencies
 ------------

@@ -201,11 +201,18 @@ def load_fonts(path):
     freefont = mypath + '/freefont-built'
     
     free = {}
-    for face in ['FreeMonoBoldOblique', 'FreeMonoBold', 'FreeMonoOblique',
-                 'FreeMono',
-                 'FreeSerifBoldItalic', 'FreeSerifBold', 'FreeSerifItalic',
-                 'FreeSerif']:
-        free[face] = TTFont(face, freefont + '/' + face + '.ttf')
+    for face in ['MonoBoldOblique', 'MonoBold', 'MonoOblique', 'Mono',
+                 'SerifBoldItalic', 'SerifBold', 'SerifItalic', 'Serif']:
+        free[face] = TTFont('Free' + face, freefont + '/Free' + face + '.ttf')
+
+    dejavu = {}
+    dejavupath = mypath + '/dejavu-built'
+    for face in (['SansMono' + suffix
+                  for suffix in ['', '-Bold', '-Oblique', '-BoldOblique']]
+                 + ['Serif' + suffix
+                    for suffix in ['', '-Bold', '-Italic', '-BoldItalic']]):
+        dejavu[face] = TTFont('DejaVu' + face,
+                              dejavupath + '/DejaVu' + face + '.ttf')
 
     liabilities = path + '/liabilities'
     etbookroman = TTFont(roman,
@@ -215,15 +222,20 @@ def load_fonts(path):
     etbookbold = TTFont(bold, liabilities + '/et-book-bold-line-figures.ttf')
 
     rv = {
-        'serif': Cascade([etbookroman, free['FreeSerif']], stsong),
-        'serif-italic': Cascade([etbookitalic, free['FreeSerifItalic']],
-                                 stsong),
-        'serif-bold': Cascade([etbookbold, free['FreeSerifBold']], stsong),
-        'serif-bold-italic': Cascade([free['FreeSerifBoldItalic']], stsong),
-        'fixed': Cascade([flmtlc, free['FreeMono']], stsong),
-        'fixed-oblique': Cascade([flmtlco, free['FreeMonoOblique']], stsong),
-        'fixed-bold': Cascade([free['FreeMonoBold']], stsong),
-        'fixed-bold-oblique': Cascade([free['FreeMonoBoldOblique']], stsong),
+        'serif': Cascade([etbookroman, free['Serif'], dejavu['Serif']], stsong),
+        'serif-italic': Cascade([etbookitalic, free['SerifItalic'],
+                                 dejavu['Serif-Italic']], stsong),
+        'serif-bold': Cascade([etbookbold, free['SerifBold'],
+                               dejavu['Serif-Bold']], stsong),
+        'serif-bold-italic': Cascade([free['SerifBoldItalic'],
+                                      dejavu['Serif-BoldItalic']], stsong),
+        'fixed': Cascade([flmtlc, free['Mono'], dejavu['SansMono']], stsong),
+        'fixed-oblique': Cascade([flmtlco, free['MonoOblique'],
+                                  dejavu['SansMono-Oblique']], stsong),
+        'fixed-bold': Cascade([free['MonoBold'], dejavu['SansMono-Bold']],
+                              stsong),
+        'fixed-bold-oblique': Cascade([free['MonoBoldOblique'],
+                                       dejavu['SansMono-BoldOblique']], stsong),
     }
 
     for cascade in rv:

@@ -780,5 +780,36 @@ something up.
 It takes about 9 minutes instead of about 5 minutes to generate the
 PDF now.
 
-This is most of a solution for the tofu showstopper.  What's left is
-the ET Book license and newlines following bullets.
+It turns out that subscript index letters like ₖ or *ₖ* (bold: **ₖ**,
+bold italic: _**ₖ**_) are not in (this version of) FreeFont, but they
+*are* in DejaVuSerif and DejaVuSerif-Italic.  They're used in file
+`isotropic-texture-effects` and file `observable-transaction-possibilities`.
+So I'm going to go ahead and add the relevant DejaVu fonts, including
+for typewriter text (`ₖ`, *`ₖ`*, _**`ₖ`**_, **`ₖ`**), to the font
+cascade.
+
+That seems to solve the problem.  So maybe I can declare the Dercuano
+PDF pipeline tofu-free, at the cost of dozens of megabytes of fonts
+added to the source repository.
+
+So, the remaining showstopper problems are the ET Book license and
+newlines following bullets.  Then I can work on some problems that are
+annoying but less critical, like subscripts and superscripts, page
+numbers, blockquote formatting, ligatures, per-note tables of
+contents, extra spaces, extra newlines in `<pre>`, header colors, and
+header padding.
+
+(Although, as it turns out, I spent some time adding caches to the
+font cascade code to see if I could make it a little less slow.  This
+cut the PDF build time from 9.5 minutes to 8 minutes.)
+
+#### Newlines following bullets ####
+
+This happens with the construct `<li><p>fulano</p></li>`.  Entering
+the `<li>` causes one newline (followed by a bullet), and entering the
+`<p>` causes another.  The correct solution is to make the `<p>` a box
+vertically nested inside the `<li>` box without any extra padding, so
+that, unless there's something above it to push it down, their tops
+are at the same position.  But the janky PDF generation script doesn't
+have a box model; it just has newlines.  How could we avoid generating
+a newline?
