@@ -68,8 +68,9 @@ import re
 import sys
 try:
     from urllib import unquote
+    from urlparse import urlparse
 except ImportError:
-    from urllib.parse import unquote
+    from urllib.parse import unquote, urlparse
 import xml.etree.cElementTree as ET
 
 from reportlab.pdfgen.canvas import Canvas
@@ -609,6 +610,56 @@ def read_plaintext(bookmarkname, filename):
 
     return root
 
+def descendant_nodes(etnode):
+    "ElementTree nodes excluding the node itself.  Probably ET has a method for this..."
+    for kid in etnode:
+        yield kid
+        for descendant in descendant_nodes(kid):
+            yield descendant
+
+def unique_ahref_urls(etnode):
+    "Delivers URLs in document order."
+    seen = set()
+    for node in descendant_nodes(etnode):
+        href = node.get('href')
+        if node.tag == 'a' and href:
+            url = unquote(href)
+            seen.add(url)
+            yield url
+
+def parse_html(filename):
+    try:
+        tree = ET.parse(filename)
+        return tree.getroot()
+    except Exception:
+        print("parse error on", filename + ":", sys.exc_info()[1])
+        try:
+            # Although the above chews through all of Dercuano in 1.3
+            # seconds on this netbook, it fails to parse 3% of the
+            # notes because they have things like raw HTML blocks in
+            # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
+            # <td>1 <td>0.4%``.)  So we preprocess everything
+            # with HTML Tidy.  sgmllib and htmllib are
+            # removed in Python 3, and HTMLParser (html.parser) is a
+            # tag-soup parser.
+            import tidylib
+            xml = tidylib.tidy_document(open(filename).read(),
+                                        {'input-encoding': 'utf8',
+                                         'output-encoding': 'utf8',
+                                         'numeric-entities': True})[0]
+            root = ET.fromstring(xml)
+            # remove XML namespace prefixes:
+            deprefixnodes = [root]
+            while deprefixnodes:
+                node = deprefixnodes.pop()
+                deprefixnodes.extend(list(node))
+                node.tag = re.compile('{.*}').sub('', node.tag)
+            print("recovered using tidylib")
+            return root
+        except Exception:
+            print("tidylib failed too:", sys.exc_info()[1])
+            return ET.fromstring('<html>XML parse failure</html>')
+
 
 class Pagenos:
     def __init__(self, filename):
@@ -662,22 +713,22 @@ def main(path):
                     + ', by Kragen Javier Sitaker, 2019')
     canvas.setAuthor('Kragen Javier Sitaker')
 
+    index_filename = path + '/index.html'
     corpus = OrderedDict()
-    corpus['index.html'] = path + '/index.html'
+    corpus['index.html'] = index_filename
+    plaintexts = set()
 
-    notes = path + '/notes'
-    for basename in os.listdir(notes)[::20] if fast else os.listdir(notes):
-        corpus['notes/' + basename] = notes + '/' + basename
+    index_node = parse_html(index_filename)
+    for i, relative_url in enumerate(unique_ahref_urls(index_node)):
+        if urlparse(relative_url).path.startswith('/'):
+            print('not a relative URL', relative_url)
+            # Thaaat's not a *relative* URL!
+            continue
 
-    topics = path + '/topics'
-    for basename in (sorted(os.listdir(topics))[::20] if fast else
-                     sorted(os.listdir(topics))):
-        corpus['topics/' + basename] = topics + '/' + basename
-
-    corpus['liabilities/LICENSE.ETBook'] = (
-        path + '/' + 'liabilities/LICENSE.ETBook')
-
-    plaintexts = {'liabilities/LICENSE.ETBook'}
+        if not fast or i % 20 == 1:
+            corpus[relative_url] = path + '/' + relative_url
+            if not relative_url.endswith('.html'):
+                plaintexts.add(relative_url)
 
     for i, bookmarkname in enumerate(corpus):
         sys.stdout.write('%d/%d ' % (i, len(corpus)))
@@ -686,38 +737,7 @@ def main(path):
         if bookmarkname in plaintexts:
             root = read_plaintext(bookmarkname, filename)
         else:
-            try:
-                tree = ET.parse(filename)
-                root = tree.getroot()
-            except Exception:
-                print("parse error on", bookmarkname + ":", sys.exc_info()[1])
-                try:
-                    # Although the above chews through all of Dercuano in 1.3
-                    # seconds on this netbook, it fails to parse 3% of the
-                    # notes because they have things like raw HTML blocks in
-                    # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
-                    # <td>1 <td>0.4%``.)  So we preprocess everything
-                    # with HTML Tidy.  sgmllib and htmllib are
-                    # removed in Python 3, and HTMLParser (html.parser) is a
-                    # tag-soup parser.
-                    import tidylib
-                    xml = tidylib.tidy_document(open(filename).read(),
-                                                {'input-encoding': 'utf8',
-                                                 'output-encoding': 'utf8',
-                                                 'numeric-entities': True})[0]
-                    root = ET.fromstring(xml)
-                    # remove XML namespace prefixes:
-                    deprefixnodes = [root]
-                    while deprefixnodes:
-                        node = deprefixnodes.pop()
-                        deprefixnodes.extend(list(node))
-                        node.tag = re.compile('{.*}').sub('', node.tag)
-                    print("recovered using tidylib")
-                except Exception:
-                    print("tidylib failed too:", sys.exc_info()[1])
-                    render(pagenos, corpus, bookmarkname, canvas,
-                        ET.fromstring('<html>XML parse failure</html>'), fonts)
-                    continue
+            root = parse_html(filename)
 
         render(pagenos, corpus, bookmarkname, canvas, root, fonts)
 
