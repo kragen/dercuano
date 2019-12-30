@@ -507,6 +507,20 @@ def render(corpus, bookmark, c, xml, fonts):
     t.end_page()
     c.addOutlineEntry(title, bookmark, level=0)
 
+def read_plaintext(bookmarkname, filename):
+    root = ET.XML('<html><title></title>'
+                 + '<body><pre></pre></body>'
+                 + '</html>')
+    root[0].text = bookmarkname
+    body = root[1]
+    assert body.tag == 'body'
+    for paragraph in open(filename).read().decode('utf-8').split('\n\n'):
+        ptag = ET.Element('p')
+        ptag.text = paragraph
+        body.append(ptag)
+
+    return root
+
 def main(path):
     fonts = load_fonts(path)
 
@@ -528,41 +542,50 @@ def main(path):
     for basename in sorted(os.listdir(topics)):#[::20]:
         corpus['topics/' + basename] = topics + '/' + basename
 
+    corpus['liabilities/LICENSE.ETBook'] = (
+        path + '/' + 'liabilities/LICENSE.ETBook')
+
+    plaintexts = {'liabilities/LICENSE.ETBook'}
+
     for i, bookmarkname in enumerate(corpus):
         sys.stdout.write('%d/%d ' % (i, len(corpus)))
         filename = corpus[bookmarkname]
-        try:
-            tree = ET.parse(filename)
-            root = tree.getroot()
-        except Exception:
-            print("parse error on", bookmarkname + ":", sys.exc_info()[1])
+
+        if bookmarkname in plaintexts:
+            root = read_plaintext(bookmarkname, filename)
+        else:
             try:
-                # Although the above chews through all of Dercuano in 1.3
-                # seconds on this netbook, it fails to parse 3% of the
-                # notes because they have things like raw HTML blocks in
-                # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
-                # <td>1 <td>0.4%``.)  So we preprocess everything
-                # with HTML Tidy.  sgmllib and htmllib are
-                # removed in Python 3, and HTMLParser (html.parser) is a
-                # tag-soup parser.
-                import tidylib
-                xml = tidylib.tidy_document(open(filename).read(),
-                                            {'input-encoding': 'utf8',
-                                             'output-encoding': 'utf8',
-                                             'numeric-entities': True})[0]
-                root = ET.fromstring(xml)
-                # remove XML namespace prefixes:
-                deprefixnodes = [root]
-                while deprefixnodes:
-                    node = deprefixnodes.pop()
-                    deprefixnodes.extend(list(node))
-                    node.tag = re.compile('{.*}').sub('', node.tag)
-                print("recovered using tidylib")
+                tree = ET.parse(filename)
+                root = tree.getroot()
             except Exception:
-                print("tidylib failed too:", sys.exc_info()[1])
-                render(corpus, bookmarkname, canvas,
-                    ET.fromstring('<html>XML parse failure</html>'), fonts)
-                continue
+                print("parse error on", bookmarkname + ":", sys.exc_info()[1])
+                try:
+                    # Although the above chews through all of Dercuano in 1.3
+                    # seconds on this netbook, it fails to parse 3% of the
+                    # notes because they have things like raw HTML blocks in
+                    # them, which Python Markdown doesn't XMLify (e.g., ``<tr>
+                    # <td>1 <td>0.4%``.)  So we preprocess everything
+                    # with HTML Tidy.  sgmllib and htmllib are
+                    # removed in Python 3, and HTMLParser (html.parser) is a
+                    # tag-soup parser.
+                    import tidylib
+                    xml = tidylib.tidy_document(open(filename).read(),
+                                                {'input-encoding': 'utf8',
+                                                 'output-encoding': 'utf8',
+                                                 'numeric-entities': True})[0]
+                    root = ET.fromstring(xml)
+                    # remove XML namespace prefixes:
+                    deprefixnodes = [root]
+                    while deprefixnodes:
+                        node = deprefixnodes.pop()
+                        deprefixnodes.extend(list(node))
+                        node.tag = re.compile('{.*}').sub('', node.tag)
+                    print("recovered using tidylib")
+                except Exception:
+                    print("tidylib failed too:", sys.exc_info()[1])
+                    render(corpus, bookmarkname, canvas,
+                        ET.fromstring('<html>XML parse failure</html>'), fonts)
+                    continue
 
         render(corpus, bookmarkname, canvas, root, fonts)
 
