@@ -1057,7 +1057,25 @@ have space at the top, so that the quoted lists in file `flexures`
 don't collide with the headers right above them.
 
 Oh!  I think I know how to fix the subscript/superscript problem.  I
-just need to do the opposite setRise before setRise(0), because I
-think the implementation of setRise in Reportlab adds an increment to
-`self._y`.
+just need to do the opposite setRise before setRise(0), because
+the implementation of setRise in Reportlab adds an increment to
+`self._y`:
+
+    def setRise(self, rise):
+        "Move text baseline up or down to allow superscrip/subscripts"
+        self._rise = rise
+        self._y = self._y - rise    # + ?  _textLineMatrix?
+        self._code.append('%s Ts' % fp_str(rise))
+
+So, when we restore the rise back to zero, we need to also restore
+`_y`.  So if we previously did setRise(6) we should do setRise(-6)
+before setRise(0).  Well, that will work for the simple case of 0;
+what if the rise was previously 2?  We don't want setRise(2) to result
+in an additional 2 points of displacement for `_y`.  So we should do
+setRise(-8) before setRise(2).  So, I got that fixed, although
+sometimes the fix does the wrong thing when it restores the rise on a
+different line.
+
+Hmm, "*Pₒᵤₜ*" looks like shit maybe because of inconsistent font
+fallbacks; it's the same problem as the superscript digits.
 

@@ -550,9 +550,12 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
 
             if obj.tag in ('sup', 'sub'):
                 font_size = current_style['font-size']
-                rise = 0.5 * font_size * (1 if obj.tag == 'sup' else -1)
-                stack.append(('clear_rise',
-                              t._rise if hasattr(t, '_rise') else 0))
+                prev_rise = t._rise if hasattr(t, '_rise') else 0
+                # XXX this `prev_rise +` doesn't seem to be working
+                rise = prev_rise + font_size * (+0.5 if obj.tag == 'sup' else
+                                                -0.25)
+                # XXX this is inappropriate if we end in a different line
+                stack.append(('clear_rise', (-rise - prev_rise, prev_rise)))
                 t.set_rise(rise)
                 push_style(stack, current_style, 'font-size',
                            max(0.2*em, 0.7071 * font_size))
@@ -578,7 +581,9 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
             render_text(c, t, obj, current_style, fonts)
             top_of_block = False
         elif kind == 'clear_rise':
-            t.set_rise(obj)
+            # workaround for a bug in Reportlab (?) where y coord got horked
+            t.set_rise(obj[0])
+            t.set_rise(obj[1])
         else:
             assert kind == 'restore'
             prop, val = obj
@@ -658,7 +663,7 @@ def main(path):
     corpus['index.html'] = path + '/index.html'
 
     notes = path + '/notes'
-    for basename in os.listdir(notes)[1::20] if fast else os.listdir(notes):
+    for basename in os.listdir(notes)[::20] if fast else os.listdir(notes):
         corpus['notes/' + basename] = notes + '/' + basename
 
     topics = path + '/topics'
