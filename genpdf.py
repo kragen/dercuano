@@ -649,7 +649,8 @@ def main(path):
     fast = False
     fonts = load_fonts(path)
 
-    canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
+    pdf_filename = 'dercuano.tmp.fast.pdf' if fast else 'dercuano.tmp.pdf'
+    canvas = Canvas(pdf_filename, invariant=True, pageCompression=True,
                     pagesize=pagesize)
     # Avoid horking our page number database with fast debugging runs
     pagenos = (Pagenos('dercuano.fast.pagenos') if fast else
