@@ -938,3 +938,28 @@ problem --- but it sucks pretty bad.
 Sunrise is well underway, though the streetlights have not yet gone
 out.
 
+The character-level markup problem is because the way words get
+separated in the document is that every word gets a space appended to
+it, regardless of whether what followed it was a space, the element
+end, or an element beginning.  Originally I was using `words =
+text.split()` but now that I'm using `re.split` this problem should
+actually be easy to fix:
+
+    >>> re.split(r'[ \t]+', 'a b')
+    ['a', 'b']
+    >>> re.split(r'[ \t]+', 'a b ')
+    ['a', 'b', '']
+    >>> re.split(r'[ \t]+', ' a b ')
+    ['', 'a', 'b', '']
+
+So, I only want to append a space if the word is not the last word in
+the string.
+
+This small change yields an enormous improvement in formatting.  I was
+whispering, "Holy fuck, holy fuck, holy fuck," as I looked at the
+results.  Exponents are better (in, *e.g.*, file
+`adaptive-hill-climbing`); formulas with italic letters are better
+(for example, file `adaptive-hill-climbing`'s presentation of the law
+of cosines); inline typewriter text is better (in, *e.g.*, file
+`escheme`, though it still has major problems with `<pre>`); italic
+words in paragraphs are better; links are better.

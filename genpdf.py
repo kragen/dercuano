@@ -354,7 +354,7 @@ def render_text(c, t, text, style, fonts):
     box = [x - font_size* 0.1, y - font_size * 0.1, x, y + font_size]
     newline_style = style_override(style, 'postscript-font',
                                    font.default_postscript_font)
-    for word in words:
+    for wi, word in enumerate(words):
         width = font.width(word, font_size)
         x = t.get_x()
         if pre or x + width > max_x:
@@ -379,7 +379,13 @@ def render_text(c, t, text, style, fonts):
             word = right
             width = font.width(word, font_size)
 
-        text_out(fonts, t, style, word + ' ')
+        # The last word in a string shouldn't have a space after it.
+        # (re.split will give us an empty last word if the string ends
+        # in whitespace.)
+        if wi < len(words) - 1 and not pre:
+            word = word + ' '
+
+        text_out(fonts, t, style, word)
         box[2] = t.get_x()
 
     add_link(c, box, style['link destination'])
