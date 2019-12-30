@@ -6,7 +6,6 @@ This is still pretty poor PDF generation for Dercuano.
 Missing pieces include:
 
 - a layout engine capable of handling varying font sizes in a line
-- Unicode subscripts (superscripts are OK, at least the ones in Latin-1)
 - proper indentation for lists (<ul>, <ol>)
 - tables
 - wrapping overlong lines so they don't get cut off (e.g., one of the
@@ -28,8 +27,8 @@ Missing pieces include:
 - URLs for external links?
 - italic subscripts in *fₖₛ* in isotropic-texture-effects; also
   *yₙ* = Σ*ᵢwᵢxₙ₋ᵢ* in observable-transaction-possibilities
-- computing-with-strain (computation-with-strain?) has a broken
-  diagram because of a missing space
+- computation-with-strain has a broken diagram because of a missing blank line;
+  check it
 - lua-#-operator and $1-recognizer-diagrams both suffer from %-encoding and
   the links don't work (e.g., in multitouch-puppeteering)
 
@@ -118,6 +117,7 @@ class Cascade:
                                         fallback).fontName
         self.string_cache = {}
         self.char_cache = {}
+        self.width_cache = {}
 
     def register(self):
         for font in self.fonts:
@@ -155,7 +155,7 @@ class Cascade:
                 rv.append((f, chars))
                 last_font = f
 
-        return tuple((f, ''.join(chars)) for f, chars in rv)
+        return tuple((f, u''.join(chars)) for f, chars in rv)
 
     def map(self, string):
         "Map a string to a tuple of (font, substring) pairs."
@@ -167,7 +167,13 @@ class Cascade:
 
     def width(self, string, size):
         "Equivalent of font.stringWidth or canvas.stringWidth."
-        return sum(f.stringWidth(s, size) for f, s in self.map(string))
+        k = string, size
+        if k not in self.width_cache:
+            if len(self.width_cache) > 4096:
+                self.width_cache.clear()
+            self.width_cache[k] = sum(f.stringWidth(s, size)
+                                      for f, s in self.map(string))
+        return self.width_cache[k]
 
     def text_out(self, textobject, style, string):
         "Equivalent of Textobject.text_out."
