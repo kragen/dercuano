@@ -469,7 +469,7 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
                 was_top_of_block = top_of_block
-                top_of_block = True
+                top_of_block = (obj.tag == 'li')
             else:
                 top_of_block = False
 
