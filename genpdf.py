@@ -533,6 +533,13 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
 
             if obj.tag in block_fonts:
                 font_family, font_size = block_fonts[obj.tag]
+
+                size_override = re.search(r'font-size:\s*([\d.]+)em',
+                                          obj.get('style', ''))
+                if size_override:
+                    font_size = (current_style['font-size']
+                                 * float(size_override.group(1)))
+
                 if not top_of_block:
                     new_font_size = (font_size if font_size is not None else
                                      current_style['font-size'])
