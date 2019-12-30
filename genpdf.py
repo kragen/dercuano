@@ -2,37 +2,23 @@
 # -*- coding: utf-8 -*-
 """Parse HTML output to generate a PDF.
 
-This is still pretty poor PDF generation for Dercuano.
+This is surprisingly adequate PDF generation for Dercuano.
 Missing pieces include:
 
 - a layout engine capable of handling varying font sizes in a line
 - proper indentation for lists (<ul>, <ol>)
 - tables
-- wrapping overlong lines so they don't get cut off (e.g., one of the
-  calculations in hot-wire-saw)
 - JS tables of contents for individual notes
-- <sub> and <sup> (maybe using t.setRise)
 - chronological ordering
-- not putting spaces after close tags
 - maybe making the output file less than 12.4 megabytes?? not using
   base85 would fucking help
 - colored titles
 - hyphenation and justification
-- need to include ET Book license
-- not putting more newlines in random places when there are elements inside
-  a <pre> (as in, for example, escheme.html)
 - properly making the first part of a link a link when it crosses pages;
   instead the first part ends up at the bottom of the next page
-- page numbers for links
 - URLs for external links?
-- italic subscripts in *fₖₛ* in isotropic-texture-effects; also
-  *yₙ* = Σ*ᵢwᵢxₙ₋ᵢ* in observable-transaction-possibilities
-- computation-with-strain has a broken diagram because of a missing blank line;
-  check it
-- lua-#-operator and $1-recognizer-diagrams both suffer from %-encoding and
-  the links don't work (e.g., in multitouch-puppeteering)
 
-It also takes over five minutes to run on my netbook and generates a 4685-page PDF,
+It also takes over 7 minutes to run on my netbook and generates a 3764-page PDF,
 so maybe some kind of output caching system would be useful.
 
 The codepoint coverage thing may be a bit tricky.  Really we probably need to
@@ -80,6 +66,10 @@ import errno
 import os
 import re
 import sys
+try:
+    from urllib import unquote
+except ImportError:
+    from urllib.parse import unquote
 import xml.etree.cElementTree as ET
 
 from reportlab.pdfgen.canvas import Canvas
@@ -346,7 +336,8 @@ def text_out(fonts, t, style, s):
 def render_text(c, t, text, style, fonts):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
-    words = (re.split('\n', text) if pre else re.split('[ \n\r\t]+', text))
+    words = (re.split('([^\n]+\n)', text) if pre else
+             re.split('[ \n\r\t]+', text))
     x, y = t.get_x(), t.get_y()
     font_family = style['font-family']
     font = fonts[font_family]
@@ -355,19 +346,25 @@ def render_text(c, t, text, style, fonts):
     newline_style = style_override(style, 'postscript-font',
                                    font.default_postscript_font)
     for wi, word in enumerate(words):
+        ends_in_newline = word.endswith('\n')   # for <pre>
+        if ends_in_newline:
+            word = word[:-1]
+
         width = font.width(word, font_size)
         x = t.get_x()
-        if pre or x + width > max_x:
+        if x + width > max_x:
             t.newline(newline_style, 0)
             add_link(c, box, style['link destination'])
             x, y = t.get_x(), t.get_y()
-            box = [x - font_size * 0.1, y - font_size * 0.1, x, y + font_size]
+            box = [x - font_size * 0.1, y - font_size * 0.1,
+                   x + font_size * 0.1, y + font_size]
 
         # chop up words too wide for lines
         while word and x + width > max_x:
             left, right = chop(font, font_size, word, max_x - x)
             text_out(fonts, t, style, left)
-            x = box[2] = t.get_x()
+            x = t.get_x()
+            box[2] = x + font_size * 0.1
             add_link(c, box, style['link destination'])
             # Add circles to indicate a broken line
             c.circle(x + font_size * .2, y + font_size * .3, font_size/6)
@@ -386,7 +383,11 @@ def render_text(c, t, text, style, fonts):
             word = word + ' '
 
         text_out(fonts, t, style, word)
-        box[2] = t.get_x()
+        if ends_in_newline:
+            t.newline(newline_style, 0)
+
+        x = t.get_x()
+        box[2] = x + font_size * 0.1
 
     add_link(c, box, style['link destination'])
 
@@ -408,7 +409,7 @@ block_fonts = {
     'tr': ('serif', 1*em),
     }
 
-extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5)
+extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5, pre=1)
 
 italicize_table = {
     'serif': 'serif-italic',
@@ -460,7 +461,8 @@ inline_fonts = {'i': italicize,
                 }
 
 def get_link(node):
-    return node.get('href') if node.tag == 'a' else None
+    url = node.get('href') if node.tag == 'a' else None
+    return None if url is None else unquote(url)
 
 def push_style(stack, current_style, prop, value):
     stack.append(('restore', (prop, current_style[prop])))
@@ -583,6 +585,7 @@ def read_plaintext(bookmarkname, filename):
 
     return root
 
+
 class Pagenos:
     def __init__(self, filename):
         self.filename = filename
@@ -616,6 +619,7 @@ class Pagenos:
     def __setitem__(self, bookmark, pageno):
         assert len(bookmark.split()) == 1
         self.pagenos[bookmark] = pageno
+
 
 def main(path):
     fonts = load_fonts(path)
