@@ -401,24 +401,28 @@ def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct
     add_link(c, box, style['link destination'])
 
 block_fonts = {
-    'p': ('serif', 1*em),
+    'p': (None, None),
     'h1': ('serif', 2*em),
     'h2': ('serif', 1.59*em),
     'h3': ('serif', 1.26*em),
     'h4': ('serif-bold', 1.1*em),
     'h5': ('serif-bold', 1*em),
     'h6': ('serif-bold-italic', 1*em),
-    'li': ('serif', 1*em),
-    'div': ('serif', 1*em),
+    'li': (None, None),
+    'div': (None, None),
     # With Latin Modern Mono Light Condensed, I need just over 28 ems for 80
     # columns, so font-size:98% seems about right.
     'pre': ('fixed', 0.98*em),
-    'br': ('serif', 1*em),
+    'br': (None, None),
     # Actual table support would be a lot better obviously but until then:
-    'tr': ('serif', 1*em),
+    'tr': (None, None),
+    'blockquote': (None, 0.8409*em),  # sqrt(sqrt(2))
+    'ul': (None, None),
+    'ol': (None, None),
     }
 
-extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5, pre=1)
+extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5, pre=1,
+                               blockquote=0.5)
 
 italicize_table = {
     'serif': 'serif-italic',
@@ -508,19 +512,23 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
             if obj.tag in block_fonts:
                 font_family, font_size = block_fonts[obj.tag]
                 if not top_of_block:
+                    new_font_size = (font_size if font_size is not None else
+                                     current_style['font-size'])
                     newline_style = style_override(current_style,
                                                    'postscript-font',
                         fonts[current_style['font-family']]
                             .default_postscript_font)
-                    skip = ( font_size - 1*em
-                           + font_size * extra_padding_ems_above.get(obj.tag, 0)
+                    skip = ( new_font_size - 1*em
+                           + new_font_size * extra_padding_ems_above.get(obj.tag, 0)
                            )
                     t.newline(newline_style, extra_skip=skip)
 
-                push_style(stack, current_style, 'font-family', font_family)
-                push_style(stack, current_style, 'font-size', font_size)
+                if font_family is not None:  # inherit
+                    push_style(stack, current_style, 'font-family', font_family)
+                if font_size is not None:    # inherit
+                    push_style(stack, current_style, 'font-size', font_size)
                 was_top_of_block = top_of_block
-                top_of_block = (obj.tag == 'li')
+                top_of_block = (obj.tag in ('li', 'blockquote'))
             else:
                 top_of_block = False
 
@@ -631,7 +639,7 @@ class Pagenos:
 
 
 def main(path):
-    fast = True
+    fast = False
     fonts = load_fonts(path)
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
@@ -650,7 +658,7 @@ def main(path):
     corpus['index.html'] = path + '/index.html'
 
     notes = path + '/notes'
-    for basename in os.listdir(notes)[::20] if fast else os.listdir(notes):
+    for basename in os.listdir(notes)[1::20] if fast else os.listdir(notes):
         corpus['notes/' + basename] = notes + '/' + basename
 
     topics = path + '/topics'

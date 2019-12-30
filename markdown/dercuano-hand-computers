@@ -1047,3 +1047,17 @@ each paragraph an extra indent.
 
 An absolute minimum thing to do for blockquote formatting is to reduce
 the font size, and that's easy, so I'll do that.
+
+Hmm, not quite so easy, because I haven't implemented font inheritance
+for block elements, so paragraphs inside a blockquote don't inherit
+the font.  So I implemented font inheritance for block elements.
+
+Also I added `<ol>` and `<ul>` back as block elements, causing them to
+have space at the top, so that the quoted lists in file `flexures`
+don't collide with the headers right above them.
+
+Oh!  I think I know how to fix the subscript/superscript problem.  I
+just need to do the opposite setRise before setRise(0), because I
+think the implementation of setRise in Reportlab adds an increment to
+`self._y`.
+
