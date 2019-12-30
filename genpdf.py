@@ -305,6 +305,9 @@ class Textobject:
     def get_y(self):
         return self.t.getY()
 
+    def set_rise(self, rise):
+        return self.t.setRise(rise)
+
 def resolve_link(corpus, url):
     while url.startswith('../'):
         url = url[3:]
@@ -520,6 +523,15 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
                 push_style(stack, current_style, 'font-family', font[0])
                 push_style(stack, current_style, 'font-size', font[1])
 
+            if obj.tag in ('sup', 'sub'):
+                font_size = current_style['font-size']
+                rise = 0.5 * font_size * (1 if obj.tag == 'sup' else -1)
+                stack.append(('clear_rise',
+                              t._rise if hasattr(t, '_rise') else 0))
+                t.set_rise(rise)
+                push_style(stack, current_style, 'font-size',
+                           max(0.2*em, 0.7071 * font_size))
+
             if obj.tag == 'title':
                 title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text).strip()
             if get_link(obj):
@@ -540,6 +552,8 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
         elif kind == 'text':
             render_text(c, t, obj, current_style, fonts)
             top_of_block = False
+        elif kind == 'clear_rise':
+            t.set_rise(obj)
         else:
             assert kind == 'restore'
             prop, val = obj
