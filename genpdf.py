@@ -76,6 +76,7 @@ from __future__ import print_function
 
 import cgitb
 from collections import OrderedDict
+import errno
 import os
 import re
 import sys
@@ -367,6 +368,8 @@ block_fonts = {
     'tr': ('serif', 1*em),
     }
 
+extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5)
+
 italicize_table = {
     'serif': 'serif-italic',
     'serif-italic': 'serif-italic',
@@ -423,9 +426,10 @@ def push_style(stack, current_style, prop, value):
     stack.append(('restore', (prop, current_style[prop])))
     current_style[prop] = value
 
-def render(corpus, bookmark, c, xml, fonts):
+def render(pagenos, corpus, bookmark, c, xml, fonts):
     print("PDFing", bookmark)
     c.bookmarkPage(bookmark, fit='XYZ')  # `fit` to suppress zooming out to whole page
+    pagenos[bookmark] = c.getPageNumber()
     title = bookmark
     current_style = {
         'font-family': 'serif',
@@ -457,7 +461,10 @@ def render(corpus, bookmark, c, xml, fonts):
                                                    'postscript-font',
                         fonts[current_style['font-family']]
                             .default_postscript_font)
-                    t.newline(newline_style, extra_skip = font_size - 1*em)
+                    skip = ( font_size - 1*em
+                           + font_size * extra_padding_ems_above.get(obj.tag, 0)
+                           )
+                    t.newline(newline_style, extra_skip=skip)
 
                 push_style(stack, current_style, 'font-family', font_family)
                 push_style(stack, current_style, 'font-size', font_size)
@@ -485,8 +492,12 @@ def render(corpus, bookmark, c, xml, fonts):
             if obj.tag == 'title':
                 title = re.compile(r'\s*Dercuano\s*$').sub('', obj.text).strip()
             if get_link(obj):
-                push_style(stack, current_style, 'link destination',
-                           resolve_link(corpus, get_link(obj)))
+                link_dest = resolve_link(corpus, get_link(obj))
+                push_style(stack, current_style, 'link destination', link_dest)
+
+                if link_dest[0] == 'bookmark':
+                    stack.append(('text',
+                            ' (p. %s)' % pagenos.get(link_dest[1], '???')))
 
             if obj.text is not None and obj.tag not in ('title', 'script', 'style'):
                 render_text(c, t, obj.text, current_style, fonts)
@@ -521,12 +532,49 @@ def read_plaintext(bookmarkname, filename):
 
     return root
 
+class Pagenos:
+    def __init__(self, filename):
+        self.filename = filename
+        self.pagenos = {}
+
+    def load(self):
+        try:
+            f = open(self.filename)
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                return
+            raise
+
+        with f:
+            for line in f:
+                pageno, bookmark = line.split()
+                self.pagenos[bookmark] = int(pageno)
+
+    def save(self):
+        with open(self.filename + '.tmp', 'w') as f:
+            for bookmark, pageno in self.pagenos.items():
+                f.write('%d %s\n' % (pageno, bookmark))
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.rename(self.filename + '.tmp', self.filename)
+
+    def get(self, bookmark, default):
+        return self.pagenos.get(bookmark, default)
+
+    def __setitem__(self, bookmark, pageno):
+        assert len(bookmark.split()) == 1
+        self.pagenos[bookmark] = pageno
+
 def main(path):
     fonts = load_fonts(path)
 
     canvas = Canvas('dercuano.tmp.pdf', invariant=True, pageCompression=True,
                     pagesize=pagesize)
-    # pdf.js, gv, and MuPDF Mini display this:
+    pagenos = Pagenos('dercuano.tmp.pagenos')
+    pagenos.load()
+
+    # pdf.js, gv, MuPDF Mini, and Evince display this:
     canvas.setTitle('Dercuano ' + os.path.basename(path)
                     + ', by Kragen Javier Sitaker, 2019')
     canvas.setAuthor('Kragen Javier Sitaker')
@@ -583,13 +631,14 @@ def main(path):
                     print("recovered using tidylib")
                 except Exception:
                     print("tidylib failed too:", sys.exc_info()[1])
-                    render(corpus, bookmarkname, canvas,
+                    render(pagenos, corpus, bookmarkname, canvas,
                         ET.fromstring('<html>XML parse failure</html>'), fonts)
                     continue
 
-        render(corpus, bookmarkname, canvas, root, fonts)
+        render(pagenos, corpus, bookmarkname, canvas, root, fonts)
 
     canvas.save()
+    pagenos.save()
 
 if __name__ == '__main__':
     cgitb.enable(format='text')
