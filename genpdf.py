@@ -30,6 +30,8 @@ Missing pieces include:
   *yₙ* = Σ*ᵢwᵢxₙ₋ᵢ* in observable-transaction-possibilities
 - computing-with-strain (computation-with-strain?) has a broken
   diagram because of a missing space
+- lua-#-operator and $1-recognizer-diagrams both suffer from %-encoding and
+  the links don't work (e.g., in multitouch-puppeteering)
 
 It also takes over five minutes to run on my netbook and generates a 4685-page PDF,
 so maybe some kind of output caching system would be useful.
