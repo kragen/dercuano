@@ -1,6 +1,9 @@
 Dercuano
 ========
 
+> Sitaker, Kragen Javier. (2019). Dercuano (Version
+  20191230). Zenodo. <http://doi.org/10.5281/zenodo.3595681>
+
 You can download the final build, full of prerendered HTML, at
 <http://canonical.org/~kragen/dercuano-20191230.tar.gz>.  It's also at
 <https://perma.cc/H98P-TTP5>.  For hand computers that can't handle
