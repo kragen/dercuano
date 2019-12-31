@@ -1,9 +1,12 @@
 Dercuano
 ========
 
-(You can download the latest build, full of prerendered HTML, at
-<http://canonical.org/~kragen/dercuano-20191215.tar.gz>.  It's also at
-<https://perma.cc/RAA7-C6LE>.)
+You can download the final build, full of prerendered HTML, at
+<http://canonical.org/~kragen/dercuano-20191230.tar.gz>.  It's also at
+<https://perma.cc/H98P-TTP5>.  For hand computers that can't handle
+tarballs of HTML, there's a PDF at
+<http://canonical.org/~kragen/dercuano.20191230.pdf>, also at
+<https://perma.cc/28YH-Z7AW>.
 
 I have a few thousand pages of notes I mostly haven’t published in any
 form, and I’m not confident I’ll be able to keep a server running to
