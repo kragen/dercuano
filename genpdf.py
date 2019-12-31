@@ -344,7 +344,8 @@ def text_out(fonts, t, style, s):
     fonts[style['font-family']].text_out(t, style, s)
 
 # Abbreviations not to put an extra space after
-abbrevs = {'Mr.', 'vs.', 'cf.', 'Jr.', 'pp.', 'Ms.', 'Dr.', 'p.', 'St.', '(St.'}
+abbrevs = {'Mr.', 'vs.', 'cf.', 'Jr.', 'pp.', 'Ms.', 'Dr.', 'p.', 'St.', '(St.',
+           'etc.', 'i.e.', 'e.g.', '(i.e.', '(e.g.'}
 spacepunct = tuple('.?!:;')
 
 def start_box(x, y, font_size):
@@ -353,7 +354,7 @@ def start_box(x, y, font_size):
 def render_text(c, t, text, style, fonts, abbrevs=abbrevs, spacepunct=spacepunct):
     max_x = pagesize[0] - right_margin
     pre = style['white-space'] == 'pre'
-    words = (re.split('([^\n]+\n)', text) if pre else
+    words = (re.split('([^\n]*\n)', text) if pre else
              re.split('[ \n\r\t]+', text))
     x, y = t.get_x(), t.get_y()
     font_family = style['font-family']
@@ -434,7 +435,7 @@ block_fonts = {
     }
 
 extra_padding_ems_above = dict(h2=0.5, h3=0.5, h4=0.5, h5=0.5, h6=0.5, pre=1,
-                               blockquote=0.5)
+                               blockquote=0.5, p=0.33)
 
 block_colors = {
     'h1': 'rgba(136,0,0,.794)',
@@ -492,6 +493,7 @@ inline_fonts = {'i': italicize,
                 'code': codify,
                 'b': embolden,
                 'strong': embolden,
+                'th': embolden,  # hey, it's *something*
                 }
 
 def get_link(node):
@@ -627,16 +629,17 @@ def render(pagenos, corpus, bookmark, c, xml, fonts):
 
 def read_plaintext(bookmarkname, filename):
     root = ET.XML('<html><title></title>'
-                 + '<body><pre></pre></body>'
+                 + '<body><h1></h1><pre></pre></body>'
                  + '</html>')
-    root[0].text = bookmarkname
+    title = root[0]
+    assert title.tag == 'title'
     body = root[1]
-    assert body.tag == 'body'
-    for paragraph in open(filename).read().decode('utf-8').split('\n\n'):
-        ptag = ET.Element('p')
-        ptag.text = paragraph
-        body.append(ptag)
-
+    h1 = body[0]
+    assert h1.tag == 'h1'
+    title.text = h1.text = bookmarkname
+    pre = body[1]
+    assert pre.tag == 'pre'
+    pre.text = open(filename).read().decode('utf-8')
     return root
 
 def descendant_nodes(etnode):

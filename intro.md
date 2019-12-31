@@ -1,9 +1,13 @@
-Dercuano is a self-contained downloadable HTML tarball containing a
+[Dercuano is a self-contained downloadable HTML tarball][Dercuano] containing a
 book’s worth of disorganized notes I’ve made over the last few years.
-As an alternative option for computer systems incapable of handling a
-downloadable HTML tarball, I've hacked together an inferior PDF
-rendering of it as well, which comes to some 4000 pages, formatted for
+As an alternative option for printing and for
+computer systems incapable of handling a
+downloadable HTML tarball, I've hacked together [an inferior PDF
+rendering of it][PDF] as well, which comes to some 3900 pages, formatted for
 comfortable reading on hand computers.
+
+[Dercuano]: http://canonical.org/~kragen/dercuano-20191230.tar.gz
+[PDF]: http://canonical.org/~kragen/dercuano.20191230.pdf
 
 Buried among the errors, red herrings, and ratholes, there
 are numerous wonderful insights (perhaps even a few of them original),
@@ -48,7 +52,7 @@ Much of what is written here is wrong in a variety of ways.
 On the other hand, some of it is correct.  Of the correct part, most
 is unoriginal — sometimes I’m just taking notes on well-established
 concepts, and sometimes I’m laboriously rediscovering things that are
-already obvious to others — while some small part is original.
+already obvious to others — while some small part is both original and correct.
 Unfortunately, I don’t know which part.
 
 Most of these notes are about things I barely understood, or
@@ -65,7 +69,7 @@ Many of the dates are only approximate.
 One of the distinguishing features of scholarly publications, as currently
 understood, is that they are consciously situated with regard to the
 existing state of knowledge: they are aware of the state of the art;
-build on its successes (rather than falling victim to known
+they build on its successes (rather than falling victim to known
 pitfalls); they explicitly describe how they relate to that existing
 knowledge, declaring which pieces of its foundation are sourced from
 existing work and what its novel contributions are; and they give
@@ -84,7 +88,7 @@ Dercuano consists of such attempts.  This is not due to malice, but
 simply because doing scholarly work properly is a lot of effort, and I
 haven’t finished that work, and in fact I’ve given up on ever finishing it for
 most of the notes in Dercuano.  From a scholarly perspective, Dercuano
-is best understood as a collection of unfinished notes on ideas that
+is best understood as a collection of working notes on ideas that
 mostly seem promising and merit further investigation, which could lead to
 a scholarly publication, rather than a scholarly publication in itself.
 
@@ -105,9 +109,15 @@ exposed and done in the open even before reaching the level of
 a scholarly publication.  I am fortunate to have been in the position
 where I could do this.
 
+Often in Dercuano I refer to something being "published".  By this I
+generally mean "made public".  There's a current fad in academia (over
+the last, say, half century) to use "published" to mean "brought up to
+the standards of scholarly publication and approved as such by means
+of scholarly peer review".  This is usually not what I mean.
+
 ### Size and public-domain dedication ###
 
-On 2019-12-28 as I write this, the Dercuano tarball is 3.6 megabytes
+On 2019-12-30 as I write this, the Dercuano tarball is 3.6 megabytes
 and contains some 1.2 million words in 882 notes,
 about 3500 paperback pages’
 worth of text.  The PDF rendering mentioned above uses a page size
@@ -118,17 +128,23 @@ As far as I’m concerned, everyone is free to redistribute Dercuano, in
 whole or in part, modified or unmodified, with or without credit; I
 waive all rights associated with it to the maximum extent possible
 under applicable law.  Where applicable, I abandon its copyright to
-the public domain.  I wrote and published Dercuano in Argentina.
+the public domain.  I wrote and published Dercuano in Argentina in 2019.
 
 The exception to the above public-domain dedication is the ET Book
 font family used, licensed under [the X11
 license](liabilities/LICENSE.ETBook).  This doesn’t impede you from
 redistributing or modifying Dercuano but does prohibit you from
 removing the font’s copyright notice and license (unless you also
-remove the font).
+remove the font).  The PDF embeds part of FreeFont and of the DejaVu
+fonts, [whose copyright notices are also
+included](liabilities/dejavu-copyright), but DejaVu and FreeFont are
+not used in the HTML tarball.
 
-(The source repository also contains some other fonts which are used
-to produce a PDF, but those are not included in the HTML tarball.)
+The note on [Nova RDOS](notes/nova-rdos.html) quotes significant
+amounts of source code from the Data General Nova RDOS operating
+system for the purpose of study and criticism ("I don't know how you
+start designing an operating system in 1977 and screw up the design
+this badly").
 
 ### Gitlab ###
 

@@ -303,7 +303,7 @@ then you can use their Pythagorean sum to precisely compute the energy
 in that frequency component of the signal.
 
 If you’re dumping the decimated samples into a four-sample circular
-buffer x[0], x[1], x[2], x[3], with some incrementing pointer xp:
+buffer x\[0], x\[1], x[2], x[3], with some incrementing pointer xp:
 
     x[xp++ & 3] = new_sample;
 
@@ -311,8 +311,8 @@ Then you could imagine using x[xp], x[xp-1], x[xp-2], and x[xp-3] with
 the appropriate modulo math.  However, this is totally not necessary,
 because you actually don’t care how these sinusoids are aligned with
 the signal; you only care that they are orthogonal.  It’s totally
-valid to compute one phase component as x[0] - x[2] and the other as
-x[1] - x[3] and then compute their Pythagorean sum:
+valid to compute one phase component as x\[0] - x[2] and the other as
+x\[1] - x[3] and then compute their Pythagorean sum:
 
     return pythsum(x[0] - x[2], x[1] - x[3]);
 
