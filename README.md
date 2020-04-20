@@ -96,3 +96,9 @@ Reportlab.  It attempts to use Janos Guljas's
 PyTidyLib wrapper for the W3C's HTML Tidy library if it is
 installed, but if not, it falls back on just using ElementTree's XML
 parser, which is part of the Python standard library.
+
+Errata
+------
+
+Please let me know if you find factual errors or serious oversights in
+Dercuano.
