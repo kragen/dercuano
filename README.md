@@ -103,7 +103,8 @@ Errata
 Please let me know if you find factual errors or serious oversights in
 Dercuano.
 
-The "jellybeans" note entirely omits diodes, other than zeners.
+The "jellybeans" note entirely omits diodes,
+other than zeners and LEDs, nor optocouplers.
 Thanks to an anonymous benefactor for rectifying this serious
-oversight.  Neither does "jellybeans-2016".
+oversight.  So does "jellybeans-2016".
 
