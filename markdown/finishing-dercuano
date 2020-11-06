@@ -1,0 +1,151 @@
+Finishing Dercuano
+==================
+
+Today is the day I'm finishing Dercuano, or, perhaps, giving up on it.
+I could of course continue to add stuff to it indefinitely, but I want
+it to have a definite, unambiguous publication year, and there's only
+one day left in the year, plus a few hours.  I slept six hours this
+afternoon after pulling an all-nighter.  I want to get it done tonight
+so that the publication year doesn't depend on your timezone.
+
+Goaded by John Cowan,
+I've spent the last week hacking together [a terrible piece of shit
+that renders a pile of HTML to a PDF file for reading on hand
+computers][0], as described in file `dercuano-hand-computers`.  The
+result is considerably more readable than the output of a one-week
+HTML-rendering hack has any right to be, and in many ways it's much
+more readable than the PDF output of browsers: it has better margins,
+its font sizes are more readable on hand computers, and links are
+annotated with page numbers so you can follow them (with about 15
+seconds of effort, in hallway user testing) even if your PDF viewer
+doesn't support links, as Google Drive's PDF viewer doesn't.
+
+[0]: https://gitlab.com/kragen/dercuano/blob/master/genpdf.py
+
+There are lots of things I wanted to add to both Dercuano and its PDF
+rendering that I haven't managed to: dynamic models, 3-D models,
+drawings, diagrams, decent formula display, and so on, not to mention
+an endless variety of ideas I hoped to explore further.  Some of these
+things are in fact present in Dercuano itself, but missing from the
+HTML rendering.  File `parabolic-optimization` has a calculation form
+that doesn't work in PDF.  File `mechano-optical-vector-display` and
+file `dercuano-drawings` contain SVG graphics, but I haven't
+implemented an SVG renderer, so they're not in the PDF version.
+*Lots* of notes contain tables which I went to the trouble of
+converting to HTML, but I haven't implemented HTML tables in my PDF
+renderer (whose layout model is impossibly simpleminded) and so
+they're only barely preserved; most of them are comprehensible, while
+a few aren't.  This is what happens when you hack together an HTML
+renderer in a week.
+
+I suppose no plans are realized completely, so when it's too late to
+pursue them further, they all end with some regret.
+
+Nevertheless, I can rest easy knowing that all of this foofaraw has
+been *Published* --- not in the peer-reviewed-research sense, but in
+the sense of being made public, and therefore probably being able to
+survive the inevitable and fairly imminent death of this body, as well
+as serving as prior art ("printed material") for patent purposes.
+
+So, what will this body do next?  After all, it's extremely improbable
+that it will die in the next two days.  Will there be a "Derctuwo"?
+
+I don't know.  I think I'd like to write something that has a little
+more of the nature of a Jupyter notebook and can include a lot of
+colorful illustrations, and that realizes some of the aspirations in
+`book-in-itself`.
+
+Ideas I'm just now getting around to writing down
+-------------------------------------------------
+
+Here are some things I might have written full notes about if I'd
+gotten around to it.
+
+Could you move things around a multitouch acoustic panel, as described
+in file `audio-tablet.md`, using ultrasound, vibrating it under them?
+
+Can you get mobile browsers to open `data:` URLs embedded in QR codes?
+Can you gzip the contents?  Can you stick HTML with `<canvas>` or SVG
+into those files?
+
+Normal build systems like `make` are pretty much theorem provers, but
+they generally only handle monotonic logics: no build artifact is
+conditional on the *absence* of another build artifact, just its
+presence.  But suppose you made a build artifact depend on the result
+of a query; adding new assertions to the database could change the
+result of the query and thus trigger a rebuild.  This could, for
+example, cause Dercuano to build a new version of an HTML file if a
+note gained new topics.
+
+Can you get haptic feedback for piano keys using magnetic braking?
+Normally piano keys move heavy hammers which have a large mechanical
+advantage; can you replicate that with magnetic brakes?
+
+In things like file `principled-apl` I considered something similar to
+normal APL syntax, so `X×Y` would multiply `X` and `Y` elementwise,
+but to sum it you would need `+/X×Y`, meaning `+/(X×Y)`.  For an
+exploratory data analysis UI, this is kind of a suboptimal sequence:
+`+/X` is usually not a good first approximation to `+/X×Y`.  Usually
+you start with `X×Y` and then reduce it, so a postfix `.sum()` (with
+some kind of syntax) is probably better.
+
+Can you get better efficiency in floating point by sharing the same
+exponent among a group of mantissas, perhaps using some kind of CPU
+fault to trigger an exponent change?
+
+Can you build a really simple and cheap spectrum analyzer with a
+wide-range VCO, a mixer, and an STM32 that can digitize half a
+megahertz of bandwidth at any given time?
+
+The usual implementation of a priority queue uses a binary heap, but
+what if you keep the top, say, 8 items insertion-sorted in an array
+instead?  Or the top up-to-8 items?  Maybe that would give you better
+constant factors than always using a binary heap.
+
+This netbook, like many old netbooks, runs on 14 volts.  How hard
+would it be to generate 14 volts at the 800 mW or so it needs with a
+boost converter from a USB power pack?
+
+The standard Android lockscreen snaps your finger's path to a number
+of grid points in order to discretize it and thus make it possible to
+accept or reject a passcode attempt.  Hofstadter's "gridfonts" are
+similarly discretized and are aesthetically interesting letterforms;
+could such an interface be an interesting way to draw gridfont
+letterforms?
+
+The sinc tails of a brickwall bandpass filter's impulse response are
+full of beating (a "carrier frequency" amplitude-modulated by a lower
+"beat frequency"; the "beat frequency" here is the oscillating tail of
+the sinc that is the inverse Fourier transform of the rectangular
+passband in the frequency domain, while the "carrier frequency" is its
+offset from zero, which is an impulse in the frequency domain that's
+been convolved with that pulse to shift it away from zero, and thus is
+multiplied by it in the frequency domain).  Such beating also arises
+by adding two oscillations of different pure frequencies.  Can you
+somehow make a filter that somehow approximates these tails by adding
+together sinusoidal time-domain responses?
+
+Evince (the PDF etc. viewer) remembers where it is in files by
+filename.  This means that if you rename a file, for example to have a
+name other than '3280523.pdf' or 'thesis.pdf', it forgets where it
+was.  The same is true of, for example, F-Droid's Document Viewer.
+Maybe it would be better to use the file size plus some checksums of
+some byte-ranges of the file, rather than the file's name.
+
+How would you make a composite material to resist abrasion?  Making it
+very hard is of course a useful element, but perhaps it's even better
+to mix very hard flakes with a gummy binder that deforms plastically
+instead of splitting off.  Hardened steel works this way, for example,
+as does road asphalt, but you could use many other materials.
+
+A backpack needs to resist a number of different failure modes:
+ultraviolet degradation, water penetration (if it gets soaked and
+everything inside is destroyed by the water, the backpack has failed,
+abrasion, failure by tensile stress, and the zipper wearing out or
+otherwise failing.  You could imagine a backpack with different layers
+for these different failure modes; UHMWPE fiber is great at resisting
+tension, for example, but sucks at resisting ultraviolet, so a layer
+on top of the UHMWPE fiber that protects it from light would be
+useful, and some hard bosses (metal or whatever) could prevent
+abrasion from reaching the softer fabrics.
+
