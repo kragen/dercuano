@@ -108,3 +108,9 @@ other than zeners and LEDs, nor optocouplers.
 Thanks to an anonymous benefactor for rectifying this serious
 oversight.  So does "jellybeans-2016".
 
+The [note on retia mirabilia](notes/capillary-heat-exchanger.html)
+incorrectly claims that Galen discovered retia mirabilia.  [In fact,
+they were known hundreds of years earlier by, for example,
+Herophilos.](https://www.karger.com/Article/FullText/346232 "The
+Neuroanatomy of Herophilus") Thanks to Darius Bacon for the
+correction!
