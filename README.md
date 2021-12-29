@@ -114,3 +114,9 @@ they were known hundreds of years earlier by, for example,
 Herophilos.](https://www.karger.com/Article/FullText/346232 "The
 Neuroanatomy of Herophilus") Thanks to Darius Bacon for the
 correction!
+
+In [Cheap frequency
+detection](notes/cheap-frequency-detection.html#addtoc_11) it says
+that multiplying by 27 requires “three additions: x + (x << 1) + (x <<
+4) + (x << 5).”  The correct expression is x + (x << 1) + (x << 3) +
+(x << 4).  Thanks to Sofia for pointing out the error.
